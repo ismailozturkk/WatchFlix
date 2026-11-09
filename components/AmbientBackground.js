@@ -231,8 +231,9 @@ export function AmbientBlobs({ width, height, blobs, playing, speed = 1, intensi
 
 // Ayar açıkken monte edilen iç parça: odak/uygulama durumu/hareket azaltma
 // abonelikleri yalnız burada kurulur. Ayar KAPALIYKEN 46 ekranın hiçbiri bu
-// abonelikleri taşımaz.
-function AmbientLayer() {
+// abonelikleri taşımaz. Ayarlar > Atmosfer'in telefon önizlemesi de bunu
+// (genel anahtardan bağımsız) doğrudan çizer: aynı leke/renk/saydamlık.
+export function AmbientLayer() {
   const preset = useEffectPreset();
   const { ambientDensity, ambientOpacity = 1 } = useAmbientBackgroundSettings();
   const seed = useDecorSeed();

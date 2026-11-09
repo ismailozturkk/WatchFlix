@@ -116,7 +116,9 @@ function getSharedElement(seed, cols, rows, opacity) {
   return sharedElements.get(key);
 }
 
-function IconPattern({ opacity }) {
+// Ayarlar > Atmosfer'in telefon önizlemesi bunu genel anahtardan bağımsız
+// doğrudan çizer (desen aynı tohumdan, ekran boyutunda; önizleme ölçekler).
+export function IconPattern({ opacity }) {
   const {
     iconBackgroundMode,
     iconBackgroundOpacity = 1,

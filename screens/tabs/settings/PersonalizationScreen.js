@@ -1,29 +1,18 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
-// Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ambiyans arka
-// planı + ikon arka planı (görünürlük + opaklık + düzen). Hub'dan ayrı ekrana
-// taşındı.
+// Ayarlar > Kişiselleştirme. Görsel efekt modu + atmosfer giriş satırı.
+// Atmosfer, ambiyans arka planı ve ikon arka planı ayarları (9 Kas'tan beri
+// hepsi) AtmosphereScreen'de: tek telefon önizlemesinde katmanlı görünürler.
+// Hub'dan ayrı ekrana taşındı.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React from "react";
 import { useNavigation } from "@react-navigation/native";
-import {
-  Animated,
-  View,
-  Text,
-  StyleSheet,
-  PanResponder,
-} from "react-native";
-import SwitchToggle from "@components/SwitchToggle";
+import { View, Text, StyleSheet } from "react-native";
 import AppIcon from "@components/AppIcon";
-import {
-  AmbientPreview,
-  IconPatternPreview,
-  SnowPreview,
-} from "@components/settings/SettingPreviews";
+import { SnowPreview } from "@components/settings/SettingPreviews";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
 import AppIconSection from "@components/settings/AppIconSection";
 import PremiumPill from "@components/premium/PremiumPill";
-import { usePremiumGate } from "@hooks/usePremiumGate";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import {
@@ -38,18 +27,10 @@ import {
   onerilenEffectMode,
   setEffectMode,
   useEffectMode,
-  useEffectPreset,
 } from "@services/effectSettings";
-import { reshuffleDecorSeed } from "@services/decorSeed";
-import * as Haptics from "@services/hapticsService";
-import { i18nText, percentText } from "@utils/i18nText";
-import {
-  AMBIENT_OPACITY_MIN,
-  DECOR_DENSITIES,
-  resolveAmbientBlobCount,
-  resolveIconGrid,
-} from "@utils/decorLayout";
-import { clamp } from "@utils/colorUtils";
+import { i18nText } from "@utils/i18nText";
+import useWeatherSettings from "@hooks/useWeatherSettings";
+import { WEATHER_ICONS, weatherChoiceLabel } from "@components/settings/AtmosphereControls";
 import { isDecorCustomized } from "@utils/decorScopes";
 import { countHiddenSections } from "@utils/sectionVisibility";
 import { alpha } from "@theme/colors";
@@ -61,269 +42,15 @@ import {
 } from "./settingsUi";
 import { fillCopy, getSectionVisibilityCopy } from "./sectionVisibilityCopy";
 import GlassTouchable from "../../../components/common/GlassTouchable";
-import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
-
-// İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
-function OpacitySlider({ value, onChange, colors, min = 0.1 }) {
-  const MIN = min;
-  const MAX = 1;
-  const [trackW, setTrackW] = useState(0);
-  const widthRef = useRef(0);
-  const dragStartXRef = useRef(0);
-  const isDraggingRef = useRef(false);
-  const latestValRef = useRef(value);
-  latestValRef.current = value;
-  const rafIdRef = useRef(null);
-
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
-
-  const thumbAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const lastBoundaryHitRef = useRef(null);
-
-  // Prop değeri değiştiğinde (sürükleme yapılmıyorsa) animasyonlu pozisyonu güncelle
-  useEffect(() => {
-    if (!isDraggingRef.current && trackW > 0) {
-      const r = clamp((value - MIN) / (MAX - MIN), 0, 1);
-      const maxTravel = Math.max(0, trackW - 22);
-      thumbAnim.setValue(r * maxTravel);
-    }
-  }, [value, trackW, thumbAnim]);
-
-  const updatePosition = useCallback(
-    (x, isImmediateCommit = false) => {
-      const w = widthRef.current;
-      if (!w) return;
-      const maxTravel = Math.max(0, w - 22);
-      const clampedRatio = clamp((x - 11) / Math.max(1, maxTravel), 0, 1);
-      const targetX = clampedRatio * maxTravel;
-
-      // 1) Anlık 120 FPS native görsel güncelleme (0ms gecikme)
-      thumbAnim.setValue(targetX);
-
-      // 2) Sınır haptikleri
-      if (clampedRatio === 0 && lastBoundaryHitRef.current !== "min") {
-        lastBoundaryHitRef.current = "min";
-        Haptics.selectionAsync();
-      } else if (clampedRatio === 1 && lastBoundaryHitRef.current !== "max") {
-        lastBoundaryHitRef.current = "max";
-        Haptics.selectionAsync();
-      } else if (clampedRatio > 0.02 && clampedRatio < 0.98) {
-        lastBoundaryHitRef.current = null;
-      }
-
-      const val = MIN + clampedRatio * (MAX - MIN);
-      latestValRef.current = val;
-
-      if (isImmediateCommit) {
-        if (rafIdRef.current) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
-        }
-        changeRef.current?.(val);
-      } else if (!rafIdRef.current) {
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          changeRef.current?.(latestValRef.current);
-        });
-      }
-    },
-    [thumbAnim],
-  );
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        isDraggingRef.current = true;
-        dragStartXRef.current = e.nativeEvent.locationX;
-        updatePosition(e.nativeEvent.locationX, true);
-        Animated.spring(scaleAnim, {
-          toValue: 1.25,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-      onPanResponderMove: (_, g) => {
-        updatePosition(dragStartXRef.current + g.dx, false);
-      },
-      onPanResponderRelease: (_, g) => {
-        isDraggingRef.current = false;
-        updatePosition(dragStartXRef.current + g.dx, true);
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        isDraggingRef.current = false;
-        if (rafIdRef.current) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
-        }
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-    }),
-  ).current;
-
-  const ratio = clamp((value - MIN) / (MAX - MIN), 0, 1);
-
-  return (
-    <View
-      {...pan.panHandlers}
-      onLayout={(e) => {
-        const w = e.nativeEvent.layout.width;
-        widthRef.current = w;
-        setTrackW(w);
-      }}
-      style={ps.opacitySliderContainer}
-      hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-    >
-      <View
-        pointerEvents="none"
-        style={[
-          ps.opacityTrackBg,
-          { backgroundColor: colors.cardAlt, borderColor: colors.border },
-        ]}
-      >
-        <View
-          style={[
-            ps.opacityFill,
-            { width: ratio * trackW, backgroundColor: colors.accent },
-          ]}
-        />
-      </View>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          ps.opacityThumb,
-          {
-            backgroundColor: colors.accent,
-            borderColor: colors.white,
-            transform: [
-              { translateX: thumbAnim },
-              { scale: scaleAnim },
-            ],
-          },
-        ]}
-      />
-    </View>
-  );
-}
-
-const DENSITY_LABELS = {
-  auto: () => i18nText("autoI18n.dekor_yogunluk_otomatik", "Otomatik"),
-  low: () => i18nText("autoI18n.dekor_yogunluk_az", "Az"),
-  medium: () => i18nText("autoI18n.dekor_yogunluk_orta", "Orta"),
-  high: () => i18nText("autoI18n.dekor_yogunluk_cok", "Çok"),
-};
-
-// Yoğunluk seçici: kartın ORTASINDA durduğu için alt köşe yuvarlaması yok
-// (kart sonundaki "Düzen" segmentinden farkı bu).
-function DensitySegment({ value, onChange, colors }) {
-  return (
-    <View
-      accessibilityRole="radiogroup"
-      style={[ps.densitySegment, { backgroundColor: colors.cardAlt, borderColor: colors.border }]}
-    >
-      {DECOR_DENSITIES.map((d) => {
-        const active = value === d;
-        return (
-          <GlassTouchable
-            key={d}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: active }}
-            style={[ps.segOpt, active && { backgroundColor: colors.accent }]}
-            onPress={() => {
-              if (active) return;
-              Haptics.selectionAsync();
-              onChange(d);
-            }}
-            activeOpacity={0.7}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[
-                ps.segText,
-                { color: active ? colors.white : colors.muted, fontWeight: active ? "700" : "500" },
-              ]}
-            >
-              {DENSITY_LABELS[d]()}
-            </Text>
-          </GlassTouchable>
-        );
-      })}
-    </View>
-  );
-}
-
-// Başlık (ikon + başlık + alt yazı + sağda rozet) + altında kontrol.
-function ControlBlock({
-  colors,
-  iconName,
-  iconFamily,
-  iconBg,
-  iconColor,
-  title,
-  subtitle,
-  badge,
-  children,
-}) {
-  return (
-    <View style={[ps.iconBgOpacity, { borderBottomColor: colors.borderMuted }]}>
-      <View style={ps.iconBgModeHeader}>
-        <View style={[ps.iconWrap, { backgroundColor: iconBg }]}>
-          <AppIcon family={iconFamily} name={iconName} size={16} color={iconColor} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text allowFontScaling={false} style={[ps.rowTitle, { color: colors.text }]}>
-            {title}
-          </Text>
-          <Text allowFontScaling={false} style={[ps.rowSub, { color: colors.muted }]}>
-            {subtitle}
-          </Text>
-        </View>
-        {badge != null ? (
-          <View style={[ps.qualityBadge, { backgroundColor: colors.accentDim }]}>
-            <Text
-              allowFontScaling={false}
-              style={[ps.qualityBadgeText, { color: colors.accentStrong }]}
-            >
-              {badge}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={ps.iconBgSliderWrap}>{children}</View>
-    </View>
-  );
-}
 
 export default function PersonalizationScreen() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
-  const { showSnow, snowAllowed, changeShowSnow } = useSnowSettings();
-  const {
-    showAmbientBackground,
-    ambientAllowed,
-    changeShowAmbientBackground,
-    ambientDensity,
-    changeAmbientDensity,
-    ambientOpacity,
-    changeAmbientOpacity,
-  } = useAmbientBackgroundSettings();
-  const effectPreset = useEffectPreset();
+  const { showSnow, snowAllowed } = useSnowSettings();
+  const { choice: weatherChoice, effect: weatherEffect } = useWeatherSettings();
+  const { showAmbientBackground } = useAmbientBackgroundSettings();
+  const { showIconBackground } = useIconBackgroundSettings();
   const { decorHidden } = useDecorScopeSettings();
   // Ekran bölümleri: gizlenen bölüm sayısı satırdaki rozeti besler. "Devam Edenler"in
   // kendi ayarı (Dil ve içerik) de aynı listeye girdiği için o da sayılır.
@@ -333,39 +60,8 @@ export default function PersonalizationScreen() {
   const hiddenSectionCount =
     countHiddenSections(sectionsHidden) + (showOngoingTvShows === false ? 1 : 0);
   const navigation = useNavigation();
-  const {
-    showIconBackground,
-    iconBackgroundAllowed,
-    changeShowIconBackground,
-    iconBackgroundMode,
-    changeIconBackgroundMode,
-    iconBackgroundOpacity,
-    changeIconBackgroundOpacity,
-    iconBackgroundDensity,
-    changeIconBackgroundDensity,
-  } = useIconBackgroundSettings();
-  const iconGrid = resolveIconGrid(iconBackgroundDensity, effectPreset);
-  const ambientBlobCount = resolveAmbientBlobCount(ambientDensity, effectPreset);
-  // Desen tohumu ikon yerleşimini ve ambiyans renklerini birlikte belirler.
-  const showRegenerate = showIconBackground || showAmbientBackground;
-  const regenerateBackground = useCallback(() => {
-    Haptics.selectionAsync();
-    reshuffleDecorSeed();
-  }, []);
-
-  // Kar, ambiyans ve ikon arka planı Premium'da. Free kullanıcıda anahtar KİLİTLİ
-  // ve kapalı çizilir (bkz. AppSettingsContext: kayıtlı tercih silinmez, yalnız
-  // çizilen değer kapanır); dokununca anahtar oynamaz, yükseltme sayfası gelir
-  // (bkz. SwitchToggle `locked`). Satırın kendisine basmak da aynı yere götürür.
-  const snowGate = usePremiumGate("snow_effect");
-  const ambientGate = usePremiumGate("ambient_background");
-  const iconBackgroundGate = usePremiumGate("icon_background");
-  const openSnowUpsell = useCallback(() => snowGate.showUpsell(), [snowGate]);
-  const openAmbientUpsell = useCallback(() => ambientGate.showUpsell(), [ambientGate]);
-  const openIconBackgroundUpsell = useCallback(
-    () => iconBackgroundGate.showUpsell(),
-    [iconBackgroundGate],
-  );
+  // Atmosfer satırının alt yazısı için: açık arka plan katmanı sayısı.
+  const layerCount = (showAmbientBackground ? 1 : 0) + (showIconBackground ? 1 : 0);
 
   // Görsel efekt modu. Cihaz sınıfı yalnız varsayılanı seçer; burada kullanıcı
   // kendi dengesini kurar (bkz. utils/deviceTier.js, services/effectSettings.js).
@@ -555,237 +251,40 @@ export default function PersonalizationScreen() {
           { backgroundColor: C.card, borderColor: C.border },
         ]}
       >
-        {/* Kar KAPALIYKEN satırın zemininde önizleme yağar: kullanıcı açmadan
-            önce ne alacağını görür. AÇIKKEN önizleme yok — kar zaten tüm
-            ekranda yağıyor, ikinci bir Lottie boşuna maliyet. O durumda ikon da
-            kar tanesi değil kar küreme makinesi: satırın işlevi artık "aç"
-            değil "temizle". */}
+        {/* Atmosfer kendi ekranında (Ayarlar > Atmosfer): telefon önizlemesi +
+            efekt, yoğunluk, türe göre + ambiyans ve ikon arka planı katmanları.
+            Burada yalnız giriş satırı; alt yazı açık katmanları da sayar. KAPALIYKEN
+            satırın zemininde seçili efektin önizlemesi akar; AÇIKKEN efekt
+            zaten tüm ekranda, ikinci katman boşuna maliyet. */}
         <SettingRow
           colors={C}
           iconBg={C.iconTeal}
           iconColor={C.teal}
-          iconFamily={showSnow ? "MaterialCommunityIcons" : "Ionicons"}
-          iconName={showSnow ? "bulldozer" : "snow-outline"}
+          iconFamily={WEATHER_ICONS[weatherChoice].family}
+          iconName={WEATHER_ICONS[weatherChoice].name}
           title={t.snow}
-          subtitle={t.snowSubtitle}
-          onPress={snowAllowed ? undefined : openSnowUpsell}
+          subtitle={[
+            showSnow
+              ? weatherChoiceLabel(weatherChoice, weatherEffect)
+              : `${i18nText("autoI18n.efekt_kapali", "Kapalı")} · ${weatherChoiceLabel(weatherChoice, weatherEffect)}`,
+            layerCount > 0
+              ? i18nText("autoI18n.atmosfer_katman_sayisi", "+{{n}} arka plan katmanı", {
+                  n: layerCount,
+                }).replace("{{n}}", String(layerCount))
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          onPress={() => navigation.navigate("AtmosphereScreen")}
+          last
           background={showSnow ? null : <SnowPreview />}
           right={
             <View style={ps.rowRightGroup}>
               {snowAllowed ? null : <PremiumPill />}
-              <SwitchToggle
-                value={showSnow}
-                onValueChange={changeShowSnow}
-                locked={!snowAllowed}
-                onLockedPress={openSnowUpsell}
-                size={36}
-              />
+              <Chevron color={C.muted} />
             </View>
           }
         />
-        {/* Ambiyans da Premium'da (kar ve ikon arka planıyla aynı kural): Free'de
-            anahtar kilitli, satıra basmak yükseltme sayfasını açar. Kar gibi
-            KAPALIYKEN satırın zemininde (aynı renklerle) süzülen lekeler görünür
-            — Free kullanıcı da ne alacağını görür; AÇIKKEN ekranın tamamı zaten
-            ambiyans olduğundan önizleme çizilmez. Bulanıklık gerçek blur değil,
-            yumuşak kenarlı degrade — bu yüzden Efektler "Kapalı" modunda da
-            çalışır, yalnız leke sayısı azalır ve hareket yavaşlar. */}
-        <SettingRow
-          colors={C}
-          iconBg={C.iconPurple}
-          iconColor={C.purple}
-          iconName={showAmbientBackground ? "prism" : "prism-outline"}
-          title={t.ambientBackground}
-          subtitle={t.ambientBackgroundSubtitle}
-          onPress={ambientAllowed ? undefined : openAmbientUpsell}
-          background={showAmbientBackground ? null : <AmbientPreview />}
-          right={
-            <View style={ps.rowRightGroup}>
-              {ambientAllowed ? null : <PremiumPill />}
-              <SwitchToggle
-                value={showAmbientBackground}
-                onValueChange={changeShowAmbientBackground}
-                locked={!ambientAllowed}
-                onLockedPress={openAmbientUpsell}
-                size={36}
-              />
-            </View>
-          }
-        />
-        {/* Ambiyans açıkken: leke sayısı (yoğunluk) + saydamlık. Leke sayısı
-            doğrudan çizim maliyeti; "Otomatik" efekt modunu izler. */}
-        {showAmbientBackground ? (
-          <>
-            <ControlBlock
-              colors={C}
-              iconName="color-filter-outline"
-              iconBg={C.iconPurple}
-              iconColor={C.purple}
-              title={i18nText("autoI18n.ambiyans_yogunluk_baslik", "Ambiyans yoğunluğu")}
-              subtitle={i18nText(
-                "autoI18n.ambiyans_yogunluk_alt",
-                "Işık lekesi sayısı · {{n}} leke",
-                { n: ambientBlobCount },
-              ).replace("{{n}}", String(ambientBlobCount))}
-            >
-              <DensitySegment
-                value={ambientDensity}
-                onChange={changeAmbientDensity}
-                colors={C}
-              />
-            </ControlBlock>
-            <ControlBlock
-              colors={C}
-              iconName="contrast-outline"
-              iconBg={C.iconPurple}
-              iconColor={C.purple}
-              title={i18nText("autoI18n.ambiyans_saydamlik_baslik", "Ambiyans saydamlığı")}
-              subtitle={i18nText(
-                "autoI18n.ambiyans_saydamlik_alt",
-                "Renklerin ne kadar belirgin olacağı",
-              )}
-              badge={percentText(Math.round((ambientOpacity ?? 1) * 100), language)}
-            >
-              <OpacitySlider
-                value={ambientOpacity ?? 1}
-                onChange={changeAmbientOpacity}
-                colors={C}
-                min={AMBIENT_OPACITY_MIN}
-              />
-            </ControlBlock>
-          </>
-        ) : null}
-        {/* Desen önizlemesi hem açık hem kapalıyken durur: statik ve ucuz,
-            ayrıca ayar açıkken de "şu an bu desen kullanılıyor" bilgisini
-            veriyor. Sabit opaklık kullanılıyor — buradaki iş deseni
-            tanıtmak; opaklığın kendisinin ayarı aşağıdaki kaydırıcıda. */}
-        <SettingRow
-          colors={C}
-          iconBg={C.iconBlue}
-          iconColor={C.blue}
-          iconName={showIconBackground ? "image-outline" : "image-sharp"}
-          title={t.iconBackground}
-          subtitle={t.iconBackgroundSubtitle}
-          onPress={iconBackgroundAllowed ? undefined : openIconBackgroundUpsell}
-          last={!showIconBackground}
-          background={<IconPatternPreview opacity={0.35} fadeColor={C.card} />}
-          right={
-            <View style={ps.rowRightGroup}>
-              {iconBackgroundAllowed ? null : <PremiumPill />}
-              <SwitchToggle
-                value={showIconBackground}
-                onValueChange={changeShowIconBackground}
-                locked={!iconBackgroundAllowed}
-                onLockedPress={openIconBackgroundUpsell}
-                size={36}
-              />
-            </View>
-          }
-        />
-        {showIconBackground && (
-          <>
-            <View style={[ps.iconBgOpacity, { borderBottomColor: C.borderMuted }]}>
-              <View style={ps.iconBgModeHeader}>
-                <View style={[ps.iconWrap, { backgroundColor: C.iconPurple }]}>
-                  <AppIcon name="contrast-outline" size={16} color={C.purple} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text allowFontScaling={false} style={[ps.rowTitle, { color: C.text }]}>
-                    {t.iconBackgroundOpacity}
-                  </Text>
-                  <Text allowFontScaling={false} style={[ps.rowSub, { color: C.muted }]}>
-                    {t.iconBackgroundOpacitySubtitle}
-                  </Text>
-                </View>
-                <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[ps.qualityBadgeText, { color: C.accentStrong }]}
-                  >
-                    {percentText(Math.round((iconBackgroundOpacity ?? 1) * 100), language)}
-                  </Text>
-                </View>
-              </View>
-              <View style={ps.iconBgSliderWrap}>
-                <OpacitySlider
-                  value={iconBackgroundOpacity ?? 1}
-                  onChange={changeIconBackgroundOpacity}
-                  colors={C}
-                />
-              </View>
-            </View>
-
-            {/* Öğe sayısı = ekran başına görsel görünümü sayısı (12–45). */}
-            <ControlBlock
-              colors={C}
-              iconFamily="MaterialCommunityIcons"
-              iconName="dots-grid"
-              iconBg={C.iconBlue}
-              iconColor={C.blue}
-              title={i18nText("autoI18n.ikon_yogunluk_baslik", "İçerik yoğunluğu")}
-              subtitle={i18nText(
-                "autoI18n.ikon_yogunluk_alt",
-                "Daha az ikon daha hafif çizilir · {{n}} ikon",
-                { n: iconGrid.cols * iconGrid.rows },
-              ).replace("{{n}}", String(iconGrid.cols * iconGrid.rows))}
-            >
-              <DensitySegment
-                value={iconBackgroundDensity}
-                onChange={changeIconBackgroundDensity}
-                colors={C}
-              />
-            </ControlBlock>
-
-            <View style={ps.iconBgMode}>
-              <View style={ps.iconBgModeHeader}>
-                <View style={[ps.iconWrap, { backgroundColor: C.iconBlue }]}>
-                  <AppIcon family="MaterialCommunityIcons" name="view-grid-outline" size={16} color={C.blue} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text allowFontScaling={false} style={[ps.rowTitle, { color: C.text }]}>
-                    {t.iconBackgroundLayout}
-                  </Text>
-                  <Text allowFontScaling={false} style={[ps.rowSub, { color: C.muted }]}>
-                    {iconBackgroundMode === "random"
-                      ? t.iconBackgroundRandomHint
-                      : t.iconBackgroundSharedHint}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  ps.segment,
-                  { backgroundColor: C.cardAlt, borderTopColor: C.border },
-                ]}
-              >
-                {[
-                  { value: "shared", label: t.iconBackgroundShared },
-                  { value: "random", label: t.iconBackgroundRandom },
-                ].map((o) => {
-                  const active = iconBackgroundMode === o.value;
-                  return (
-                    <GlassTouchable
-                      key={o.value}
-                      style={[ps.segOpt, active && { backgroundColor: C.accent }]}
-                      onPress={() => changeIconBackgroundMode(o.value)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          ps.segText,
-                          { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
-                        ]}
-                      >
-                        {o.label}
-                      </Text>
-                    </GlassTouchable>
-                  );
-                })}
-              </View>
-            </View>
-          </>
-        )}
       </View>
 
       {/* Efektlerin HANGİ ekran gruplarında görüneceği ayrı sayfada (bkz.
@@ -797,30 +296,6 @@ export default function PersonalizationScreen() {
           { backgroundColor: C.card, borderColor: C.border },
         ]}
       >
-        {showRegenerate ? (
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName="shuffle-outline"
-            title={i18nText("autoI18n.dekor_yeniden_baslik", "Arka planı yeniden oluştur")}
-            subtitle={i18nText(
-              "autoI18n.dekor_yeniden_alt",
-              "Desen ve ambiyans renkleri bir kez üretilir, her ekranda aynısı kullanılır",
-            )}
-            onPress={regenerateBackground}
-            right={
-              <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
-                <Text
-                  allowFontScaling={false}
-                  style={[ps.qualityBadgeText, { color: C.accentStrong }]}
-                >
-                  {i18nText("autoI18n.dekor_yeniden_dugme", "Yenile")}
-                </Text>
-              </View>
-            }
-          />
-        ) : null}
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -968,77 +443,6 @@ const ps = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
-  iconBgMode: { paddingTop: 13 },
-  iconBgModeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  iconBgOpacity: {
-    paddingTop: 13,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  iconBgSliderWrap: { paddingHorizontal: 16 },
   qualityBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   qualityBadgeText: { fontSize: 11, fontWeight: "700" },
-  opacitySliderContainer: {
-    height: 32,
-    justifyContent: "center",
-  },
-  opacityTrackBg: {
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: "hidden",
-    justifyContent: "center",
-  },
-  opacityFill: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    opacity: 0.35,
-  },
-  opacityThumb: {
-    position: "absolute",
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 3,
-    top: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  // Kart kırpıyor (overflow): seçili cam seçenek basılınca kartın yan/alt sınırında
-  // kesilmesin diye o kenarlarda GLASS_PRESS_ROOM.
-  segment: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    paddingTop: 4,
-    paddingHorizontal: GLASS_PRESS_ROOM,
-    paddingBottom: GLASS_PRESS_ROOM,
-    gap: 2,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-  },
-  segOpt: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  segText: { fontSize: 11, textAlign: "center" },
-  densitySegment: {
-    flexDirection: "row",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 3,
-    gap: 2,
-  },
 });

@@ -33,19 +33,22 @@
 //           paneli yalnız ["icon"] ister: dar/kaydırmalı alanda kar ve ambiyans
 //           dikkat dağıtıyordu.
 
+//   genres  detay ekranları: yapımın TMDB türleri (id, {id,name} ya da ad).
+//           "Detaylarda türe göre" açıksa atmosfer bu türlerin karışımı olur.
+
 import React from "react";
 import AmbientBackground from "./AmbientBackground";
 import IconBacground from "./IconBacground";
 import ScreenSnow from "./ScreenSnow";
 import useDecorVisibility from "../hooks/useDecorVisibility";
 
-function ScreenDecor({ iconOpacity = 0.5, scope, effects }) {
+function ScreenDecor({ iconOpacity = 0.5, scope, effects, genres }) {
   const show = useDecorVisibility(scope, effects);
   return (
     <>
       {show.ambient ? <AmbientBackground /> : null}
       {show.icon ? <IconBacground opacity={iconOpacity} /> : null}
-      {show.snow ? <ScreenSnow /> : null}
+      {show.snow ? <ScreenSnow genres={genres} /> : null}
     </>
   );
 }

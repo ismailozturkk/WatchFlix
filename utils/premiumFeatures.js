@@ -859,19 +859,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "snow",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Kar animasyonu", en: "Snow animation", es: "Animación de nieve", pt: "Animação de neve", de: "Schneeanimation" },
+    // Kimlik tarihsel olarak "snow_effect"; kapsamı artık tüm atmosfer efektleri.
+    title: { tr: "Atmosfer efektleri", en: "Atmosphere effects", es: "Efectos de atmósfera", pt: "Efeitos de atmosfera", de: "Atmosphäre-Effekte" },
     upsell: {
-      title: { tr: "Kar yağışı Premium'da", en: "Snowfall is a Premium perk", es: "La nevada es una ventaja Premium", pt: "A nevasca é um benefício Premium", de: "Schneefall ist ein Premium-Vorteil" },
+      title: { tr: "Atmosfer efektleri Premium'da", en: "Atmosphere effects are a Premium perk", es: "Los efectos de atmósfera son una ventaja Premium", pt: "Os efeitos de atmosfera são um benefício Premium", de: "Atmosphäre-Effekte sind ein Premium-Vorteil" },
       message: {
-        tr: "Ekranlarının üzerine hafif hafif kar yağdır.",
-        en: "Let a gentle snowfall drift across your screens.",
-        es: "Deja que una suave nevada caiga sobre tus pantallas.",
-        pt: "Deixe uma neve suave cair sobre as suas telas.",
-        de: "Lass sanften Schneefall über deine Bildschirme treiben.",
+        tr: "Kar, fırtına, kuzey ışıkları, patlamış mısır, kelebek ve daha fazlası ekranlarının arkasında; detaylarda yapımın türüne göre.",
+        en: "Snow, storms, northern lights, popcorn, butterflies and more behind your screens, matched to the genre on details.",
+        es: "Nieve, tormentas, auroras, palomitas, mariposas y más detrás de tus pantallas, según el género en los detalles.",
+        pt: "Neve, tempestades, aurora boreal, pipoca, borboletas e mais atrás das suas telas, conforme o gênero nos detalhes.",
+        de: "Schnee, Gewitter, Polarlichter, Popcorn, Schmetterlinge und mehr hinter deinen Bildschirmen, in Details passend zum Genre.",
       },
     },
     freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
-    paidValue: { tr: "Kar yağışı", en: "Snowfall", es: "Nevada", pt: "Neve", de: "Schneefall" },
+    paidValue: { tr: "20 atmosfer efekti + türe göre", en: "20 atmosphere effects + by genre", es: "20 efectos de atmósfera + por género", pt: "20 efeitos de atmosfera + por gênero", de: "20 Atmosphäre-Effekte + nach Genre" },
   }),
   ambient_background: feature({
     id: "ambient_background",

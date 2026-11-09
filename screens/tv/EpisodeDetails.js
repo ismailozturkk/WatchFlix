@@ -271,7 +271,7 @@ export default function EpisodeDetails({ route, navigation }) {
           { marginTop: -heroMetrics.contentOverlap },
         ]}
       >
-        <ScreenDecor scope="details" iconOpacity={0.25} />
+        <ScreenDecor scope="details" iconOpacity={0.25} genres={genres} />
 
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>

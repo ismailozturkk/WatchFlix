@@ -9,12 +9,12 @@
 // kendi metin/anahtar katmanı üstte kalır. Kırpma satırda yapılır (bkz.
 // settingsUi.SettingRow → background verildiğinde overflow:"hidden").
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { alpha } from "../../theme/colors";
-import LottieView from "lottie-react-native";
+import WeatherLayer from "../decor/WeatherLayer";
 
 import useAppActive from "../../hooks/useAppActive";
 import useReduceMotion from "../../hooks/useReduceMotion";
@@ -30,44 +30,43 @@ import {
 } from "../IconBacground";
 
 /**
- * Kar önizlemesi: satırın zemininde dönen küçük Lottie.
+ * Hava efekti önizlemesi: satırın zemininde, SEÇİLİ türün (kar/yaprak/...)
+ * küçültülmüş hali. Satır ölçülür, parçacık sayısı alanla orantılıdır.
  *
- * Ayar AÇIKKEN kullanılmaz — o durumda kar zaten tüm ekranda yağıyor, satırda
- * ikinci bir Lottie kurmak boşuna maliyet olurdu (bkz. PersonalizationScreen).
+ * Ayar AÇIKKEN kullanılmaz — o durumda efekt zaten tüm ekranda, satırda ikinci
+ * bir katman kurmak boşuna maliyet olurdu (bkz. PersonalizationScreen).
  */
 // Opaklıklar bilerek düşük: önizleme satırın METNİNİN ARKASINDA duruyor,
 // başlık/alt başlık her temada okunur kalmalı.
 export function SnowPreview({ opacity = 0.6 }) {
   const reduceMotion = useReduceMotion();
   const appActive = useAppActive();
-  const lottieRef = useRef(null);
-
-  // Arka planda dönen animasyon çizilmez ama zamanlayıcısı çalışır; durdur.
-  useEffect(() => {
-    const lottie = lottieRef.current;
-    if (!lottie) return;
-    if (appActive) lottie.resume?.();
-    else lottie.pause?.();
-  }, [appActive]);
+  const [size, setSize] = useState(null);
 
   // "Hareketi Azalt" açıkken hiç çizilmez: önizleme de bir animasyondur.
   if (reduceMotion) return null;
 
   return (
-    <View style={[styles.fill, { opacity }]} pointerEvents="none">
-      <LottieView
-        ref={lottieRef}
-        style={styles.fill}
-        source={require("@lottie/snow.json")}
-        autoPlay
-        loop
-        // Kompozisyon tam ekran oranında: "contain" olsaydı 60px'lik şeride
-        // sığdırmak için ortada dar bir sütuna büzülürdü. "cover" satırın
-        // genişliğini doldurup dikeyde kırpıyor.
-        resizeMode="cover"
-        // Tam ekran karla aynı hızda akınca dar şeritte telaşlı görünüyor.
-        speed={0.6}
-      />
+    <View
+      style={[styles.fill, { opacity }]}
+      pointerEvents="none"
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((prev) =>
+          prev && prev.width === width && prev.height === height ? prev : { width, height },
+        );
+      }}
+    >
+      {size ? (
+        <WeatherLayer
+          preview
+          width={size.width}
+          height={size.height}
+          playing={appActive}
+          // Tam ekranla aynı hızda akınca dar şeritte telaşlı görünüyor.
+          speedScale={0.6}
+        />
+      ) : null}
     </View>
   );
 }

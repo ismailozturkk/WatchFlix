@@ -134,13 +134,16 @@ export function SettingsSubScreen({
   children,
   background = null,
   scrollable = true,
+  // Bu ekranın çizebildiği dekor efektleri (ScreenDecor `effects`). Atmosfer
+  // ekranı tam ekran atmosferi çizmez: önizlemesi zaten aynı efekti gösterir.
+  decorEffects,
 }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const C = buildUiColors(theme);
   return (
     <View style={[ui.root, { backgroundColor: C.bg }]}>
-      <ScreenDecor scope="settings" iconOpacity={0.15} />
+      <ScreenDecor scope="settings" iconOpacity={0.15} effects={decorEffects} />
       {background}
       <View style={[ui.header, { paddingTop: insets.top + 8 }]}>
         <BackButton absolute={false} />
