@@ -4,9 +4,9 @@ import {
   Text,
   View,
   Image,
-  TouchableOpacity,
   Animated,
   InteractionManager,
+  useWindowDimensions,
 } from "react-native";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -83,11 +83,14 @@ const TopBar = ({ children }) => (
 // Izgara boyutu seçici: panelin içinden çıkıp üst çubuğa taşındı (panelin sağ
 // kenarındaki dikey yığın, seçili bölümde kapat düğmesiyle çakışmasın diye
 // `top: 44` kaydırması gerektiriyordu).
-const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, theme }) {
+// `compact`: dikey düzende kartın solundaki dar rayda (bkz. RAIL_* sabitleri).
+const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, theme, vertical = false, compact = false }) {
   return (
     <View
       style={[
         styles.modeSwitch,
+        vertical && styles.modeSwitchVertical,
+        compact && styles.modeSwitchCompact,
         { backgroundColor: theme.secondary, borderColor: theme.border },
       ]}
     >
@@ -103,13 +106,14 @@ const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, 
             hitSlop={3}
             style={({ pressed }) => [
               styles.modeBtn,
+              compact && styles.modeBtnCompact,
               active && { backgroundColor: theme.accent },
               pressed && !active && styles.modeBtnPressed,
             ]}
           >
             <Ionicons
               name={option.icon}
-              size={16}
+              size={compact ? 15 : 16}
               color={active ? "#fff" : theme.text.primary}
             />
           </GlassPressable>
@@ -150,23 +154,28 @@ const SkeletonLoading = ({ theme }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <TopBar />
-      <Animated.View style={[styles.skeletonBody, { opacity }]}>
-        <View
+      <View style={styles.headRow}>
+        <View style={styles.headRail}>
+          <BackButton absolute={false} size={RAIL_BTN} fallbackRadius={10} />
+        </View>
+        <Animated.View
           style={[
             styles.infoPanelWrapper,
+            styles.infoPanelWrapperHead,
             styles.skeletonPanel,
-            { backgroundColor: theme.secondary },
+            { backgroundColor: theme.secondary, opacity },
           ]}
         >
-          <View style={block(90, 130, 10)} />
-          <View style={{ flex: 1, marginLeft: 14, gap: 10 }}>
-            <View style={block(180, 22)} />
-            <View style={block(120, 14)} />
-            <View style={block(80, 18)} />
-            <View style={block(140, 12)} />
+          <View style={block(POSTER_W, POSTER_H, 8)} />
+          <View style={{ flex: 1, marginLeft: 12, gap: 8 }}>
+            <View style={block(150, 18)} />
+            <View style={block(110, 12)} />
+            <View style={block(80, 20)} />
+            <View style={block(130, 10)} />
           </View>
-        </View>
+        </Animated.View>
+      </View>
+      <Animated.View style={[styles.skeletonBody, { opacity }]}>
         <View style={styles.skeletonGrid}>
           {Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
@@ -207,6 +216,10 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
+  // Yatay (genişlik > yükseklik): butonlar sol rayda sütun, bilgi kartı yanında,
+  // ızgara sağda tüm yükseklikte. Dikey: üst çubuk + kompakt kart + ızgara.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const wide = windowWidth > windowHeight;
   const { getTmdbUrl } = useImageQualitySettings();
   const posterUri = usePosterUri();
   const backdropUri = useBackdropUri();
@@ -462,234 +475,260 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // Paylaş + ızgara boyutu her iki düzende de geri düğmesinin altında SÜTUN:
+  // dikeyde bilgi kartının solunda dar ray (kartla aynı boy), yatayda ekran boyu ray.
+  const shareButton = graphShare ? (
+    <GlassIconButton
+      icon="share-outline"
+      iconSize={18}
+      size={wide ? 40 : RAIL_BTN}
+      fallbackRadius={wide ? 12 : 10}
+      color={theme.text.primary}
+      accessibilityLabel={i18nText("autoI18n.tvgraph_paylas", "Grafiği paylaş")}
+      onPress={() => setShareOpen(true)}
+      testID="tvgraph-share-button"
+    />
+  ) : null;
+  const modeSwitch = (
+    <GridModeSwitch
+      options={gridOptions}
+      value={gridMode}
+      onChange={handleGridModeChange}
+      theme={theme}
+      vertical
+      compact={!wide}
+    />
+  );
+
+  const closeSelectedEpisode = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedEpisode(null);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const openEpisodeDetails = () => {
+    // EpisodeDetails bu meta'yı WatchedAdd → markEpisodes'a
+    // iletir; eksik gönderilirse ilk işaretlemede watchedTv
+    // dokümanı boş adla/0 bölüm sayısıyla oluşur ve sonraki
+    // işaretlemeler bu meta'yı bir daha onarmaz.
+    const seasonMeta = showDetail?.seasons?.find(
+      (s) => s.season_number === selectedEpisode.season,
+    );
+    navigation.navigate("EpisodeDetails", {
+      showId: id,
+      seasonNumber: selectedEpisode.season,
+      episodeNumber: selectedEpisodeData.episode_number,
+      showName: showDetail?.name || "",
+      showEpisodeCount: showDetail?.number_of_episodes || 0,
+      showSeasonCount: showDetail?.number_of_seasons || 0,
+      seasonEpisodes: seasonMeta?.episode_count || 0,
+      showPosterPath: showDetail?.poster_path || null,
+      seasonPosterPath: seasonMeta?.poster_path || null,
+      genres: showDetail?.genres?.map((g) => g.name) || [],
+    });
+  };
+
+  const episodeColors =
+    selectedEpisodeData?.vote_average > 0
+      ? getRatingColors(selectedEpisodeData.vote_average)
+      : null;
+
+  // ── Üst Bilgi Paneli ──
+  // Dikey: SABİT yükseklikli yatay kart (PANEL_HEIGHT) — içerik değişince ızgara
+  // oynamasın. Yatay: sol rayın yanında, ekran boyu dikey kart (görsel üstte,
+  // bilgiler altta); ızgara sağda tüm yüksekliği kullanır.
+  const infoPanel = (
+    <View style={[styles.infoPanelWrapper, wide ? styles.infoPanelWrapperWide : styles.infoPanelWrapperHead]}>
+      {/* Backdrop */}
+      <Image
+        source={{
+          uri: selectedEpisodeData?.still_path
+            ? getTmdbUrl(selectedEpisodeData.still_path, 'backdrop', 1000)
+            : backdropUri("tv", showDetail.id, showDetail.backdrop_path),
+        }}
+        style={styles.panelBackdrop}
+        blurRadius={1}
+      />
+      <View style={styles.panelOverlay} />
+
+      <Animated.View
+        style={[
+          styles.infoPanelContainer,
+          wide && styles.infoPanelContainerWide,
+          { opacity: fadeAnim },
+        ]}
+      >
+        {/* Afiş / bölüm görseli — dikeyde SABİT genişlikli yuva: metin sütununun
+            sol kenarı seçimde sağa sola oynamaz. */}
+        <View style={[styles.panelMediaSlot, wide && styles.panelMediaSlotWide]}>
+          <Image
+            source={{
+              uri: selectedEpisodeData?.still_path
+                ? getTmdbUrl(selectedEpisodeData.still_path, wide ? 'backdrop' : 'poster', wide ? 500 : 200)
+                : posterUri("tv", showDetail.id, showDetail.poster_path),
+            }}
+            style={
+              selectedEpisodeData
+                ? [styles.panelStill, wide && styles.panelStillWide]
+                : [styles.panelPoster, wide && styles.panelPosterWide]
+            }
+          />
+        </View>
+
+        {/* Bilgiler */}
+        <View style={[styles.panelInfo, wide && styles.panelInfoWide]}>
+          {selectedEpisodeData ? (
+            // ── Bölüm Bilgisi ── (tarih rozet satırında: ayrı satır yok)
+            <>
+              <View style={styles.panelBadgeRow}>
+                <View style={[styles.badge, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
+                  <Text style={styles.badgeText}>
+                    S{selectedEpisode.season} · E{selectedEpisode.index + 1}
+                  </Text>
+                </View>
+                {selectedEpisodeData.runtime > 0 && (
+                  <View style={[styles.badge, { backgroundColor: "rgba(255,255,255,0.1)" }]}>
+                    <Text style={styles.badgeText}>
+                      {selectedEpisodeData.runtime} {t.minutes}
+                    </Text>
+                  </View>
+                )}
+                {selectedEpisodeData.air_date ? (
+                  <Text style={styles.badgeDate} numberOfLines={1}>
+                    {selectedEpisodeData.air_date}
+                  </Text>
+                ) : null}
+              </View>
+
+              <Text style={styles.panelTitle} numberOfLines={wide ? 2 : 1}>
+                {selectedEpisodeData.name}
+              </Text>
+
+              {selectedEpisodeData.overview ? (
+                <Text style={styles.panelOverview} numberOfLines={wide ? 5 : 4}>
+                  {selectedEpisodeData.overview}
+                </Text>
+              ) : null}
+
+              <View style={styles.panelBottomRow}>
+                {episodeColors && (
+                  <View style={[styles.ratingBadge, { backgroundColor: episodeColors.bg }]}>
+                    <Text style={[styles.ratingBadgeText, { color: episodeColors.text }]}>
+                      ★ {selectedEpisodeData.vote_average.toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                <GlassPressable
+                  glass={false}
+                  accessibilityRole="button"
+                  style={styles.detailBtn}
+                  onPress={openEpisodeDetails}
+                >
+                  <Text style={styles.detailBtnText}>{t.detail} →</Text>
+                </GlassPressable>
+              </View>
+            </>
+          ) : (
+            // ── Dizi Bilgisi ──
+            <>
+              <Text style={styles.panelTitle} numberOfLines={2}>
+                {showDetail.name}
+              </Text>
+              <Text style={styles.panelSubtitle} numberOfLines={1}>
+                {showDetail.first_air_date}
+                {" · "}
+                {showDetail.status === "Ended"
+                  ? showDetail.last_air_date
+                  : i18nText("autoI18n.devam_ediyor", "Devam ediyor")}
+              </Text>
+              <View style={styles.panelBottomRow}>
+                <View style={styles.ratingBadge}>
+                  <Text style={[styles.ratingBadgeText, { color: "#fff" }]}>
+                    ★ {showDetail.vote_average.toFixed(1)}
+                  </Text>
+                </View>
+                <Text style={styles.voteCount} numberOfLines={1}>
+                  {showDetail.imdb_votes} {i18nText("votes", "oy")}
+                </Text>
+              </View>
+              <Text style={styles.hintText} numberOfLines={1}>
+                {i18nText("autoI18n.bolume_dokun_bolum_bilgisi", "Bölüme dokun → bölüm bilgisi")}
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* Seçili bölümü kapat */}
+        {selectedEpisode && (
+          <GlassPressable
+            glass={false}
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+            hitSlop={8}
+            style={styles.closeBtn}
+            onPress={closeSelectedEpisode}
+          >
+            <Text style={styles.closeBtnText}>✕</Text>
+          </GlassPressable>
+        )}
+      </Animated.View>
+    </View>
+  );
+
+  // ── Değerlendirme Izgarası ──
+  const gridView = (
+    <TvGraphGrid
+      seasons={tvShows}
+      grid={grid}
+      gridKey={renderGridMode}
+      selected={selectedEpisode}
+      onPress={handleEpisodePress}
+      borderColor={theme.primary}
+      headerColor={theme.text.secondary}
+      labels={gridLabels}
+    />
+  );
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
       <ScreenDecor scope="details" iconOpacity={0.25} />
 
-      <TopBar>
-        <View style={styles.topActions}>
-          {graphShare ? (
-            <GlassIconButton
-              icon="share-outline"
-              iconSize={18}
-              size={38}
-              fallbackRadius={12}
-              color={theme.text.primary}
-              accessibilityLabel={i18nText("autoI18n.tvgraph_paylas", "Grafiği paylaş")}
-              onPress={() => setShareOpen(true)}
-              testID="tvgraph-share-button"
-            />
-          ) : null}
-          <GridModeSwitch
-            options={gridOptions}
-            value={gridMode}
-            onChange={handleGridModeChange}
-            theme={theme}
-          />
+      {wide ? (
+        // Yatay: [geri / paylaş / boyut sütunu] [bilgi kartı] [ızgara]
+        <View style={styles.wideBody}>
+          <View style={styles.sideRail}>
+            <BackButton absolute={false} />
+            {shareButton}
+            {modeSwitch}
+          </View>
+          {infoPanel}
+          <View style={styles.wideGrid}>{gridView}</View>
         </View>
-      </TopBar>
-
-      {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
-      <View style={styles.infoPanelWrapper}>
-        {/* Backdrop */}
-        <Image
-          source={{
-            uri: selectedEpisodeData?.still_path
-              ? getTmdbUrl(selectedEpisodeData.still_path, 'backdrop', 1000)
-              : backdropUri("tv", showDetail.id, showDetail.backdrop_path),
-          }}
-          style={styles.panelBackdrop}
-          blurRadius={1}
-        />
-        <View style={styles.panelOverlay} />
-
-        <Animated.View
-          style={[
-            styles.infoPanelContainer,
-            // Sağ kenar yalnız seçili bölümde kapat düğmesi için ayrılır.
-            // Sağ boşluk SABİT (kapat düğmesi yeri hep ayrılı): seçimde 14 ↔ 52
-            // değişirse metin sütunu daralıp satır kaydırıyordu.
-            { opacity: fadeAnim },
-          ]}
-        >
-          {/* Sol: Poster veya Bölüm Görseli — SABİT genişlikli yuva; poster (82)
-              ve bölüm görseli (120) yuvanın içinde ortalanır, böylece metin
-              sütununun sol kenarı seçimde sağa sola oynamaz. */}
-          <View style={styles.panelMediaSlot}>
-            <Image
-              source={{
-                uri: selectedEpisodeData?.still_path
-                  ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
-                  : posterUri("tv", showDetail.id, showDetail.poster_path),
-              }}
-              style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
-            />
+      ) : (
+        // Dikey: [geri / paylaş / boyut sütunu | bilgi kartı] → altta ızgara
+        <>
+          <View style={styles.headRow}>
+            <View style={styles.headRail}>
+              <BackButton absolute={false} size={RAIL_BTN} fallbackRadius={10} />
+              {shareButton}
+              {modeSwitch}
+            </View>
+            {infoPanel}
           </View>
-
-          {/* Sağ: Bilgiler */}
-          <View style={styles.panelInfo}>
-            {selectedEpisodeData ? (
-              // ── Bölüm Bilgisi ──
-              <>
-                <View style={styles.panelBadgeRow}>
-                  <View
-                    style={[
-                      styles.badge,
-                      { backgroundColor: "rgba(255,255,255,0.15)" },
-                    ]}
-                  >
-                    <Text style={styles.badgeText}>
-                      S{selectedEpisode.season} · E{selectedEpisode.index + 1}
-                    </Text>
-                  </View>
-                  {selectedEpisodeData.runtime > 0 && (
-                    <View
-                      style={[
-                        styles.badge,
-                        { backgroundColor: "rgba(255,255,255,0.1)" },
-                      ]}
-                    >
-                      <Text style={styles.badgeText}>
-                        {selectedEpisodeData.runtime} {t.minutes}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.panelTitle} numberOfLines={2}>
-                  {selectedEpisodeData.name}
-                </Text>
-
-                <Text style={styles.panelSubtitle}>
-                  {selectedEpisodeData.air_date}
-                </Text>
-
-                {selectedEpisodeData.overview ? (
-                  <Text style={styles.panelOverview} numberOfLines={2}>
-                    {selectedEpisodeData.overview}
-                  </Text>
-                ) : null}
-
-                <View style={styles.panelBottomRow}>
-                  {selectedEpisodeData.vote_average > 0 && (
-                    <View
-                      style={[
-                        styles.ratingBadge,
-                        {
-                          backgroundColor: getRatingColors(
-                            selectedEpisodeData.vote_average,
-                          ).bg,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.ratingBadgeText,
-                          {
-                            color: getRatingColors(
-                              selectedEpisodeData.vote_average,
-                            ).text,
-                          },
-                        ]}
-                      >
-                        ★ {selectedEpisodeData.vote_average.toFixed(1)}
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.detailBtn}
-                    onPress={() => {
-                      // EpisodeDetails bu meta'yı WatchedAdd → markEpisodes'a
-                      // iletir; eksik gönderilirse ilk işaretlemede watchedTv
-                      // dokümanı boş adla/0 bölüm sayısıyla oluşur ve sonraki
-                      // işaretlemeler bu meta'yı bir daha onarmaz.
-                      const seasonMeta = showDetail?.seasons?.find(
-                        (s) => s.season_number === selectedEpisode.season,
-                      );
-                      navigation.navigate("EpisodeDetails", {
-                        showId: id,
-                        seasonNumber: selectedEpisode.season,
-                        episodeNumber: selectedEpisodeData.episode_number,
-                        showName: showDetail?.name || "",
-                        showEpisodeCount: showDetail?.number_of_episodes || 0,
-                        showSeasonCount: showDetail?.number_of_seasons || 0,
-                        seasonEpisodes: seasonMeta?.episode_count || 0,
-                        showPosterPath: showDetail?.poster_path || null,
-                        seasonPosterPath: seasonMeta?.poster_path || null,
-                        genres: showDetail?.genres?.map((g) => g.name) || [],
-                      });
-                    }}
-                  >
-                    <Text style={styles.detailBtnText}>{t.detail} →</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              // ── Dizi Bilgisi ──
-              <>
-                <Text style={styles.panelTitle} numberOfLines={2}>
-                  {showDetail.name}
-                </Text>
-                <Text style={styles.panelSubtitle}>
-                  {showDetail.first_air_date}
-                  {" · "}
-                  {showDetail.status === "Ended"
-                    ? showDetail.last_air_date
-                    : i18nText("autoI18n.devam_ediyor", "Devam ediyor")}
-                </Text>
-                <View style={styles.panelBottomRow}>
-                  <View style={styles.ratingBadge}>
-                    <Text style={[styles.ratingBadgeText, { color: "#fff" }]}>
-                      ★ {showDetail.vote_average.toFixed(1)}
-                    </Text>
-                  </View>
-                  <Text style={styles.voteCount}>
-                    {showDetail.imdb_votes} {i18nText("votes", "oy")}
-                  </Text>
-                </View>
-                <Text style={styles.hintText}>{i18nText("autoI18n.bolume_dokun_bolum_bilgisi", "Bölüme dokun → bölüm bilgisi")}</Text>
-              </>
-            )}
-          </View>
-
-          {/* Seçili bölümü kapat */}
-          {selectedEpisode && (
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => {
-                Animated.timing(fadeAnim, {
-                  toValue: 0,
-                  duration: 120,
-                  useNativeDriver: true,
-                }).start(() => {
-                  setSelectedEpisode(null);
-                  Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 200,
-                    useNativeDriver: true,
-                  }).start();
-                });
-              }}
-            >
-              <Text style={styles.closeBtnText}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      </View>
-
-      {/* ── Değerlendirme Izgarası ────────────────────────────────────────── */}
-      <TvGraphGrid
-        seasons={tvShows}
-        grid={grid}
-        gridKey={renderGridMode}
-        selected={selectedEpisode}
-        onPress={handleEpisodePress}
-        borderColor={theme.primary}
-        headerColor={theme.text.secondary}
-        labels={gridLabels}
-      />
+          {gridView}
+        </>
+      )}
 
       <TvGraphShareSheet
         visible={shareOpen}
@@ -709,8 +748,30 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-// Bilgi panelinin sabit yüksekliği (dizi kartı = bölüm kartı; bkz. infoPanelContainer).
-const PANEL_HEIGHT = 196;
+// Bilgi panelinin sabit yüksekliği (dikeyde dizi kartı = bölüm kartı; bkz. infoPanelContainer).
+// 9 Kas: 196 → 122 (kullanıcı isteği: dikeyde daha kompakt). Bölüm kartının en uzun
+// hâli: rozet satırı (tarih dahil) 18 + 1 satır başlık 20 + 2 satır özet 28 +
+// alt satır 24 + 3 boşluk 12 = 102 + dikey dolgu 2×10.
+//
+// 9 Kas (2): dikeyde üst çubuk kalktı; geri + paylaş + boyut seçici kartın SOLUNDA
+// sütun (ray). Kart yüksekliği = rayın yüksekliği → ikisi alt/üst hizalı biter.
+//   ray = geri 30 + paylaş 30 + boyut seçici 82 + 2 boşluk × 5 = 152
+// Bölüm kartının en uzun hâli: rozet 18 + başlık 20 + 4 satır özet 56 + alt satır 24
+// + 3 boşluk 12 = 130 ≤ 152 − 2×10.
+const RAIL_BTN = 30;
+const RAIL_GAP = 5;
+const RAIL_MODE_W = 28;
+const RAIL_MODE_H = 24;
+const RAIL_SWITCH_PAD = 2;
+// 3 düğme + 2 aralık (2) + iç dolgu + kenarlık (1+1)
+const RAIL_SWITCH_H = RAIL_MODE_H * 3 + 2 * 2 + RAIL_SWITCH_PAD * 2 + 2; // 82
+const PANEL_PAD_V = 10;
+const PANEL_HEIGHT = RAIL_BTN * 2 + RAIL_SWITCH_H + RAIL_GAP * 2; // 152
+const POSTER_H = PANEL_HEIGHT - PANEL_PAD_V * 2; // 132
+const POSTER_W = Math.round((POSTER_H * 2) / 3); // 88
+const MEDIA_SLOT_W = 96;
+// Yatay düzende bilgi kartının genişliği (sol rayın yanında, ekran boyu).
+const WIDE_PANEL_W = 260;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -720,9 +781,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 12,
-    paddingTop: 6,
+    paddingTop: 4,
     paddingBottom: 6,
   },
   modeSwitch: {
@@ -733,6 +794,8 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     borderWidth: 1,
   },
+  modeSwitchVertical: { flexDirection: "column" },
+  modeSwitchCompact: { padding: RAIL_SWITCH_PAD, borderRadius: 13 },
   modeBtn: {
     width: 34,
     height: 30,
@@ -741,18 +804,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modeBtnPressed: { backgroundColor: "rgba(127,127,127,0.18)" },
-  topActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  modeBtnCompact: { width: RAIL_MODE_W, height: RAIL_MODE_H, borderRadius: 9 },
+
+  // ── Dikey düzen: ray + kart satırı ──────────────────────────────────────
+  headRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingLeft: 10,
+    paddingRight: 12,
+    paddingTop: 4,
+  },
+  headRail: { alignItems: "center", gap: RAIL_GAP },
+
+  // ── Yatay düzen ─────────────────────────────────────────────────────────
+  wideBody: { flex: 1, flexDirection: "row" },
+  sideRail: {
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingTop: 6,
+  },
+  wideGrid: { flex: 1 },
 
   // ── Bilgi Paneli ────────────────────────────────────────────────────────
   infoPanelWrapper: {
     marginHorizontal: 12,
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: "hidden",
     elevation: 6,
     shadowColor: "#000",
     shadowOpacity: 0.4,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
+  },
+  infoPanelWrapperHead: { flex: 1, marginHorizontal: 0 },
+  infoPanelWrapperWide: {
+    width: WIDE_PANEL_W,
+    marginHorizontal: 0,
+    marginTop: 6,
+    marginBottom: 12,
+    alignSelf: "stretch",
   },
   panelBackdrop: {
     position: "absolute",
@@ -771,101 +863,137 @@ const styles = StyleSheet.create({
   },
   infoPanelContainer: {
     flexDirection: "row",
-    paddingVertical: 14,
-    paddingLeft: 14,
-    paddingRight: 52,
+    paddingVertical: PANEL_PAD_V,
+    paddingLeft: 10,
+    // Sağ boşluk SABİT (kapat düğmesi yeri hep ayrılı): seçimde değişirse metin
+    // sütunu daralıp satır kaydırıyordu.
+    paddingRight: 40,
     alignItems: "center",
     // SABİT yükseklik: dizi kartı ile bölüm kartı aynı boyda olmalı. İçerik
-    // uzunluğuna göre (başlık/özet satırı) değişirse panelin altındaki bütün
-    // ızgara aşağı yukarı oynuyordu. 196 = bölüm kartının en uzun hâli
-    // (rozetler + 2 satır başlık + tarih + 2 satır özet + alt satır + dolgu).
+    // uzunluğuna göre değişirse panelin altındaki bütün ızgara aşağı yukarı oynuyordu.
     height: PANEL_HEIGHT,
     overflow: "hidden",
   },
+  // Yatay: ekran boyu dikey kart; görsel üstte, bilgiler altta. Izgara yanda
+  // olduğu için yükseklik değişimi ızgarayı oynatmaz.
+  infoPanelContainerWide: {
+    flex: 1,
+    height: undefined,
+    flexDirection: "column",
+    alignItems: "stretch",
+    padding: 12,
+  },
   panelMediaSlot: {
-    width: 120,
+    width: MEDIA_SLOT_W,
     alignItems: "center",
     justifyContent: "center",
   },
-  // Panel 196 yüksek, dikey dolgu 14+14 → 168'lik alanı 2:3 oranla doldurur.
+  panelMediaSlotWide: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
   panelPoster: {
-    width: 112,
-    height: 168,
-    borderRadius: 10,
+    width: POSTER_W,
+    height: POSTER_H,
+    borderRadius: 8,
     backgroundColor: "#111",
   },
+  panelPosterWide: { width: 80, height: 120, borderRadius: 10 },
   panelStill: {
-    width: 120,
-    height: 68,
-    borderRadius: 10,
+    width: MEDIA_SLOT_W,
+    height: 54,
+    borderRadius: 8,
     backgroundColor: "#111",
     alignSelf: "center",
   },
+  panelStillWide: {
+    width: "100%",
+    height: undefined,
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+  },
   panelInfo: {
     flex: 1,
-    marginLeft: 14,
-    gap: 6,
+    minWidth: 0,
+    marginLeft: 12,
+    gap: 4,
     justifyContent: "center",
+  },
+  panelInfoWide: {
+    marginLeft: 0,
+    gap: 6,
+    justifyContent: "flex-start",
   },
   panelBadgeRow: {
     flexDirection: "row",
-    gap: 6,
+    alignItems: "center",
+    gap: 5,
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 20,
   },
   badgeText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10.5,
+    lineHeight: 14,
     fontWeight: "600",
   },
+  badgeDate: {
+    flexShrink: 1,
+    fontSize: 10.5,
+    lineHeight: 14,
+    color: "rgba(255,255,255,0.6)",
+  },
   panelTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
     color: "#fff",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   panelSubtitle: {
     fontSize: 12,
+    lineHeight: 15,
     color: "rgba(255,255,255,0.6)",
   },
   panelOverview: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.5)",
-    lineHeight: 15,
+    color: "rgba(255,255,255,0.55)",
+    lineHeight: 14,
   },
   panelBottomRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 2,
+    gap: 8,
   },
   ratingBadge: {
     backgroundColor: "rgb(255,165,0)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderRadius: 20,
   },
   ratingBadgeText: {
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 16,
     fontWeight: "700",
   },
   voteCount: {
-    fontSize: 12,
+    flexShrink: 1,
+    fontSize: 11.5,
     color: "rgba(255,255,255,0.5)",
   },
   hintText: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.3)",
+    fontSize: 10.5,
+    lineHeight: 13,
+    color: "rgba(255,255,255,0.32)",
     fontStyle: "italic",
-    marginTop: 2,
   },
   detailBtn: {
     backgroundColor: "rgba(129, 206, 254, 0.25)",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 3,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(129, 206, 254, 0.4)",
@@ -873,12 +1001,13 @@ const styles = StyleSheet.create({
   detailBtnText: {
     color: "#81cefe",
     fontSize: 12,
+    lineHeight: 16,
     fontWeight: "600",
   },
   closeBtn: {
     position: "absolute",
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
     width: 26,
     height: 26,
     borderRadius: 13,
@@ -902,7 +1031,8 @@ const styles = StyleSheet.create({
   skeletonBody: { flex: 1 },
   skeletonPanel: {
     flexDirection: "row",
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingVertical: PANEL_PAD_V,
     alignItems: "center",
     height: PANEL_HEIGHT,
   },

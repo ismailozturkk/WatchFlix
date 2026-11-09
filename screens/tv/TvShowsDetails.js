@@ -34,7 +34,6 @@ import DetailHeroStage, {
 } from "../../components/detail/DetailHeroStage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
-import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "@components/AppToast";
 import SeasonItem from "./SeasonItem";
@@ -46,6 +45,7 @@ import {
   useListLayoutSettings,
 } from "../../context/AppSettingsContext";
 import { detailPosterRadius } from "../../utils/posterCorners";
+import { detailRailItemWidth } from "../../utils/posterSizes";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import MediaNoteSheet from "@components/detail/MediaNoteSheet";
@@ -77,6 +77,7 @@ import RatingSummary from "@components/RatingSummary";
 import ExternalRatingsRow from "@components/detail/ExternalRatingsRow";
 import CertificationBadge from "../../components/detail/CertificationBadge";
 import { i18nText } from "../../utils/i18nText";
+import EpisodeGraphButton from "../../components/tv/EpisodeGraphButton";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import AIChatScreen from "@screens/chat/AIChatScreen";
@@ -129,8 +130,10 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
   navigation,
   theme,
 }) {
-  const { posterBadges, railPosterRadius } = useListLayoutSettings();
+  const { posterBadges, railPosterRadius, railPosterSize } = useListLayoutSettings();
   const posterRadius = detailPosterRadius(railPosterRadius);
+  // Kart genişliği Ayarlar > Poster görünümü > Poster boyutunu izler (utils/posterSizes).
+  const itemWidth = detailRailItemWidth(width, railPosterSize);
   const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -153,7 +156,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         activeOpacity={0.9}
-        style={styles.railItem}
+        style={{ width: itemWidth }}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
         onLongPress={() =>
           openQuickActions({ item, mediaType: "tv", navigation })
@@ -759,7 +762,7 @@ export default function TvShowsDetails({ route, navigation }) {
       />
 
       <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
-      <ScreenDecor scope="details" iconOpacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} />
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -899,8 +902,8 @@ export default function TvShowsDetails({ route, navigation }) {
                     airDate={details.first_air_date}
                     seasonPosterPath={details.poster_path}
                     type="tv"
-                    // Eylem satırındaki öteki simgelerle aynı (ListViewTv: 30, dar düzende 24).
-                    size={30}
+                    // Eylem satırındaki öteki simgelerle aynı (ListViewTv: 18, dar düzende 15).
+                    size={18}
                   />
                 ) : null
               }
@@ -994,105 +997,14 @@ export default function TvShowsDetails({ route, navigation }) {
           {details.seasons.filter((s) => s.season_number > 0).length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.seasons} theme={theme} />
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate("TvGraphDetailScreen", { id })
-                }
-                activeOpacity={0.88}
-                style={[styles.graphCard, { borderColor: theme.border }]}
-              >
-                {Boolean(backdropUri("tv", details.id, details.backdrop_path)) && (
-                  <Image
-                    source={{
-                      uri: backdropUri("tv", details.id, details.backdrop_path),
-                    }}
-                    style={styles.graphBackdrop}
-                    blurRadius={2}
-                  />
-                )}
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.72)"]}
-                  style={StyleSheet.absoluteFill}
-                />
-                <View style={styles.graphContent}>
-                  {Boolean(posterUri("tv", details.id, details.poster_path)) && (
-                    <Image
-                      source={{
-                        uri: posterUri("tv", details.id, details.poster_path),
-                      }}
-                      style={styles.graphPoster}
-                    />
-                  )}
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.graphTitle, { color: "#fff" }]}
-                    >
-                      {details.name}
-                    </Text>
-                    <View style={styles.graphStats}>
-                      {[
-                        {
-                          icon: "layers-outline",
-                          val: details.number_of_seasons,
-                          lbl: t.seasons,
-                        },
-                        {
-                          icon: "play-circle-outline",
-                          val: details.number_of_episodes,
-                          lbl: t.episodes || t.episode,
-                        },
-                        {
-                          icon: "star-outline",
-                          val: details.vote_count,
-                          lbl: t.votes,
-                        },
-                      ].map(({ icon, val, lbl }) => (
-                        <View key={lbl} style={styles.graphStatItem}>
-                          <Ionicons
-                            name={icon}
-                            size={14}
-                            color="rgba(255,255,255,0.7)"
-                          />
-                          <Text
-                            allowFontScaling={false}
-                            style={styles.graphStatVal}
-                          >
-                            {val || 0}
-                          </Text>
-                          <Text
-                            allowFontScaling={false}
-                            style={styles.graphStatLbl}
-                          >
-                            {lbl}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={[styles.graphChevron]}>
-                      <Ionicons
-                        name="bar-chart-outline"
-                        size={13}
-                        color="rgba(255,255,255,0.7)"
-                      />
-                      <Text
-                        allowFontScaling={false}
-                        style={styles.graphChevronText}
-                      >
-                        {i18nText(
-                          "autoI18n.detayli_istatistikler",
-                          "Detaylı İstatistikler"
-                        )}
-                      </Text>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={14}
-                        color="rgba(255,255,255,0.6)"
-                      />
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
+              {/* Bölüm puanları grafiği: afiş + açacağı ızgaranın önizlemesi; API isteği yok (components/tv/EpisodeGraphButton.js) */}
+              <EpisodeGraphButton
+                seasons={details.seasons}
+                posterPath={details.poster_path}
+                mediaId={details.id}
+                backdropUri={backdropUri("tv", details.id, details.backdrop_path)}
+                onPress={() => navigation.navigate("TvGraphDetailScreen", { id })}
+              />
             </View>
           )}
 
@@ -1570,9 +1482,9 @@ const styles = StyleSheet.create({
   /* Body */
   body: { paddingHorizontal: 15 },
 
-  listActionsBlock: { marginBottom: 10 },
+  listActionsBlock: { marginBottom: 16, gap: 9 },
   showProgressTrack: {
-    marginTop: -4,
+    marginTop: 0,
   },
 
   /* Stat row */
@@ -1698,29 +1610,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  /* Graph card */
-  graphCard: {
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-    height: 160,
-  },
-  graphBackdrop: { ...StyleSheet.absoluteFill, resizeMode: "cover" },
-  graphContent: {
-    flex: 1,
-    flexDirection: "row",
-    padding: 14,
-    gap: 12,
-    alignItems: "center",
-  },
-  graphPoster: { width: 80, height: 120, borderRadius: 10 },
-  graphTitle: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
-  graphStats: { flexDirection: "row", gap: 16 },
-  graphStatItem: { alignItems: "center", gap: 2 },
-  graphStatVal: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  graphStatLbl: { color: "rgba(255,255,255,0.6)", fontSize: 10 },
-  graphChevron: { flexDirection: "row", alignItems: "center", gap: 5 },
-  graphChevronText: { color: "rgba(255,255,255,0.65)", fontSize: 12, flex: 1 },
 
   /* Overview */
   /* Accordion */
@@ -1751,7 +1640,6 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 14 },
 
   /* Yatay ray kartı */
-  railItem: { width: width * 0.38 },
   railPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
