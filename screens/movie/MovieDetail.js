@@ -39,6 +39,7 @@ import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { detailPosterRadius } from "../../utils/posterCorners";
+import { detailRailItemWidth } from "../../utils/posterSizes";
 import usePosterUri from "../../hooks/usePosterUri";
 import useBackdropUri from "../../hooks/useBackdropUri";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
@@ -103,10 +104,10 @@ const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
 const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
-// Yatay ray kartı: "Önerilen" ile "Seri" aynı genişliği paylaşıyor.
-// Seri rayı getItemLayout hesabı için sayıya ihtiyaç duyuyor, bu yüzden ölçü
-// stil içinde gömülü kalmak yerine buradan tek yerden veriliyor.
-const RAIL_ITEM_WIDTH = width * 0.38;
+// Yatay ray kartı: "Önerilen" ile "Seri" aynı genişliği paylaşıyor ve
+// Ayarlar > Poster görünümü > Ana Ekran > Poster boyutunu izliyor
+// (utils/posterSizes detailRailItemWidth). Seri rayı getItemLayout için sayıya
+// ihtiyaç duyduğundan genişlik stil yerine bu yardımcıdan hesaplanır.
 const RAIL_ITEM_GAP = 10;
 
 /* ─────────────────────────────────────────
@@ -117,8 +118,9 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
   navigation,
 }) {
   const { theme } = useTheme();
-  const { posterBadges, railPosterRadius } = useListLayoutSettings();
+  const { posterBadges, railPosterRadius, railPosterSize } = useListLayoutSettings();
   const posterRadius = detailPosterRadius(railPosterRadius);
+  const itemWidth = detailRailItemWidth(width, railPosterSize);
   const { openQuickActions } = useMediaQuickActions();
   const scale = React.useRef(new Animated.Value(1)).current;
 
@@ -141,7 +143,7 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         activeOpacity={0.9}
-        style={styles.railItem}
+        style={{ width: itemWidth }}
         onPress={() => navigation.push("MovieDetails", { id: item.id })}
         onLongPress={() =>
           openQuickActions({ item, mediaType: "movie", navigation })
@@ -198,8 +200,9 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
 }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
-  const { posterBadges, railPosterRadius } = useListLayoutSettings();
+  const { posterBadges, railPosterRadius, railPosterSize } = useListLayoutSettings();
   const posterRadius = detailPosterRadius(railPosterRadius);
+  const itemWidth = detailRailItemWidth(width, railPosterSize);
   const year = item.release_date ? String(item.release_date).slice(0, 4) : "";
 
   return (
@@ -207,7 +210,7 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
       activeOpacity={isCurrent ? 1 : 0.9}
       // Açık olan filme basmak aynı ekranı yığına tekrar iterdi.
       disabled={isCurrent}
-      style={styles.railItem}
+      style={{ width: itemWidth }}
       onPress={() => navigation.push("MovieDetails", { id: item.id })}
     >
       <View>
@@ -315,8 +318,9 @@ export default function MovieDetails({ navigation, route }) {
   const providerRegion = tmdbRegionOf(language);
   const { theme } = useTheme();
   // Poster köşeleri Ayarlar > Poster görünümü > Ana Ekran ayarını izler (eskiden sabit 14).
-  const { railPosterRadius } = useListLayoutSettings();
+  const { railPosterRadius, railPosterSize } = useListLayoutSettings();
   const mainPosterRadius = detailPosterRadius(railPosterRadius);
+  const railItemWidth = detailRailItemWidth(width, railPosterSize);
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   // "Tekrar dene" aynı id/dil için isteği yeniden tetikler (bkz. DetailLoadError).
@@ -612,11 +616,11 @@ export default function MovieDetails({ navigation, route }) {
 
   const collectionItemLayout = useCallback(
     (_data, index) => ({
-      length: RAIL_ITEM_WIDTH,
-      offset: (RAIL_ITEM_WIDTH + RAIL_ITEM_GAP) * index,
+      length: railItemWidth,
+      offset: (railItemWidth + RAIL_ITEM_GAP) * index,
       index,
     }),
-    [],
+    [railItemWidth],
   );
 
   const addReminder = async () => {
@@ -942,7 +946,7 @@ export default function MovieDetails({ navigation, route }) {
       />
 
       <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
-      <ScreenDecor scope="details" iconOpacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} />
       <ScrollView
         style={styles.container}
         nestedScrollEnabled
@@ -1771,7 +1775,6 @@ const styles = StyleSheet.create({
   castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
 
   /* Yatay ray kartı */
-  railItem: { width: RAIL_ITEM_WIDTH },
   railPoster: {
     width: "100%",
     aspectRatio: 2 / 3,

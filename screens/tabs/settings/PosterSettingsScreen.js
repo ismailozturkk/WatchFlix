@@ -17,6 +17,7 @@ import { useListLayoutSettings } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "../../../utils/i18nText";
 import { REMINDER_BADGE } from "../../../utils/reminderBadge";
+import { POSTER_SIZES, posterSizeScale, railPosterWidth } from "../../../utils/posterSizes";
 import {
   POSTER_CORNER_LEVELS,
   posterCornerIndex,
@@ -375,6 +376,7 @@ const buildColumnLabels = () => ({
 const buildRailSizeLabels = () => ({
   normal: i18nText("autoI18n.varsayilan", "Varsayılan"),
   small: i18nText("autoI18n.kucuk", "Küçük"),
+  xsmall: i18nText("autoI18n.daha_kucuk", "Daha küçük"),
 });
 
 const buildPostListLayoutOptions = () => [
@@ -536,7 +538,7 @@ const buildPosterBadgeOptions = () => [
 // Gerçek poster genişliği (pt) — önizlemedeki köşe bununla orantılanır.
 // Izgara: SeeAll/Listeler kenar boşluğu + 8 pt aralık; raf: useRailPosterStyle.
 const realGridWidth = (windowWidth, columns) => (windowWidth - 24 - 8 * (columns - 1)) / columns;
-const realRailWidth = (windowWidth, size) => windowWidth * 0.4 * (size === "small" ? 0.85 : 1);
+const realRailWidth = railPosterWidth;
 
 // Seçili alanın gerçek orandaki önizlemesi. Raf posterleri sahneden taşar (yatay kaydırma hissi).
 function AreaPreview({ area, settings, colors, stageWidth, windowWidth }) {
@@ -692,14 +694,14 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
           label: COLUMN_LABELS[value],
           renderVisual: (ink) => <MiniGrid columns={value} ink={ink} />,
         }))
-      : ["normal", "small"].map((value) => ({
+      : POSTER_SIZES.map((value) => ({
           value,
           label: RAIL_SIZE_LABELS[value],
           renderVisual: (ink) => (
             <View
               style={{
-                width: value === "small" ? 10 : 13,
-                height: value === "small" ? 15 : 19,
+                width: Math.round(13 * posterSizeScale(value)),
+                height: Math.round(19 * posterSizeScale(value)),
                 borderRadius: 2.5,
                 backgroundColor: ink,
               }}
@@ -712,7 +714,8 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
     renderVisual: () => <PostListLayoutPreview layout={opt.value} colors={C} tileWidth={20} radius={5} />,
   }));
 
-  const badgePreviewWidth = railPosterSize === "small" ? 84 : 96;
+  // Rozet önizleme posteri raf boyutunu izler (Varsayılan 96 · Küçük 82 · Daha küçük 69).
+  const badgePreviewWidth = Math.round(96 * posterSizeScale(railPosterSize));
   const enabledBadgeCount = POSTER_BADGE_OPTIONS.filter(
     (item) => posterBadges?.[item.key] !== false
   ).length;

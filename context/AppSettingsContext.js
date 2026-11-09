@@ -28,6 +28,7 @@ import {
   setDecorVisible,
 } from "../utils/decorScopes";
 import { POSTER_CORNER_SCALES } from "../utils/posterCorners";
+import { isPosterSize } from "../utils/posterSizes";
 import {
   DECOR_DENSITIES,
   clampAmbientOpacity,
@@ -303,7 +304,7 @@ export const AppSettingsProvider = ({ children }) => {
   const [seeAllPosterRadius, setSeeAllPosterRadius] = useState(() =>
     get(Keys.seeAllPosterRadius),
   );
-  // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
+  // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small" | "xsmall", utils/posterSizes) ve köşe (4 | 15 varsayılan | 24)
   const [railPosterSize, setRailPosterSize] = useState(() => get(Keys.railPosterSize));
   const [railPosterRadius, setRailPosterRadius] = useState(() => get(Keys.railPosterRadius));
   // Eğlence (oyunlar, Top 100, turnuva…) ve Kütüphane (liste kapakları, Wrapped) afiş köşesi:
@@ -589,7 +590,7 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeRailPosterSize = useCallback((size) => {
-    if (size !== "normal" && size !== "small") return;
+    if (!isPosterSize(size)) return;
     setRailPosterSize(size);
     persist(Keys.railPosterSize, size, GORUNUM_HATASI);
   }, []);

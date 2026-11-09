@@ -8,6 +8,7 @@ import { useListStatus } from "@hooks/useListStatus";
 import { useMediaActivity } from "@hooks/useMediaActivity";
 import useUpcomingReminder from "@hooks/useUpcomingReminder";
 import { REMINDER_BADGE } from "../utils/reminderBadge";
+import { posterBadgeScale } from "../utils/posterSizes";
 
 /**
  * Poster üzerinde içeriğin hangi listelerde olduğunu, kullanıcının o içerik için
@@ -78,7 +79,7 @@ const ListBadges = memo(function ListBadges({
     if (posterWidth != null) {
       baseScale = Math.min(1.1, Math.max(0.6, posterWidth / 110));
     } else {
-      if (railPosterSize === "small") baseScale *= 0.82;
+      baseScale *= posterBadgeScale(railPosterSize);
       if (listsGridColumns === 4) baseScale *= 0.82;
     }
   }

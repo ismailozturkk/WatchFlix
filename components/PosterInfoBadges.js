@@ -11,6 +11,7 @@
 
 import { copyLanguage, normalizeAppLanguage } from "../utils/appLanguages";
 import { formatCompactVotes } from "../utils/externalRatings";
+import { posterBadgeScale } from "../utils/posterSizes";
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -18,7 +19,6 @@ import { useListLayoutSettings } from "../context/AppSettingsContext";
 import { useLanguage } from "../context/LanguageContext";
 
 // Poster boyutu → rozet ölçeği.
-const SCALE_FOR = { small: 0.82, normal: 1 };
 
 // Hazır köşe konumları (sabit; ölçekli konum için `corner` prop'unu kullan).
 export const POSTER_BADGE_POS = {
@@ -94,7 +94,7 @@ export function usePillMetrics(scale, posterWidth) {
   } else if (posterWidth != null) {
     s = Math.min(1.1, Math.max(0.6, posterWidth / 110));
   } else {
-    s = SCALE_FOR[railPosterSize] || 1;
+    s = posterBadgeScale(railPosterSize);
     if (listsGridColumns === 4) s *= 0.82;
   }
 
