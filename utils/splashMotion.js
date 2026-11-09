@@ -1,359 +1,326 @@
 // utils/splashMotion.js
 //
-// Açılış ekranının (components/SplashPosterWave.js) SAF hareket modeli: süreler,
-// halka geometrisi ve native sürücüye verilecek interpolate tabloları. RN
-// import'u yok → jest'te doğrudan test edilir (bkz. __tests__/splashMotion.test.js).
-// Hangi cihazda/modda hangi hareketin ve kaç posterin çalışacağı (kalite kademeleri,
-// görünürlük kırpması) utils/splashPlan.js'te.
+// Açılış ekranının (components/SplashLensIntro.js) SAF hareket modeli. RN importu
+// yok, jest'te doğrudan test edilir (__tests__/splashMotion.test.js). Kademeler ve
+// ekrana göre yerleşim utils/splashPlan.js'te.
 //
-// ZAMAN ÇİZELGESİ (mount anından, ms)
+// Hikâye, Lens logo animasyonunun kısaltılmış hâli
+// (marketing/marka/yeni-logo/kaynak/anim2.cjs, video 6,4 sn → burada ~2,4 sn):
 //
-//   0 ─────────────────────────────────────────────── MIN_VISIBLE_MS ──▶ hazırsa çıkış
-//   │ zemin: yerel splash grisi → tema rengi         [0 … 360]
-//   │ ışıma (logo renklerinde) belirir + nefes alır   [0 … 700], sonra döngü
-//   │ logo: ilk karede yerel splash'le AYNI; 1 kez nabız [110 … 450]
-//   │ halka 0 → 1 → 2 (→ 3): merkezden dışa çiçeklenir [72 … ~780], 81 ms arayla
-//   │ dalga (Meksika dalgası) döngüsü + halkaların YAVAŞLAYARAK duran yörüngesi
-//   └ çıkış (EXIT_MS): logo/ışıma/halkalar dışa süzülüp solar, zemin açılır
+//   0 ──────────────────────────────────────────── MIN_VISIBLE_MS ──▶ hazırsa çıkış
+//   │ yerel splash: yalnız mürekkep zemin (yıldızlar JS'te ilk kareden doğar)
+//   │ yıldız alanı belirir                                   [0 … 0,4]
+//   │ camgöbeği + kırmızı yıldız sarmal çizerek yaklaşır,     [0,08 … 1,12]
+//   │   yaklaştıkça hızlanır, büyür ve ışık izi bırakır
+//   │ çarpışma: parlama, şok halkaları, kıvılcımlar          [1,12 … ~1,9]
+//   │ dönüş söner, iki daire dikey konumda göze oturur        [1,12 … 1,50]
+//   │ göz bebeği yaylanarak belirir, parıltı yanar            [1,45 … 1,85]
+//   │ işaret yukarı kayar, "seelogd" harf harf yükselir      [1,55 … 2,37]
+//   │ bekleme döngüsü: göz bir yana bakar ve kırpar (veri gelene kadar)
+//   └ çıkış (EXIT_MS): içerik hafif büyüyerek solar, zemin en son açılır
 //
-// Neden hepsi interpolate: tüm hareket tek bir doğrusal [0,1] sürücüden
-// MATEMATİKSEL türer. Açılışta JS thread'i navigator mount'u, cache parse'ı
-// yüzünden bloklansa da animasyon native tarafta akar; setTimeout/sequence tabanlı
-// bir kurgu bu pencerede takılırdı. Easing, interpolate'in `easing` seçeneğiyle
-// DEĞİL tabloya örneklenerek uygulanır (native sürücü yalnız doğrusal parçaları
-// bilir).
+// Neden hepsi interpolate: tüm hareket tek bir doğrusal saat sürücüsünden (saniye)
+// MATEMATİKSEL türer ve native tarafta akar. Açılışta JS thread'i bloklansa da
+// animasyon takılmaz. Eğriler interpolate'in `easing` seçeneğiyle değil, tabloya
+// örneklenerek uygulanır (native sürücü yalnız doğrusal parçaları bilir).
+//
+// Birimler: işaret 512'lik tasarım ızgarasında (daire r 132, merkezler arası d 120);
+// bileşen birimi "giriş ölçeği" ile dp'ye çevirir (splashPlan.layoutSplash).
 
-// ── Süreler ──────────────────────────────────────────────────────────────────
-export const INTRO_MS = 900;
+// ── Renkler (Lens) ───────────────────────────────────────────────────────────
+export const LENS_COLORS = Object.freeze({
+  ink: "#0D0E13",
+  paper: "#F5F2EB",
+  cyan: "#14C8E8",
+  red: "#FF3D5E",
+});
+
+// Yerel splash'in zemini (app.json → expo-splash-screen.backgroundColor ile AYNI).
+export const NATIVE_SPLASH_BG = LENS_COLORS.ink;
+
+// ── İşaret ölçüleri (tasarım birimi) ─────────────────────────────────────────
+export const LENS = Object.freeze({
+  r: 132, // daire yarıçapı
+  d: 120, // son düzende merkezler arası
+  pupil: 40,
+  glint: 9.6,
+  glintOff: 15, // parıltı bebeğin merkezinden sağ-üste
+});
+export const CONTACT_SEP = 2 * LENS.r; // daireler bu ayrılıkta değer (264)
+export const START_SEP = 640; // yıldızların ilk ayrılığı
+export const TURNS = 2.6; // çarpışmaya kadar toplam tur
+export const MARK_HEIGHT = 2 * LENS.r + LENS.d; // dikey işaretin boyu (384)
+// Göz: iki dairenin kesişimi. Eksen boyunca uzunluk 2r - d, enine genişlik 2·√(r² - (d/2)²).
+export const EYE_LENGTH = 2 * LENS.r - LENS.d; // 144
+export const EYE_WIDTH = 2 * Math.sqrt(LENS.r ** 2 - (LENS.d / 2) ** 2); // ≈ 235,2
+
+// ── Zaman çizelgesi (saniye, mount anından) ──────────────────────────────────
+export const T = Object.freeze({
+  appear: 0.08, // yıldızlar belirir
+  grow: 0.3, // küçük parlak yıldız evresi biter, büyüme başlar
+  collide: 1.12, // çarpışma
+  settle: 1.5, // dönüş biter, göz yerinde
+  pupilAt: 1.45,
+  pupilDur: 0.4,
+  glintAt: 1.6,
+  glintDur: 0.15,
+  riseAt: 1.55, // işaret yukarı kayar (yazıya yer açar)
+  riseDur: 0.45,
+  lettersAt: 1.7,
+  letterStep: 0.045,
+  letterDur: 0.4,
+});
+// Saat tablolarında mutlaka bulunan anlar.
+export const KEY_TIMES = Object.freeze([
+  T.appear,
+  T.grow,
+  T.collide,
+  T.settle,
+  T.pupilAt,
+  T.glintAt,
+  T.riseAt,
+  T.riseAt + T.riseDur,
+]);
+export const INTRO_S = 2.4;
+export const INTRO_MS = INTRO_S * 1000;
 export const EXIT_MS = 600;
-// Giriş bitmeden çıkışa geçmek animasyonu yarıda keser; veri çok hızlı gelse bile
-// splash en az bu kadar görünür. Veri geç gelirse zaten APP_READY'ye kadar kalır —
-// bu yalnız "her şey hazırken" ödenen tabandır.
-export const MIN_VISIBLE_MS = 800;
-// Afişler pakette gelir ama açılışta asenkron ÇÖZÜLÜR (decode). Giriş, afişler
-// hazır olana kadar (ilk kare yerel splash'le aynı: zemin + logo) bekler; aksi
-// halde halkalar boş karolarla açılır ve hızlı açılışta afişler hiç görünmeden
-// splash kapanırdı. Çözüm bu süreyi aşarsa giriş yine başlar (tavan).
-export const POSTER_WAIT_MS = 600;
-// Güvenlik ağı: APP_READY hiç gelmezse bu sürede zorla çıkış başlar.
+// Veri çok hızlı gelse bile splash en az bu kadar görünür (giriş anından sayılır):
+// çarpışma, göz ve yazının neredeyse tamamı oynar. Veri geç gelirse splash zaten
+// APP_READY'ye kadar kalır ve bekleme döngüsü (bakış + kırpma) sürer.
+export const MIN_VISIBLE_MS = 2150;
+// APP_READY hiç gelmezse zorla çıkış.
 export const FALLBACK_EXIT_MS = 10000;
-// Çıkış animasyonunun "bitti" haberi (native → JS) kaybolursa overlay sonsuza
-// kadar ekranda kalırdı; bu pay geçince zorla sökülür.
+// Native "bitti" geri çağrısı kaybolursa overlay en geç EXIT_MS + bu kadar sonra sökülür.
 export const EXIT_GUARD_MS = 1200;
+// Döngüler.
+export const IDLE_MS = 3600; // bekleme: bakış + kırpma
+export const TWINKLE_MS = 2600; // yıldız alanı pırıltısı
+export const DRIFT_MS = 14000; // yıldız alanının yavaş dönüşü (durur, sonsuz değil)
+export const DRIFT_DEG = 40;
 
-export const WAVE_PERIOD_MS = 2800;
-export const BREATH_MS = 3200;
-export const GLOW_SPIN_MS = 16000;
-// Yörünge sonsuz DÖNMEZ: ORBIT_MS içinde ORBIT_SWEEP_DEG kadar süzülüp durur.
-// (a) Görünürlük kırpması bu açıya göre kesin hesaplanır — sonsuz dönüşte
-// ekran dışındaki posterlerin hepsi lazım olurdu. (b) Uzun süren bir açılışta
-// bile hareket kendiliğinden sakinleşir, sonsuza dek iş yapmaz.
-export const ORBIT_MS = 7000;
-export const ORBIT_SWEEP_DEG = 26;
-
-// Yerel (native) splash'in zemin rengi — app.json > expo-splash-screen
-// backgroundColor ile AYNI olmak zorunda (bkz. __tests__/splashMotion.test.js).
-// JS splash bu renkle başlar, sonra tema rengine geçer: ilk kare yerel splash'ten
-// ayırt edilemez, açık temada "karanlıktan aydınlığa" sert bir parlama olmaz.
-export const NATIVE_SPLASH_BG = "#1E1E1E";
-
-// ── Geometri ─────────────────────────────────────────────────────────────────
-// Logo kutusu: adaptive foreground PNG'nin (1024 px, kendi güvenli-alan dolgusu
-// var; görünür "S" ~%37 genişlik) çizildiği kare. Android 12+ sistem splash'i bu
-// simgeyi 288 dp'lik kareye oturtur; iOS'ta app.json'daki `ios.imageWidth` bu
-// değere eşitlenir → iki platformda da yerel splash ile JS splash'te "S" AYNI
-// boyutta ve el değiştirme sıçramasız olur.
-export const LOGO_SIZE = 288;
-
-export const TILE_W = 78;
-export const TILE_H = 117;
-export const FIRST_RING_RADIUS = 150; // logo boşluğu → ilk halkanın merkezi
-export const RING_STEP = TILE_H + 6; // halkalar radyal olarak neredeyse bitişik
-export const MAX_RING_COUNT = 4; // büyük ekranlarda (tablet) dördüncü halka da gelir
-export const TANGENTIAL_GAP = 4; // aynı halkadaki posterler neredeyse bitişik
-// Halkanın iç kenarı köşe uzaklığının bu kesrini aşıyorsa halka ekrana yeterince
-// girmiyor sayılır ve üretilmez.
-const CORNER_REACH = 0.97;
-
-// Işıma görseli (assets/splash-glow.png, scripts/generate-splash-glow.cjs ile
-// üretilir; SVG degrade DEĞİL — hazır bitmap, açılışta çizim/ayrıştırma işi yok)
-// bu kareye gerilir.
-export const GLOW_SIZE = 380;
-
-// ── Easing (saf; RN Easing'e bağımlı değil) ──────────────────────────────────
-export const ease = {
-  linear: (t) => t,
-  outQuad: (t) => 1 - (1 - t) * (1 - t),
-  outCubic: (t) => 1 - Math.pow(1 - t, 3),
-  inCubic: (t) => t * t * t,
-  inOutCubic: (t) =>
-    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
-  // Hafif aşımlı varış: "çiçeklenme" hissi. s = aşım miktarı (1.2 ≈ %5 taşma).
-  outBack: (t, s = 1.2) => {
-    const c3 = s + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2);
-  },
+// ── Yardımcılar ──────────────────────────────────────────────────────────────
+export const clamp01 = (x) => Math.max(0, Math.min(1, x));
+export const ease = Object.freeze({
+  linear: (x) => x,
+  out: (x) => 1 - (1 - x) ** 3,
+  inOut: (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
+  // Sönümlü yay (aşımlı oturma): 0 → 1, birkaç küçük salınım.
+  spring: (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-5.5 * x) * Math.cos(9.5 * x)),
+});
+const round = (v, digits = 4) => {
+  const k = 10 ** digits;
+  return Math.round(v * k) / k;
 };
 
-/**
- * Easing'i [from,to] giriş aralığında örnekleyip interpolate tablosuna çevirir.
- * Sürücü aralığın dışında kenar değerde kalır (çağıran `extrapolate: "clamp"`
- * kullanmalı).
- */
-export function sampleCurve({ from = 0, to = 1, a, b, easing = ease.linear, samples = 14 }) {
-  const inputRange = [];
-  const outputRange = [];
-  for (let i = 0; i <= samples; i++) {
-    const t = i / samples;
-    inputRange.push(from + (to - from) * t);
-    outputRange.push(a + (b - a) * easing(t));
+// ── Hareket fonksiyonları (t saniye) ─────────────────────────────────────────
+
+/** İki yıldızın merkezleri arası (tasarım birimi). Çarpışmadan sonra yay ile d'ye oturur. */
+export function sepAt(t) {
+  if (t < T.collide) {
+    const u = clamp01((t - T.appear) / (T.collide - T.appear));
+    return CONTACT_SEP + (START_SEP - CONTACT_SEP) * (1 - u) ** 1.6;
   }
-  return { inputRange, outputRange };
+  return CONTACT_SEP - (CONTACT_SEP - LENS.d) * ease.spring(clamp01((t - T.collide) / (T.settle - T.collide)));
 }
 
-// ── Halka geometrisi ─────────────────────────────────────────────────────────
-
-/**
- * İkonun etrafında eş merkezli daireler: her halkada posterler çembere eşit açıyla
- * dizilir, komşu halkalar yarım adım kaydırılır. Konumlar ekran MERKEZİNE göre
- * (dx, dy) verilir — ekranı ölçmeye (onLayout) ve ölçü gelince yeniden
- * yerleştirmeye gerek yoktur; bileşen `left/top: 50%` + kenar boşluğuyla çizer.
- *
- * Bir halka, iç kenarı ekranın köşe uzaklığına (neredeyse) varmıyorsa üretilmez:
- * köşeye yalnızca ucu değen dördüncü halka (35 poster) telefonda görünür bir şey
- * katmaz. İlk halka her ekranda vardır. Ekran dışında kalan posterlerin elenmesi
- * burada DEĞİL utils/splashPlan.js'te (yörünge + çiçeklenme payıyla).
- */
-export function buildRings(screenW, screenH, maxRings = MAX_RING_COUNT) {
-  const cornerDistance = Math.hypot(screenW / 2, screenH / 2);
-  const limit = Math.min(maxRings, MAX_RING_COUNT);
-  const rings = [];
-  for (let ring = 0; ring < limit; ring++) {
-    const radius = FIRST_RING_RADIUS + ring * RING_STEP;
-    if (ring > 0 && radius - TILE_H / 2 > cornerDistance * CORNER_REACH) break;
-    const count = Math.max(
-      6,
-      Math.round((2 * Math.PI * radius) / (TILE_W + TANGENTIAL_GAP)),
-    );
-    const angleOffset = ring % 2 ? Math.PI / count : 0;
-    const tiles = [];
-    for (let s = 0; s < count; s++) {
-      const angle = angleOffset + (s / count) * 2 * Math.PI;
-      tiles.push({ dx: radius * Math.cos(angle), dy: radius * Math.sin(angle) });
+// Kepler benzeri dönüş: açısal hız ayrılığın -1,5 kuvvetiyle artar, çarpışmadan sonra söner.
+// Toplam açı sayısal integralle bir kez hesaplanır; son açı -90° (cyan üstte, dikey kilit).
+const DT = 1 / 2000;
+let thetaCache = null;
+function thetaIntegral() {
+  if (thetaCache) return thetaCache;
+  const steps = Math.ceil((INTRO_S + 0.5) / DT);
+  const acc = new Float64Array(steps + 1);
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const t = i * DT;
+    let w = 0;
+    if (t >= T.appear && t < T.collide) w = sepAt(t) ** -1.5;
+    else if (t >= T.collide && t < T.settle) {
+      w = CONTACT_SEP ** -1.5 * (1 - (t - T.collide) / (T.settle - T.collide)) ** 2;
     }
-    rings.push({ ring, radius, tiles });
+    sum += w * DT;
+    acc[i] = sum;
   }
-  return rings;
+  const end = acc[Math.round(T.settle / DT)];
+  thetaCache = { acc, end, k: (TURNS * 2 * Math.PI) / end };
+  return thetaCache;
 }
 
-/** Halka yönü: çift halkalar saat yönünde, tekler tersi → komşu halkalar birbirine zıt akar. */
-export const orbitDirection = (ring) => (ring % 2 === 0 ? 1 : -1);
+export const WOBBLE_S = 0.6;
 
-// ── Yörünge (sınırlı, yavaşlayarak durur) ────────────────────────────────────
-// Halka kabı `orbitTable(dir)` kadar döner; her poster `orbitTable(dir, true)`
-// ile TERS döner → posterler dik kalır. Aynı sürücüden türediği için toplamları
-// her an tam sıfırdır.
-export function orbitTable(dir, counter = false) {
-  const sign = counter ? -dir : dir;
-  const { inputRange, outputRange } = sampleCurve({
-    a: 0,
-    b: sign * ORBIT_SWEEP_DEG,
-    easing: ease.outQuad,
-    samples: 14,
-  });
-  return { inputRange, outputRange: outputRange.map((v) => `${v.toFixed(4)}deg`) };
-}
-
-// ── Giriş: halka çiçeklenmesi ────────────────────────────────────────────────
-const BLOOM_START = 0.08; // ilk halkanın başlangıcı (INTRO'nun kesri)
-const BLOOM_STAGGER = 0.09; // halkalar arası gecikme
-const BLOOM_SPAN = 0.52; // bir halkanın çiçeklenme süresi
-export const BLOOM_FROM_SCALE = 0.55; // halka merkeze yakın başlar, dışa açılır
-// Dış halkalar arka planda kalsın: odak ortadaki logo + iç halkalarda.
-const RING_PEAK_OPACITY = [1, 0.88, 0.74, 0.62];
-// Dalga akmıyorsa (düşük kalite / hareketi azalt) posterler tepe parlaklığın bu
-// kesrinde SABİT durur: ne tamamen sönük ne de dalga tepesi kadar parlak.
-export const STATIC_LEVEL = 0.5;
-
-export const ringPeakOpacity = (ring) =>
-  RING_PEAK_OPACITY[Math.min(ring, RING_PEAK_OPACITY.length - 1)];
-
-/** Halkanın giriş penceresi, INTRO sürücüsünün [0,1] kesri olarak. */
-export function bloomWindow(ring) {
-  const start = BLOOM_START + BLOOM_STAGGER * ring;
-  return { start, end: Math.min(1, start + BLOOM_SPAN) };
-}
-
-/** `flat` true ise ölçek hep 1 (çiçeklenme yalnız opaklıkla). */
-export function bloomScaleTable(ring, flat = false) {
-  const { start, end } = bloomWindow(ring);
-  return sampleCurve({
-    from: start,
-    to: end,
-    a: flat ? 1 : BLOOM_FROM_SCALE,
-    b: 1,
-    easing: flat ? ease.linear : (t) => ease.outBack(t, 1.1),
-  });
-}
-
-/** `level`: tepe parlaklığın kesri (dalga varken 1; dalgasızken STATIC_LEVEL). */
-export function bloomOpacityTable(ring, level = 1) {
-  const { start, end } = bloomWindow(ring);
-  // Opaklık ölçekten biraz önce oturur: halka belirirken büyüyormuş gibi değil,
-  // büyürken belirmiş gibi görünür.
-  return sampleCurve({
-    from: start,
-    to: start + (end - start) * 0.7,
-    a: 0,
-    b: ringPeakOpacity(ring) * level,
-    easing: ease.outCubic,
-    samples: 10,
-  });
-}
-
-// ── Dalga (Meksika dalgası) ──────────────────────────────────────────────────
-const WAVE_SCALE_AMP = 0.14; // tepe noktasında poster 1.14x büyür
-const WAVE_CREST = 0.4; // halka döngünün yalnız bu kesrinde hareket eder
-const WAVE_REST_OPACITY = 0.14;
-const WAVE_SAMPLES = 32;
-
-// Yükseltilmiş-kosinüs tepeciği; dışında 0. f(0)=f(1) → döngü sarımında sıçrama yok.
-function crestBump(local) {
-  return local < WAVE_CREST
-    ? 0.5 * (1 - Math.cos((2 * Math.PI * local) / WAVE_CREST))
-    : 0;
-}
-
-function waveTable(phase, map) {
-  const inputRange = [];
-  const outputRange = [];
-  for (let s = 0; s <= WAVE_SAMPLES; s++) {
-    const t = s / WAVE_SAMPLES;
-    inputRange.push(t);
-    outputRange.push(map(crestBump((t - phase + 1) % 1)));
+/** Yıldız ekseninin açısı (radyan). Ekran koordinatı: y aşağı; -π/2 = cyan tam üstte. */
+export function thetaAt(t) {
+  const { acc, end, k } = thetaIntegral();
+  const i = Math.max(0, Math.min(acc.length - 1, Math.round(t / DT)));
+  let th = -Math.PI / 2 - (end - acc[i]) * k;
+  if (t > T.settle && t < T.settle + WOBBLE_S) {
+    // Oturmanın küçük sallantısı; pencerenin sonunda TAM -90°'ye iner.
+    const q = t - T.settle;
+    th += 0.09 * Math.exp(-8 * q) * Math.sin(20 * q) * (1 - q / WOBBLE_S);
   }
-  return { inputRange, outputRange };
+  return th;
 }
 
-export function waveScaleTable(phase) {
-  return waveTable(phase, (b) => 1 + WAVE_SCALE_AMP * b);
+/** Yıldız boyu (0..1, r'nin oranı): küçük ve parlak başlar, çarpışmada tam boy. */
+export function sizeAt(t) {
+  if (t < T.appear) return 0;
+  if (t < T.grow) return 0.3 * ease.out(clamp01((t - T.appear) / (T.grow - T.appear)));
+  if (t < T.collide) return 0.3 + 0.7 * ease.inOut(clamp01((t - T.grow) / (T.collide - T.grow)));
+  return 1;
 }
 
-export function waveOpacityTable(phase) {
-  return waveTable(phase, (b) => WAVE_REST_OPACITY + (1 - WAVE_REST_OPACITY) * b);
+/** Yıldız halesinin gücü: yaklaşırken yanar, çarpışmadan sonra söner. */
+export function glowAt(t) {
+  if (t < T.collide) return clamp01((t - T.appear) / 0.2);
+  return 1 - ease.out(clamp01((t - T.collide) / 0.5));
 }
 
-// ── Logo ─────────────────────────────────────────────────────────────────────
-// İlk karede logo yerel splash'le aynı (ölçek 1, opaklık 1). Halkalar açılırken tek
-// bir nabız atar: halkaları "o salmış" gibi okunur.
-export function logoPulseTable() {
-  const from = 0.12;
-  const to = 0.5;
-  const inputRange = [];
-  const outputRange = [];
-  const samples = 16;
-  for (let i = 0; i <= samples; i++) {
-    const t = i / samples;
-    inputRange.push(from + (to - from) * t);
-    outputRange.push(1 + 0.07 * Math.sin(Math.PI * t));
-  }
-  return { inputRange, outputRange };
+/** Işık izinin gücü: çarpışmaya dek tam, sonra hızla söner. */
+export const trailAt = (t) => (t < T.collide ? 1 : 1 - clamp01((t - T.collide) / 0.2));
+
+/** Çarpışma anında işaretin kısa "yumruk" büyümesi (oran, 0 = yok). */
+export function punchAt(t) {
+  const tau = t - T.collide;
+  if (tau <= 0) return 0;
+  return 0.07 * Math.exp(-9 * tau) * Math.sin(Math.min(tau * 20, Math.PI));
 }
 
-/** [0,1] döngüsü boyunca 1 → 1+amp → 1 sinüs "nefesi" (sarım noktasında kesintisiz). */
-export function breathTable(amp) {
-  const inputRange = [];
-  const outputRange = [];
-  const samples = 16;
-  for (let i = 0; i <= samples; i++) {
-    const t = i / samples;
-    inputRange.push(t);
-    outputRange.push(1 + amp * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
-  }
-  return { inputRange, outputRange };
-}
+/** İşaretin yukarı kayma ilerlemesi (0..1). */
+export const riseAt = (t) => ease.inOut(clamp01((t - T.riseAt) / T.riseDur));
 
-// ── Zemin + ışıma girişi ─────────────────────────────────────────────────────
-export function veilTable() {
-  return sampleCurve({ from: 0, to: 0.4, a: 0, b: 1, easing: ease.outCubic, samples: 8 });
-}
+/** Giriş ölçeği → son ölçek oranı: video gibi işaret önce %18 büyük, yazıyla birlikte küçülür. */
+export const INTRO_TO_FINAL = 1 / 1.18;
 
-/** `peak`: ışımanın tepe opaklığı (açık zeminde daha silik). */
-export function glowOpacityTable(peak = 1) {
-  return sampleCurve({ from: 0, to: 0.78, a: 0, b: peak, easing: ease.outCubic, samples: 10 });
-}
+/** İşaret kabının ölçeği (giriş ölçeğine göre): kayarken küçülür, çarpışmada yumruk. */
+export const markScaleAt = (t) => (1 + (INTRO_TO_FINAL - 1) * riseAt(t)) * (1 + punchAt(t));
 
-export function glowScaleTable(flat = false) {
-  return sampleCurve({
-    from: 0,
-    to: 0.78,
-    a: flat ? 1 : 0.7,
-    b: 1,
-    easing: ease.outCubic,
-    samples: 10,
-  });
-}
+/** Göz bebeği yayı (0..1, aşımlı). */
+export const pupilAt = (t) => ease.spring(clamp01((t - T.pupilAt) / T.pupilDur));
+export const glintOpacityAt = (t) => clamp01((t - T.glintAt) / T.glintDur);
+
+/** i. harfin ilerlemesi (0..1). */
+export const letterAt = (t, i) => ease.out(clamp01((t - T.lettersAt - i * T.letterStep) / T.letterDur));
+
+/** Yıldız alanının belirişi. */
+export const starsInAt = (t) => clamp01(t / 0.4);
 
 /**
- * Işıma görselinin (koyu zemine göre pişirilmiş: tepe alfa 0.62) görünürlük çarpanı.
- * Açık zeminde daha silik (yoksa yıkanmış görünür): 0.4 / 0.62 ≈ 0.65.
+ * Göz ölçeği, verilen ayrılıkta (son göze göre): [eksen boyunca, enine].
+ * Kesişim yoksa (ayrılık ≥ 2r) ikisi de 0.
  */
-export const glowPeakAlpha = (isLightBackground) => (isLightBackground ? 0.65 : 1);
-
-// ── Çıkış ────────────────────────────────────────────────────────────────────
-// Çıkış sürücüsü 0→1 (EXIT_MS). Katmanlar farklı pencerelerde ve ölçeklerde süzülür;
-// iç halkalar önce, dış halkalar bir an sonra çözülür → "içinden geçiş" hissi.
-const EXIT_RING_SCALE = 1.34;
-const EXIT_LOGO_SCALE = 1.2;
-const EXIT_GLOW_SCALE = 1.5;
-
-export function exitRingScaleTable(ring, flat = false) {
-  return sampleCurve({
-    from: 0,
-    to: 1,
-    a: 1,
-    b: flat ? 1 : EXIT_RING_SCALE + 0.03 * ring,
-    easing: ease.inCubic,
-    samples: 12,
-  });
+export function eyeScaleForSep(sep) {
+  const along = Math.max(0, CONTACT_SEP - sep) / EYE_LENGTH;
+  const half = sep / 2;
+  const across = half >= LENS.r ? 0 : (2 * Math.sqrt(LENS.r ** 2 - half ** 2)) / EYE_WIDTH;
+  return [along, across];
 }
 
-export function exitRingOpacityTable(ring) {
-  const from = 0.06 + 0.05 * ring;
-  return sampleCurve({ from, to: Math.min(1, from + 0.7), a: 1, b: 0, easing: ease.inOutCubic, samples: 10 });
+// ── Çarpışma efektleri (tau = t - T.collide) ─────────────────────────────────
+export const FLASH_S = 0.35;
+export const flashOpacityAt = (t) => {
+  const tau = t - T.collide;
+  if (tau <= 0 || tau >= FLASH_S) return 0;
+  return 0.75 * (1 - tau / FLASH_S) ** 2;
+};
+// Parlamanın yarıçapı ekran genişliğinin oranı olarak (en büyük 0,42).
+export const FLASH_MAX = 0.42;
+export const flashRadiusAt = (t) => 0.12 + 0.3 * clamp01((t - T.collide) / FLASH_S);
+
+// Şok halkaları: [gecikme s, renk, en büyük yarıçap (ekran genişliği oranı)].
+export const SHOCK_RINGS = Object.freeze([
+  Object.freeze([0, LENS_COLORS.paper, 0.75]),
+  Object.freeze([0.05, LENS_COLORS.cyan, 0.62]),
+  Object.freeze([0.09, LENS_COLORS.red, 0.55]),
+]);
+export const SHOCK_S = 0.6;
+export const SHOCK_MIN = 0.05;
+export function shockProgressAt(t, ring) {
+  return clamp01((t - T.collide - SHOCK_RINGS[ring][0]) / SHOCK_S);
+}
+export const shockRadiusAt = (t, ring) =>
+  SHOCK_MIN + SHOCK_RINGS[ring][2] * ease.out(shockProgressAt(t, ring));
+export function shockOpacityAt(t, ring) {
+  const p = shockProgressAt(t, ring);
+  return p <= 0 || p >= 1 ? 0 : 0.6 * (1 - p) ** 1.4;
 }
 
-export function exitLogoScaleTable(flat = false) {
-  return sampleCurve({
-    from: 0,
-    to: 0.8,
-    a: 1,
-    b: flat ? 1 : EXIT_LOGO_SCALE,
-    easing: ease.inCubic,
-    samples: 10,
-  });
+/** Kıvılcımın merkezden uzaklığı (ekran genişliği oranı) ve opaklığı. */
+export const sparkDistanceAt = (t, v) => {
+  const tau = Math.max(0, t - T.collide);
+  return 0.62 * v * (1 - Math.exp(-4.5 * tau));
+};
+export function sparkOpacityAt(t, life) {
+  const tau = t - T.collide;
+  if (tau <= 0 || tau >= life) return 0;
+  return (1 - tau / life) ** 1.3;
 }
 
-export function exitLogoOpacityTable() {
-  return sampleCurve({ from: 0.04, to: 0.8, a: 1, b: 0, easing: ease.inOutCubic, samples: 10 });
+// ── Bekleme döngüsü (b ∈ [0,1], IDLE_MS) ─────────────────────────────────────
+export const LOOK_WINDOW = Object.freeze([0.08, 0.3]);
+export const BLINK_WINDOW = Object.freeze([0.5, 0.5 + 0.22 / (IDLE_MS / 1000)]);
+export const LOOK_UNITS = -18; // bebek bu kadar sola bakar
+export const BLINK_SEP = 148; // kırpışta daireler bu kadar ayrılır → göz kapanır
+const windowPhase = (b, [a, z]) => (b <= a || b >= z ? 0 : Math.sin((Math.PI * (b - a)) / (z - a)));
+export const lookAt = (b) => LOOK_UNITS * windowPhase(b, LOOK_WINDOW);
+export const blinkAt = (b) => windowPhase(b, BLINK_WINDOW); // 0..1..0
+export const blinkSepAt = (b) => BLINK_SEP * blinkAt(b);
+// Göz kapanırken bebek ince bir şerit olarak kalmasın: kapanmanın sonunda solar.
+export const blinkFadeAt = (b) => clamp01((blinkAt(b) - 0.55) / 0.3);
+
+// ── Pırıltı döngüsü (yıldız grubu başına faz) ────────────────────────────────
+export const twinkleAt = (x, phase) => 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(2 * Math.PI * (x + phase)));
+
+// ── Tema zemini ──────────────────────────────────────────────────────────────
+// Yerel splash uygulamanın temasını okuyamaz (tema JS deposunda), bu yüzden sahne
+// HER temada mürekkep uzayda başlar. Çarpışmanın şok dalgası ekranı merkezden
+// temanın zeminine boyar; açık temada yıldızlar bu sırada söner. Hareketi Azalt'ta
+// dalga yok: zemin ilk anlarda kısa bir geçişle temaya döner.
+export const WIPE_S = 0.55;
+const wipeProgressAt = (t) => clamp01((t - T.collide) / WIPE_S);
+export const wipeAt = (t) => ease.out(wipeProgressAt(t)); // dalga yarıçapı (0 → ekranı örter)
+export const wipeOpacityAt = (t) => ease.out(clamp01(wipeProgressAt(t) / 0.35));
+export const STILL_WIPE_S = 0.35;
+export const stillWipeAt = (t) => ease.inOut(clamp01(t / STILL_WIPE_S));
+
+// ── Çıkış (e ∈ [0,1], EXIT_MS) ───────────────────────────────────────────────
+export const exitContentOpacityAt = (e) => 1 - ease.out(clamp01(e / 0.6));
+export const exitContentScaleAt = (e) => 1 + 0.06 * ease.out(clamp01(e / 0.7));
+export const exitBackdropOpacityAt = (e) => 1 - ease.inOut(clamp01((e - 0.35) / 0.65));
+
+// ── Tablolar ─────────────────────────────────────────────────────────────────
+
+/**
+ * Bir fonksiyonu [from, to] aralığında örnekleyip native interpolate tablosu kurar.
+ * Aralık dışında değer sabit kalsın diye çağıran `extrapolate: "clamp"` verir.
+ * `step` saniye (ya da sürücü birimi) aralıkla; uçlar her zaman dahil.
+ */
+export function sampleTable(fn, { from = 0, to = INTRO_S, step = 1 / 60, map, knots = KEY_TIMES } = {}) {
+  const xs = [];
+  const n = Math.max(1, Math.ceil((to - from) / step - 1e-9));
+  for (let i = 0; i <= n; i++) xs.push(round(i === n ? to : from + i * step, 5));
+  // Kırılma anları (çarpışma, oturma...) örnek ızgarasına düşmese de tabloda olsun:
+  // yoksa doğrusal ara değer o anın değerini kaçırır (ör. çarpışmadaki ayrılık).
+  for (const k of knots) if (k > from && k < to) xs.push(round(k, 5));
+  xs.sort((p, q) => p - q);
+  const inputRange = [];
+  const outputRange = [];
+  for (const x of xs) {
+    if (inputRange.length && x - inputRange[inputRange.length - 1] < 1e-4) continue;
+    const v = fn(x);
+    inputRange.push(x);
+    outputRange.push(map ? map(v) : round(v));
+  }
+  return { inputRange, outputRange };
 }
 
-export function exitGlowScaleTable(flat = false) {
-  return sampleCurve({
-    from: 0,
-    to: 0.8,
-    a: 1,
-    b: flat ? 1 : EXIT_GLOW_SCALE,
-    easing: ease.outCubic,
-    samples: 10,
-  });
-}
+export const toDeg = (rad) => `${round((rad * 180) / Math.PI, 3)}deg`;
 
-export function exitGlowOpacityTable() {
-  return sampleCurve({ from: 0, to: 0.8, a: 1, b: 0, easing: ease.inOutCubic, samples: 10 });
-}
-
-// Zemin en son açılır: önce içerik çözülür, sonra altındaki uygulama belirir.
-export function exitBackdropTable() {
-  return sampleCurve({ from: 0.3, to: 1, a: 1, b: 0, easing: ease.inOutCubic, samples: 12 });
+/** Bir tablonun bütün çıktıları sayısal ve sonlu mu (test ve geliştirme denetimi). */
+export function isFiniteTable({ inputRange, outputRange }) {
+  if (inputRange.length !== outputRange.length || inputRange.length < 2) return false;
+  for (let i = 1; i < inputRange.length; i++) if (!(inputRange[i] > inputRange[i - 1])) return false;
+  return outputRange.every((v) =>
+    typeof v === "number" ? Number.isFinite(v) : /^-?\d+(\.\d+)?deg$/.test(v),
+  );
 }

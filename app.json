@@ -65,9 +65,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/icon_default/android-icon-foreground.png",
+          "image": "./assets/splash/native-blank.png",
           "resizeMode": "contain",
-          "backgroundColor": "#1E1E1E",
+          "backgroundColor": "#0D0E13",
           "ios": {
             "imageWidth": 288
           }

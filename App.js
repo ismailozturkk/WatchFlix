@@ -46,7 +46,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import LoginScreen from "./screens/auth/LoginScreen";
 import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
 import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
-import LottieView from "lottie-react-native";
+import WeatherLayer from "./components/decor/WeatherLayer";
 import { useTheme } from "./context/ThemeContext";
 import { SnowProvider, useSnow } from "./context/SnowContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
@@ -89,7 +89,7 @@ import PremiumTopBannerLayout from "./components/premium/PremiumTopBannerLayout"
 import { PosterChoicesProvider } from "./context/PosterChoicesProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
-import SplashPosterWave from "./components/SplashPosterWave";
+import SplashLensIntro from "./components/SplashLensIntro";
 import { FALLBACK_EXIT_MS, MIN_VISIBLE_MS } from "./utils/splashMotion";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
@@ -139,10 +139,10 @@ installTmdbKeyHealth();
 installTmdbTitleFallback();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 // Yerel splash anında değil kısa bir çapraz solmayla çekilir (Android varsayılanı
-// zaten solar, iOS'ta `fade` açılmalı). Yerel ve JS splash'in logosu aynı boyutta
-// ve aynı yerde (utils/splashMotion LOGO_SIZE ↔ app.json ios.imageWidth), bu
-// yüzden çapraz solma "iki logo üst üste" değil, tek logonun etrafında halkaların
-// belirmesi gibi görünür. `setOptions`ı bilmeyen eski bir yerel derlemede
+// zaten solar, iOS'ta `fade` açılmalı). Yerel splash yalnız mürekkep zemindir
+// (görseli saydam: assets/splash/native-blank.png) ve JS splash'in ilk karesi de
+// aynı zemin; çapraz solma görünmez, yıldızlar boş uzayda doğar.
+// `setOptions`ı bilmeyen eski bir yerel derlemede
 // fırlayabilir; sessizce yutulur.
 try {
   ExpoSplashScreen.setOptions({ fade: true, duration: 320 });
@@ -224,38 +224,29 @@ setTimeout(() => {
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
-// Splash arka planı (theme.primary) koyuysa status bar ikonları açık renk
-// basılmalı. expo-status-bar "barStyle" değil "style" prop'u tanır; cihaz
-// temasına düşen "auto" yerine gerçek arka plan parlaklığından türetiyoruz.
-
-
-// Açılış ekranı: tüm hareket (giriş, döngü, çıkış) SplashPosterWave'de. Burası
-// yalnız tema/kar bağlamlarını ona taşır. `exiting` true olunca çıkış başlar,
-// bitince `onExited` çağrılır (overlay o zaman sökülür).
+// Açılış ekranı: tüm hareket (Lens yıldız animasyonu, bekleme döngüsü, çıkış)
+// SplashLensIntro'da. Burası yalnız tema zeminini ve kar bağlamını ona taşır.
+// `exiting` true olunca çıkış başlar, bitince `onExited` çağrılır (overlay o zaman
+// sökülür). Sahne mürekkep uzayda başlar (yerel splash), çarpışma dalgası ekranı
+// temanın zeminine boyar; durum çubuğu simge rengini de SplashLensIntro yönetir.
 const SplashScreen = ({ exiting, onExited, onIntroStart }) => {
-  const { theme } = useTheme();
   const { showSnow } = useSnow();
-  const light = isLightSurface(theme.primary);
+  const { theme } = useTheme();
 
   return (
-    <SplashPosterWave
-      backgroundColor={theme.primary}
-      light={light}
+    <SplashLensIntro
       exiting={exiting}
       onExited={onExited}
       onIntroStart={onIntroStart}
       background={theme.primary}
     >
+      {/* Hava efekti (Skia) — Skia modülü yalnız efekt açıkken yüklenir. */}
       {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("@lottie/snow.json")}
-          autoPlay={true}
-          loop
-        />
+        <View style={styles.splashWeather} pointerEvents="none">
+          <WeatherLayer playing />
+        </View>
       )}
-      <StatusBar style={light ? "dark" : "light"} />
-    </SplashPosterWave>
+    </SplashLensIntro>
   );
 };
 
@@ -738,6 +729,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="AtmosphereScreen"
+          getComponent={() => require("./screens/tabs/settings/AtmosphereScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="HapticsSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/HapticsSettingsScreen").default}
           options={{ headerShown: false }}
@@ -888,13 +884,18 @@ function AppContent() {
           options={{ headerShown: false, animation: "fade" }}
         />
         <Stack.Screen
+          name="QuickGameScreen"
+          getComponent={() => require("./screens/game/QuickGameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
           name="DailyFrameScreen"
           getComponent={() => require("./screens/game/DailyFrameScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
-          name="QuickGameScreen"
-          getComponent={() => require("./screens/game/QuickGameScreen").default}
+          name="Top100Screen"
+          getComponent={() => require("./screens/fun/Top100Screen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -918,13 +919,13 @@ function AppContent() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
-          name="Top100Screen"
-          getComponent={() => require("./screens/fun/Top100Screen").default}
+          name="OlderGameScreen"
+          getComponent={() => require("./screens/game/OlderGameScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
-          name="OlderGameScreen"
-          getComponent={() => require("./screens/game/OlderGameScreen").default}
+          name="FilmChainScreen"
+          getComponent={() => require("./screens/game/FilmChainScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -935,11 +936,6 @@ function AppContent() {
         <Stack.Screen
           name="FilmClubDiscussionScreen"
           getComponent={() => require("./screens/club/FilmClubDiscussionScreen").default}
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="FilmChainScreen"
-          getComponent={() => require("./screens/game/FilmChainScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -988,10 +984,10 @@ function AppContent() {
 
 export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
-  // Çıkış animasyonu SplashPosterWave'in içinde; burada yalnız tetikleyici durur.
+  // Çıkış animasyonu SplashLensIntro'nun içinde; burada yalnız tetikleyici durur.
   const [splashExiting, setSplashExiting] = useState(false);
-  // Splash girişi, afişler çözülünce başlar (SplashPosterWave). En kısa görünme
-  // süresi o andan sayılır; yoksa hızlı açılışta splash afişler görünmeden kapanırdı.
+  // Splash girişi mount anında başlar (SplashLensIntro onIntroStart'ı çağırır). En
+  // kısa görünme süresi o andan sayılır.
   const splashIntro = useRef(null);
   if (!splashIntro.current) {
     let resolve;
@@ -1038,8 +1034,8 @@ export default wrapRoot(function App() {
     ExpoSplashScreen.hideAsync().catch(() => {});
 
     // Preload zaten modül yüklenirken başladı (yukarıda).
-    // Splash en az MIN_VISIBLE_MS görünür: giriş animasyonu (halkaların
-    // çiçeklenmesi) bitmeden çıkışa geçmek onu yarıda keserdi. Veri geç geliyorsa
+    // Splash en az MIN_VISIBLE_MS görünür: giriş animasyonu (yıldızların
+    // çarpışıp Lens'e dönüşmesi ve yazı) bitmeden çıkışa geçmek onu yarıda keserdi. Veri geç geliyorsa
     // splash zaten APP_READY'ye kadar kalır — bu sabit yalnız "her şey hazırken"
     // ödenen tabandır (utils/splashMotion.js).
     const MIN_MS = MIN_VISIBLE_MS;
@@ -1228,12 +1224,12 @@ const styles = StyleSheet.create({
   blurRoot: {
     flex: 1,
   },
-  lottie: {
+  splashWeather: {
     position: "absolute",
     top: 0,
-    height: 1000,
-    left: -60,
-    right: -60,
+    bottom: 0,
+    left: 0,
+    right: 0,
     zIndex: 0,
   },
   toastError: {
