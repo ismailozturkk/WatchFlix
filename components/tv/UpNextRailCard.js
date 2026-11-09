@@ -1,12 +1,21 @@
 // components/tv/UpNextRailCard.js
 //
-// TV ana ekranındaki "Devam Eden Dizilerim" rayının kartı. Poster ölçüsü ve
-// rozet düzeni diğer raylarla aynıdır; farkı SIRADAKİ BÖLÜM katmanıdır:
-// sıradaki bölüm aksiyonları POSTERİN ÜZERİNDE, alt kısmındaki gradient
-// karartmanın içinde durur. Böylece kart rayın standart yüksekliğini korur —
-// poster altına şerit eklenseydi bu bölüm diğer raylardan uzun görünürdü.
+// Kütüphane sekmesindeki "Devam Edenler" rayının kartı (9 Kas yenilemesi,
+// aynı gün kompaktlaştırıldı).
 //
-// Düğmeler posterin dokunma alanının İÇİNDE olduğundan basış olayı ayrıca
+// Yayın uygulamalarındaki "izlemeye devam et" kartı gibi yatay ama KISA:
+//
+//   ┌──────── bölüm karesi (2:1) ─────────┐
+//   │ [S2·B5]                     [12/24] │
+//   │ ▄ [afiş] Dizi adı  %50              │
+//   └═════════ ilerleme çubuğu ═══════════┘
+//     Bölüm adı                   (📅) (✓)
+//     S2 · B5 · 3 Kas
+//
+// Bölüm karesi (TMDB still) yoksa dizinin afişi bulanıklaştırılıp zemin yapılır;
+// küçük afiş küçük resmi her durumda diziyi tanıtır.
+//
+// Düğmeler kartın dokunma alanının İÇİNDE olduğundan basış olayı ayrıca
 // durduruluyor (bkz. stopPropagation): düğmeye dokunmak diziyi açmasın.
 //
 // Üç uç durum bilinçlidir:
@@ -15,13 +24,13 @@
 //   • item.isAired false → bölüm var ama yayınlanmadı (işaretlenemez)
 //
 // "İzledim" kartı beklemeden sıradaki bölüme ilerletir (useUpNextQueue). Bölüm
-// değişimi sessiz bir metin değişimi gibi görünmesin diye bölüm katmanı sağdan
+// değişimi sessiz bir metin değişimi gibi görünmesin diye bölüm içeriği sağdan
 // kayarak, bölüm numarası rozeti zıplayarak gelir. İlk çizimde ve iskeletten
 // çözülmeye geçişte oynamaz — yalnız gösterilen bölüm BAŞKA bir bölüme
 // döndüğünde (izlendi, geri alındı ya da arka plan tazelemesi ilerletti).
 
 import { intlLocaleOf } from "../../utils/appLanguages";
-import React, { memo, useEffect, useRef } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -31,14 +40,23 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Progress from "react-native-progress";
 
 import PosterImage from "../PosterImage";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import useReduceMotion from "../../hooks/useReduceMotion";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { getWatchedShowProgress } from "../../utils/watchState";
+
+const RADIUS = 16;
+const THUMB_W = 32;
+const THUMB_H = 48;
+const ACTION = 34;
+// "İzledim" onayının bekleme süresi (göz → tik → göz).
+const CONFIRM_MS = 3000;
 
 const formatAirDate = (value, language) => {
   if (!value) return null;
@@ -54,7 +72,7 @@ function UpNextRailCard({
   show,
   item,
   resolved,
-  poster,
+  cardWidth,
   theme,
   language,
   scaleValue,
@@ -65,10 +83,51 @@ function UpNextRailCard({
   onChooseDate,
   onQuickActions,
 }) {
+  const { getTmdbUrl } = useImageQualitySettings();
+  // Bulanık zemin de kullanıcının özel afiş seçimine uysun (küçük resimle aynı afiş).
+  const posterUri = usePosterUri();
   const { watched, total, progress } = getWatchedShowProgress(show);
-  const progressColor = progress > 0 ? "#FF9500" : theme.accent;
+  const accent = theme.accent;
   const upcomingColor = theme.colors?.orange || "#FF9500";
+  const textPrimary = theme.text?.primary || "#fff";
+  const textMuted = theme.text?.muted || theme.text?.between || "#888";
   const reduceMotion = useReduceMotion();
+
+  // ── İki adımlı "İzledim" onayı ──
+  // İlk dokunuş göz simgesini tik'e çevirir; tik CONFIRM_MS boyunca bekler,
+  // ikinci dokunuş bölümü işaretler. Süre dolarsa ya da bölüm değişirse göze döner.
+  const [confirmArmed, setConfirmArmed] = useState(false);
+  const confirmTimer = useRef(null);
+  const confirmPop = useRef(new Animated.Value(1)).current;
+  const disarmConfirm = useCallback(() => {
+    if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    confirmTimer.current = null;
+    setConfirmArmed(false);
+  }, []);
+  const armConfirm = useCallback(() => {
+    if (confirmTimer.current) clearTimeout(confirmTimer.current);
+    setConfirmArmed(true);
+    confirmTimer.current = setTimeout(() => {
+      confirmTimer.current = null;
+      setConfirmArmed(false);
+    }, CONFIRM_MS);
+    if (!reduceMotion) {
+      confirmPop.setValue(0.5);
+      Animated.spring(confirmPop, {
+        toValue: 1,
+        friction: 5,
+        tension: 140,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [confirmPop, reduceMotion]);
+  useEffect(() => () => confirmTimer.current && clearTimeout(confirmTimer.current), []);
+
+  // 2:1 — 16:9'dan biraz basık; kare yine tanınır, kart kısa kalır.
+  const heroHeight = Math.round(cardWidth / 2);
+  const posterPath = item?.showPosterPath || show.imagePath;
+  const stillPath = item?.episodePosterPath || null;
+  const showName = item?.showName || show.name || "";
 
   // 1 = durgun. Bölüm değişince 0'a çekilip yaya bırakılır; yay hafif aşar,
   // kayma bu yüzden yerine "oturur".
@@ -89,7 +148,13 @@ function UpNextRailCard({
     }).start();
   }, [shownId, reduceMotion, swap]);
 
-  const overlaySwapStyle = {
+  // Gösterilen bölüm değişti (izlendi, geri alındı, tazelendi): bekleyen onay
+  // yeni bölüme geçmesin.
+  useEffect(() => {
+    disarmConfirm();
+  }, [shownId, disarmConfirm]);
+
+  const contentSwapStyle = {
     opacity: swap.interpolate({
       inputRange: [0, 1],
       outputRange: [0, 1],
@@ -105,316 +170,352 @@ function UpNextRailCard({
     ],
   };
 
-  // Basış işleyicisi olmayan Text dokunmayı yakalamaz; bölüm adına dokunmak
-  // posterin kendisine (dizi detayına) gider.
-  const caption = (text, muted) => (
-    <Text numberOfLines={1} style={[styles.caption, muted && styles.captionMuted]}>
-      {text}
-    </Text>
+  const airDateLabel = item ? formatAirDate(item.airDate, language) : null;
+
+  // Kompakt alt satır: solda bölüm adı + küçük durum satırı, sağda yuvarlak
+  // eylem düğmeleri. Tek satır olduğu için kart yüksekliği her durumda aynı.
+  const infoColumn = (title, meta, metaColor, metaIcon, titleColor = textPrimary) => (
+    <View style={styles.flex}>
+      <Text numberOfLines={1} style={[styles.episodeTitle, { color: titleColor }]}>
+        {title}
+      </Text>
+      <View style={styles.metaRow}>
+        {metaIcon ? <Ionicons name={metaIcon} size={11} color={metaColor} /> : null}
+        <Text numberOfLines={1} allowFontScaling={false} style={[styles.metaText, { color: metaColor }]}>
+          {meta}
+        </Text>
+      </View>
+    </View>
   );
+
+  let body;
+  if (!resolved) {
+    body = (
+      <>
+        <View style={styles.flex}>
+          <View style={[styles.skeletonLine, { width: "75%", backgroundColor: alpha(textMuted, 0.18) }]} />
+          <View style={[styles.skeletonLine, { width: "40%", marginTop: 6, backgroundColor: alpha(textMuted, 0.12) }]} />
+        </View>
+        <View style={[styles.roundAction, { backgroundColor: alpha(textMuted, 0.12) }]} />
+      </>
+    );
+  } else if (!item) {
+    body = infoColumn(
+      i18nText("autoI18n.up_next_ray_bekleniyor", "Yeni bölüm yok"),
+      i18nText("autoI18n.up_next_ray_yeni_sezon", "Sezon bekleniyor"),
+      textMuted,
+      "hourglass-outline",
+      textMuted
+    );
+  } else if (!item.isAired) {
+    body = infoColumn(
+      item.episodeName || i18nText("autoI18n.up_next_ray_bolum", "Sıradaki bölüm"),
+      airDateLabel || i18nText("autoI18n.up_next_ray_yakinda", "Yakında"),
+      upcomingColor,
+      "time-outline"
+    );
+  } else {
+    body = (
+      <>
+        {infoColumn(
+          item.episodeName || i18nText("autoI18n.up_next_ray_bolum", "Sıradaki bölüm"),
+          `S${item.seasonNumber} · B${item.episodeNumber}${airDateLabel ? ` · ${airDateLabel}` : ""}`,
+          textMuted
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={i18nText("autoI18n.up_next_ray_tarih_sec", "Tarih seç")}
+          hitSlop={4}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            onChooseDate(item);
+          }}
+          style={({ pressed }) => [
+            styles.roundAction,
+            { backgroundColor: alpha(accent, pressed ? 0.26 : 0.14) },
+          ]}
+        >
+          <Ionicons name="calendar-outline" size={15} color={accent} />
+        </Pressable>
+        {/* İki adımlı İzledim: göz → (3 sn) tik → işaretle. Yanlışlıkla
+            dokunma bölümü ilerletmesin diye. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            confirmArmed
+              ? i18nText("autoI18n.onayla", "Onayla")
+              : i18nText("autoI18n.up_next_ray_izledim", "İzledim")
+          }
+          hitSlop={4}
+          onPress={(event) => {
+            event.stopPropagation?.();
+            if (!confirmArmed) {
+              armConfirm();
+              return;
+            }
+            disarmConfirm();
+            onWatched(item);
+          }}
+          style={({ pressed }) => [
+            styles.roundAction,
+            confirmArmed
+              ? { backgroundColor: pressed ? alpha(accent, 0.72) : accent }
+              : { backgroundColor: alpha(accent, pressed ? 0.26 : 0.14) },
+          ]}
+        >
+          <Animated.View style={{ transform: [{ scale: confirmPop }] }}>
+            <Ionicons
+              name={confirmArmed ? "checkmark" : "eye-outline"}
+              size={confirmArmed ? 18 : 16}
+              color={confirmArmed ? "#fff" : accent}
+            />
+          </Animated.View>
+        </Pressable>
+      </>
+    );
+  }
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.9}
       onPressIn={() => onPressIn(show.id)}
       onPressOut={() => onPressOut(show.id)}
       onPress={() => onOpen(show)}
       onLongPress={onQuickActions ? () => onQuickActions(show) : undefined}
       delayLongPress={350}
-      style={[
-        styles.cell,
-        { width: poster.posterWidth, height: poster.posterHeight },
-      ]}
+      style={[styles.cell, { width: cardWidth }]}
     >
       <Animated.View
-        style={{
-          transform: [{ scale: scaleValue }],
-          // Alta yapışık ilerleme çubuğu ve bölüm katmanı poster köşesinden
-          // taşmasın diye köşe yarıçapıyla kırpılır.
-          overflow: "hidden",
-          borderRadius: poster.radius,
-        }}
+        style={[
+          styles.card,
+          {
+            transform: [{ scale: scaleValue }],
+            backgroundColor: theme.secondary,
+            borderColor: alpha(theme.border || "#888", 0.6),
+            shadowColor: theme.shadow,
+          },
+        ]}
       >
-        <PosterImage
-          path={item?.showPosterPath || show.imagePath}
-          type="tv"
-          mediaId={show.id}
-          size={200}
-          style={[
-            styles.poster,
-            {
-              width: poster.posterWidth,
-              height: poster.posterHeight,
-              borderRadius: poster.radius,
-              shadowColor: theme.shadow,
-            },
-          ]}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={`tvongoing-${show.id}`}
-          transition={120}
-        />
-
-        {/* Karartma, altındaki bölüm katmanını okunur tutacak kadar yüksek. */}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.92)"]}
-          locations={[0, 0.45, 1]}
-          style={[
-            styles.gradient,
-            {
-              height: poster.posterHeight * 0.62,
-              borderBottomLeftRadius: poster.radius,
-              borderBottomRightRadius: poster.radius,
-            },
-          ]}
-        />
-
-        {/* İlerleme çubuğu — poster altına yapışık, tam genişlik */}
-        <View style={styles.progressBar}>
-          <Progress.Bar
-            progress={progress}
-            width={poster.posterWidth}
-            height={3}
-            borderWidth={0}
-            borderRadius={2}
-            color={progressColor}
-            unfilledColor="rgba(255,255,255,0.2)"
-          />
-        </View>
-
-        {/* İzlenen/toplam bölüm — sağ üst */}
-        <View
-          style={[styles.countBadge, { backgroundColor: theme.secondaryt }]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.badgeText, { color: progressColor }]}
-          >
-            {total > 0 ? `${watched}/${total}` : watched}
-          </Text>
-        </View>
-
-        {/* Sıradaki bölüm numarası — sol üst */}
-        {item ? (
-          <Animated.View
-            style={[
-              styles.episodePill,
-              {
-                backgroundColor: item.isAired
-                  ? alpha(theme.accent, 0.92)
-                  : alpha(upcomingColor, 0.92),
-              },
-              pillSwapStyle,
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.episodePillText}>
-              S{item.seasonNumber}·B{item.episodeNumber}
-            </Text>
-          </Animated.View>
-        ) : null}
-
-        {/* ── Sıradaki bölüm katmanı: posterin alt kısmında ── */}
-        <Animated.View style={[styles.overlay, overlaySwapStyle]}>
-          {!resolved ? (
-            <View style={styles.skeletonAction} />
-          ) : !item ? (
-            <>
-              {caption(
-                i18nText("autoI18n.up_next_ray_bekleniyor", "Yeni bölüm yok"),
-                true
-              )}
-              <View style={styles.waitingChip}>
-                <Ionicons name="hourglass-outline" size={11} color="#fff" />
-                <Text
-                  numberOfLines={1}
-                  allowFontScaling={false}
-                  style={styles.waitingText}
-                >
-                  {i18nText(
-                    "autoI18n.up_next_ray_yeni_sezon",
-                    "Sezon bekleniyor"
-                  )}
-                </Text>
-              </View>
-            </>
-          ) : !item.isAired ? (
-            <>
-              {caption(
-                item.episodeName ||
-                  i18nText("autoI18n.up_next_ray_bolum", "Sıradaki bölüm")
-              )}
-              <View
-                style={[
-                  styles.waitingChip,
-                  { backgroundColor: alpha(upcomingColor, 0.85) },
-                ]}
-              >
-                <Ionicons name="time-outline" size={11} color="#fff" />
-                <Text
-                  numberOfLines={1}
-                  allowFontScaling={false}
-                  style={styles.waitingText}
-                >
-                  {formatAirDate(item.airDate, language) ||
-                    i18nText("autoI18n.up_next_ray_yakinda", "Yakında")}
-                </Text>
-              </View>
-            </>
+        {/* ── Üst: bölüm karesi ── */}
+        <View style={[styles.hero, { height: heroHeight }]}>
+          {stillPath ? (
+            <Image
+              source={{ uri: getTmdbUrl(stillPath, "still", 300) }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={`upnext-still-${show.id}`}
+              transition={160}
+            />
+          ) : posterPath ? (
+            // Kare yoksa: afişin bulanık hali zemin olur (16:9'a kırpılmış afiş
+            // yerine renk ve doku verir).
+            <Image
+              source={{ uri: posterUri("tv", show.id, posterPath, 92) }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              blurRadius={18}
+              cachePolicy="memory-disk"
+              recyclingKey={`upnext-blur-${show.id}`}
+              transition={160}
+            />
           ) : (
-            <View style={styles.actionRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={i18nText(
-                    "autoI18n.up_next_ray_izledim",
-                    "İzledim"
-                  )}
-                  onPress={(event) => {
-                    event.stopPropagation?.();
-                    onWatched(item);
-                  }}
-                  style={({ pressed }) => [
-                    styles.primaryAction,
-                    {
-                      backgroundColor: pressed
-                        ? alpha(theme.accent, 0.72)
-                        : theme.accent,
-                    },
-                  ]}
-                >
-                  <Ionicons name="checkmark" size={13} color="#fff" />
-                  <Text
-                    numberOfLines={1}
-                    allowFontScaling={false}
-                    style={styles.primaryActionText}
-                  >
-                    {i18nText("autoI18n.up_next_ray_izledim", "İzledim")}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={i18nText(
-                    "autoI18n.up_next_ray_tarih_sec",
-                    "Tarih seç"
-                  )}
-                  onPress={(event) => {
-                    event.stopPropagation?.();
-                    onChooseDate(item);
-                  }}
-                  style={({ pressed }) => [
-                    styles.secondaryAction,
-                    {
-                      backgroundColor: pressed
-                        ? "rgba(255,255,255,0.34)"
-                        : "rgba(255,255,255,0.18)",
-                    },
-                  ]}
-                >
-                  <Ionicons name="calendar-outline" size={13} color="#fff" />
-                </Pressable>
-            </View>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(accent, 0.25) }]} />
           )}
-        </Animated.View>
+
+          <LinearGradient
+            colors={["rgba(0,0,0,0.35)", "transparent", "rgba(0,0,0,0.85)"]}
+            locations={[0, 0.35, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+
+          {/* Sıradaki bölüm numarası — sol üst */}
+          {item ? (
+            <Animated.View
+              style={[
+                styles.episodePill,
+                {
+                  backgroundColor: item.isAired
+                    ? alpha(accent, 0.95)
+                    : alpha(upcomingColor, 0.95),
+                },
+                pillSwapStyle,
+              ]}
+            >
+              <Ionicons
+                name={item.isAired ? "play" : "time"}
+                size={10}
+                color="#fff"
+              />
+              <Text allowFontScaling={false} style={styles.episodePillText}>
+                S{item.seasonNumber} · B{item.episodeNumber}
+              </Text>
+            </Animated.View>
+          ) : null}
+
+          {/* İzlenen/toplam bölüm — sağ üst */}
+          {total > 0 || watched > 0 ? (
+            <View style={styles.countBadge}>
+              <Text allowFontScaling={false} style={styles.countText}>
+                {total > 0 ? `${watched}/${total}` : watched}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Afiş küçük resmi + dizi adı — alt */}
+          <View style={styles.heroFooter}>
+            <View style={styles.thumbWrap}>
+              <PosterImage
+                path={posterPath}
+                type="tv"
+                mediaId={show.id}
+                size={92}
+                style={styles.thumb}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={`upnext-thumb-${show.id}`}
+                transition={120}
+              />
+            </View>
+            <View style={styles.flex}>
+              <Text numberOfLines={1} style={styles.showName}>
+                {showName}
+              </Text>
+              {progress > 0 ? (
+                <Text allowFontScaling={false} style={styles.progressText}>
+                  {new Intl.NumberFormat(intlLocaleOf(language), {
+                    style: "percent",
+                    maximumFractionDigits: 0,
+                  }).format(Math.max(0, Math.min(1, progress)))}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {/* İlerleme çubuğu — karenin altına yapışık */}
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${Math.max(0, Math.min(1, progress)) * 100}%`,
+                  backgroundColor: accent,
+                },
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* ── Alt: sıradaki bölüm ── */}
+        <Animated.View style={[styles.body, contentSwapStyle]}>{body}</Animated.View>
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  cell: { marginRight: 10, marginBottom: 5 },
-  poster: {
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+  flex: { flex: 1 },
+  cell: { marginRight: 10, marginBottom: 6 },
+  card: {
+    borderRadius: RADIUS,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  gradient: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  progressBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  countBadge: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: { fontSize: 10, fontWeight: "700" },
+  hero: { width: "100%", overflow: "hidden" },
   episodePill: {
     position: "absolute",
-    top: 5,
-    left: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-  episodePillText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-
-  // ── Poster üzerindeki sıradaki bölüm katmanı ──
-  // İlerleme çubuğu 3px olduğu için taban 8'den başlar.
-  overlay: {
+  episodePillText: { color: "#fff", fontSize: 10.5, fontWeight: "800", letterSpacing: 0.2 },
+  countBadge: {
     position: "absolute",
-    left: 7,
-    right: 7,
-    bottom: 8,
-    gap: 5,
+    top: 8,
+    right: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  caption: {
+  countText: { color: "#fff", fontSize: 10.5, fontWeight: "700" },
+  heroFooter: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 9,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  thumbWrap: {
+    borderRadius: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  thumb: {
+    width: THUMB_W,
+    height: THUMB_H,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  showName: {
     color: "#fff",
-    fontSize: 10.5,
-    lineHeight: 14,
-    fontWeight: "700",
-    textShadowColor: "rgba(0,0,0,0.85)",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800",
+    textShadowColor: "rgba(0,0,0,0.6)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  captionMuted: { color: "rgba(255,255,255,0.72)", fontWeight: "600" },
-  actionRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  primaryAction: {
-    flex: 1,
-    minHeight: 28,
-    borderRadius: 9,
+  progressText: {
+    marginTop: 2,
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  progressTrack: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  progressFill: { height: "100%", borderTopRightRadius: 2, borderBottomRightRadius: 2 },
+
+  // ── Alt içerik (tek satır) ──
+  body: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 5,
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  primaryActionText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  secondaryAction: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+  episodeTitle: { fontSize: 13, lineHeight: 17, fontWeight: "700" },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
+  metaText: { fontSize: 11, fontWeight: "600" },
+  roundAction: {
+    width: ACTION,
+    height: ACTION,
+    borderRadius: ACTION / 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  waitingChip: {
-    minHeight: 28,
-    borderRadius: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 6,
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
-  waitingText: { color: "#fff", fontSize: 9.5, fontWeight: "800" },
-  skeletonAction: {
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: "rgba(255,255,255,0.14)",
-  },
+  skeletonLine: { height: 11, borderRadius: 6 },
 });
 
 export default memo(UpNextRailCard);

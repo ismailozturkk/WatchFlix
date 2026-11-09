@@ -20,6 +20,7 @@ import {
   FlatList,
   StyleSheet,
   InteractionManager,
+  useWindowDimensions,
 } from "react-native";
 
 import SectionHeader, { SectionBadge } from "../../components/home/SectionHeader";
@@ -28,7 +29,6 @@ import WatchedDateSheet from "../../components/detail/WatchedDateSheet";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useHomeRenderKey } from "../../hooks/useHomeContentSettings";
 import useUpNextQueue from "../../hooks/useUpNextQueue";
 import { i18nText } from "../../utils/i18nText";
@@ -39,12 +39,19 @@ import { getSeeAllLabel } from "../../utils/homeSectionCopy";
 // "Tümü" ile açılan Sıradaki ekranı çözer.
 const RAIL_LIMIT = 10;
 
+// Kompakt "izlemeye devam et" kartı: ekranın ~%64'ü (bir sonraki kart kenardan
+// görünür, kaydırılabildiği belli olur), tablette 280'i geçmez.
+const CARD_GAP = 10;
+const cardWidthFor = (screenWidth) =>
+  Math.round(Math.min(280, Math.max(210, screenWidth * 0.64)));
+
 // `surface` ölçümde hangi yüzeyin kullanıldığını söyler: TV ana ekranı "rail",
 // Kütüphane sekmesi "library" (bkz. hooks/useUpNextQueue).
 export default function TvOngoingSection({ navigation, surface = "rail" }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const poster = useRailPosterStyle();
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = cardWidthFor(screenWidth);
   // renderItem useCallback ile sabit; poster kalitesi/rozet ayarı değişince
   // hücreleri yeniden çizdirmek için (bkz. utils/homeContentSettings.js).
   const renderKey = useHomeRenderKey();
@@ -84,7 +91,7 @@ export default function TvOngoingSection({ navigation, surface = "rail" }) {
 
   const onPressIn = useCallback((id) => {
     Animated.timing(getScaleValue(id), {
-      toValue: 0.9,
+      toValue: 0.97,
       duration: 150,
       useNativeDriver: true,
     }).start();
@@ -122,7 +129,7 @@ export default function TvOngoingSection({ navigation, surface = "rail" }) {
           show={show}
           item={itemsByShow[key]}
           resolved={key in itemsByShow}
-          poster={poster}
+          cardWidth={cardWidth}
           theme={theme}
           language={language}
           scaleValue={getScaleValue(show.id)}
@@ -143,7 +150,7 @@ export default function TvOngoingSection({ navigation, surface = "rail" }) {
       language,
       onPressIn,
       onPressOut,
-      poster,
+      cardWidth,
       theme,
     ]
   );
@@ -175,6 +182,9 @@ export default function TvOngoingSection({ navigation, surface = "rail" }) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        snapToInterval={cardWidth + CARD_GAP}
+        snapToAlignment="start"
+        decelerationRate="fast"
         keyExtractor={(item) => String(item.id)}
         extraData={renderKey}
         initialNumToRender={3}

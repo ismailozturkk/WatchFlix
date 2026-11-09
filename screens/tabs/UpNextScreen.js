@@ -11,7 +11,6 @@
 import { intlLocaleOf, pickByLanguage } from "../../utils/appLanguages";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -20,6 +19,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
+import LensLoader from "../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -572,7 +573,7 @@ export default function UpNextScreen({ navigation }) {
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={theme.accent} />
+            <LensLoader size="large" color={theme.accent} />
           </View>
         ) : visibleItems.length === 0 ? (
           <View style={styles.center}>
@@ -636,6 +637,7 @@ export default function UpNextScreen({ navigation }) {
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
                 tintColor={theme.accent}
+                colors={LENS_REFRESH_COLORS}
               />
             }
             ListHeaderComponent={
