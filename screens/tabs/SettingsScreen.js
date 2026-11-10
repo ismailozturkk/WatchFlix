@@ -40,7 +40,7 @@ import Constants from "expo-constants";
 import CountryFlag from "react-native-country-flag";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
-import BetaBadge from "../../components/common/BetaBadge";
+import BetaBadge, { DevBadge } from "../../components/common/BetaBadge";
 import { isBetaFeature } from "../../utils/betaFeatures";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
@@ -1228,7 +1228,12 @@ export default function SettingsScreen() {
             <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
               iconName="analytics-outline" title="Debug"
               onPress={() => navigation.navigate("UsageDebugScreen")}
-              right={<Chevron color={C.muted} />} last />
+              right={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <DevBadge />
+                  <Chevron color={C.muted} />
+                </View>
+              } last />
           </GlassBox>
         ) : null}
 

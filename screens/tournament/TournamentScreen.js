@@ -31,6 +31,7 @@ import Animated, {
 import * as Haptics from "@services/hapticsService";
 import BackButton from "@components/BackButton";
 import AppIcon from "@components/AppIcon";
+import { DevBadge } from "@components/common/BetaBadge";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { toast } from "@components/AppToast";
 import MatchCard from "@components/tournament/MatchCard";
@@ -1296,6 +1297,7 @@ export default function TournamentScreen() {
       {Header}
       {__DEV__ && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devStrip}>
+          <DevBadge />
           {DEV_PRESETS.map((p) => (
             <GlassTouchable
               key={p.key}

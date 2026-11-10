@@ -11,6 +11,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
+import { DevBadge } from "@components/common/BetaBadge";
 import { alpha } from "@theme/colors";
 import { getPremiumPlanDisplayName } from "@utils/premium";
 import { useTheme } from "../../context/ThemeContext";
@@ -51,12 +52,15 @@ export default function DevPlanSimulatorCard() {
           <AppIcon name="flask-outline" size={15} color={warn} />
         </View>
         <View style={styles.headerCopy}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.title, { color: theme.text.primary }]}
-          >
-            Plan simülatörü (yalnız geliştirme)
-          </Text>
+          <View style={styles.titleRow}>
+            <Text
+              allowFontScaling={false}
+              style={[styles.title, styles.titleText, { color: theme.text.primary }]}
+            >
+              Plan simülatörü
+            </Text>
+            <DevBadge />
+          </View>
           <Text
             allowFontScaling={false}
             style={[styles.sub, { color: theme.text.muted }]}
@@ -132,6 +136,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerCopy: { flex: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  titleText: { flexShrink: 1 },
   title: { fontSize: 13.5, fontWeight: "700" },
   sub: { fontSize: 11, marginTop: 2 },
   choices: { flexDirection: "row", gap: 8, marginTop: 12 },

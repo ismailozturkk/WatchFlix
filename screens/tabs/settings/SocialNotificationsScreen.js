@@ -9,6 +9,7 @@ import { View, StyleSheet } from "react-native";
 import LensLoader from "../../../components/LensLoader";
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
+import { DevBadge } from "@components/common/BetaBadge";
 import { appAlert } from "@components/AppAlert";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -182,11 +183,14 @@ export default function SocialNotificationsScreen() {
             last
             onPress={handleSendTestPush}
             right={
-              sendingTestPush ? (
-                <LensLoader size="small" color={C.blue} />
-              ) : (
-                <AppIcon name="chevron-forward" size={16} color={C.muted} />
-              )
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <DevBadge />
+                {sendingTestPush ? (
+                  <LensLoader size="small" color={C.blue} />
+                ) : (
+                  <AppIcon name="chevron-forward" size={16} color={C.muted} />
+                )}
+              </View>
             }
           />
         )}

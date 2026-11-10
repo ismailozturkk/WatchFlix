@@ -32,6 +32,8 @@ import { APP_ICONS, DEFAULT_APP_ICON_ID } from "@utils/appIcons";
 import { i18nText } from "@utils/i18nText";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import PremiumPill from "@components/premium/PremiumPill";
+import BetaBadge, { DevBadge } from "../common/BetaBadge";
+import { isBetaFeature } from "@utils/betaFeatures";
 import { alpha } from "@theme/colors";
 import GlassBox from "../common/GlassBox";
 
@@ -122,9 +124,12 @@ export default function AppIconSection({ colors: C }) {
     if (!__DEV__ || !status) return null;
     return (
       <GlassBox role="card" style={[styles.card, styles.devNote, { borderColor: C.borderMuted }]}>
-        <Text allowFontScaling={false} style={[styles.devTitle, { color: C.muted }]}>
-          Uygulama simgesi seçici gizli (yalnız geliştirme build'inde görünür)
-        </Text>
+        <View style={styles.titleRow}>
+          <DevBadge />
+          <Text allowFontScaling={false} style={[styles.devTitle, styles.titleText, { color: C.muted }]}>
+            Uygulama simgesi seçici gizli
+          </Text>
+        </View>
         <Text allowFontScaling={false} style={[styles.devBody, { color: C.muted }]}>
           {status === "no-module"
             ? "Bu yapıda SeelogdAppIcon native modülü yok (Expo Go ya da modülden önce alınmış build). Yeni bir development build gerekir."
@@ -141,9 +146,12 @@ export default function AppIconSection({ colors: C }) {
           <AppIcon name="apps-outline" size={16} color={C.blue} />
         </View>
         <View style={styles.headerTexts}>
-          <Text allowFontScaling={false} style={[styles.title, { color: C.text }]}>
-            {i18nText("autoI18n.uygulama_simgesi_baslik", "Uygulama simgesi")}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text allowFontScaling={false} style={[styles.title, styles.titleText, { color: C.text }]}>
+              {i18nText("autoI18n.uygulama_simgesi_baslik", "Uygulama simgesi")}
+            </Text>
+            {isBetaFeature("app_icon") ? <BetaBadge /> : null}
+          </View>
           <Text allowFontScaling={false} style={[styles.sub, { color: C.muted }]}>
             {iconLocked
               ? i18nText(
@@ -219,9 +227,12 @@ export default function AppIconSection({ colors: C }) {
         })}
       </View>
       {__DEV__ && missingCount > 0 ? (
-        <Text allowFontScaling={false} style={[styles.devFootnote, { color: C.muted }]}>
-          {`${missingCount} simge bu native build'de yok (yalnız geliştirme build'inde görünür). Yeni build gerekir.`}
-        </Text>
+        <View style={[styles.titleRow, styles.devFootnoteRow]}>
+          <DevBadge compact />
+          <Text allowFontScaling={false} style={[styles.devFootnote, styles.titleText, { color: C.muted }]}>
+            {`${missingCount} simge bu native build'de yok. Yeni build gerekir.`}
+          </Text>
+        </View>
       ) : null}
     </GlassBox>
   );
@@ -249,11 +260,14 @@ const styles = StyleSheet.create({
   },
   headerTexts: { flex: 1 },
   title: { fontSize: 14, fontWeight: "500" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  titleText: { flexShrink: 1 },
   sub: { fontSize: 11, marginTop: 2 },
   devNote: { borderStyle: "dashed", padding: 12, gap: 4, opacity: 0.8 },
   devTitle: { fontSize: 12, fontWeight: "600" },
   devBody: { fontSize: 11, lineHeight: 16 },
-  devFootnote: { fontSize: 10.5, lineHeight: 15, paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
+  devFootnote: { fontSize: 10.5, lineHeight: 15 },
+  devFootnoteRow: { paddingHorizontal: 14, paddingBottom: 12, marginTop: -4, gap: 6 },
   // Üç sütunlu ızgara: katalog sırasıyla üst satır Lens (Varsayılan · 3B · Cam), alt satır S
   // (Klasik · Cam · Düz). Sütun aralığı yüzde genişlik + space-between ile verilir: `gap`
   // yüzdelere eklenince son sütun alt satıra düşüyordu.

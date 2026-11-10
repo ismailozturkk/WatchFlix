@@ -22,6 +22,7 @@ export const BETA_FEATURE_IDS = Object.freeze([
   "film_club", // Film Kulübü
   "atmosphere", // Atmosfer (evren sahneleri, parçacıklar)
   "profile_banner", // Profil kapağı
+  "app_icon", // Uygulama simgesi seçici
 ]);
 
 const BETA_SET = new Set(BETA_FEATURE_IDS);
