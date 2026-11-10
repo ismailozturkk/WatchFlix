@@ -174,6 +174,9 @@ const settingsKeys = {
   // (aksiyon → kıvılcım, romantik → kalp...; bkz. weatherParticles GENRE_EFFECT).
   // Kapalıysa detaylarda da seçili atmosfer çizilir.
   atmosphereByGenre: { key: "atmosphereByGenre", type: TYPES.boolean, default: true },
+  // Sabit tarihli özel günlerde (yılbaşı, sevgililer günü, Cadılar Bayramı...)
+  // seçili atmosfer yerine güne uygun atmosfer çizilir (weatherParticles SPECIAL_DAYS).
+  atmosphereSpecialDays: { key: "atmosphereSpecialDays", type: TYPES.boolean, default: true },
   // Hava efekti parçacık sayısı: "auto" efekt modunu izler.
   weatherDensity: {
     key: "weatherDensity",

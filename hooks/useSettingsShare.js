@@ -127,6 +127,7 @@ export default function useSettingsShare() {
         // Tür serbest (kapı aç/kapa bayrağında); depoya yazılır, katman useStored ile izler.
         if (has("weatherEffect")) set(Keys.weatherEffect, orDefault(values.weatherEffect, "weatherEffect"));
         if (has("atmosphereByGenre")) set(Keys.atmosphereByGenre, values.atmosphereByGenre !== false);
+        if (has("atmosphereSpecialDays")) set(Keys.atmosphereSpecialDays, values.atmosphereSpecialDays !== false);
         if (has("showAmbientBackground")) c.ambient.changeShowAmbientBackground(values.showAmbientBackground === true);
         if (has("showIconBackground")) c.iconBackground.changeShowIconBackground(values.showIconBackground === true);
         if (has("iconBackgroundMode")) {

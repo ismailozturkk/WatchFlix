@@ -946,7 +946,14 @@ export default function MovieDetails({ navigation, route }) {
       />
 
       <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
-      <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} />
+      <ScreenDecor
+        scope="details"
+        iconOpacity={0.25}
+        genres={details.genres}
+        titleType="movie"
+        titleId={details.id}
+        collectionId={details.belongs_to_collection?.id}
+      />
       <ScrollView
         style={styles.container}
         nestedScrollEnabled

@@ -23,9 +23,10 @@
 //
 // Kullanım: ekranlara DOĞRUDAN eklenmez, <ScreenDecor /> üzerinden monte edilir.
 // `genres` (detay ekranları): yapımın TMDB türleri → türe göre atmosfer.
+// `titleType`/`titleId`/`collectionId`: tanınan evrense (Star Wars, GoT…) o sahne.
 // Katman sırası: ekran arka plan rengi → ikon deseni → hava efekti → içerik.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, InteractionManager } from "react-native";
 import { useSnowSettings } from "../context/AppSettingsContext";
 import useReduceMotion from "../hooks/useReduceMotion";
@@ -35,7 +36,11 @@ import WeatherLayer from "./decor/WeatherLayer";
 
 const PARK_AFTER_MS = 4000;
 
-function ScreenSnow({ genres }) {
+function ScreenSnow({ genres, titleType, titleId, collectionId }) {
+  const title = useMemo(
+    () => (titleType && titleId != null ? { type: titleType, id: titleId, collectionId } : null),
+    [titleType, titleId, collectionId],
+  );
   const { showSnow } = useSnowSettings();
   const focused = useScreenFocused();
   const reduceMotion = useReduceMotion();
@@ -77,7 +82,7 @@ function ScreenSnow({ genres }) {
 
   return (
     <View style={styles.overlay} pointerEvents="none">
-      <WeatherLayer playing={focused && appActive} genres={genres} />
+      <WeatherLayer playing={focused && appActive} genres={genres} title={title} />
     </View>
   );
 }

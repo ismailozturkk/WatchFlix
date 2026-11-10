@@ -8,10 +8,17 @@
 // Seçicide grup başına en çok 6 simge (tek satıra sığsın):
 //   mevsimler      mevsime göre, kar, bahar bahçesi (çim + büyüyen çiçek), yaz
 //                  kıyısı (dalga + kum + martı + parıltı), yaprak
-//   gökyüzü/ışık   yağmur, fırtına (yağmur + şimşek), aurora, yıldız tozu, kıvılcım
-//   doğa           sakura, ateş böceği, kelebek, karahindiba
+//   gökyüzü/ışık   yağmur, fırtına (yağmur + şimşek), aurora, yıldız tozu, kıvılcım, güneş sistemi (Güneş + 8 gezegen yörüngede, Ay, Uzay
+//                  İstasyonu, asteroit kuşağı, kara delik, pulsar, kuyruklu yıldız; renkli şekiller)
+//   doğa           sakura, ateş böceği, kelebek
 //   sinema/şenlik  patlamış mısır, bilet ve yıldız, havai fişek, kalpler,
-//                  Cadılar Bayramı (özel günler yalnız SABİT tarihli)
+//                  Cadılar Bayramı (yarasa, balkabağı, hayalet, mezar, örümcek), Noel
+//                  (kar, hediye, kardan adam, ağaç, ara sıra Noel Baba kızağı)
+//   film / dizi / anime  19 "evren" sahnesi (utils/weatherUniverses.js): Star Wars,
+//                  Matrix, Harry Potter, … Fullmetal Alchemist. Detay ekranında
+//                  yapımın TMDB kimliğiyle kendiliğinden, seçicide elle.
+// Karahindiba ayrı seçenek DEĞİL: bahar bahçesinin parçası (eski kayıt → bahar).
+// Özel günler (SPECIAL_DAYS, yalnız SABİT tarihli) ayrı "Özel günler" anahtarıyla.
 // Kaldırılanlar (eski kayıt → kar): film tozu, bokeh, sis, projektör, kabarcık.
 // İÇ EFEKTLER (seçicide yok): bileşik efektlerin ve tür karışımının parçaları
 //   (şimşek, çim, çiçek, dalga, kum, martı, aurora şeridi, balon, nota, ...).
@@ -37,19 +44,28 @@
 
 import { seededRandom, deriveSeed } from "./decorLayout";
 import { foldGenreName, kanonikTur } from "./genreCanon";
+import {
+  SCENE_BUILDERS,
+  SCENERY,
+  UNIVERSE_COMPOSITES,
+  UNIVERSE_GROUPS,
+  UNIVERSE_SPECS,
+} from "./weatherUniverses";
 
 // ── Seçici ──────────────────────────────────────────────────────────────────
 
 /** Seçici grupları (sıra = ekrandaki sıra). "auto" mevsimler grubunun başında. */
 export const WEATHER_GROUPS = Object.freeze([
   Object.freeze({ id: "seasons", effects: Object.freeze(["auto", "snow", "springGarden", "summerShore", "leaves"]) }),
-  Object.freeze({ id: "sky", effects: Object.freeze(["rain", "storm", "aurora", "stardust", "embers"]) }),
-  Object.freeze({ id: "nature", effects: Object.freeze(["sakura", "fireflies", "butterflies", "dandelion"]) }),
-  Object.freeze({ id: "festive", effects: Object.freeze(["popcorn", "tickets", "fireworks", "hearts", "halloween"]) }),
+  Object.freeze({ id: "sky", effects: Object.freeze(["rain", "storm", "aurora", "stardust", "embers", "solarSystem"]) }),
+  Object.freeze({ id: "nature", effects: Object.freeze(["sakura", "fireflies", "butterflies"]) }),
+  Object.freeze({ id: "festive", effects: Object.freeze(["popcorn", "tickets", "fireworks", "hearts", "halloween", "christmas"]) }),
+  // evrenler: films (7), series (6), anime (5)
+  ...UNIVERSE_GROUPS.map((g) => Object.freeze({ id: g.id, effects: Object.freeze([...g.effects]) })),
 ]);
 
-/** Seçicide bir grubun en çok simge sayısı (tek satır). */
-export const WEATHER_GROUP_MAX = 6;
+/** Seçicide bir grubun en çok simge sayısı (kayan tek satır). */
+export const WEATHER_GROUP_MAX = 7;
 
 /** Seçici değerleri ("auto" dahil). */
 export const WEATHER_CHOICES = Object.freeze(WEATHER_GROUPS.flatMap((g) => g.effects));
@@ -61,14 +77,22 @@ export const WEATHER_EFFECTS = Object.freeze(WEATHER_CHOICES.filter((c) => c !==
 const OVERLAY_EFFECT_OF = Object.freeze({
   flare: 0, planet: 1, heartbeat: 2, fog: 3, lampFlicker: 4, flashlight: 5, blinds: 6, neon: 7,
   warmGlow: 8, equalizer: 9, candle: 10, viewfinder: 11, farFlashes: 12, heatHaze: 13, spotlight: 14,
-  paparazzi: 15,
+  paparazzi: 15, orbits: 16,
+  // evren sahneleri (büyük silüetler + sahne ışıkları)
+  iceWall: 17, dunes: 18, gotham: 19, skyline: 20, mordor: 21, mesa: 22, prison: 23, london: 24,
+  pool: 25, titanWall: 26, transmute: 27, blueprint: 28, skyBeam: 30, river: 31, swPlanet: 32, hogwarts: 33, opShip: 34, rmPortal: 35,
 });
 const OVERLAY_EFFECTS = Object.keys(OVERLAY_EFFECT_OF);
 
 /** Yalnız bileşiklerin ve tür karışımının içinde kullanılan efektler. */
 export const INTERNAL_EFFECTS = Object.freeze([
   "lightning", "grass", "flowers", "waves", "sand", "glints", "seagulls", "auroraBands", "skyStars",
-  "balloons", "notes", "motes", "wisps", "bats", "ash", "sandDrift",
+  "balloons", "notes", "motes", "wisps", "bats", "ash", "sandDrift", "dandelion",
+  // özel gün parçaları
+  "solarBodies", "asteroidBelt", "blackHole", "pulsar", "comets",
+  "halloweenBats", "ghosts", "tombstones", "spiders", "xmasGoodies", "xmasScene", "sleigh", "cinema",
+  // evren sahnesi parçaları (SCENE_BUILDERS)
+  ...Object.keys(SCENE_BUILDERS),
   // tür parçaları (parçacık)
   "coals", "magicMotes", "rosePetals", "windowDrops", "confetti", "paperStars", "clouds", "kites",
   "planes", "parchment", "smoke", "tumbleweed",
@@ -90,7 +114,7 @@ export const WEATHER_SEED_SALT = 0x5e7;
 // ── Doku şeridi ─────────────────────────────────────────────────────────────
 
 /** Bir şeklin dokudaki hücre aralığı (px). */
-export const SPRITE_CELL = 64;
+export const SPRITE_CELL = 128; // 10 Kas: 64 → 128 (büyütülen şekiller bulanıktı); doku 1024 × 2048
 /** Doku ızgarasının sütun sayısı: 8 × 5 hücre = 512 × 320 px (eski cihazların
  *  2048 px doku sınırının çok altında). Şimşek, dalga ve kum dokuda DEĞİL:
  *  ekranda büyük çizildikleri için vektör (components/decor/VectorLayers.js). */
@@ -136,8 +160,121 @@ export const SPRITE = Object.freeze({
   plane: 34,
   parchment: 35,
   tumbleweed: 36,
+  sleigh: 37,
+  snowman: 38,
+  xmasTree: 39,
+  gift: 40,
+  candyCane: 41,
+  ornament: 42,
+  ghost: 43,
+  tombstone: 44,
+  spider: 45,
+  thread: 46,
+  sun: 47,
+  mercury: 48,
+  venus: 49,
+  earth: 50,
+  mars: 51,
+  jupiter: 52,
+  saturn: 53,
+  uranus: 54,
+  neptune: 55,
+  moon: 56,
+  iss: 57,
+  pulsar: 58,
+  blackHole: 59,
+  // ── evrenler (utils/weatherUniverses.js)
+  deathStar: 60,
+  xwing: 61,
+  tie: 62,
+  glyphA: 63,
+  glyphA2: 64,
+  glyphB: 65,
+  glyphB2: 66,
+  pill: 67,
+  bullet: 68,
+  shockRing: 69,
+  catA: 70,
+  catB: 71,
+  candle: 72,
+  snitchOpen: 73,
+  snitchClosed: 74,
+  owlOpen: 75,
+  owlClosed: 76,
+  letter: 77,
+  fellOpen: 78,
+  fellClosed: 79,
+  oneRing: 80,
+  wormHead: 81,
+  wormSeg: 82,
+  thopterA: 83,
+  thopterB: 84,
+  capeA: 85,
+  capeB: 86,
+  web: 87,
+  swinger: 88,
+  rv: 89,
+  tileBr: 90,
+  tileBa: 91,
+  hat: 92,
+  flask: 93,
+  dragonOpen: 94,
+  dragonClosed: 95,
+  ravenOpen: 96,
+  ravenClosed: 97,
+  longshipA: 98,
+  longshipB: 99,
+  runeA: 100,
+  runeB: 101,
+  runeC: 102,
+  crane: 103,
+  footprint: 104,
+  magnifier: 105,
+  duckSwim: 106,
+  duckFlyOpen: 107,
+  duckFlyClosed: 108,
+  feather: 109,
+  apple: 110,
+  appleBitten: 111,
+  page: 112,
+  titan: 113,
+  scout: 114,
+  shuriken: 115,
+  kunai: 116,
+  pirateShip: 117,
+  strawHat: 118,
+  devilFruit: 119,
+  pocketWatch: 120,
+  starDestroyer: 121,
+  blastRing: 122,
+  broomRiderL: 123, // sola bakan süpürgeli oyuncu (eski falcon hücresi)
+  broomRider: 124,
+  rick: 125,
+  morty: 126,
+  saucer: 127,
 });
-export const SPRITE_COUNT = 37;
+export const SPRITE_COUNT = 128;
+
+/**
+ * Kendi renkleriyle çizilen (renkli) şekiller. Diğerleri beyaz/gri çizilip
+ * parçacık başına paletle boyanır (modulate). Renkli şekilde parçacık BEYAZA
+ * boyanır, doku olduğu gibi görünür; opaklık, solma, yoğunluk aynen çalışır.
+ * Çizim components/decor/particleSprites.js'te (renkleri orada verilir).
+ * Not: renkli şekil açık/koyu temaya göre renk değiştirmez.
+ */
+export const COLORED_SPRITES = Object.freeze([
+  SPRITE.sleigh, SPRITE.sun, SPRITE.mercury, SPRITE.venus, SPRITE.earth, SPRITE.mars, SPRITE.jupiter,
+  SPRITE.saturn, SPRITE.uranus, SPRITE.neptune, SPRITE.moon, SPRITE.iss, SPRITE.pulsar, SPRITE.blackHole,
+  // evrenler
+  SPRITE.deathStar, SPRITE.xwing, SPRITE.tie, SPRITE.bullet, SPRITE.candle, SPRITE.snitchOpen,
+  SPRITE.snitchClosed, SPRITE.owlOpen, SPRITE.owlClosed, SPRITE.letter, SPRITE.oneRing, SPRITE.rv,
+  SPRITE.tileBr, SPRITE.tileBa, SPRITE.dragonOpen, SPRITE.dragonClosed, SPRITE.longshipA, SPRITE.longshipB,
+  SPRITE.magnifier, SPRITE.duckSwim, SPRITE.duckFlyOpen, SPRITE.duckFlyClosed, SPRITE.apple,
+  SPRITE.appleBitten, SPRITE.titan, SPRITE.scout, SPRITE.pirateShip, SPRITE.strawHat, SPRITE.devilFruit,
+  SPRITE.pocketWatch, SPRITE.starDestroyer, SPRITE.broomRiderL,
+  SPRITE.broomRider, SPRITE.rick, SPRITE.morty, SPRITE.saucer, SPRITE.swinger,
+]);
+const COLORED_SET = new Set(COLORED_SPRITES);
 export const SPRITE_ROWS = Math.ceil(SPRITE_COUNT / SPRITE_COLS);
 
 // Hücre içindeki şekil dikdörtgeni, 100 birimlik kutuda [x, y, w, h].
@@ -154,6 +291,19 @@ export const SPRITE_RECT = Object.freeze({
   [SPRITE.balloon]: [20, 0, 60, 100],
   [SPRITE.drop]: [40, 0, 20, 100],
   [SPRITE.confetti]: [20, 37, 60, 26],
+  [SPRITE.sleigh]: [0, 22, 100, 50],
+  [SPRITE.thread]: [47, 0, 6, 100],
+  [SPRITE.iss]: [0, 30, 100, 40],
+  [SPRITE.glyphA]: [25, 6, 50, 88],
+  [SPRITE.glyphA2]: [25, 6, 50, 88],
+  [SPRITE.glyphB]: [25, 6, 50, 88],
+  [SPRITE.glyphB2]: [25, 6, 50, 88],
+  [SPRITE.bullet]: [0, 36, 100, 28],
+  [SPRITE.kunai]: [0, 38, 100, 24],
+  [SPRITE.rv]: [0, 18, 100, 64],
+  [SPRITE.xwing]: [0, 14, 100, 72],
+  [SPRITE.longshipA]: [0, 10, 100, 80],
+  [SPRITE.longshipB]: [0, 10, 100, 80],
 });
 const FULL_RECT = Object.freeze([0, 0, 100, 100]);
 export const spriteRect = (sprite) => SPRITE_RECT[sprite] || FULL_RECT;
@@ -172,6 +322,11 @@ export const KIND = Object.freeze({
   tile: 10, // kıyı katmanı: dalga / kum (VEKTÖR, Atlas çizmez)
   band: 11, // geniş, yavaş dalgalanan ışık şeridi (aurora)
   bolt: 12, // şimşek çizgisi (VEKTÖR; aydınlıkla aynı zamanlama)
+  orbit: 16, // güneş sistemi: elips yörüngede dolanır (isteğe bağlı bir ebeveyn çevresinde: ay, uzay istasyonu)
+  glide: 14, // ara sıra ekranı yatay geçer (Noel Baba kızağı)
+  dangle: 15, // tavandan iplikle sarkar, aşağı yukarı iner (örümcek: part 0 ip, 1 gövde)
+  track: 17, // evren sahnesi: anahtar karelerle senaryolu rota (gel–dur–eylem–git), isteğe bağlı kare değişimi
+  emit: 18, // evren sahnesi: bir rotadan (ya da sabit noktadan) pencerede saçılan parçacık (ateş, buhar, mermi halkası)
   overlay: 13, // tür ışık katmanı (VEKTÖR: vinyet, sis, fener, ekolayzer…; `part` = OVERLAY)
 });
 
@@ -194,18 +349,44 @@ export const OVERLAY = Object.freeze({
   heatHaze: 13, // western: yükselen sıcak hava dalgaları
   spotlight: 14, // realite: yavaşça gezen spot ışığı
   paparazzi: 15, // realite: küçük flaş patlamaları
+  orbits: 16, // güneş sistemi: gezegen yörünge elipsleri (sabit çizgiler)
+  // evren sahneleri (utils/weatherUniverses.js)
+  iceWall: 17, // Game of Thrones: buz duvarı + Kara Kale kuleleri
+  dunes: 18, // Dune: kum tepeleri + iki ay
+  gotham: 19, // Batman: gotik şehir silüeti + çatı heykeli
+  skyline: 20, // Spider-Man: gökdelenler + su kuleleri
+  mordor: 21, // Yüzüklerin Efendisi: kule + alevli göz + süpüren bakış + yanardağ
+  mesa: 22, // Breaking Bad: çöl masaları
+  prison: 23, // Prison Break: tel örgü + dikenli tel + kule projektörü
+  london: 24, // Sherlock: çatılar, bacalar, saat kulesi
+  pool: 25, // Sopranos: havuz + banliyö ağaçları
+  titanWall: 26, // Attack on Titan: dev duvar (ÖNDE: titan arkasından yükselir)
+  transmute: 27, // Fullmetal Alchemist: kendini çizen dönüşüm çemberi + mavi şimşekler
+  blueprint: 28, // Prison Break: kendini çizen kaçış planı
+  tether: 29, // ip / halat / zincir: bir rotadaki gövdeyi pencerelerdeki çapaya bağlar
+  skyBeam: 30, // Batman: şehirden göğe uzanan, bulutları tarayan projektör
+  river: 31, // Vikings: nehir, kıyı ormanı, kuşatılan kale (yanar)
+  swPlanet: 32, // Star Wars: Ölüm Yıldızı, gezegen, süperlazer ışını ve patlama (vektör)
+  hogwarts: 33, // Harry Potter: Hogwarts şatosu + göl + ay (arka planda)
+  opShip: 34, // One Piece: aslan başlı yelkenli (vektör, 44 sn)
+  rmPortal: 35, // Rick and Morty: yeşil portal (30 sn)
 });
 /** İçeriğe yakın (Atlas'ın ÖNÜNDE) çizilen katmanlar; gerisi arkada. */
 export const OVERLAY_FRONT = Object.freeze([
-  OVERLAY.heartbeat, OVERLAY.fog, OVERLAY.equalizer, OVERLAY.viewfinder, OVERLAY.paparazzi,
+  OVERLAY.heartbeat, OVERLAY.fog, OVERLAY.equalizer, OVERLAY.viewfinder, OVERLAY.paparazzi, OVERLAY.titanWall,
 ]);
 
 // sizeMode: 0 = dp, 1 = ekran yüksekliğinin katı, 2 = uzun kenarın katı,
 // 3 = ekran genişliğinin katı.
 export const SIZE_MODE = Object.freeze({ dp: 0, height: 1, max: 2, width: 3 });
 
-/** Havai fişek: her patlama bu kadar kıvılcımdan oluşur. */
-export const BURST_SIZE = 16;
+/** Havai fişek: bir roket (baş + kuyruk) ve patlayınca saçılan kıvılcımlar. */
+export const FIREWORK_SPARKS = 16;
+export const FIREWORK_TRAIL = 6;
+/** Bir fişek grubunun parça sayısı (roket + kıvılcım). */
+export const BURST_SIZE = FIREWORK_SPARKS + FIREWORK_TRAIL;
+/** Döngünün (görünür kısmın) roketin yükseldiği ilk payı. */
+export const FIREWORK_LAUNCH = 0.3;
 
 /** Şimşek başına önceden üretilen biçim sayısı (her çakmada biri, aynalı da). */
 export const BOLT_VARIANTS = 4;
@@ -256,24 +437,49 @@ const EFFECT_SPECS = Object.freeze({
   dandelion: { counts: { low: 10, medium: 16, high: 26 }, palette: p2(["#ffffff", "#f3f3f3"], ["#7d838d", "#8d939c"]) },
   // ── özel gün
   fireworks: {
-    counts: { low: 32, medium: 64, high: 96 }, // BURST_SIZE katları
+    counts: { low: 44, medium: 88, high: 132 }, // BURST_SIZE katları (2 / 4 / 6 fişek)
     palette: p2(
       ["#ffd166", "#ef476f", "#06d6a0", "#4cc9f0", "#f72585", "#ffffff"],
       ["#e09f00", "#d62650", "#06a77d", "#1d8fd0", "#c41a6f", "#7b2cbf"],
     ),
   },
   hearts: { counts: { low: 12, medium: 20, high: 32 }, palette: p2(["#ff7aa2", "#ff4d79", "#ffa3bf"], ["#e8436e", "#d42a57", "#f0668c"]) },
-  halloween: {
+  halloweenBats: {
     counts: { low: 10, medium: 16, high: 26 },
     // yarasa: koyu zeminde mor-gri silüet, açık zeminde koyu
     palette: p2(["#8a7aa8", "#9c8cba"], ["#2b2236", "#3a2f48"]),
     palette2: p2(["#ff8c2b", "#f57a1f"], ["#ef7d1a", "#e06c0f"]),
   },
   // ── bileşikler (sayı = toplam; dağılım COMPOSITES'te)
+  solarSystem: { counts: { low: 55, medium: 75, high: 110 } }, // + 15 sabit (11 cisim, kara delik, pulsar, kuyruklu yıldız, yörünge çizgileri)
+  halloween: { counts: { low: 26, medium: 36, high: 54 } }, // + 3 mezar + 3 örümcek (sabit)
+  christmas: { counts: { low: 45, medium: 75, high: 120 } }, // + 4 sahne + 1 kızak (sabit)
+  cinema: { counts: { low: 24, medium: 40, high: 62 } },
   storm: { counts: { low: 57, medium: 92, high: 152 } },
   springGarden: { counts: { low: 34, medium: 52, high: 80 } },
   summerShore: { counts: { low: 18, medium: 32, high: 52 } }, // + 3 dalga + 1 kum (vektör)
   aurora: { counts: { low: 24, medium: 36, high: 54 } },
+  // ── güneş sistemi parçaları (renkli şekiller; palet yalnız asteroit/kuyruklu yıldız)
+  solarBodies: { counts: { low: 11, medium: 11, high: 11 }, palette: p2(["#ffffff"], ["#ffffff"]) },
+  asteroidBelt: { counts: { low: 12, medium: 18, high: 28 }, palette: p2(["#b3a58c", "#9a8d77", "#c4b79e"], ["#6e6252", "#5f5345", "#7d7160"]) },
+  blackHole: { counts: { low: 1, medium: 1, high: 1 }, palette: p2(["#ffffff"], ["#ffffff"]) },
+  pulsar: { counts: { low: 1, medium: 1, high: 1 }, palette: p2(["#ffffff"], ["#ffffff"]) },
+  comets: { counts: { low: 1, medium: 1, high: 1 }, palette: p2(["#bfe9ff", "#e0f4ff"], ["#2b7fd0", "#4a6fd0"]) },
+  orbits: { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE },
+  // ── özel gün parçaları
+  ghosts: { counts: { low: 4, medium: 6, high: 10 }, palette: p2(["#e8efff", "#d6e0ff", "#f4f1ff"], ["#6b7a99", "#7b6b99", "#5f7d99"]) },
+  tombstones: { counts: { low: 3, medium: 3, high: 3 }, palette: p2(["#7d8497", "#6b7388", "#8b8fa3"], ["#4a5062", "#3d4455", "#575d70"]) },
+  spiders: { counts: { low: 6, medium: 6, high: 6 }, palette: p2(["#a99bc4", "#9c8cba"], ["#2b2236", "#3a2f48"]) },
+  xmasGoodies: {
+    counts: { low: 10, medium: 16, high: 26 },
+    palette: p2(["#ff6b6b", "#4cd37b", "#ffd166", "#ffffff", "#7cc4ff"], ["#d62f2f", "#1f9d55", "#d99a00", "#8c98a8", "#2b7fd0"]),
+  },
+  xmasScene: {
+    counts: { low: 4, medium: 4, high: 4 },
+    palette: p2(["#f4f8ff", "#ffffff"], ["#9fb4c8", "#8aa3bb"]),
+    palette2: p2(["#4fbf7a", "#3aa865"], ["#2f8f55", "#2a7d4a"]),
+  },
+  sleigh: { counts: { low: 1, medium: 1, high: 1 }, palette: p2(["#ffe2a8", "#ffd68a"], ["#b23a28", "#9c3020"]) },
   // ── iç efektler
   lightning: { counts: { low: 2, medium: 2, high: 2 }, palette: p2(["#f4f8ff"], ["#3d5f80"]) },
   grass: {
@@ -335,6 +541,12 @@ const EFFECT_SPECS = Object.freeze({
   heatHaze: { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE },
   spotlight: { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE },
   paparazzi: { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE },
+  // ── evren ışık katmanları ve sahneleri (utils/weatherUniverses.js)
+  ...Object.fromEntries(
+    ["iceWall", "dunes", "gotham", "skyline", "mordor", "mesa", "prison", "london", "pool", "titanWall", "transmute", "blueprint", "skyBeam", "river", "swPlanet", "hogwarts", "opShip", "rmPortal"]
+      .map((e) => [e, { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE }]),
+  ),
+  ...UNIVERSE_SPECS,
   // ── tür aileleri (bileşik: sayı = toplam, dağılım COMPOSITES'te)
   genreAction: { counts: { low: 40, medium: 64, high: 100 } },
   genreScifi: { counts: { low: 34, medium: 56, high: 88 } },
@@ -360,11 +572,29 @@ const EFFECT_SPECS = Object.freeze({
 // Parçalar sırayla çizilir (sonraki öndedir).
 export const COMPOSITES = Object.freeze({
   storm: Object.freeze([["rain", 1], ["lightning", { fixed: 2 }]]),
-  springGarden: Object.freeze([["grass", 0.62], ["flowers", 0.22], ["sakura", 0.1], ["butterflies", 0.06]]),
+  springGarden: Object.freeze([
+    ["grass", 0.54], ["flowers", 0.2], ["sakura", 0.08], ["dandelion", 0.12], ["butterflies", 0.06],
+  ]),
   summerShore: Object.freeze([
     ["seagulls", 0.18], ["waves", { fixed: 3 }], ["glints", 0.82], ["sand", { fixed: 1 }],
   ]),
   aurora: Object.freeze([["skyStars", 1], ["auroraBands", { fixed: 4 }]]),
+  // Güneş sistemi: yıldızlar + yörünge çizgileri + Güneş ve 8 gezegen (Ay, Uzay İstasyonu,
+  // Satürn halkaları) + asteroit kuşağı + kara delik + pulsar + ara sıra kuyruklu yıldız.
+  solarSystem: Object.freeze([
+    ["skyStars", 0.7], ["orbits", { fixed: 1 }], ["asteroidBelt", 0.3], ["blackHole", { fixed: 1 }],
+    ["pulsar", { fixed: 1 }], ["solarBodies", { fixed: 11 }], ["comets", { fixed: 1 }],
+  ]),
+  // Özel günler: Cadılar Bayramı (yarasa + balkabağı + hayalet + mezar + örümcek),
+  // Noel (kar + hediye/şeker/top + kardan adam/ağaç + ara sıra Noel Baba kızağı),
+  // Sinema Günü (mısır + bilet).
+  halloween: Object.freeze([
+    ["tombstones", { fixed: 3 }], ["halloweenBats", 0.6], ["ghosts", 0.4], ["spiders", { fixed: 6 }],
+  ]),
+  christmas: Object.freeze([
+    ["snow", 0.55], ["xmasGoodies", 0.45], ["sleigh", { fixed: 1 }], ["xmasScene", { fixed: 4 }],
+  ]),
+  cinema: Object.freeze([["popcorn", 0.5], ["tickets", 0.5]]),
   // Tür aileleri (GENRE_FAMILIES): parçacık + ışık katmanı.
   genreAction: Object.freeze([["embers", 0.75], ["coals", 0.25], ["flare", { fixed: 1 }]]),
   genreScifi: Object.freeze([["stardust", 0.75], ["magicMotes", 0.25], ["planet", { fixed: 1 }]]),
@@ -383,13 +613,17 @@ export const COMPOSITES = Object.freeze({
   genreWar: Object.freeze([["farFlashes", { fixed: 1 }], ["smoke", 0.2], ["ash", 0.8]]),
   genreWestern: Object.freeze([["heatHaze", { fixed: 1 }], ["sandDrift", 0.85], ["tumbleweed", 0.15]]),
   genreReality: Object.freeze([["spotlight", { fixed: 1 }], ["tickets", 1], ["paparazzi", { fixed: 1 }]]),
+  // Evrenler (utils/weatherUniverses.js)
+  ...UNIVERSE_COMPOSITES,
 });
 
 export const getWeatherSpec = (effect) => EFFECT_SPECS[ALL_EFFECTS.includes(effect) ? effect : "snow"];
 
 export const normalizeWeatherEffect = (value) => (ALL_EFFECTS.includes(value) ? value : "snow");
 
-export const normalizeWeatherChoice = (value) => (WEATHER_CHOICES.includes(value) ? value : "snow");
+// Eski kayıt: karahindiba artık ayrı seçenek değil, bahar bahçesinin parçası.
+export const normalizeWeatherChoice = (value) =>
+  value === "dandelion" ? "springGarden" : WEATHER_CHOICES.includes(value) ? value : "snow";
 
 export const normalizeWeatherDensity = (value) => (WEATHER_DENSITIES.includes(value) ? value : "auto");
 
@@ -412,27 +646,46 @@ export function seasonalWeatherEffect(date = new Date()) {
 }
 
 /**
- * Sabit tarihli özel günler (yıl içinde günü HİÇ değişmeyenler — kullanıcı
- * kararı, 8 Kas): 31 Ara + 1 Oca havai fişek, 14 Şub kalpler, 31 Eki Cadılar
- * Bayramı. Cihazın yerel tarihi. Özel gün yoksa null.
+ * Sabit tarihli, dünyada bilinen özel günler (yıl içinde günü HİÇ değişmeyenler
+ * — kullanıcı kararı; Ramazan/Kurban/Anneler Günü gibi kayanlar YOK).
+ * `dates`: [ay (0–11), gün]. `effect`: o gün çizilen atmosfer.
+ * "Özel günler" ayarı açıkken bu günlerde seçili atmosfer yerine bu çizilir.
  */
-export function specialDayEffect(date = new Date()) {
+export const SPECIAL_DAYS = Object.freeze([
+  Object.freeze({ id: "newYear", dates: Object.freeze([[11, 31], [0, 1]]), effect: "fireworks" }),
+  Object.freeze({ id: "valentines", dates: Object.freeze([[1, 14]]), effect: "hearts" }),
+  Object.freeze({ id: "womensDay", dates: Object.freeze([[2, 8]]), effect: "rosePetals" }),
+  Object.freeze({ id: "earthDay", dates: Object.freeze([[3, 22]]), effect: "springGarden" }),
+  Object.freeze({ id: "halloween", dates: Object.freeze([[9, 31]]), effect: "halloween" }),
+  Object.freeze({ id: "childrensDay", dates: Object.freeze([[10, 20]]), effect: "genreFamily" }),
+  Object.freeze({ id: "christmas", dates: Object.freeze([[11, 24], [11, 25]]), effect: "christmas" }),
+  Object.freeze({ id: "cinemaDay", dates: Object.freeze([[11, 28]]), effect: "cinema" }),
+]);
+
+/** O günün özel günü ({id, dates, effect}); yoksa null. Cihazın yerel tarihi. */
+export function specialDayOf(date = new Date()) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
   const m = date.getMonth();
   const d = date.getDate();
-  if ((m === 11 && d === 31) || (m === 0 && d === 1)) return "fireworks";
-  if (m === 1 && d === 14) return "hearts";
-  if (m === 9 && d === 31) return "halloween";
-  return null;
+  return SPECIAL_DAYS.find((s) => s.dates.some(([sm, sd]) => sm === m && sd === d)) || null;
 }
 
-/** "Mevsime göre" o gün ne çizer: önce özel gün, yoksa mevsim. */
-export const autoWeatherEffect = (date = new Date()) => specialDayEffect(date) || seasonalWeatherEffect(date);
+/** O günün özel gün efekti; özel gün yoksa null. */
+export const specialDayEffect = (date = new Date()) => specialDayOf(date)?.effect ?? null;
 
-/** Ayardaki seçimi (auto dahil) çizilecek efekte çevirir. */
-export function resolveWeatherEffect(choice, date = new Date()) {
+/** "Mevsime göre" o gün ne çizer: önce özel gün (açıksa), yoksa mevsim. */
+export const autoWeatherEffect = (date = new Date(), specialDays = true) =>
+  (specialDays ? specialDayEffect(date) : null) || seasonalWeatherEffect(date);
+
+/**
+ * Ayardaki seçimi (auto dahil) çizilecek efekte çevirir. "Özel günler" açıkken
+ * özel günde seçim ne olursa olsun günün efekti çizilir.
+ */
+export function resolveWeatherEffect(choice, date = new Date(), specialDays = true) {
   const c = normalizeWeatherChoice(choice);
-  return c === "auto" ? autoWeatherEffect(date) : c;
+  const special = specialDays ? specialDayEffect(date) : null;
+  if (special) return special;
+  return c === "auto" ? seasonalWeatherEffect(date) : c;
 }
 
 // ── Türe göre ───────────────────────────────────────────────────────────────
@@ -650,7 +903,47 @@ function blank(rand) {
     group: 0,
     part: 0, // grow: 0 sap, 1 baş · tile: 0–2 dalga katmanı, 3 kum
     stemLen: 0,
+    orbitR: 0, // orbit: yörünge yarıçapı (dp, × ölçek)
+    orbitW: 0, // orbit: açısal hız (rad/sn)
+    parentR: 0, // orbit: ebeveynin yörünge yarıçapı (0 = Güneş etrafında)
+    parentW: 0,
+    parentPh: 0,
+    launch: 0, // burst: roket yükselişinin döngü payı
+    lag: 0, // burst: kuyruk parçasının geriliği (0 = roketin başı)
     seaBand: 0, // 1: y0 deniz bandı içinde oran (ışıltı)
+    ocx: 0.5, // orbit: merkez (ekran oranı)
+    ocy: ORBIT_CENTER_Y,
+    oratio: 0.5, // orbit: dikey/yatay yarıçap oranı
+    orbitPulse: 0, // orbit: yarıçap nefesi (oran; frekans driftFreqY)
+    // track / emit (evren sahneleri; utils/weatherUniverses.js)
+    kf: null, // anahtar kareler, KF_STRIDE'lık düz dizi
+    tlag: 0, // döngü payı kadar geriden izler (takipçi, gövde halkası)
+    rest: 1, // dinlenme katı: olay döngünün ilk 1/rest kadarında, kalanı boş (olay seyrekliği)
+    jitterX: 0, // döngü başına rastgele kayma (ekran oranı)
+    jitterY: 0,
+    ox: 0, // ofset (dp × ölçek × kare boyu)
+    oy: 0,
+    face: 0, // 1: gidiş yönüne döner
+    framed: 0, // 1: şekil karesi anahtar kareden (+ kanat çırpma flapFrom'dan itibaren)
+    flapFrom: 0,
+    bobAmp: 0, // süzülme (dp)
+    bobFreq: 0,
+    bobPh: 0,
+    w0: 0, // emit: saçılma penceresi (döngü payı)
+    w1: 1,
+    life: 0.1, // emit: bir parçacığın ömrü (döngü payı)
+    eoff: 0, // emit: yuvanın faz kayması
+    loop: 0, // emit: kesintisiz (pencere yok, döngüyü sarar)
+    dirA: 0, // emit: yön (rad, 0 = sağ, π/2 = aşağı)
+    dirFace: 0, // emit: yön rotanın gidişine göre
+    spread: 0,
+    speedV: 0, // emit: hız (dp/sn)
+    grav: 0, // emit: yerçekimi (dp/sn²; eksi = yükselir)
+    grow: 1, // emit: ömür sonunda boy katı
+    align: 0, // emit: şekil hareket yönünde
+    fadeK: 1, // emit: sönme eğrisi üssü (büyük = geç söner)
+    esalt: 0,
+    anc: null, // tether: [u0, u1, ax, ay] dörtlüleri
   };
   return setSprite(p, SPRITE.dot);
 }
@@ -730,6 +1023,7 @@ function overlay(p, rand, type, o = {}) {
   p.kind = KIND.overlay;
   p.part = type;
   p.period = o.period ? lerp(o.period[0], o.period[1], rand()) : 1;
+  p.rest = o.rest ?? 1;
   p.duty = o.duty ?? 1;
   p.rise = o.rise ?? 0.3;
   p.slots = o.slots ?? 1;
@@ -746,6 +1040,31 @@ function overlay(p, rand, type, o = {}) {
   p.a = 1;
   return p;
 }
+
+// ── Güneş sistemi ───────────────────────────────────────────────────────────
+// Yörünge yarıçapları (dp, k ile ölçeklenir): Merkür … Neptün. Asteroit kuşağı
+// Mars (100) ile Jüpiter (138) arasında. Elipsin dikey oranı 0,5 (üstten eğik bakış).
+export const ORBIT_RADII = Object.freeze([46, 64, 82, 100, 138, 158, 176, 192]);
+/** Yörünge ortasının ekran yüksekliği oranı (pose ve OverlayLayers aynı değeri kullanır). */
+export const ORBIT_CENTER_Y = 0.45;
+// sprite, boyut (dp), yörünge sırası, dolanma süresi (sn), kendi ekseninde dönüş (rad/sn),
+// eksen eğikliği. Bantlı gezegenler dönmez (bantlar yatay kalmalı); Dünya, Mars, Merkür
+// ve Güneş kutuptan bakılan disk gibi döner. parent: Dünya'nın satırı.
+const SOLAR_BODIES = Object.freeze([
+  { sprite: SPRITE.sun, size: 56, spin: 0.1, tilt: 0 },
+  { sprite: SPRITE.mercury, size: 9, orbit: 0, period: 16, spin: 0.5, tilt: 0 },
+  { sprite: SPRITE.venus, size: 14, orbit: 1, period: 25, spin: 0, tilt: 0 },
+  { sprite: SPRITE.earth, size: 16, orbit: 2, period: 38, spin: 0.7, tilt: 0 },
+  { sprite: SPRITE.mars, size: 12, orbit: 3, period: 58, spin: 0.5, tilt: 0 },
+  { sprite: SPRITE.jupiter, size: 30, orbit: 4, period: 95, spin: 0, tilt: 0.05 },
+  { sprite: SPRITE.saturn, size: 40, orbit: 5, period: 135, spin: 0, tilt: -0.42 },
+  { sprite: SPRITE.uranus, size: 24, orbit: 6, period: 190, spin: 0, tilt: 1.45 },
+  { sprite: SPRITE.neptune, size: 20, orbit: 7, period: 260, spin: 0, tilt: 0 },
+  { sprite: SPRITE.moon, size: 6, parent: 3, r: 22, period: 14, spin: 0, tilt: 0 },
+  { sprite: SPRITE.iss, size: 11, parent: 3, r: 13, period: 5, spin: 0, tilt: 0 },
+]);
+// Başlangıç açıları sabit (her açılışta aynı dizilim), Ay/İstasyon Dünya'nınkini bilir.
+const solarPhase = (i) => seededRandom(deriveSeed(0x501, i + 1))() * TAU;
 
 function makeParticle(effect, rand, pal, pal2, index, count) {
   const p = blank(rand);
@@ -985,22 +1304,35 @@ function makeParticle(effect, rand, pal, pal2, index, count) {
       return p;
     }
     case "fireworks": {
-      // index'e göre grup: aynı gruptaki kıvılcımlar aynı merkezden, aynı anda
+      // index'e göre grup: aynı gruptaki parçalar aynı merkezden, aynı anda.
+      // Grubun ilk FIREWORK_TRAIL parçası alttan yükselen roket + kuyruğu (izi),
+      // kalan FIREWORK_SPARKS parça patlayan kıvılcım.
       const group = Math.floor(index / BURST_SIZE);
       const k = index % BURST_SIZE;
       const g = seededRandom(deriveSeed(0xf1e, group + 1)); // grup ortak
       p.kind = KIND.burst;
       p.group = group;
-      setSprite(p, rand() < 0.25 ? SPRITE.star : SPRITE.glow);
-      p.period = lerp(2.6, 3.8, g());
+      p.period = lerp(3.4, 4.6, g());
       p.y0 = g();
       p.salt = Math.floor(g() * 100000);
       paint(p, pickFrom(g, pal));
-      p.duty = 0.8;
-      p.rot0 = (k / BURST_SIZE) * TAU + lerp(-0.12, 0.12, rand());
+      p.duty = 0.86;
+      p.a = 1;
+      p.launch = FIREWORK_LAUNCH;
+      if (k < FIREWORK_TRAIL) {
+        // 0 = roketin başı, 1.. = kuyruk (giderek geride, küçük ve sönük)
+        p.part = 1;
+        p.lag = k;
+        setSprite(p, SPRITE.glow);
+        p.size = lerp(7, 10, d) * (1 - k * 0.11);
+        p.rot0 = 0;
+        return p;
+      }
+      p.part = 0;
+      setSprite(p, rand() < 0.25 ? SPRITE.star : SPRITE.glow);
+      p.rot0 = ((k - FIREWORK_TRAIL) / FIREWORK_SPARKS) * TAU + lerp(-0.12, 0.12, rand());
       p.speed = lerp(70, 120, rand());
       p.size = lerp(5, 9, d);
-      p.a = 1;
       return p;
     }
     case "hearts":
@@ -1008,7 +1340,7 @@ function makeParticle(effect, rand, pal, pal2, index, count) {
         dir: -1, sprite: SPRITE.heart, size: [12, 24], speed: [26, 55], wind: [-6, 6], sway: [14, 36],
         swayFreq: [0.12, 0.3], wobble: [0.15, 0.35], alpha: [0.75, 1],
       });
-    case "halloween": {
+    case "halloweenBats": {
       if (rand() < 0.75) return flapping(p, rand, d, BAT);
       paint(p, pickFrom(rand, pal2));
       return falling(p, rand, d, {
@@ -1018,6 +1350,161 @@ function makeParticle(effect, rand, pal, pal2, index, count) {
     }
     case "bats":
       return flapping(p, rand, d, BAT);
+    case "solarBodies": {
+      const row = SOLAR_BODIES[index % SOLAR_BODIES.length];
+      p.kind = KIND.orbit;
+      setSprite(p, row.sprite);
+      p.size = row.size;
+      p.rotSpeed = row.spin;
+      p.rot0 = row.tilt;
+      p.a = 0.95;
+      p.swayPhase = solarPhase(index);
+      if (row.parent !== undefined) {
+        // Ay / Uzay İstasyonu: Dünya'nın çevresinde
+        const earth = SOLAR_BODIES[row.parent];
+        p.parentR = ORBIT_RADII[earth.orbit];
+        p.parentW = TAU / earth.period;
+        p.parentPh = solarPhase(row.parent);
+        p.orbitR = row.r;
+        p.orbitW = TAU / row.period;
+      } else if (row.orbit !== undefined) {
+        p.orbitR = ORBIT_RADII[row.orbit];
+        p.orbitW = TAU / row.period;
+      }
+      return p;
+    }
+    case "asteroidBelt": {
+      p.kind = KIND.orbit;
+      setSprite(p, rand() < 0.5 ? SPRITE.speck : SPRITE.dot);
+      p.size = lerp(2.5, 5.5, d);
+      p.orbitR = lerp(108, 122, rand());
+      p.orbitW = TAU / lerp(100, 118, rand());
+      p.rotSpeed = lerp(-1, 1, rand());
+      p.a = lerp(0.5, 0.9, d);
+      return p;
+    }
+    case "blackHole":
+      // uzak köşede yavaş dönen kara delik (yığılma diski + foton halkası)
+      p.kind = KIND.float;
+      setSprite(p, SPRITE.blackHole);
+      p.size = 84;
+      p.x0 = 0.8;
+      p.y0 = 0.13;
+      p.swayAmp = 5;
+      p.swayFreq = 0.02;
+      p.driftAmpY = 4;
+      p.driftFreqY = 0.02;
+      p.rotSpeed = 0.25;
+      p.a = 1;
+      return p;
+    case "pulsar":
+      // hızlı dönen nötron yıldızı; iki ışın süpürür, parlaklık yumuşakça nefes alır
+      p.kind = KIND.float;
+      setSprite(p, SPRITE.pulsar);
+      p.size = 70;
+      p.x0 = 0.17;
+      p.y0 = 0.87;
+      p.swayAmp = 4;
+      p.swayFreq = 0.025;
+      p.driftAmpY = 4;
+      p.driftFreqY = 0.02;
+      p.rotSpeed = 1.7;
+      p.pulseFreq = 0.8;
+      p.pulseMin = 0.6;
+      p.a = 1;
+      return p;
+    case "comets":
+      p.kind = KIND.meteor;
+      setSprite(p, SPRITE.trail);
+      p.size = lerp(90, 140, rand());
+      p.period = lerp(14, 22, rand());
+      p.duty = 0.14;
+      p.a = 0.95;
+      return p;
+    case "ghosts": {
+      // süzülerek yatay uçan hayalet; yavaş aşağı yukarı, hafif eğilir, yarı saydam
+      p.kind = KIND.drift;
+      setSprite(p, SPRITE.ghost);
+      p.size = lerp(28, 46, d);
+      p.windX = (rand() < 0.5 ? -1 : 1) * lerp(12, 34, rand());
+      p.y0 = lerp(0.1, 0.75, p.y0);
+      p.swayAmp = lerp(8, 22, rand());
+      p.swayFreq = lerp(0.08, 0.18, rand());
+      p.driftAmpY = lerp(14, 36, rand());
+      p.driftFreqY = lerp(0.04, 0.09, rand());
+      p.wobbleAmp = lerp(0.08, 0.2, rand());
+      p.wobbleFreq = p.swayFreq;
+      p.pulseFreq = lerp(0.12, 0.3, rand());
+      p.pulseMin = 0.45;
+      p.a = lerp(0.5, 0.85, d);
+      return p;
+    }
+    case "tombstones": {
+      // alttan sabitli mezar taşı, taban boyunca eşit aralıklı
+      p.kind = KIND.anchor;
+      setSprite(p, SPRITE.tombstone);
+      p.x0 = (index + 0.2 + rand() * 0.6) / Math.max(1, count);
+      p.size = lerp(34, 56, d);
+      p.rot0 = lerp(-0.07, 0.07, rand());
+      p.a = lerp(0.75, 1, d);
+      return p;
+    }
+    case "spiders": {
+      // iki parçacık bir örümcek: çift index ip, tek index gövde (ortak tohum → birlikte iner)
+      const sp = Math.floor(index / 2);
+      const total = Math.max(1, Math.floor(count / 2));
+      const g = seededRandom(deriveSeed(0x5d1, sp + 1));
+      p.kind = KIND.dangle;
+      p.x0 = (sp + 0.15 + g() * 0.7) / total;
+      p.stemLen = lerp(80, 240, g());
+      p.swayFreq = lerp(0.12, 0.28, g());
+      p.swayPhase = g() * TAU;
+      p.driftFreqY = lerp(0.05, 0.11, g());
+      p.wobblePhase = g() * TAU;
+      p.wobbleAmp = lerp(0.04, 0.1, g());
+      p.part = index % 2;
+      paint(p, pickFrom(g, pal)); // ip ve gövde aynı renk
+      if (p.part === 0) {
+        setSprite(p, SPRITE.thread);
+        p.size = p.stemLen;
+        p.a = 0.6;
+      } else {
+        setSprite(p, SPRITE.spider);
+        p.size = lerp(18, 28, g());
+        p.a = 1;
+      }
+      return p;
+    }
+    case "xmasGoodies": {
+      const kinds = [SPRITE.gift, SPRITE.candyCane, SPRITE.ornament, SPRITE.star];
+      return falling(p, rand, d, {
+        sprite: pickFrom(rand, kinds), size: [16, 28], speed: [26, 52], wind: [-8, 10], sway: [14, 34],
+        swayFreq: [0.1, 0.24], rot: 0.5, wobble: [0.15, 0.4], alpha: [0.8, 1],
+      });
+    }
+    case "xmasScene": {
+      // alttan sabitli kardan adam / Noel ağacı, dönüşümlü, tabana eşit yayılır
+      p.kind = KIND.anchor;
+      const man = index % 2 === 0;
+      setSprite(p, man ? SPRITE.snowman : SPRITE.xmasTree);
+      paint(p, pickFrom(rand, man ? pal : pal2));
+      p.x0 = (index + 0.25 + rand() * 0.5) / Math.max(1, count);
+      p.size = man ? lerp(58, 84, d) : lerp(66, 100, d);
+      p.rot0 = lerp(-0.03, 0.03, rand());
+      p.a = lerp(0.85, 1, d);
+      return p;
+    }
+    case "sleigh": {
+      // ara sıra soldan sağa geçen Noel Baba kızağı (ren geyikleriyle)
+      p.kind = KIND.glide;
+      setSprite(p, SPRITE.sleigh);
+      p.size = lerp(130, 160, d);
+      p.period = lerp(16, 22, rand());
+      p.duty = 0.3;
+      p.salt = Math.floor(rand() * 100000);
+      p.a = 1;
+      return p;
+    }
     case "balloons":
       return falling(p, rand, d, {
         dir: -1, sprite: SPRITE.balloon, size: [26, 42], speed: [22, 45], wind: [-5, 8], sway: [10, 26],
@@ -1216,8 +1703,61 @@ function makeOverlay(effect, p, rand, index) {
       return p;
     case "paparazzi":
       return overlay(p, rand, type, { period: [2.6, 4.4], duty: 0.1, rise: 0.15, slots: 3, xr: [0.08, 0.92], yr: [0.14, 0.72] });
+    case "mordor":
+      // gözün bakışı: sola, ufkun üstünden aşağısına yavaşça süpürür
+      overlay(p, rand, type, { swayFreq: [0.03, 0.04] });
+      p.rot0 = 1.62;
+      p.swayAmp = 0.62;
+      return p;
+    case "prison":
+      // kule projektörü: sola-aşağı tel örgü boyunca tarar
+      overlay(p, rand, type, { swayFreq: [0.045, 0.06] });
+      p.rot0 = 0.62;
+      p.swayAmp = 0.48;
+      return p;
+    case "skyBeam":
+      // şehirden yukarı; iki hüzme farklı yer ve fazda
+      overlay(p, rand, type, { swayFreq: [0.025, 0.04] });
+      p.xr0 = index % 2 ? 0.7 : 0.24;
+      p.yr0 = 0.95;
+      p.rot0 = Math.PI + (index % 2 ? 0.16 : -0.16);
+      p.swayAmp = 0.34;
+      p.swayPhase = index * 2.1;
+      return p;
+    case "iceWall":
+      // duvarın yıkılışı ejderha turuyla (gotScene, 24 sn × 3 = 72 sn) AYNI saatte: faz 0
+      overlay(p, rand, type, { period: [72, 72], rest: 3 });
+      p.y0 = 0;
+      return p;
+    case "dunes":
+      // solucan ve titreşim: 40 sn saati (duneScene ile aynı, faz 0)
+      overlay(p, rand, type, { period: [80, 80], rest: 2 });
+      p.y0 = 0;
+      return p;
+    case "opShip":
+      overlay(p, rand, type, { period: [88, 88], rest: 2 });
+      p.y0 = rand();
+      return p;
+    case "rmPortal":
+      overlay(p, rand, type, { period: [90, 90], rest: 3 });
+      p.y0 = 0;
+      return p;
+    case "swPlanet":
+      // swScene olay döngüsüyle AYNI 60 sn saati (faz 0)
+      overlay(p, rand, type, { period: [120, 120], rest: 2 });
+      p.y0 = 0;
+      return p;
+    case "river":
+      // baskın turu vikScene ile AYNI saatte (30 sn × 3 = 90 sn, faz 0)
+      overlay(p, rand, type, { period: [90, 90], rest: 3 });
+      p.y0 = 0;
+      return p;
+    case "transmute":
+      return overlay(p, rand, type, { period: [51, 57], rest: 3 });
+    case "blueprint":
+      return overlay(p, rand, type, { period: [63, 72], rest: 3 });
     default:
-      // blinds, warmGlow, equalizer, candle, viewfinder: yalnız saat
+      // blinds, warmGlow, equalizer, candle, viewfinder, evren silüetleri: yalnız saat
       return overlay(p, rand, type);
   }
 }
@@ -1235,6 +1775,7 @@ function structuralCount(effect, n) {
     case "sand":
       return 1;
     case "flowers":
+    case "spiders":
       return Math.max(2, Math.floor(n / 2) * 2);
     default:
       return n;
@@ -1246,6 +1787,13 @@ function structuralCount(effect, n) {
  * Bileşik efekt parçalarına açılır; bazı türlerde sayı yapıya yuvarlanır
  * (fişek patlama katı, çiçek çifti, dalga/kum döşemesi, şimşek 2).
  */
+// Sahne kurucularına (utils/weatherUniverses.js) verilen araç takımı: döngüsel
+// içe aktarma olmasın diye motor parçaları çağrı anında geçer.
+const SCENE_KIT = Object.freeze({
+  SPRITE, KIND, OVERLAY, SIZE_MODE, TAU, lerp, blank, setSprite, paint, falling, floating, flapping,
+  overlay, seededRandom, deriveSeed, pickFrom,
+});
+
 export function buildParticles(effect, { count, seed = 1, lightSurface = false } = {}) {
   const e = normalizeWeatherEffect(effect);
   const total = Math.max(0, Math.min(400, Math.floor(Number(count) || 0)));
@@ -1259,6 +1807,17 @@ export function buildParticles(effect, { count, seed = 1, lightSurface = false }
       const n = typeof v === "object" ? v.fixed : Math.max(1, Math.round(rest * v));
       out.push(...buildParticles(sub, { count: n, seed: deriveSeed(seed, i + 11), lightSurface }));
     });
+    // alt kenara oturan deniz: tab çubuğunun üstüne kaldırılır (ParticleField)
+    if (e === "onePiece") for (const q of out) if (q.kind === KIND.tile) q.lift = SCENERY.lift;
+    return out;
+  }
+  const scene = SCENE_BUILDERS[e];
+  if (scene) {
+    if (total <= 0) return [];
+    const tone = lightSurface ? "light" : "dark";
+    const rand = seededRandom(deriveSeed(deriveSeed(seed, WEATHER_SEED_SALT), ALL_EFFECTS.indexOf(e) + 1));
+    const out = scene(SCENE_KIT, { rand, count: total, lightSurface, tone });
+    for (const q of out) if (COLORED_SET.has(q.sprite)) paint(q, "#ffffff");
     return out;
   }
   const n = structuralCount(e, total);
@@ -1268,7 +1827,11 @@ export function buildParticles(effect, { count, seed = 1, lightSurface = false }
   const pal2 = (spec.palette2 || spec.palette)[tone];
   const rand = seededRandom(deriveSeed(deriveSeed(seed, WEATHER_SEED_SALT), ALL_EFFECTS.indexOf(e) + 1));
   const out = new Array(n);
-  for (let i = 0; i < n; i += 1) out[i] = makeParticle(e, rand, pal, pal2, i, n);
+  for (let i = 0; i < n; i += 1) {
+    const p = makeParticle(e, rand, pal, pal2, i, n);
+    if (COLORED_SET.has(p.sprite)) paint(p, "#ffffff");
+    out[i] = p;
+  }
   return out;
 }
 
@@ -1282,12 +1845,12 @@ export function buildPlanParticles(plan, { seed = 1, lightSurface = false } = {}
 }
 
 /** Kare başına şekil karesi değişen (kanat çırpan) parçacık var mı. */
-export const needsAnimatedSprites = (particles) => particles.some((p) => p.flapFreq > 0);
+export const needsAnimatedSprites = (particles) => particles.some((p) => p.flapFreq > 0 || p.framed > 0);
 
 /** Atlas yerine vektör çizilen parçacık (şimşek çizgisi, dalga/kum katmanı, tür ışık katmanı). */
 export const isVectorParticle = (p) => p.kind === KIND.tile || p.kind === KIND.bolt || p.kind === KIND.overlay;
 
-const TIMED_KINDS = new Set([KIND.meteor, KIND.screenFlash, KIND.burst, KIND.grow, KIND.bolt]);
+const TIMED_KINDS = new Set([KIND.meteor, KIND.screenFlash, KIND.burst, KIND.grow, KIND.bolt, KIND.glide, KIND.track, KIND.emit]);
 /** Opaklığı zamanla değişen parçacık var mı (yoksa renkler bir kez yazılır). */
 export const needsAnimatedAlpha = (particles) =>
   particles.some((p) => p.pulseFreq > 0 || p.fadeOut > 0 || TIMED_KINDS.has(p.kind));
@@ -1298,6 +1861,17 @@ const wrap01 = (v) => {
   "worklet";
   return v - Math.floor(v);
 };
+
+/**
+ * Olay saati: döngünün ilk 1/rest kadarı olay (0–1'e açılır), kalanı dinlenme (2 = olay bitti).
+ * Olaylar `rest` katı seyrek gelir ama süreleri değişmez (dönem rest ile çarpılmıştır).
+ */
+export function restU(p, t) {
+  "worklet";
+  const c = (t / p.period + p.y0) % 1;
+  const u = (c < 0 ? c + 1 : c) * (p.rest || 1);
+  return u > 1 ? 2 : u;
+}
 
 /** Kıyı yerleşimi (dp): ölçek k, kumun üst kenarı, deniz bandı, katman tabanları.
  *  particlePose bunu çağırır → ondan ÖNCE tanımlı olmalı (worklet eklentisi
@@ -1340,6 +1914,101 @@ const bump = (x, c, w) => {
   const v = 1 - Math.abs(x - c) / w;
   return v > 0 ? v : 0;
 };
+
+/** Güneş sistemi ölçeği: en dış yörünge ekran genişliğinin ~%46'sı (yarıçap) olacak şekilde. */
+export function orbitScale(width) {
+  "worklet";
+  const k = (width * 0.46) / 192;
+  return k < 0.5 ? 0.5 : k > 1.35 ? 1.35 : k;
+}
+
+/** Anahtar kare satırı: u, x, y (ekran oranı), boy katı, açı, opaklık, şekil karesi,
+ *  yumuşatma (1 = bu kareden sonrakine smoothstep), dy (dp × ölçek). */
+export const KF_STRIDE = 9;
+
+/** Evren sahnesi ölçeği (dp): kıyı katmanıyla AYNI formül (dalga üstündeki gemi). */
+export function sceneScale(width, height) {
+  "worklet";
+  const k = Math.min(width / 390, height / 640);
+  return k < 0.45 ? 0.45 : k > 1.3 ? 1.3 : k;
+}
+
+/** Anahtar karelerde u (0–1) anı: doğrusal (ya da yumuşak) ara değer; şekil karesi
+ *  bölümün başındaki kare. */
+export function trackSample(kf, u) {
+  "worklet";
+  const S = 9; // KF_STRIDE
+  const n = kf.length / S;
+  if (n <= 1 || u <= kf[0]) {
+    return { x: kf[1], y: kf[2], s: kf[3], a: kf[4], al: kf[5], f: kf[6], dy: kf[8] };
+  }
+  let i = 0;
+  while (i < n - 2 && u >= kf[(i + 1) * S]) i += 1;
+  const b = i * S;
+  const c = b + S;
+  const span = kf[c] - kf[b];
+  let k = span > 0 ? (u - kf[b]) / span : 1;
+  if (k > 1) k = 1;
+  if (kf[b + 7] === 1) k = k * k * (3 - 2 * k);
+  return {
+    x: kf[b + 1] + (kf[c + 1] - kf[b + 1]) * k,
+    y: kf[b + 2] + (kf[c + 2] - kf[b + 2]) * k,
+    s: kf[b + 3] + (kf[c + 3] - kf[b + 3]) * k,
+    a: kf[b + 4] + (kf[c + 4] - kf[b + 4]) * k,
+    al: kf[b + 5] + (kf[c + 5] - kf[b + 5]) * k,
+    f: k >= 1 ? kf[c + 6] : kf[b + 6],
+    dy: kf[b + 8] + (kf[c + 8] - kf[b + 8]) * k,
+  };
+}
+
+/** Rotadaki nokta (px): anahtar kare + döngü başına kayma + ofset + süzülme. */
+export function trackPoint(p, t, u, n, width, height) {
+  "worklet";
+  const q = trackSample(p.kf, u);
+  const k = sceneScale(width, height);
+  let x = q.x * width + p.ox * q.s * k;
+  let y = q.y * height + q.dy * k + p.oy * q.s * k;
+  if (p.jitterX) x += (hash01(n, p.salt) - 0.5) * p.jitterX * width;
+  if (p.jitterY) y += (hash01(n, p.salt + 3) - 0.5) * p.jitterY * height;
+  if (p.bobAmp) {
+    y += Math.sin(t * p.bobFreq * 6.283185307179586 + p.bobPh) * p.bobAmp * k;
+    x += Math.cos(t * p.bobFreq * 3.141592653589793 + p.bobPh) * p.bobAmp * 0.6 * k;
+  }
+  return { x, y, s: q.s, a: q.a, al: q.al, f: q.f, k };
+}
+
+/** Saçılan parçacığın durumu: hangi döngü (n) ve saçılma (e), saçılma anı s0, yaş (0–1). */
+export function emitState(p, t) {
+  "worklet";
+  const c = t / p.period + p.y0 - p.tlag;
+  const n = Math.floor(c);
+  const u = c - n;
+  let local = u - p.w0 - p.eoff;
+  if (p.loop) local -= Math.floor(local);
+  if (local < 0) return { vis: 0, n, e: 0, s0: 0, age: 0 };
+  const e = Math.floor(local / p.life);
+  let s0 = p.w0 + p.eoff + e * p.life;
+  if (!p.loop && s0 > p.w1) return { vis: 0, n, e, s0, age: 0 };
+  if (p.loop) s0 -= Math.floor(s0);
+  return { vis: 1, n, e, s0, age: local / p.life - e };
+}
+
+/** İp / halat (KIND.overlay, OVERLAY.tether): çapadan rotadaki gövdeye çizgi; pencere dışında a = 0. */
+export function tetherFrame(p, t, width, height) {
+  "worklet";
+  const c = t / p.period + p.y0 - p.tlag;
+  const n = Math.floor(c);
+  const u = c - n;
+  const anc = p.anc;
+  for (let j = 0; j + 3 < anc.length; j += 4) {
+    if (u >= anc[j] && u < anc[j + 1]) {
+      const q = trackPoint(p, t, u, n, width, height);
+      if (q.al <= 0.001) break;
+      return { a: q.al, x1: anc[j + 2] * width, y1: anc[j + 3] * height, x2: q.x, y2: q.y };
+    }
+  }
+  return { a: 0, x1: -100, y1: -100, x2: -100, y2: -100 };
+}
 
 /**
  * Parçacığın t anındaki duruşu, Atlas RSXform'una hazır: şekil dikdörtgeninin
@@ -1435,10 +2104,30 @@ export function particlePose(p, t, width, height) {
     } else {
       const k = ph / p.duty;
       const cx = width * (0.15 + 0.7 * hash01(n, p.salt));
-      const cy = height * (0.12 + 0.45 * hash01(n, p.salt + 1));
-      const r = p.speed * easeOutCubic(k);
-      x = cx + Math.cos(p.rot0) * r;
-      y = cy + Math.sin(p.rot0) * r + 55 * k * k;
+      // patlama noktası ekranın üst yarısında (0.10–0.45 yükseklik)
+      const cy = height * (0.1 + 0.35 * hash01(n, p.salt + 1));
+      if (p.part === 1) {
+        // roket + kuyruk: alttan yavaşlayarak yükselir; kuyruk parçaları geriden gelir
+        const u = (k - p.lag * 0.022) / p.launch;
+        if (u < 0 || u > 1) {
+          x = -10000;
+          y = -10000;
+        } else {
+          const e = 1 - (1 - u) * (1 - u);
+          x = cx + Math.sin(u * 9 + p.salt) * 3 * (1 - u);
+          y = height + 6 + (cy - height - 6) * e;
+        }
+      } else {
+        const ks = (k - p.launch) / (1 - p.launch);
+        if (ks < 0) {
+          x = -10000;
+          y = -10000;
+        } else {
+          const r = p.speed * easeOutCubic(ks);
+          x = cx + Math.cos(p.rot0) * r;
+          y = cy + Math.sin(p.rot0) * r + 55 * ks * ks;
+        }
+      }
     }
   } else if (p.kind === 8) {
     // anchor: taban (x0·W, alt kenar) sabit, şekil tabandan yukarı uzanır
@@ -1467,6 +2156,101 @@ export function particlePose(p, t, width, height) {
     if (g <= 0) {
       x = -10000;
       y = -10000;
+    }
+  } else if (p.kind === 16) {
+    // orbit: Güneş (ya da ebeveyn) çevresinde elips; öndeki yarıda biraz büyük
+    const ok = orbitScale(width);
+    let ox = width * p.ocx;
+    let oy = height * p.ocy; // varsayılan ORBIT_CENTER_Y
+    if (p.parentR > 0) {
+      const pa = p.parentPh + t * p.parentW;
+      ox += Math.cos(pa) * p.parentR * ok;
+      oy += Math.sin(pa) * p.parentR * ok * 0.5;
+    }
+    const oa = p.swayPhase + t * p.orbitW;
+    const R = p.orbitR * ok * (p.orbitPulse ? 1 + p.orbitPulse * Math.sin(t * p.driftFreqY * TWO_PI + p.wobblePhase) : 1);
+    x = ox + Math.cos(oa) * R;
+    y = oy + Math.sin(oa) * R * (p.parentR > 0 ? 0.7 : p.oratio);
+    size *= 1 + 0.1 * Math.sin(oa);
+  } else if (p.kind === 14) {
+    // glide: döngünün başında ekranı soldan sağa geçer (üst bölgede, hafif dalgalı), gerisi gizli
+    const c = t / p.period + p.y0;
+    const n = Math.floor(c);
+    const ph = c - n;
+    if (ph >= p.duty) {
+      x = -10000;
+      y = -10000;
+    } else {
+      const k = ph / p.duty;
+      x = -size + k * (width + size * 2);
+      y = height * (0.09 + 0.2 * hash01(n, p.salt)) + Math.sin(k * 6.2832 * 1.5) * 14;
+      angle = Math.cos(k * 6.2832 * 1.5) * 0.08 - 0.04;
+    }
+  } else if (p.kind === 15) {
+    // dangle: tavandan ip; boy yavaşça aşağı yukarı, ip hafif sallanır
+    const bob = Math.sin(t * p.driftFreqY * TWO_PI + p.wobblePhase);
+    const len = p.stemLen * (0.78 + 0.22 * bob);
+    const lean = Math.sin(t * p.swayFreq * TWO_PI + p.swayPhase) * p.wobbleAmp;
+    const ax = p.x0 * width;
+    const sl = Math.sin(lean);
+    const cl = Math.cos(lean);
+    angle = lean;
+    if (p.part === 0) {
+      size = len;
+      x = ax - sl * len * 0.5;
+      y = -4 + cl * len * 0.5;
+    } else {
+      const half = size * 0.5;
+      x = ax - sl * (len + half);
+      y = -4 + cl * (len + half);
+    }
+  } else if (p.kind === 17) {
+    // track: anahtar karelerle senaryolu rota; opaklık 0 iken ekran dışı
+    const c = t / p.period + p.y0 - p.tlag;
+    const n = Math.floor(c);
+    const u = c - n;
+    const q = trackPoint(p, t, u, n, width, height);
+    if (q.al <= 0.001) {
+      x = -10000;
+      y = -10000;
+    } else {
+      x = q.x;
+      y = q.y;
+      size = p.size * q.s * q.k;
+      angle += q.a;
+      if (p.face) {
+        const back = u > 0.996;
+        const q2 = trackPoint(p, t, back ? u - 0.003 : u + 0.003, n, width, height);
+        const dx = back ? x - q2.x : q2.x - x;
+        const dy = back ? y - q2.y : q2.y - y;
+        if (dx * dx + dy * dy > 0.0001) angle += Math.atan2(dy, dx);
+      }
+    }
+  } else if (p.kind === 18) {
+    // emit: saçılma anındaki rota noktasından yön × hız + yerçekimi; yaşla büyür
+    const st = emitState(p, t);
+    if (!st.vis) {
+      x = -10000;
+      y = -10000;
+    } else {
+      const ageSec = st.age * p.life * p.period;
+      const q = trackPoint(p, t - ageSec, st.s0, st.n, width, height);
+      const k = q.k;
+      let dir = p.dirA;
+      if (p.dirFace) {
+        const q2 = trackPoint(p, t - ageSec, st.s0 + 0.003, st.n, width, height);
+        dir += Math.atan2(q2.y - q.y, q2.x - q.x);
+      }
+      const h1 = hash01(st.n * 37 + st.e, p.esalt);
+      const h2 = hash01(st.n * 37 + st.e, p.esalt + 7);
+      dir += (h1 - 0.5) * p.spread;
+      const sp = p.speedV * (0.75 + 0.5 * h2) * k;
+      const g = p.grav * k;
+      x = q.x + Math.cos(dir) * sp * ageSec;
+      y = q.y + Math.sin(dir) * sp * ageSec + 0.5 * g * ageSec * ageSec;
+      if (p.swayAmp) x += Math.sin(ageSec * p.swayFreq * TWO_PI + p.swayPhase + h1 * 6) * p.swayAmp * k;
+      size = p.size * k * (1 + (p.grow - 1) * st.age);
+      if (p.align) angle = Math.atan2(Math.sin(dir) * sp + g * ageSec, Math.cos(dir) * sp) - TWO_PI / 4;
     }
   } else if (p.kind === 11) {
     // band: geniş, yavaş dalgalanan aurora şeridi
@@ -1501,8 +2285,32 @@ export function particleAlpha(p, t, height) {
     const k = ph / p.duty;
     if (p.kind === 3) a *= Math.sin(k * PI); // belirir → söner
     else if (p.kind === 4) a *= 0.5 * bump(k, 0.16, 0.12) + bump(k, 0.6, 0.18); // çift çakma
-    else if (p.kind === 5) a *= (1 - k) * (1 - k * 0.4); // fişek: patlar ve söner
+    else if (p.kind === 5) {
+      if (p.part === 1) {
+        // roket izi: yükselirken görünür, kuyruk uca doğru sönük
+        const u = (k - p.lag * 0.022) / p.launch;
+        if (u < 0 || u > 1) return 0;
+        a *= (1 - p.lag * 0.13) * (0.55 + 0.45 * u);
+      } else {
+        // kıvılcım: roket tepeye varınca patlar ve söner
+        const ks = (k - p.launch) / (1 - p.launch);
+        if (ks < 0) return 0;
+        a *= (1 - ks) * (1 - ks * 0.4);
+      }
+    }
     else a *= k < 0.48 || k > 0.76 ? 0 : 1 - ((k - 0.48) / 0.28) * ((k - 0.48) / 0.28); // çizgi aydınlığın içinde söner
+  } else if (p.kind === 14) {
+    const c = t / p.period + p.y0;
+    if (c - Math.floor(c) >= p.duty) return 0;
+  } else if (p.kind === 17) {
+    const c = t / p.period + p.y0 - p.tlag;
+    const al = trackSample(p.kf, c - Math.floor(c)).al;
+    if (al <= 0.001) return 0;
+    a *= al > 1 ? 1 : al;
+  } else if (p.kind === 18) {
+    const st = emitState(p, t);
+    if (!st.vis) return 0;
+    a *= (st.age < 0.08 ? st.age / 0.08 : 1) * (1 - Math.pow(st.age, p.fadeK));
   } else if (p.kind === 9) {
     const c = t / p.period + p.y0;
     const k = c - Math.floor(c);
@@ -1523,6 +2331,13 @@ export function particleAlpha(p, t, height) {
 /** Dokudaki şekil hücresi: kanat çırpanlar (kelebek, yarasa, martı) iki kare arasında. */
 export function particleSprite(p, t) {
   "worklet";
+  if (p.framed) {
+    // track: kare anahtar kareden; flapFrom'dan itibaren kanat çırpar (ördek yüzer → uçar)
+    const c = t / p.period + p.y0 - p.tlag;
+    let f = trackSample(p.kf, c - Math.floor(c)).f;
+    if (p.flapFreq && f >= p.flapFrom) f += Math.sin(t * p.flapFreq * 6.283185307179586 + p.swayPhase) > 0 ? 0 : 1;
+    return p.sprite + f;
+  }
   if (!p.flapFreq) return p.sprite;
   return Math.sin(t * p.flapFreq * 6.283185307179586 + p.swayPhase) > 0 ? p.sprite : p.sprite + 1;
 }
@@ -1531,7 +2346,7 @@ export function particleSprite(p, t) {
 export function spriteOrigin(sprite) {
   "worklet";
   const col = sprite % 8; // SPRITE_COLS
-  return { x: col * 64, y: ((sprite - col) / 8) * 64 }; // SPRITE_CELL
+  return { x: col * 128, y: ((sprite - col) / 8) * 128 }; // SPRITE_CELL
 }
 
 // ── Tür ışık katmanları (worklet) ──────────────────────────────────────────
@@ -1625,8 +2440,150 @@ export function overlayFrame(p, t, width, height) {
     else r = 0.15;
   } else if (type === 14) {
     r = Math.sin(t * p.swayFreq * TWO_PI + p.swayPhase) * 0.42;
+  } else if (type === 21 || type === 23 || type === 30) {
+    // mordor (göz bakışı), hapishane projektörü, Gotham projektörü: hüzme açısı r, a nabız
+    r = p.rot0 + Math.sin(t * p.swayFreq * TWO_PI + p.swayPhase) * p.swayAmp;
+    const s = Math.sin(t * 0.21 * TWO_PI + p.pulsePhase);
+    a = 0.78 + 0.22 * s * s;
+  } else if (type === 25) {
+    // havuz: dalgacık kayması (x) ve yüzey parıltısı (a)
+    x = wrap01(t * 0.035 + p.y0);
+    a = 0.85 + 0.15 * Math.sin(t * 0.3 * TWO_PI);
+  } else if (type === 20 || type === 19) {
+    // şehir: anten ışığı yumuşak yanıp söner (r 0–1)
+    const k = wrap01(t / 2.4 + p.y0);
+    r = k < 0.5 ? Math.sin(k * 2 * 3.141592653589793) : 0;
   }
   return { a, x, y, r };
+}
+
+/**
+ * Kendini çizen çember/plan (dönüşüm çemberi, kaçış planı): draw = çizgi payı
+ * (0–1, yol kırpma), glow = parlama (0–1, yumuşak), a = katman opaklığı.
+ * Döngü: çizilir (0–0,35) → parlar (0,35–0,55) → söner (0,55–0,7) → boş.
+ */
+export function drawCycle(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  let draw = 1;
+  let glow = 0;
+  let a = 1;
+  if (u < 0.35) {
+    const k = u / 0.35;
+    draw = k * k * (3 - 2 * k);
+  } else if (u < 0.55) {
+    glow = bump(u, 0.45, 0.1);
+  } else if (u < 0.7) {
+    a = 1 - (u - 0.55) / 0.15;
+  } else {
+    a = 0;
+  }
+  return { draw, glow, a, u };
+}
+
+const smooth01 = (a, b, x) => {
+  "worklet";
+  const v = (x - a) / (b - a);
+  const c = v < 0 ? 0 : v > 1 ? 1 : v;
+  return c * c * (3 - 2 * c);
+};
+
+/**
+ * Game of Thrones duvarı (24 sn, ejderha turuyla aynı saat): ateş duvarı ısıtır
+ * (heat), sütunlar çöker (fall), moloz birikir (rubble), toz kalkar (dust);
+ * u ≥ 0,88'de duvar yeniden belirir (vis). Hiçbir değer çakmaz: hepsi yumuşak.
+ */
+export function wallFrame(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  const heat = smooth01(0.3, 0.5, u) * (1 - smooth01(0.62, 0.8, u));
+  const live = u < 0.88;
+  const fall = live ? smooth01(0.5, 0.78, u) : 0;
+  const vis = live ? 1 : smooth01(0.88, 0.98, u);
+  const rubble = live ? smooth01(0.56, 0.8, u) : 1 - smooth01(0.9, 0.99, u);
+  const dustK = (u - 0.52) / 0.36;
+  const dust = dustK > 0 && dustK < 1 ? Math.sin(dustK * 3.141592653589793) : 0;
+  const fl = 0.9 + 0.1 * Math.sin(t * 4.1);
+  return { u, heat, fall, vis, rubble, dust, fl };
+}
+
+/**
+ * Viking baskını (30 sn, vikScene ile aynı saat): gemiler yaklaşır (0–0,22),
+ * ok yağdırır (0,22–0,55), kale tutuşur (burn) ve gemiler çekilince söner.
+ * Hepsi yumuşak geçiş; yanıp sönme yok (fl yavaş ve ±%8).
+ */
+export function riverFrame(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  const burn = smooth01(0.3, 0.46, u) * (1 - smooth01(0.84, 0.98, u));
+  const fl = 0.92 + 0.05 * Math.sin(t * 3.3) + 0.03 * Math.sin(t * 5.9 + 1);
+  return { u, burn, fl, slide: wrap01(t * 0.03) };
+}
+
+/**
+ * Star Wars Ölüm Yıldızı + Falcon perdesi (60 sn, swScene olay döngüsüyle aynı saat): ds = Ölüm Yıldızı opaklığı,
+ * slide = giriş/çıkış kayması, planet = gezegen opaklığı, charge = dişli şarjı, grow/beam = ışın
+ * uzaması ve opaklığı, impact = çarpma parlaması ve çatlaklar, b/blast = patlama ilerlemesi.
+ * Tümü yumuşak: tek parlama, çakma yok.
+ */
+export function swFrame(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  const dsIn = smooth01(0.31, 0.37, u);
+  const dsOut = smooth01(0.6, 0.665, u);
+  const ds = dsIn * (1 - dsOut);
+  const slide = 1 - dsIn + dsOut * 0.5;
+  const planet = u < 0.52 ? smooth01(0.33, 0.37, u) : 0;
+  const charge = smooth01(0.42, 0.5, u) * (1 - smooth01(0.52, 0.56, u));
+  const grow = u >= 0.5 ? smooth01(0.5, 0.506, u) : 0;
+  const beam = grow * (1 - smooth01(0.522, 0.536, u));
+  const impact = u < 0.52 ? smooth01(0.506, 0.52, u) : 0;
+  const bb = (u - 0.52) / 0.1;
+  const blast = u >= 0.52 && bb < 1;
+  // Millennium Falcon: alttan ekran ortasına doğru yavaş yükselir, hiperuzayda bekler, sonra
+  // sıçrar: perspektifle ekranın merkezine (0,5 / 0,4) doğru küçülerek yok olur (ekran oranı).
+  let fy = 2;
+  let fs = 1;
+  if (u >= 0.69 && u < 0.932) {
+    if (u < 0.8) fy = 1.5 + (0.58 - 1.5) * smooth01(0.69, 0.8, u);
+    else if (u < 0.9) fy = 0.58 - 0.02 * ((u - 0.8) / 0.1);
+    else {
+      const tau = (u - 0.9) / 0.032;
+      fy = 0.56 - 0.16 * tau * tau;
+      fs = 1 / (1 + 14 * tau * tau);
+    }
+  }
+  return { u, ds, slide, planet, charge, grow, beam, impact, b: blast ? bb : 0, blast, fy, fs, fv: fy < 1.9 ? 1 : 0 };
+}
+
+/** Dune (40 sn): head = solucanın yay üzerindeki başı (−1: yer altında), shake = zemin titreşimi (0–1). */
+export function duneFrame(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  const head = u >= 0.3 && u <= 0.66 ? -0.12 + (1.74 * (u - 0.3)) / 0.36 : -1;
+  const shake = smooth01(0.18, 0.3, u) * (1 - smooth01(0.62, 0.74, u));
+  return { u, head, shake };
+}
+
+/** Rick and Morty portalı (30 sn): open = açıklık (0–1), yumuşak açılıp kapanır. */
+export function rmFrame(p, t) {
+  "worklet";
+  const u = restU(p, t);
+  return { u, open: smooth01(0.08, 0.16, u) * (1 - smooth01(0.5, 0.58, u)) };
+}
+
+/** Simya şimşeği yuvası i: yalnız parlama penceresinde, kısa (≤ 2,5 çakma/sn toplam). */
+export function sparkSlot(p, t, i) {
+  "worklet";
+  const u = restU(p, t);
+  if (u < 0.33 || u > 0.58) return { a: 0, n: 0 };
+  const per = 1.25 + 0.17 * i;
+  const c = t / per + i * 0.41;
+  const n = Math.floor(c);
+  const ph = c - n;
+  if (ph > 0.22) return { a: 0, n };
+  const k = ph / 0.22;
+  return { a: k < 0.3 ? k / 0.3 : 1 - (k - 0.3) / 0.7, n };
 }
 
 /** Ekolayzer çubuğunun boyu (0–1): kendi dalgası + ortak vuruş (~96 bpm). */
@@ -1666,6 +2623,30 @@ const OVERLAY_TONES = Object.freeze({
   13: { dark: ["#ffe2b0"], light: ["#b07a2a"], alpha: [0.12, 0.12] },
   14: { dark: ["#fff6d8"], light: ["#ffc94d"], alpha: [0.13, 0.14] },
   15: { dark: ["#ffffff", "#dbeafe"], light: ["#fef3c7", "#f59e0b"], alpha: [0.7, 0.55] },
+  16: { dark: ["#a9b8ff"], light: ["#4a5a99"], alpha: [0.2, 0.26] },
+  // evrenler: [ana, ikinci, vurgu…] — silüetler düşük opaklık (içerik önde okunur)
+  17: { dark: ["#cfe8ff", "#4f86bd", "#ffffff", "#20262f", "#59b8ff"], light: ["#9cc7ea", "#4a7fae", "#e8f4ff", "#3a4552", "#2f8fe6"], alpha: [0.5, 0.55] },
+  18: { dark: ["#c79a5b", "#a87a40", "#e0b878", "#f2e6d0", "#7a6a58", "#ff9a3c"], light: ["#e2b877", "#c9954f", "#f0cf96", "#8a7a66", "#8a6a48", "#e8590c"], alpha: [0.38, 0.5] },
+  19: { dark: ["#2a2f3d", "#3b4254", "#ffd88a"], light: ["#2b3140", "#3f4759", "#f2b84b"], alpha: [0.75, 0.32] },
+  20: { dark: ["#323a4f", "#46506a", "#ff5a5a", "#ffe08a"], light: ["#5b6680", "#7884a0", "#e03b3b", "#e8b33a"], alpha: [0.62, 0.3] },
+  21: { dark: ["#26161a", "#3a1d1d", "#ff7a1a", "#ffd166"], light: ["#3a2424", "#5a2e2a", "#ff6a00", "#ffb703"], alpha: [0.78, 0.45] },
+  22: { dark: ["#a8573a", "#c9703f", "#7a3c2a"], light: ["#d98a5c", "#e8a77a", "#b86a45"], alpha: [0.4, 0.42] },
+  23: { dark: ["#8a93a3", "#5d6575", "#fff6d8", "#2a2f39"], light: ["#4b5262", "#6b7384", "#ffd36b", "#2a2f39"], alpha: [0.55, 0.4] },
+  24: { dark: ["#2c3240", "#3d4556", "#ffe2a0"], light: ["#3a4150", "#525b6e", "#f0b84a"], alpha: [0.72, 0.3] },
+  25: { dark: ["#3fa7d6", "#1f6f9f", "#bfe9ff", "#2f4a35"], light: ["#5cc0ea", "#2b8fc4", "#ffffff", "#3f6b47"], alpha: [0.5, 0.5] },
+  26: { dark: ["#4a4f5a", "#3a3e47", "#6a707c", "#2b2e35"], light: ["#9aa0a8", "#868c95", "#b4b9c0", "#6e737b"], alpha: [0.92, 0.85] },
+  27: { dark: ["#7fd3ff", "#3aa0ff", "#e6f7ff"], light: ["#1f7fd6", "#0b5fb3", "#4aa8ff"], alpha: [0.6, 0.55] },
+  28: { dark: ["#8fc4ff", "#ff6b6b"], light: ["#2b6cb0", "#d64545"], alpha: [0.38, 0.4] },
+  29: { dark: ["#f2f4f8", "#c9ced8", "#d9b45a", "#5dff7a", "#eaffe9"], light: ["#5f6675", "#7a8090", "#a8822a", "#1a9a38", "#b8f0c4"], alpha: [0.8, 0.75] },
+  30: { dark: ["#eef4ff"], light: ["#ffe9a8"], alpha: [0.2, 0.26] },
+  // starWars Ölüm Yıldızı perdesi: [deniz, kara, ışın, ateş, Ölüm Yıldızı ışığı]
+  32: { dark: ["#4a9ae0", "#4f9a4a", "#5dff7a", "#ff9a3c", "#cfd5dc", ["#f2f4f6", "#c5cbd2", "#858d97"]], light: ["#2b78c2", "#3f8a3a", "#1a9a38", "#e8590c", "#8a929c", ["#e9ecef", "#aab2bc", "#6d7580"]], alpha: [0.95, 0.9] },
+  // Harry Potter: [şato, tepe, pencere ışığı, göl, ay]
+  33: { dark: ["#161d33", "#0f1a2c", "#ffd98a", "#0b1626", "#dfe8ff"], light: ["#3a4560", "#4b5a78", "#f2b84b", "#5b7fa8", "#fff3c4"], alpha: [0.88, 0.75] },
+  34: { dark: ["#ffffff"], light: ["#ffffff"], alpha: [0.95, 0.9] },
+  35: { dark: ["#7dff8a"], light: ["#1c9e2a"], alpha: [0.95, 0.9] },
+  // vikings: [nehir, derin su, parıltı, orman, ahşap, ateş]
+  31: { dark: ["#2d5a7a", "#102a42", "#bfe3f5", "#0d1c2a", "#5a3a1e", "#ff8a2a"], light: ["#5b9bc4", "#2a5f86", "#ffffff", "#2f4a3a", "#7a5230", "#ff7a1a"], alpha: [0.8, 0.7] },
 });
 
 /** Işık katmanı türünün renkleri ve tavan opaklığı. */

@@ -34,6 +34,8 @@
 //           dikkat dağıtıyordu.
 
 //   genres  detay ekranları: yapımın TMDB türleri (id, {id,name} ya da ad).
+//   titleType/titleId/collectionId  detay ekranları ("movie"|"tv", TMDB id, koleksiyon id) → tanınan evrenin sahnesi
+//           (utils/weatherUniverses; "Türe göre" açıkken türün önüne geçer).
 //           "Detaylarda türe göre" açıksa atmosfer bu türlerin karışımı olur.
 
 import React from "react";
@@ -42,13 +44,13 @@ import IconBacground from "./IconBacground";
 import ScreenSnow from "./ScreenSnow";
 import useDecorVisibility from "../hooks/useDecorVisibility";
 
-function ScreenDecor({ iconOpacity = 0.5, scope, effects, genres }) {
+function ScreenDecor({ iconOpacity = 0.5, scope, effects, genres, titleType, titleId, collectionId }) {
   const show = useDecorVisibility(scope, effects);
   return (
     <>
       {show.ambient ? <AmbientBackground /> : null}
       {show.icon ? <IconBacground opacity={iconOpacity} /> : null}
-      {show.snow ? <ScreenSnow genres={genres} /> : null}
+      {show.snow ? <ScreenSnow genres={genres} titleType={titleType} titleId={titleId} collectionId={collectionId} /> : null}
     </>
   );
 }

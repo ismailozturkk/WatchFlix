@@ -74,12 +74,34 @@ export const WEATHER_LABELS = {
   popcorn: () => i18nText("autoI18n.atmosfer_misir", "Patlamış mısır"),
   tickets: () => i18nText("autoI18n.atmosfer_bilet", "Bilet ve yıldız"),
   embers: () => i18nText("autoI18n.atmosfer_kivilcim", "Kıvılcım"),
+  solarSystem: () => i18nText("autoI18n.atmosfer_gunes_sistemi", "Güneş sistemi"),
   stardust: () => i18nText("autoI18n.atmosfer_yildiz_tozu", "Yıldız tozu"),
   butterflies: () => i18nText("autoI18n.atmosfer_kelebek", "Kelebek"),
   dandelion: () => i18nText("autoI18n.atmosfer_karahindiba", "Karahindiba"),
   fireworks: () => i18nText("autoI18n.atmosfer_havai_fisek", "Havai fişek"),
   hearts: () => i18nText("autoI18n.atmosfer_kalpler", "Kalpler"),
   halloween: () => i18nText("autoI18n.atmosfer_cadilar", "Cadılar Bayramı"),
+  christmas: () => i18nText("autoI18n.ozel_gun_noel", "Noel"),
+  // film/dizi/anime evrenleri (utils/weatherUniverses)
+  starWars: () => i18nText("autoI18n.evren_star_wars", "Star Wars"),
+  matrix: () => i18nText("autoI18n.evren_matrix", "Matrix"),
+  harryPotter: () => i18nText("autoI18n.evren_harry_potter", "Harry Potter"),
+  lotr: () => i18nText("autoI18n.evren_yuzuklerin_efendisi", "Yüzüklerin Efendisi"),
+  dune: () => i18nText("autoI18n.evren_dune", "Dune"),
+  batman: () => i18nText("autoI18n.evren_batman", "Batman"),
+  spiderMan: () => i18nText("autoI18n.evren_spider_man", "Örümcek Adam"),
+  breakingBad: () => i18nText("autoI18n.evren_breaking_bad", "Breaking Bad"),
+  got: () => i18nText("autoI18n.evren_game_of_thrones", "Game of Thrones"),
+  vikings: () => i18nText("autoI18n.evren_vikings", "Vikings"),
+  prisonBreak: () => i18nText("autoI18n.evren_prison_break", "Prison Break"),
+  sherlock: () => i18nText("autoI18n.evren_sherlock", "Sherlock"),
+  sopranos: () => i18nText("autoI18n.evren_sopranos", "Sopranos"),
+  deathNote: () => i18nText("autoI18n.evren_death_note", "Death Note"),
+  aot: () => i18nText("autoI18n.evren_attack_on_titan", "Attack on Titan"),
+  naruto: () => i18nText("autoI18n.evren_naruto", "Naruto"),
+  onePiece: () => i18nText("autoI18n.evren_one_piece", "One Piece"),
+  fma: () => i18nText("autoI18n.evren_fullmetal", "Fullmetal Alchemist"),
+  rickAndMorty: () => i18nText("autoI18n.evren_rick_morty", "Rick and Morty"),
 };
 
 export const WEATHER_GROUP_LABELS = {
@@ -87,6 +109,9 @@ export const WEATHER_GROUP_LABELS = {
   sky: () => i18nText("autoI18n.atmosfer_grup_gokyuzu", "Gökyüzü ve ışık"),
   nature: () => i18nText("autoI18n.atmosfer_grup_doga", "Doğa"),
   festive: () => i18nText("autoI18n.atmosfer_grup_senlik", "Sinema ve şenlik"),
+  films: () => i18nText("autoI18n.atmosfer_grup_filmler", "Film evrenleri"),
+  series: () => i18nText("autoI18n.atmosfer_grup_diziler", "Dizi evrenleri"),
+  anime: () => i18nText("autoI18n.atmosfer_grup_anime", "Anime"),
 };
 
 const MCI = "MaterialCommunityIcons";
@@ -104,12 +129,33 @@ export const WEATHER_ICONS = {
   popcorn: { family: MCI, name: "popcorn" },
   tickets: { name: "ticket-outline" },
   embers: { name: "flame-outline" },
+  solarSystem: { family: MCI, name: "orbit" },
   stardust: { name: "star-outline" },
   butterflies: { family: MCI, name: "butterfly-outline" },
   dandelion: { family: MCI, name: "flower-pollen-outline" },
   fireworks: { family: MCI, name: "firework" },
   hearts: { name: "heart-outline" },
   halloween: { family: MCI, name: "halloween" },
+  christmas: { family: MCI, name: "pine-tree" },
+  starWars: { family: MCI, name: "death-star-variant" },
+  matrix: { family: MCI, name: "matrix" },
+  harryPotter: { family: MCI, name: "wizard-hat" },
+  lotr: { family: MCI, name: "ring" },
+  dune: { family: MCI, name: "terrain" },
+  batman: { family: MCI, name: "bat" },
+  spiderMan: { family: MCI, name: "spider-web" },
+  breakingBad: { family: MCI, name: "flask-outline" },
+  got: { family: MCI, name: "wall" },
+  vikings: { family: MCI, name: "sail-boat" },
+  prisonBreak: { family: MCI, name: "fence" },
+  sherlock: { family: MCI, name: "magnify" },
+  sopranos: { family: MCI, name: "duck" },
+  deathNote: { family: MCI, name: "notebook-outline" },
+  aot: { family: MCI, name: "castle" },
+  naruto: { family: MCI, name: "ninja" },
+  onePiece: { family: MCI, name: "treasure-chest" },
+  fma: { family: MCI, name: "hexagram-outline" },
+  rickAndMorty: { family: MCI, name: "alien-outline" },
 };
 
 // Seçicide olmayan, yalnız tür karışımında çizilen efektlerin adları/simgeleri
@@ -122,6 +168,7 @@ const INTERNAL_LABELS = {
   wisps: () => i18nText("autoI18n.atmosfer_ic_hayalet", "Hayalet ışıklar"),
   motes: () => i18nText("autoI18n.atmosfer_ic_toz", "Toz zerreleri"),
   sandDrift: () => i18nText("autoI18n.atmosfer_ic_kum", "Savrulan kum"),
+  rosePetals: () => i18nText("autoI18n.atmosfer_ic_gul_yapragi", "Gül yaprakları"),
   // tür aileleri (bileşik atmosfer: parçacık + ışık katmanı)
   genreAction: () => i18nText("autoI18n.atmosfer_aile_aksiyon", "Kıvılcım ve patlama"),
   genreScifi: () => i18nText("autoI18n.atmosfer_aile_bilimkurgu", "Yıldız tozu ve gezegen"),
@@ -142,6 +189,29 @@ const INTERNAL_LABELS = {
   genreReality: () => i18nText("autoI18n.atmosfer_aile_realite", "Spot ışığı ve flaşlar"),
 };
 
+// Özel günler (utils/weatherParticles SPECIAL_DAYS) — ad ve simge.
+export const SPECIAL_DAY_LABELS = {
+  newYear: () => i18nText("autoI18n.ozel_gun_yilbasi", "Yılbaşı"),
+  valentines: () => i18nText("autoI18n.ozel_gun_sevgililer", "Sevgililer Günü"),
+  womensDay: () => i18nText("autoI18n.ozel_gun_kadinlar", "Kadınlar Günü"),
+  earthDay: () => i18nText("autoI18n.ozel_gun_dunya", "Dünya Günü"),
+  halloween: () => i18nText("autoI18n.atmosfer_cadilar", "Cadılar Bayramı"),
+  childrensDay: () => i18nText("autoI18n.ozel_gun_cocuk", "Dünya Çocuk Günü"),
+  christmas: () => i18nText("autoI18n.ozel_gun_noel", "Noel"),
+  cinemaDay: () => i18nText("autoI18n.ozel_gun_sinema", "Sinema Günü"),
+};
+
+export const SPECIAL_DAY_ICONS = {
+  newYear: { family: MCI, name: "firework" },
+  valentines: { name: "heart-outline" },
+  womensDay: { name: "flower-outline" },
+  earthDay: { family: MCI, name: "earth" },
+  halloween: { family: MCI, name: "halloween" },
+  childrensDay: { family: MCI, name: "balloon" },
+  christmas: { family: MCI, name: "pine-tree" },
+  cinemaDay: { family: MCI, name: "popcorn" },
+};
+
 /** Seçilebilir + iç efektlerin simgeleri. */
 export const EFFECT_ICONS = {
   ...WEATHER_ICONS,
@@ -152,6 +222,7 @@ export const EFFECT_ICONS = {
   wisps: { family: MCI, name: "blur" },
   motes: { family: MCI, name: "grain" },
   sandDrift: { family: MCI, name: "weather-windy" },
+  rosePetals: { name: "flower-outline" },
   genreAction: { family: MCI, name: "fire" },
   genreScifi: { family: MCI, name: "orbit" },
   genreThriller: { name: "thunderstorm-outline" },
@@ -286,7 +357,7 @@ export function ChipRow({ items, colors }) {
   );
 }
 
-// Atmosfer seçici: grup başlığı + çip şeridi (4 grup, en çok 6 simge, 19 seçenek).
+// Atmosfer seçici: grup başlığı + çip şeridi (7 grup, en çok 7 simge, 37 seçenek).
 // Kapalıyken de seçilebilir — önizleme seçileni gösterir (Free da görür).
 export function WeatherPicker({ value, onChange, colors }) {
   return (

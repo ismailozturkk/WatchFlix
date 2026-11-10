@@ -48,6 +48,7 @@ export const SETTINGS_SHARE_SECTIONS = Object.freeze([
       "showSnow",
       "weatherEffect",
       "atmosphereByGenre",
+      "atmosphereSpecialDays",
       "showAmbientBackground",
       "showIconBackground",
       "iconBackgroundMode",

@@ -25,13 +25,16 @@ import {
   vec,
 } from "@shopify/react-native-skia";
 import {
+  ORBIT_RADII,
   OVERLAY,
   equalizerLevel,
   hazeLine,
   overlayFrame,
   overlaySlot,
+  orbitScale,
   overlayStyle,
 } from "../../utils/weatherParticles";
+import { UNIVERSE_LAYERS } from "./universeOverlays";
 
 function rgba(hex, a) {
   const h = String(hex).replace("#", "");
@@ -408,7 +411,25 @@ function FarFlashes({ p, clock, width, height, tone }) {
   );
 }
 
+// ── 16 · Güneş sistemi: gezegen yörünge elipsleri (sabit, ince) ─────────────
+// Geometri weatherParticles.particlePose (kind 16) ile aynı: merkez (W/2, 0,45·H),
+// ölçek orbitScale(W), dikey oran 0,5.
+function Orbits({ width, height, tone }) {
+  const k = orbitScale(width);
+  const cx = width * 0.5;
+  const cy = height * 0.45;
+  const color = rgba(tone.colors[0], 1);
+  return (
+    <Group opacity={tone.alpha}>
+      {ORBIT_RADII.map((r) => (
+        <Oval key={r} x={cx - r * k} y={cy - r * k * 0.5} width={2 * r * k} height={r * k} style="stroke" strokeWidth={0.9} color={color} />
+      ))}
+    </Group>
+  );
+}
+
 const LAYERS = {
+  [OVERLAY.orbits]: Orbits,
   [OVERLAY.flare]: Flare,
   [OVERLAY.planet]: Planet,
   [OVERLAY.heartbeat]: Heartbeat,
@@ -425,6 +446,8 @@ const LAYERS = {
   [OVERLAY.heatHaze]: HeatHaze,
   [OVERLAY.spotlight]: Spotlight,
   [OVERLAY.paparazzi]: Paparazzi,
+  // film/dizi/anime evrenleri (17–30): universeOverlays.js
+  ...UNIVERSE_LAYERS,
 };
 
 /** Bir grup ışık katmanı (arka ya da ön). */

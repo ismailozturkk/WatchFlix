@@ -3,7 +3,7 @@
 // Atmosfer efekti çizimi: Skia Atlas ile TÜM parçacıklar tek GPU çiziminde.
 //
 //   • Şekiller bir kez beyaz/gri olarak küçük bir dokuya çizilir
-//     (components/decor/particleSprites.js, 512 × 320 px); PNG yok. Doku
+//     (components/decor/particleSprites.js, 512 × 1024 px); PNG yok. Doku
 //     MODÜL düzeyinde TEK: kaç ekranda katman açık olursa olsun bir kez
 //     çizilir, bellekte bir kopya durur (eskiden her örnek kendi dokusunu
 //     üretiyordu). Renk parçacık başına Atlas `colors` + "modulate".
@@ -41,12 +41,15 @@ import {
   Canvas,
   FilterMode,
   Group,
+  LinearGradient,
   MipmapMode,
+  Rect,
   Skia,
   drawAsPicture,
   useColorBuffer,
   useRSXformBuffer,
   useRectBuffer,
+  vec,
 } from "@shopify/react-native-skia";
 import SpriteSheet from "./particleSprites";
 import { BoltLayer, ShoreLayer } from "./VectorLayers";
@@ -65,6 +68,7 @@ import {
   particleAlpha,
   particlePose,
   particleSprite,
+  sceneScale,
   spriteOrigin,
 } from "../../utils/weatherParticles";
 
@@ -129,14 +133,14 @@ function ParticleField({
   );
   // Şimşek çizgisi ve dalga/kum vektör katmanda (VectorLayers); gerisi Atlas'ta.
   const { particles, waves, sand, bolts, backLights, frontLights } = useMemo(() => {
-    const vec = all.filter(isVectorParticle);
-    const shore = vec.filter((p) => p.kind === KIND.tile);
-    const lights = vec.filter((p) => p.kind === KIND.overlay);
+    const vectorParts = all.filter(isVectorParticle);
+    const shore = vectorParts.filter((p) => p.kind === KIND.tile);
+    const lights = vectorParts.filter((p) => p.kind === KIND.overlay);
     return {
       particles: all.filter((p) => !isVectorParticle(p)),
       waves: shore.filter((p) => p.part < 3),
       sand: shore.find((p) => p.part === 3) || null,
-      bolts: vec.filter((p) => p.kind === KIND.bolt),
+      bolts: vectorParts.filter((p) => p.kind === KIND.bolt),
       backLights: lights.filter((p) => !OVERLAY_FRONT.includes(p.part)),
       frontLights: lights.filter((p) => OVERLAY_FRONT.includes(p.part)),
     };
@@ -191,6 +195,8 @@ function ParticleField({
   });
 
   const hasShore = waves.length > 0 || sand !== null;
+  // evren denizi (One Piece): tab çubuğunun üstüne kaldırılır, altı derin suyla dolar
+  const seaLift = waves.length && waves[0].lift ? waves[0].lift * sceneScale(w, h) : 0;
   if (!n && !hasShore && !bolts.length && !backLights.length && !frontLights.length) return null;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -198,7 +204,18 @@ function ParticleField({
         {/* kıyı Atlas'ın altında: ışıltı ve martılar suyun üstünde */}
         {hasShore ? (
           <Group opacity={fade}>
-            <ShoreLayer waves={waves} sand={sand} clock={clock} width={w} height={h} lightSurface={lightSurface} seed={seed} />
+            {seaLift > 0 ? (
+              <Rect x={0} y={h - seaLift} width={w} height={seaLift + 4}>
+                <LinearGradient
+                  start={vec(0, h - seaLift)}
+                  end={vec(0, h)}
+                  colors={lightSurface ? ["#2a6d9f", "#1d4f78"] : ["#17648c", "#0d3a57"]}
+                />
+              </Rect>
+            ) : null}
+            <Group transform={seaLift > 0 ? [{ translateY: -seaLift }] : undefined}>
+              <ShoreLayer waves={waves} sand={sand} clock={clock} width={w} height={h} lightSurface={lightSurface} seed={seed} />
+            </Group>
           </Group>
         ) : null}
         {backLights.length ? (

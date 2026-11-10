@@ -762,7 +762,7 @@ export default function TvShowsDetails({ route, navigation }) {
       />
 
       <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
-      <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} />
+      <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} titleType="tv" titleId={details.id} />
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}

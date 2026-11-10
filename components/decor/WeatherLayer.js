@@ -21,6 +21,7 @@ import {
   previewParticleCount,
   resolvePlan,
 } from "../../utils/weatherParticles";
+import { universeFor, universeTitleKey } from "../../utils/weatherUniverses";
 
 let ParticleFieldImpl = null;
 function getParticleField() {
@@ -38,12 +39,19 @@ const genresKey = (genres) =>
  * @param {number} [props.height]
  * @param {boolean} [props.preview] dar alan: sayı alanla orantılı
  * @param {number} [props.speedScale]
+ * @param {string} [props.effectOverride] önizleme: ayarı yok sayıp bu efekti çiz
  * @param {Array} [props.genres]   detay ekranı: TMDB türleri (id, {id,name} ya da ad).
  *                                 "Türe göre" açıksa ve tanınan tür varsa seçili
  *                                 efektin yerine türlerin karışımı çizilir.
+ * @param {{type:"movie"|"tv", id:number, collectionId?:number}} [props.title]
+ *                                 detay ekranı: yapım tanınan bir evrense (Star Wars,
+ *                                 GoT…) türün yerine o evrenin sahnesi çizilir
+ *                                 (öncelik: özel gün > evren > tür; "Türe göre" açıkken).
  */
-function WeatherLayer({ playing, width, height, preview = false, speedScale = 1, genres }) {
-  const { effect, density, byGenre } = useWeatherSettings();
+function WeatherLayer({ playing, width, height, preview = false, speedScale = 1, genres, title, effectOverride }) {
+  const { effect: settingEffect, density, byGenre, special } = useWeatherSettings();
+  // effectOverride: ayar ekranı önizlemesinde denenen özel gün efekti (kaydedilmez).
+  const effect = effectOverride || settingEffect;
   const effectMode = useEffectMode();
   const seed = useDecorSeed();
   const { theme } = useTheme();
@@ -54,15 +62,19 @@ function WeatherLayer({ playing, width, height, preview = false, speedScale = 1,
   const h = height ?? screen.height;
 
   const gKey = genresKey(genres);
+  const tKey = universeTitleKey(title);
   const plan = useMemo(() => {
-    const fromGenres = byGenre && gKey ? genreEffectsFor(genres) : [];
-    const base = resolvePlan(fromGenres.length ? fromGenres : [effect], density, effectMode);
+    // Özel günde (ayar açıkken) yapımın türü/evreni değil günün efekti çizilir.
+    const fromTitle = byGenre && !special && !effectOverride ? universeFor(title) : null;
+    const fromGenres = !fromTitle && byGenre && gKey && !special && !effectOverride ? genreEffectsFor(genres) : [];
+    const chosen = fromTitle ? [fromTitle] : fromGenres.length ? fromGenres : [effect];
+    const base = resolvePlan(chosen, density, effectMode);
     if (!preview) return base;
     const ratioArea = w * h;
     const screenArea = screen.width * screen.height;
     return base.map(([e, c]) => [e, previewParticleCount(c, ratioArea, screenArea)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byGenre, gKey, effect, density, effectMode, preview, w, h, screen]);
+  }, [byGenre, gKey, tKey, special, effectOverride, effect, density, effectMode, preview, w, h, screen]);
 
   if (!(w > 0 && h > 0) || !plan.length) return null;
 

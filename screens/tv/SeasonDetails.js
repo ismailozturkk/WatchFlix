@@ -454,7 +454,7 @@ export default function SeasonDetails({ route, navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
     {/* Dekor İÇERİĞİN ARKASINDA: eskiden kar ScrollView'ın ÜSTÜNDE çiziliyordu. */}
-    <ScreenDecor scope="details" iconOpacity={0.25} genres={genres} />
+    <ScreenDecor scope="details" iconOpacity={0.25} genres={genres} titleType="tv" titleId={showId} />
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}

@@ -55,6 +55,7 @@ export const BACKUP_GROUPS = Object.freeze([
       "weatherEffect",
       "weatherDensity",
       "atmosphereByGenre",
+      "atmosphereSpecialDays",
       "showIconBackground",
       "showAmbientBackground",
       "iconBackgroundMode",

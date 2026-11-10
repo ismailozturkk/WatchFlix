@@ -12,12 +12,19 @@ import {
   normalizeWeatherChoice,
   normalizeWeatherDensity,
   resolveWeatherEffect,
+  specialDayOf,
 } from "../utils/weatherParticles";
 
 export default function useWeatherSettings() {
   const choice = normalizeWeatherChoice(useStored(Keys.weatherEffect));
   const density = normalizeWeatherDensity(useStored(Keys.weatherDensity));
   const byGenre = useStored(Keys.atmosphereByGenre) !== false;
+  const specialDays = useStored(Keys.atmosphereSpecialDays) !== false;
+  const changeSpecialDays = useCallback((value) => {
+    set(Keys.atmosphereSpecialDays, value !== false);
+  }, []);
+  const now = new Date();
+  const special = specialDays ? specialDayOf(now) : null;
   const changeChoice = useCallback((value) => {
     set(Keys.weatherEffect, normalizeWeatherChoice(value));
   }, []);
@@ -29,11 +36,15 @@ export default function useWeatherSettings() {
   }, []);
   return {
     choice,
-    effect: resolveWeatherEffect(choice),
+    effect: resolveWeatherEffect(choice, now, specialDays),
     density,
     byGenre,
+    specialDays,
+    // Bugün özel gün ve ayar açıksa o gün ({id, effect}); yoksa null.
+    special,
     changeChoice,
     changeDensity,
     changeByGenre,
+    changeSpecialDays,
   };
 }

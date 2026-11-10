@@ -30,6 +30,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -51,6 +52,8 @@ import {
 import {
   ChipRow,
   DENSITY_LABELS,
+  SPECIAL_DAY_ICONS,
+  SPECIAL_DAY_LABELS,
   WEATHER_ICONS,
   WeatherPicker,
   weatherChoiceLabel,
@@ -71,7 +74,8 @@ import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { copyLanguage } from "@utils/appLanguages";
 import { GENRE_LABELS } from "@utils/genreDisplay";
-import { GENRE_MIX_MAX, genreEffectsFor, resolvePlan } from "@utils/weatherParticles";
+import { GENRE_MIX_MAX, SPECIAL_DAYS, genreEffectsFor, resolvePlan } from "@utils/weatherParticles";
+import SwitchToggle from "@components/SwitchToggle";
 import { alpha } from "@theme/colors";
 import GlassBox from "../../../components/common/GlassBox";
 import GlassTouchable from "../../../components/common/GlassTouchable";
@@ -248,6 +252,7 @@ function PhonePreview({
   frameHeight,
   playing,
   genres,
+  effectOverride,
   on,
   dim,
   ambient,
@@ -256,6 +261,10 @@ function PhonePreview({
   statusOn,
   onPress,
   a11y,
+  showContent = true,
+  onToggleContent,
+  expanded = false,
+  onToggleExpand,
 }) {
   // Cihaz ekranı (pencere değil: klavye/çoklu pencere boyutu oynatmasın).
   const [screen] = useState(() => Dimensions.get("screen"));
@@ -335,9 +344,39 @@ function PhonePreview({
               <IconPattern opacity={PREVIEW_ICON_OPACITY} />
             </FadeLayer>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: glow }]}>
-              <WeatherLayer playing={playing} genres={genres} />
+              <WeatherLayer playing={playing} genres={genres} effectOverride={effectOverride} />
             </Animated.View>
-            <MockScreen theme={theme} width={screen.width} height={screen.height} topInset={14} />
+            {showContent ? (
+              <MockScreen theme={theme} width={screen.width} height={screen.height} topInset={14} />
+            ) : null}
+          </View>
+          <View style={pp.tools}>
+            <Pressable
+              onPress={onToggleContent}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={
+                showContent
+                  ? i18nText("autoI18n.atmosfer_icerik_gizle", "İçeriği gizle")
+                  : i18nText("autoI18n.atmosfer_icerik_goster", "İçeriği göster")
+              }
+              style={pp.toolBtn}
+            >
+              <AppIcon name={showContent ? "eye-outline" : "eye-off-outline"} size={16} color="#ffffff" />
+            </Pressable>
+            <Pressable
+              onPress={onToggleExpand}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={
+                expanded
+                  ? i18nText("autoI18n.atmosfer_kucult", "Küçült")
+                  : i18nText("autoI18n.atmosfer_tam_ekran", "Tam ekran")
+              }
+              style={pp.toolBtn}
+            >
+              <AppIcon name={expanded ? "contract-outline" : "expand-outline"} size={16} color="#ffffff" />
+            </Pressable>
           </View>
           <View style={[pp.island, { width: innerW * 0.3, height: islandH }]} />
           {/* Durum: adanın altında küçük hap (gerçek boyutta, ölçeklenmez). */}
@@ -544,7 +583,7 @@ function SideGenreSwitch({ value, onChange, colors, onInfo }) {
 
 // ── Ekran ──────────────────────────────────────────────────────────────────
 
-function CardHeader({ colors, icon, title, subtitle, badge }) {
+function CardHeader({ colors, icon, title, subtitle, badge, right }) {
   return (
     <View style={st.blockHeader}>
       <View style={[st.iconWrap, { backgroundColor: colors.iconTeal }]}>
@@ -567,6 +606,7 @@ function CardHeader({ colors, icon, title, subtitle, badge }) {
           </Text>
         </View>
       ) : null}
+      {right || null}
     </View>
   );
 }
@@ -581,8 +621,17 @@ export default function AtmosphereScreen() {
   const reduceMotion = useReduceMotion();
   const effectMode = useEffectMode();
   const { showSnow, snowAllowed, changeShowSnow } = useSnowSettings();
-  const { choice, effect, density, byGenre, changeChoice, changeDensity, changeByGenre } =
-    useWeatherSettings();
+  const {
+    choice,
+    effect,
+    density,
+    byGenre,
+    specialDays,
+    changeChoice,
+    changeDensity,
+    changeByGenre,
+    changeSpecialDays,
+  } = useWeatherSettings();
   // Arka plan katmanları: Free'de de önizlemede görünür (ne alacağını görür),
   // Premium'da yalnız açıksa.
   const { showAmbientBackground, ambientAllowed } = useAmbientBackgroundSettings();
@@ -603,18 +652,38 @@ export default function AtmosphereScreen() {
       return [...prev, id].slice(-GENRE_MIX_MAX);
     });
   }, []);
-  const previewGenres = byGenre && sampleGenres.length ? sampleGenres : undefined;
+  // Önizlemede denenen özel gün (yalnız bu ekranda; kaydedilmez). Özel gün
+  // seçiliyken tür örneği çizilmez (WeatherLayer da efekti öne alır).
+  const [sampleDay, setSampleDay] = useState(null);
+  const toggleDay = useCallback((id) => {
+    Haptics.selectionAsync();
+    setSampleDay((prev) => (prev === id ? null : id));
+  }, []);
+  const sampleDayEffect = specialDays && sampleDay ? SPECIAL_DAYS.find((s) => s.id === sampleDay)?.effect : undefined;
+  const previewGenres = byGenre && sampleGenres.length && !sampleDayEffect ? sampleGenres : undefined;
 
   // Önizlemenin çizdiği efektler (rozet + "N parçacık" için).
   const plan = useMemo(() => {
+    if (sampleDayEffect) return resolvePlan([sampleDayEffect], density, effectMode);
     const fromGenres = previewGenres ? genreEffectsFor(previewGenres) : [];
     return resolvePlan(fromGenres.length ? fromGenres : [effect], density, effectMode);
-  }, [previewGenres, effect, density, effectMode]);
+  }, [sampleDayEffect, previewGenres, effect, density, effectMode]);
   const particleCount = plan.reduce((sum, [, c]) => sum + c, 0);
 
   const lang = copyLanguage(language, LANGS);
   const frameHeight = Math.round(Math.max(260, Math.min(440, windowH * 0.45)));
   const playing = isFocused && appActive && !reduceMotion;
+  const [fullscreen, setFullscreen] = useState(false);
+  const [showContent, setShowContent] = useState(true);
+  const toggleContent = useCallback(() => {
+    Haptics.selectionAsync();
+    setShowContent((v) => !v);
+  }, []);
+  const toggleFullscreen = useCallback(() => {
+    Haptics.selectionAsync();
+    setFullscreen((v) => !v);
+  }, []);
+  const fullHeight = Math.round(Math.max(frameHeight, windowH - 110));
 
   const statusText = reduceMotion
     ? i18nText("autoI18n.atmosfer_onizleme_hareket", "Hareketi Azalt açık · önizleme duraklatıldı")
@@ -622,9 +691,11 @@ export default function AtmosphereScreen() {
       ? i18nText("autoI18n.atmosfer_onizleme_premium", "Premium · açmak için dokun")
       : !showSnow
         ? i18nText("autoI18n.atmosfer_onizleme_kapali", "Kapalı · açmak için dokun")
-        : previewGenres
-          ? i18nText("autoI18n.atmosfer_onizleme_tur", "Tür önizlemesi · detay ekranında böyle")
-          : weatherChoiceLabel(choice, effect);
+        : sampleDayEffect
+          ? i18nText("autoI18n.atmosfer_onizleme_ozel_gun", "Özel gün önizlemesi · o gün böyle")
+          : previewGenres
+            ? i18nText("autoI18n.atmosfer_onizleme_tur", "Tür önizlemesi · detay ekranında böyle")
+            : weatherChoiceLabel(choice, effect);
 
   // Telefona dokun = aç/kapa. Free'de anahtar oynamaz, yükseltme sayfası gelir.
   const togglePower = useCallback(() => {
@@ -643,8 +714,9 @@ export default function AtmosphereScreen() {
         <PhonePreview
           theme={theme}
           frameHeight={frameHeight}
-          playing={playing}
+          playing={playing && !fullscreen}
           genres={previewGenres}
+          effectOverride={sampleDayEffect}
           on={showSnow}
           // Free'de sönük değil: ne alacağını tam görsün.
           dim={snowAllowed && !showSnow}
@@ -657,6 +729,10 @@ export default function AtmosphereScreen() {
             label: t.snow,
             hint: i18nText("autoI18n.atmosfer_dokun_ipucu", "Açmak ya da kapatmak için dokun"),
           }}
+          showContent={showContent}
+          onToggleContent={toggleContent}
+          expanded={false}
+          onToggleExpand={toggleFullscreen}
         />
         <SideGenreSwitch value={byGenre} onChange={changeByGenre} colors={C} onInfo={() => setInfoOpen(true)} />
       </View>
@@ -709,6 +785,38 @@ export default function AtmosphereScreen() {
           </GlassBox>
         ) : null}
 
+        {/* Özel günler (türe göre kartıyla aynı düzen): anahtar + açıkken önizlemede
+            gün dene (kaydedilmez). Sabit tarihli günlerde atmosfer güne uyar. */}
+        <GlassBox role="card" style={[st.card, st.cardPadded, { backgroundColor: C.card, borderColor: C.border }]}>
+          <CardHeader
+            colors={C}
+            icon={{ family: "MaterialCommunityIcons", name: "calendar-star" }}
+            title={i18nText("autoI18n.atmosfer_ozel_gunler", "Özel günler")}
+            subtitle={
+              specialDays
+                ? i18nText("autoI18n.atmosfer_ozel_dene", "Önizlemede dene · bir gün seç")
+                : i18nText(
+                    "autoI18n.atmosfer_ozel_gunler_alt",
+                    "Yılbaşı, Sevgililer Günü, Cadılar Bayramı… günü gelince atmosfer ona uyar",
+                  )
+            }
+            right={<SwitchToggle value={specialDays} onValueChange={changeSpecialDays} size={36} />}
+          />
+          {specialDays ? (
+            <ChipRow
+              colors={C}
+              items={SPECIAL_DAYS.map(({ id }) => ({
+                key: id,
+                role: "radio",
+                label: SPECIAL_DAY_LABELS[id](),
+                icon: SPECIAL_DAY_ICONS[id],
+                active: sampleDay === id,
+                onPress: () => toggleDay(id),
+              }))}
+            />
+          ) : null}
+        </GlassBox>
+
         {/* Arka plan katmanları: atmosferin ARKASINDA çizilir, önizlemede
             birlikte görünür. */}
         <Text allowFontScaling={false} style={[st.sectionLabel, { color: C.muted }]}>
@@ -718,6 +826,40 @@ export default function AtmosphereScreen() {
         <IconLayerCard colors={C} />
         <RegenerateBackgroundCard colors={C} />
       </ScrollView>
+      <Modal
+        visible={fullscreen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setFullscreen(false)}
+      >
+        <View style={st.fullBackdrop}>
+          {fullscreen ? (
+            <PhonePreview
+              theme={theme}
+              frameHeight={fullHeight}
+              playing={playing}
+              genres={previewGenres}
+              effectOverride={sampleDayEffect}
+              on={showSnow}
+              dim={snowAllowed && !showSnow}
+              ambient={previewAmbient}
+              icon={previewIcon}
+              status={statusText}
+              statusOn={showSnow && !reduceMotion}
+              onPress={togglePower}
+              a11y={{
+                label: t.snow,
+                hint: i18nText("autoI18n.atmosfer_dokun_ipucu", "Açmak ya da kapatmak için dokun"),
+              }}
+              showContent={showContent}
+              onToggleContent={toggleContent}
+              expanded
+              onToggleExpand={toggleFullscreen}
+            />
+          ) : null}
+        </View>
+      </Modal>
       <AtmosphereGenreInfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} />
     </SettingsSubScreen>
   );
@@ -753,6 +895,15 @@ const pp = StyleSheet.create({
     borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
+  },
+  tools: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", gap: 6 },
+  toolBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
   island: {
     position: "absolute",
@@ -811,6 +962,7 @@ const ms = StyleSheet.create({
 
 const st = StyleSheet.create({
   flex: { flex: 1 },
+  fullBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.88)", alignItems: "center", justifyContent: "center" },
   previewArea: { flexDirection: "row", alignItems: "center", paddingTop: 4, paddingBottom: 14, gap: 12 },
   controls: { paddingBottom: 110, gap: 12 },
   card: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
