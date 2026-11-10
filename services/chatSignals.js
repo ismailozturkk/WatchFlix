@@ -1,100 +1,44 @@
 // services/chatSignals.js
 //
-// Sohbete özgü uçucu sinyaller — saf mantık (RN/Firebase yok). RTDB yazımı
-// `adapter` ile enjekte edilir; gerçek bağlantı services/chatRtdb.js'de.
+// "Bu sohbet şu an EKRANDA" bayrağının (inChat) yazıcısı — saf mantık
+// (RN/Firebase yok). RTDB yazımı `adapter` ile enjekte edilir; gerçek bağlantı
+// services/chatRtdb.js'de.
 //
-//   inChat/{uid} : "şu an bu sohbet EKRANDA" — değer bağlantı kimliğidir
-//   typing/{uid} : "şu an yazıyor"          — değer bağlantı kimliğidir
+// Bayrağın değeri `true` yerine bağlantı kimliğidir: sunucu (functions/
+// chatPresence.js) bayrağı yalnız o kimliğin /presence/{uid}/conns kaydı hâlâ
+// duruyorsa geçerli sayar. Soket ölünce / uygulama arka plana atılınca kayıt
+// silinir ve bayrak kendiliğinden geçersiz olur. Eskiden bunun için chatMeta
+// başına ayrı onDisconnect kuruluyordu; tek seferlik olduğundan yeniden
+// bağlanmada kayboluyor, ardından gelen ani kapanışta sunucu push'unun susması
+// TAKILI kalıyordu.
 //
-// Değer `true` yerine presence bağlantı kimliğidir (bkz. presenceModel.js):
-// karşı taraf bayrağı yalnız o kimliğin kaydı hâlâ duruyorsa geçerli sayar.
-// Soket ölünce / uygulama arka plana atılınca kayıt silinir ve bayrak kendiliğinden
-// geçersiz olur. Eskiden bunun için chatMeta başına ayrı onDisconnect kuruluyordu;
-// tek seferlik olduğundan yeniden bağlanmada kayboluyor, ardından gelen ani
-// kapanışta "Sohbette"/"yazıyor" ve sunucu push'unun susması TAKILI kalıyordu.
-
-import { isLiveFlag } from "./presenceModel";
-
-export const TYPING_IDLE_MS = 4000;
+// Karşı tarafın durumunu okuyan kod ve ikinci bayrak 10 Kas 2026'da silindi
+// (çevrimiçi durumu özelliği kaldırıldı).
 
 /**
- * Yazıyor göstergesi denetleyicisi.
- *   • İlk tuşta hemen "yazıyor" (eskiden 600 ms gecikmeliydi),
- *   • sonraki tuşlar yalnız zamanlayıcıyı uzatır (yazma yok),
- *   • `idleMs` hareketsizlik, boş girdi, gönderme veya odak kaybında kapanır.
- * Eskiden metin kutuda dururken bayrak sonsuza dek açık kalıyordu: yazıp
- * bırakan kullanıcı dakikalarca "yazıyor…" görünürdü.
- */
-export function createTypingController({
-  send,
-  idleMs = TYPING_IDLE_MS,
-  setTimer = setTimeout,
-  clearTimer = clearTimeout,
-}) {
-  let typing = false;
-  let timer = null;
-
-  const clear = () => {
-    if (timer) {
-      clearTimer(timer);
-      timer = null;
-    }
-  };
-  const set = (value) => {
-    if (typing === value) return;
-    typing = value;
-    send(value);
-  };
-
-  return {
-    /** Her metin değişiminde çağır. */
-    input(hasText) {
-      if (!hasText) {
-        clear();
-        set(false);
-        return;
-      }
-      set(true);
-      clear();
-      timer = setTimer(() => {
-        timer = null;
-        set(false);
-      }, idleMs);
-    },
-    /** Gönderme, odak kaybı, ekrandan ayrılma. */
-    stop() {
-      clear();
-      set(false);
-    },
-    isTyping: () => typing,
-  };
-}
-
-/**
- * inChat + typing yazıcısı. `session`: presenceSession (getConnection/subscribe).
+ * inChat yazıcısı. `session`: presenceSession (getConnection/subscribe).
  * Bağlantı yoksa (arka plan, çevrimdışı) hiçbir şey yazılmaz; bağlantı geri
  * gelince istenen durum otomatik yeniden yazılır.
  */
 export function createChatSignals({ session, adapter }) {
   const entries = new Map(); // chatId -> { uid, count } — ekranda açık sohbetler
-  const typingWanted = new Map(); // chatId -> uid — "yazıyor" istendi
-  const written = { inChat: new Map(), typing: new Map() }; // chatId -> istenen son değer
-  const pending = { inChat: new Map(), typing: new Map() }; // chatId -> sıralı yazım
+  const written = new Map(); // chatId -> istenen son değer
+  const pending = new Map(); // chatId -> sıralı yazım
 
   const valueFor = (uid) => {
     const conn = session.getConnection();
     return conn && conn.uid === uid ? conn.connId : false;
   };
 
-  function push(kind, chatId, uid, value) {
-    const memo = written[kind];
+  function push(chatId, uid, value) {
+    const memo = written;
     if ((memo.get(chatId) ?? false) === value) return;
     memo.set(chatId, value);
-    const write = kind === "inChat" ? adapter.writeInChat : adapter.writeTyping;
+    const write = adapter.writeInChat;
     // Gir/çık ve arka plan/ön plan geçişleri ağda ters sırayla tamamlanırsa
     // eski "açık" bayrağı yeniden canlanıp sonraki push'ları susturabilir.
     // Aynı sohbetin yazımlarını sırala; henüz başlamamış ara değerleri atla.
-    const previous = pending[kind].get(chatId);
+    const previous = pending.get(chatId);
     const task = Promise.resolve(previous)
       .catch(() => {})
       .then(() => {
@@ -106,19 +50,14 @@ export function createChatSignals({ session, adapter }) {
         if (memo.get(chatId) === value) memo.delete(chatId);
       })
       .finally(() => {
-        if (pending[kind].get(chatId) === task) pending[kind].delete(chatId);
+        if (pending.get(chatId) === task) pending.delete(chatId);
       });
-    pending[kind].set(chatId, task);
+    pending.set(chatId, task);
   }
 
   function sync() {
     entries.forEach(({ uid }, chatId) => {
-      push("inChat", chatId, uid, valueFor(uid));
-    });
-    const chatIds = new Set([...entries.keys(), ...typingWanted.keys()]);
-    chatIds.forEach((chatId) => {
-      const uid = entries.get(chatId)?.uid ?? typingWanted.get(chatId);
-      push("typing", chatId, uid, typingWanted.has(chatId) ? valueFor(uid) : false);
+      push(chatId, uid, valueFor(uid));
     });
   }
 
@@ -142,38 +81,14 @@ export function createChatSignals({ session, adapter }) {
         return;
       }
       entries.delete(chatId);
-      typingWanted.delete(chatId);
-      push("inChat", chatId, uid, false);
-      push("typing", chatId, uid, false);
-    },
-
-    setTyping(chatId, uid, isTyping) {
-      if (!chatId || !uid) return;
-      if (isTyping) typingWanted.set(chatId, uid);
-      else typingWanted.delete(chatId);
-      push("typing", chatId, uid, isTyping ? valueFor(uid) : false);
+      push(chatId, uid, false);
     },
 
     dispose() {
       unsubscribe();
       entries.clear();
-      typingWanted.clear();
-      written.inChat.clear();
-      written.typing.clear();
-      pending.inChat.clear();
-      pending.typing.clear();
+      written.clear();
+      pending.clear();
     },
-  };
-}
-
-/**
- * Karşı tarafın sinyalleri: ham chatMeta + onun presence düğümü → canlı
- * "yazıyor" / "sohbette". Presence yoksa ya da bayrağın bağlantısı düşmüşse false.
- */
-export function resolveFriendSignals(meta, presence, friendUid) {
-  const data = meta || {};
-  return {
-    typing: isLiveFlag(data.typing?.[friendUid], presence),
-    inChat: isLiveFlag(data.inChat?.[friendUid], presence),
   };
 }

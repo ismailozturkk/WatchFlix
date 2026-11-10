@@ -73,9 +73,10 @@
     },
     "singleProjectMode": true
   },
-  "database": {
-    "rules": "database.rules.json"
-  },
+  "database": [
+    { "instance": "movieandtv-2832a", "rules": "database.rules.json" },
+    { "instance": "movieandtv-2832a-default-rtdb", "rules": "database.rules.json" }
+  ],
   "functions": [
     {
       "source": "functions",

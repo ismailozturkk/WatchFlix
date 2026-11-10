@@ -16,6 +16,11 @@ import {
 } from "../services/usageTrackerService";
 import { Keys, get, set } from "../services/storage";
 
+// Sayaç yalnız geliştirme build'inde sayar (yayın denetimi P-1); jest __DEV__'i false tanımlıyor.
+const previousDev = global.__DEV__;
+beforeAll(() => { global.__DEV__ = true; });
+afterAll(() => { global.__DEV__ = previousDev; });
+
 describe("usageTrackerService - Durability & Telemetry Tests", () => {
   beforeEach(() => {
     resetUsageStats();

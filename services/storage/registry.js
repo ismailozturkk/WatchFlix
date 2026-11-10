@@ -66,6 +66,10 @@ function defineKey(name, spec) {
 /* ================================================================== */
 
 const settingsKeys = {
+  // Kullanım istatistikleri + hata raporları gönderilsin mi (Gizlilik Ayarları).
+  // Tek sahibi services/usageSharing.js. Varsayılan açık; kapatınca Firebase
+  // Analytics toplaması ve Sentry gönderimi durur.
+  usageSharing: { key: "usageSharingEnabled", type: TYPES.boolean, default: true },
   showSnow: { key: "showSnow", type: TYPES.boolean, default: false },
   language: { key: "selectedLanguage", type: TYPES.string, default: "tr" },
   // "blue" | "dark" | ... | "custom:<id>" — serbest string, doğrulama tema

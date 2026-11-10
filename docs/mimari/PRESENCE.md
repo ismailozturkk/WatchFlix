@@ -1,5 +1,12 @@
 # Çevrimiçi (presence) ve sohbet sinyalleri
 
+> **10 Kasım 2026 — özellik tümüyle kaldırıldı (kullanıcı kararı).** Son görülme YAZILMIYOR (eski değer ilk
+> bağlantıda silinir); `/presence/{uid}` yalnız sahibince, `chatMeta` hiç kimsece okunamıyor; okuyucu kod
+> (`presenceModel.js`, `subscribeChatMeta`, `resolveFriendSignals`) ve "yazıyor" bayrağı silindi.
+> **Tek kalan:** `conns` bağlantı kaydı + `inChat` bayrağı — yalnız sunucunun açık sohbet push'unu
+> susturması için (`functions/chatPresence.js`). Eski sürümler için `lastSeen`/`typing` yazma kuralları
+> duruyor. Aşağıdaki okuyucu, gösterge, `lastSeen` ve `typing` anlatımı TARİHSEL.
+
 Realtime Database üzerinde; kalıcı mesaj verisi Firestore'da kalır.
 
 > **1 Kasım 2026 — göstergeler kaldırıldı (kullanıcı kararı).** Uygulamada çevrimiçi durumu, "Sohbette",

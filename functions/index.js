@@ -37,7 +37,8 @@ const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
-const { getDatabase } = require("firebase-admin/database");
+const { getDatabaseWithUrl } = require("firebase-admin/database");
+const { APP_DATABASE_URL } = require("./rtdbInstance");
 const { Expo } = require("expo-server-sdk");
 const { createHash, randomInt, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
@@ -86,7 +87,7 @@ require("./upstreamStub").setupUpstreamStub({ expo });
 // database.rules.json'suz kurulmuşsa) null kalır, kontrol sessizce atlanır.
 let rtdb = null;
 try {
-  rtdb = getDatabase();
+  rtdb = getDatabaseWithUrl(APP_DATABASE_URL);
 } catch (e) {
   console.warn("RTDB başlatılamadı (inChat kontrolü atlanacak):", e.message);
 }

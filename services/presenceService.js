@@ -1,26 +1,26 @@
 // services/presenceService.js
 //
-// Presence (çevrimiçi / son görülme) — Realtime Database üzerinde /presence/{uid}.
+// Bağlantı kaydı — Realtime Database üzerinde /presence/{uid}/conns.
 //
-// 1 Kas 2026: çevrimiçi / son görülme GÖSTERGELERİ uygulamadan kaldırıldı (kullanıcı kararı;
-// profil ve sohbet artık kimsenin durumunu okumuyor). Kayıt yine tutulur, çünkü sohbetin
-// görünmez "inChat" bayrağı yalnız canlı bir conns kaydıyla geçerli sayılır ve sunucu açık
-// sohbetin push'unu bununla susturur (functions/chatPresence.js).
+// ÇEVRİMİÇİ DURUMU ÖZELLİĞİ YOK (1 Kas 2026 göstergeler, 10 Kas 2026 veri): kimse kimsenin
+// durumunu göremez, son görülme YAZILMAZ, düğümü yalnız sahibi ve sunucu okuyabilir
+// (database.rules.json). Geriye kalan tek şey teknik bir bağlantı kaydıdır: sohbetin görünmez
+// "inChat" bayrağı yalnız canlı bir conns kaydıyla geçerli sayılır ve sunucu açık sohbetin
+// push'unu bununla susturur (functions/chatPresence.js). Kayıt olmasa, uygulama ani
+// kapandığında bayrak takılı kalır ve o sohbetin bildirimleri sonsuza dek susardı.
 //
 // MİMARİ:
 //   • Karar mantığı services/presenceSession.js'de (saf durum makinesi, testli).
 //     Burası yalnızca onu gerçek RTDB + AppState'e bağlayan ince katman.
-//   • Veri modeli ve okuyucu yardımcıları services/presenceModel.js'de.
 //
-// Çevrimiçi kaydı soket başına /presence/{uid}/conns/{connId}. Kullanıcı en az
-// bir canlı kaydı varken çevrimiçidir; her kayıt yalnız kendi soketinin ölümüyle
+// Kayıt soket başına /presence/{uid}/conns/{connId}; her kayıt yalnız kendi soketinin ölümüyle
 // (onDisconnect) ya da uygulama arka plana atılınca silinir. Firestore'daki
 // heartbeat (60 sn'de bir yazma) modeli yok; RTDB'nin onDisconnect'i soket
 // koptuğu an sunucu tarafında temizler.
 //
 //   /presence/{uid}
 //     conns/{connId} : number (serverTimestamp)  ← açık soket + ön plan
-//     lastSeen       : number (serverTimestamp)  ← en son çevrimdışına düşüş
+//   (lastSeen yazılmaz; eski sürümlerin bıraktığı değer ilk bağlantıda silinir.)
 //
 // ÇIKIŞ: auth düştükten sonra offline yazımı reddedilirdi (kullanıcı çıkış
 // yapınca "çevrimiçi" takılı kalırdı). `beforeAuthStateChanged` kancası oturum
@@ -38,16 +38,12 @@ import {
   serverTimestamp as rtdbServerTimestamp,
 } from "firebase/database";
 import { createPresenceSession } from "./presenceSession";
-import { isOnlineEffective } from "./presenceModel";
-
-export { isOnlineEffective };
 
 // Çıkış yolunu bekletmemek için kaydı silmeye ayrılan azami süre.
 const SIGN_OUT_BUDGET_MS = 1500;
 
 const presenceRef = (uid) => ref(rtdb, `presence/${uid}`);
 const connRef = (uid, connId) => ref(rtdb, `presence/${uid}/conns/${connId}`);
-const lastSeenRef = (uid) => ref(rtdb, `presence/${uid}/lastSeen`);
 
 // RTDB + AppState'i durum makinesinin beklediği arayüze çevirir.
 const adapter = {
@@ -60,29 +56,19 @@ const adapter = {
   },
   // push() yalnızca anahtar üretir; ağ çağrısı yapmaz.
   newConnId: (uid) => push(ref(rtdb, `presence/${uid}/conns`)).key,
-  arm: (uid, connId) =>
-    Promise.all([
-      onDisconnect(connRef(uid, connId)).remove(),
-      onDisconnect(lastSeenRef(uid)).set(rtdbServerTimestamp()),
-    ]),
-  disarm: (uid, connId) =>
-    Promise.all([
-      onDisconnect(connRef(uid, connId)).cancel(),
-      onDisconnect(lastSeenRef(uid)).cancel(),
-    ]),
-  // isOnline/lastActiveAt: eski şemanın (takılı kalabilen) alanları — temizlenir.
+  arm: (uid, connId) => onDisconnect(connRef(uid, connId)).remove(),
+  disarm: (uid, connId) => onDisconnect(connRef(uid, connId)).cancel(),
+  // isOnline/lastActiveAt (eski şema) ve lastSeen (son görülme, artık tutulmuyor) temizlenir.
   markOnline: (uid, connId, staleConnId) =>
     update(presenceRef(uid), {
       [`conns/${connId}`]: rtdbServerTimestamp(),
       ...(staleConnId ? { [`conns/${staleConnId}`]: null } : {}),
       isOnline: null,
       lastActiveAt: null,
+      lastSeen: null,
     }),
   markOffline: (uid, connId) =>
-    update(presenceRef(uid), {
-      [`conns/${connId}`]: null,
-      lastSeen: rtdbServerTimestamp(),
-    }),
+    update(presenceRef(uid), { [`conns/${connId}`]: null }),
   onError: (err) => {
     if (__DEV__) console.warn("presence:", err?.message);
   },

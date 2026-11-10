@@ -50,8 +50,8 @@
       </p>
       <div class="stamp">
         <span>Yürürlük: <b>16 Ekim 2026</b></span>
-        <span>Son güncelleme: <b>6 Kasım 2026</b></span>
-        <span>Sürüm: <b>1.6</b></span>
+        <span>Son güncelleme: <b>10 Kasım 2026</b></span>
+        <span>Sürüm: <b>1.7</b></span>
       </div>
     </div>
 
@@ -266,7 +266,7 @@
       <ul>
         <li><strong>Herkese açık (giriş yapmış kullanıcılar):</strong> kullanıcı adınız, görünen adınız, avatarınız, biyografiniz, rozetleriniz, dört favoriniz, eklediyseniz sosyal hesap kullanıcı adlarınız (dokunulunca ilgili platformun uygulaması veya sitesi açılır; orada o platformun kendi politikası geçerlidir), yorumlarınız, verdiğiniz puanlar ve liderlik tablosu kaydınız.</li>
         <li><strong>Gönderiler:</strong> paylaşırken <em>herkese açık</em> ya da <em>yalnızca takipçiler</em> seçersiniz. Herkese açık gönderiler, uygulamayı kullanmayan kişilerce de görülebilecek şekilde erişilebilir olabilir.</li>
-        <li><strong>Ayarla kontrol edilir:</strong> profil, listeler ve çevrimiçi durumu için Ayarlar → Gizlilik’ten ayrı ayrı seçim yaparsınız (profil ve listeler için <em>herkese açık / yalnızca arkadaşlar / gizli</em>; çevrimiçi durumu için <em>herkes / arkadaşlar / hiç kimse</em>). Liste görünürlüğü sunucu güvenlik kurallarında da uygulanır; profil ve çevrimiçi durumu tercihleri uygulama arayüzünde uygulanır.</li>
+        <li><strong>Ayarla kontrol edilir:</strong> profil ve listeler için Ayarlar → Gizlilik’ten ayrı ayrı seçim yaparsınız (<em>herkese açık / yalnızca arkadaşlar / gizli</em>). Liste görünürlüğü sunucu güvenlik kurallarında da uygulanır; profil tercihi uygulama arayüzünde uygulanır. Uygulamada çevrimiçi durumu ve son görülme özelliği yoktur: başka kullanıcılar çevrimiçi olup olmadığınızı göremez, son görülme zamanınız tutulmaz.</li>
         <li><strong>Davet bağı:</strong> bir arkadaşınızın davet kodunu girerseniz o kişi davet ekranında adınızı, kullanıcı adınızı, avatarınızı, katılma zamanınızı ve durumunuzu (“kayıt oldu”, ilk ücretli aboneliğinizi başlattıysanız “abone oldu”, ücretsiz ay kazanıldıysa “ödül kazanıldı”) görür; ne satın aldığınız veya ne kadar ödediğiniz görünmez. Siz de sizi davet edenin adını görürsünüz. Kodu girmediğiniz sürece davet edenle aranızda bir bağ kurulmaz.</li>
         <li><strong>Yalnızca ilgili kişiler:</strong> birebir ve grup mesajları yalnızca o sohbetin katılımcılarına, CineSwipe odası yalnızca odadaki iki kişiye açıktır. Sohbete bir liste, film kartı veya AI cevabı gönderirseniz o içerik sohbetin katılımcılarına görünür.</li>
         <li><strong>Yalnızca siz:</strong> notlar, hatırlatıcılar, takvim, istatistik ayrıntıları, AI sohbet geçmişiniz, geri bildirimleriniz, e-posta adresiniz ve doğum tarihiniz. E-posta adresiniz ve doğum tarihiniz uygulamada diğer kullanıcılara gösterilmez.</li>
@@ -404,6 +404,7 @@
         <li>Çökme ve hata durumunda: hata mesajı, kod yığını (stack trace), cihaz modeli, işletim sistemi ve uygulama sürümü.</li>
         <li>Örneklenmiş performans ölçümleri: uygulama açılış süresi, yavaş veya donan kareler ve ekran geçiş süreleri (kişisel içerik taşımaz).</li>
         <li>Firebase yükleme kimliği (uygulama kurulumuna özgü rastgele bir kimlik) ve <strong>Android’de cihazın reklam kimliği</strong>. Firebase Analytics ayrıca IP adresinden yaklaşık bölge (ülke/şehir düzeyinde) bilgisi türetebilir.</li>
+        <li><strong>Kapatabilirsiniz:</strong> Ayarlar → Gizlilik → “İstatistik ve hata raporlarını paylaş” anahtarını kapattığınızda o cihazdan kullanım istatistiği (Firebase Analytics) ve hata raporu (Sentry) gönderimi durur. Tercih cihaza özeldir.</li>
       </ul>
       <p>Ölçüme <strong>gitmeyen</strong> veri:</p>
       <ul>
@@ -570,6 +571,7 @@
       </p>
       <p><strong>Sürüm geçmişi</strong></p>
       <ul>
+        <li><strong>1.7 — 10 Kasım 2026:</strong> Kullanım istatistiği ve hata raporu gönderimini kapatma anahtarı eklendi (Ayarlar → Gizlilik). Çevrimiçi durumu ayarına ilişkin ifade kaldırıldı: uygulamada çevrimiçi durumu ve son görülme özelliği yok, son görülme zamanı tutulmuyor.</li>
         <li><strong>1.6 — 6 Kasım 2026:</strong> Test kullanıcısı olan adresin yayın günü haber için bekleme listesine de eklendiği belirtildi. Tarayıcıda e-posta adresinin yalnız maskeli hâlinin tutulduğu, yazı tiplerinin kendi sunucumuzdan geldiği, sitedeki afişlerin TMDB’den, form kütüphanesinin Google sunucularından yüklendiği eklendi. Bekleme ve test listesindeki kayıtlar artık siteden kimse tarafından tek tek sorgulanamaz.</li>
         <li><strong>1.5 — 4 Kasım 2026:</strong> Web sitesine “Test kullanıcısı ol” formu (e-posta, platform, site dili) ve çerezsiz, IP saklamayan ziyaret istatistiği (yalnız günlük toplamlar) eklendi; saklama süresi ve yerel depolama bölümleri buna göre güncellendi.</li>
         <li><strong>1.4 — 21 Ekim 2026:</strong> Profilde isteğe bağlı sosyal hesap kullanıcı adları ve arkadaşla zevk uyumu eklendi. Hesap silme artık sunucuda tam kapsamlı çalışıyor: turnuva oyları, geri bildirimler, promosyon kullanım kaydı, başkalarının gönderilerindeki beğenileriniz, başkalarının bildirim kutusuna gönderdiğiniz bildirimler ve günlük liderlik kayıtlarınız da silinir; içerik şikâyetlerinde hesap kimliğiniz kayıttan çıkarılır.</li>
@@ -617,8 +619,8 @@
       </p>
       <div class="stamp">
         <span>Effective: <b>16 October 2026</b></span>
-        <span>Last updated: <b>6 November 2026</b></span>
-        <span>Version: <b>1.6</b></span>
+        <span>Last updated: <b>10 November 2026</b></span>
+        <span>Version: <b>1.7</b></span>
       </div>
     </div>
 
@@ -834,7 +836,7 @@
       <ul>
         <li><strong>Visible to signed-in users:</strong> your username, display name, avatar, bio, badges, four favourites, social account usernames if you added any (tapping one opens that platform’s app or site, where the platform’s own policy applies), comments, ratings and leaderboard entry.</li>
         <li><strong>Posts:</strong> you choose <em>public</em> or <em>followers only</em> when you post. Public posts may be accessible to people who do not use the app.</li>
-        <li><strong>Controlled by settings:</strong> in Settings → Privacy you choose separately for your profile and lists (<em>public / friends only / private</em>) and for your online status (<em>everyone / friends / nobody</em>). List visibility is enforced in the server security rules as well; the profile and online-status preferences are enforced in the app interface.</li>
+        <li><strong>Controlled by settings:</strong> in Settings → Privacy you choose separately for your profile and lists (<em>public / friends only / private</em>). List visibility is enforced in the server security rules as well; the profile preference is enforced in the app interface. The app has no online-status or last-seen feature: other users cannot see whether you are online, and no last-seen time is kept.</li>
         <li><strong>Invite link:</strong> if you enter a friend’s invite code, that person sees your name, username, avatar, the time you joined and your status on their invite screen (“joined”, “subscribed” once you start your first paid subscription, “reward earned” once a free month has been granted); what you bought or how much you paid is not shown. You in turn see the name of the person who invited you. Unless you enter a code, no link to an inviter is created.</li>
         <li><strong>Only the people involved:</strong> direct and group messages are visible only to participants of that conversation, and a CineSwipe room only to the two people in it. If you send a list, a title card or an AI answer into a chat, it is visible to that chat’s participants.</li>
         <li><strong>Only you:</strong> notes, reminders, calendar, detailed statistics, your AI chat history, your feedback, your e-mail address and your date of birth. Your e-mail and date of birth are not shown to other users in the app.</li>
@@ -971,6 +973,7 @@
         <li>On a crash or error: the error message, stack trace, device model, OS and app version.</li>
         <li>Sampled performance measurements: app start-up time, slow or frozen frames and screen-transition times (they carry no personal content).</li>
         <li>A Firebase installation id (a random id specific to this installation) and, <strong>on Android, the device advertising id</strong>. Firebase Analytics may also derive an approximate region (country/city level) from your IP address.</li>
+        <li><strong>You can turn this off:</strong> when you switch off Settings → Privacy → “Share statistics and crash reports”, usage statistics (Firebase Analytics) and crash reports (Sentry) stop being sent from that device. The choice is stored per device.</li>
       </ul>
       <p>What is <strong>not</strong> sent:</p>
       <ul>
@@ -1131,6 +1134,7 @@
       </p>
       <p><strong>Version history</strong></p>
       <ul>
+        <li><strong>1.7 — 10 November 2026:</strong> Added a switch to stop sending usage statistics and crash reports (Settings → Privacy). Removed the wording about an online-status setting: the app has no online-status or last-seen feature and no last-seen time is kept.</li>
         <li><strong>1.6 — 6 November 2026:</strong> Stated that a tester’s address is also added to the waitlist for the launch-day notice. Added that the browser keeps only a masked form of your e-mail address, that fonts are served from our own server, and that the website’s posters load from TMDB and the form library from Google’s servers. Waitlist and tester-list entries can no longer be looked up one by one from the site.</li>
         <li><strong>1.5 — 4 November 2026:</strong> Added the website’s “Become a tester” form (e-mail, platform, site language) and cookie-free visit statistics that store no IP address (daily totals only); the retention and local-storage sections were updated accordingly.</li>
         <li><strong>1.4 — 21 October 2026:</strong> Added optional social account usernames on the profile and taste match with a friend. Account deletion now runs in full on the server: tournament votes, feedback, promo redemption record, your likes on other people’s posts, notifications you sent to other users’ inboxes and your daily leaderboard entries are deleted too; your account id is removed from content reports you filed.</li>

@@ -138,9 +138,12 @@ describe("sosyal alt koleksiyonlar", () => {
     await assertFails(getDoc(doc(as(BOB), "Users", ALICE, "conversations", BOB)));
   });
 
-  test("çevrimiçi durumu yalnız sahibi yazar", async () => {
+  test("çevrimiçi durumu kalıntısı: yalnız sahibi yazar VE okur", async () => {
     await assertSucceeds(setDoc(doc(as(ALICE), "Presence", ALICE), { online: true }));
     await assertFails(setDoc(doc(as(BOB), "Presence", ALICE), { online: false }));
+    // 10 Kas 2026: özellik kaldırıldı — başkası (arkadaş dahil) kimsenin durumunu okuyamaz.
+    await assertSucceeds(getDoc(doc(as(ALICE), "Presence", ALICE)));
+    await assertFails(getDoc(doc(as(BOB), "Presence", ALICE)));
   });
 });
 

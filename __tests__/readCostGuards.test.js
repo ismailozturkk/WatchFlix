@@ -36,3 +36,17 @@ test("çevrimiçi durumu hiçbir ekranda okunmuyor ve ayarı yok (1 Kas 2026, ku
   expect(read("screens/tabs/profile/PrivacySettingsScreen.js")).not.toMatch(/key: "onlineStatus"|onlineStatus: \[/);
   expect(read("services/presenceService.js")).not.toMatch(/export function (subscribeToUserPresence|formatLastSeen)/);
 });
+
+test("çevrimiçi durumu verisi de yok: son görülme yazılmaz, başkasının durumu okunmaz (10 Kas 2026)", () => {
+  const fs = require("fs");
+  const path = require("path");
+  expect(fs.existsSync(path.join(__dirname, "..", "services", "presenceModel.js"))).toBe(false);
+  // Yorum satırları hariç: kod son görülmeyi yalnız SİLER (lastSeen: null).
+  const code = (file) => read(file).replace(/^\s*\/\/.*$/gm, "");
+  const service = code("services/presenceService.js");
+  expect(service).not.toMatch(/lastSeenRef|isOnlineEffective/);
+  expect(service.match(/lastSeen[^\n]*/g)).toEqual(["lastSeen: null,"]);
+  const chat = code("services/chatRtdb.js");
+  expect(chat).not.toMatch(/onValue|subscribeChatMeta|typing/i);
+  expect(code("services/chatSignals.js")).not.toMatch(/typing|resolveFriendSignals/i);
+});

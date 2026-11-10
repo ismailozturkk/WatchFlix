@@ -494,6 +494,12 @@ const createEmptyStats = () => ({
   dailyHistory: {},
 });
 
+// Sayaç yalnız geliştirme build'inde çalışır. Tüketicisi (UsageDebugScreen) yayında zaten kapalı;
+// kapı olmadan her Firestore okuması ve TMDB isteği 1000 girişlik günlükle birlikte tüm istatistik
+// nesnesini MMKV'ye yazıyordu (JS iş parçacığında senkron serileştirme). Yayın denetimi 9 Kas, P-1.
+// Çağrı anında okunur: jest `__DEV__`i false tanımlar, sayaç testleri true'ya çevirip dener.
+const trackingEnabled = () => typeof __DEV__ !== "undefined" && __DEV__;
+
 let inMemoryStats = null;
 const subscribers = new Set();
 
@@ -634,6 +640,7 @@ export function resetUsageStats() {
 
 /** Firestore Okuma Takibi (Koleksiyon ve Bölge Ayrımıyla) */
 export function trackFirestoreRead(collectionName = "unknown", count = 1) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.firestore.reads += count;
   if (!stats.firestore.collections[collectionName]) {
@@ -673,6 +680,7 @@ export function trackFirestoreRead(collectionName = "unknown", count = 1) {
 
 /** Firestore Yazma / Güncelleme Takibi */
 export function trackFirestoreWrite(collectionName = "unknown", count = 1) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.firestore.writes += count;
   if (!stats.firestore.collections[collectionName]) {
@@ -712,6 +720,7 @@ export function trackFirestoreWrite(collectionName = "unknown", count = 1) {
 
 /** Firestore Silme Takibi */
 export function trackFirestoreDelete(collectionName = "unknown", count = 1) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.firestore.deletes += count;
   if (!stats.firestore.collections[collectionName]) {
@@ -747,6 +756,7 @@ export function trackFirestoreDelete(collectionName = "unknown", count = 1) {
 
 /** TMDB İstek & SWR Önbellek Takibi */
 export function trackTmdbRequest(endpoint = "", fromCache = false) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   if (!stats.tmdb) stats.tmdb = { totalRequests: 0, cachedRequests: 0, networkRequests: 0 };
   stats.tmdb.totalRequests += 1;
@@ -778,6 +788,7 @@ export function trackTmdbRequest(endpoint = "", fromCache = false) {
 
 /** Cloud Functions Çağrı Takibi */
 export function trackFunctionCall(functionName = "callGemini", durationMs = 0) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.functions.totalCalls += 1;
   stats.functions.totalDurationMs += durationMs;
@@ -816,6 +827,7 @@ export function trackGeminiUsage({
   thoughtsTokens = 0,
   costUsd = 0,
 } = {}) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   const totalTokens = promptTokens + outputTokens + thoughtsTokens;
   const modelConfig = GEMINI_MODELS[model] || GEMINI_MODELS["gemini-2.5-flash"];
@@ -921,6 +933,7 @@ export function getDailyAnalytics(stats = inMemoryStats || createEmptyStats()) {
 
 /** Realtime Database İşlemi Takibi */
 export function trackRtdbEvent(operation = "presence", detail = "") {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.rtdb.events += 1;
   addLogEntry("rtdb_event", `Realtime DB (${operation})`, detail || "Sinyal/Olay", 0, "chat");
@@ -929,6 +942,7 @@ export function trackRtdbEvent(operation = "presence", detail = "") {
 
 /** Network / TMDB API & Cache Kazanç Takibi */
 export function trackNetworkRequest(endpoint = "", cached = false) {
+  if (!trackingEnabled()) return;
   const stats = loadStats();
   stats.network.requests += 1;
   if (cached) {

@@ -1,10 +1,12 @@
-// Presence + sohbet sinyalleri + sunucu push kararı — UÇTAN UCA.
+// Bağlantı kaydı + "sohbet açık" bayrağı + sunucu push kararı — UÇTAN UCA.
 //
 // Gerçek presenceService/chatRtdb/presenceSession/chatSignals modülleri,
 // bellek içi sahte RTDB üzerinde çalışır (bkz. helpers/fakeRtdb.js). Asıl hedef
 // kullanıcı şikâyeti: "sohbetteyken uygulamayı doğrudan kapatınca sürekli
-// çevrimiçi kalıyor". Karşı tarafın gördüğü durum ve sunucunun push kararı da
-// aynı veriden okunur.
+// çevrimiçi kalıyor". Çevrimiçi durumu özelliği 10 Kas 2026'da tümüyle kaldırıldı:
+// kayıt artık YALNIZ sunucunun push kararını besler, kimse okuyamaz. Bu yüzden
+// gözlem noktası "karşı tarafın gördüğü" değil, sunucunun gördüğüdür
+// (isRecipientViewingChat) ve ham veridir.
 
 global.__DEV__ = false;
 
@@ -34,25 +36,23 @@ function boot() {
   fake.reset();
   const presence = require("../services/presenceService");
   const chat = require("../services/chatRtdb");
-  // Arkadaşın gözünden "me"yi izle.
-  const seen = [];
-  const stop = chat.subscribeChatMeta(CHAT, "me", (s) => seen.push(s));
-  return { fake, presence, chat, seen, last: () => seen[seen.length - 1], stop };
+  // Sunucunun kararı: "alıcı bu sohbeti şu an ekranda tutuyor mu?"
+  const viewing = () => isRecipientViewingChat(fake.adminRtdb, CHAT, "me");
+  return { fake, presence, chat, viewing };
 }
 
-async function goOnlineInChat(env, { typing = false } = {}) {
+async function goOnlineInChat(env) {
   env.presence.startPresence("me");
   env.fake.connect();
   await flush();
   env.chat.enterChat(CHAT, "me");
-  if (typing) env.chat.setTyping(CHAT, "me", true);
   await flush();
 }
 
 const connIds = (fake) => Object.keys(fake.read("presence/me/conns") || {});
 
 describe("çevrimiçi olma", () => {
-  test("bağlanınca kayıt yazılır, onDisconnect kuruludur, karşı taraf çevrimiçi görür", async () => {
+  test("bağlanınca kayıt yazılır ve onDisconnect kuruludur", async () => {
     const env = boot();
     env.presence.startPresence("me");
     env.fake.connect();
@@ -60,19 +60,36 @@ describe("çevrimiçi olma", () => {
 
     expect(connIds(env.fake)).toHaveLength(1);
     expect(env.fake.pendingDisconnectOps().length).toBeGreaterThan(0);
-    expect(env.presence.isOnlineEffective(env.last().presence)).toBe(true);
   });
 
-  test("sohbete girince karşı taraf 'Sohbette' ve 'yazıyor' görür", async () => {
+  test("sohbete girince sunucu 'ekranda' görür; yalnız inChat bayrağı yazılır", async () => {
     const env = boot();
-    await goOnlineInChat(env, { typing: true });
-    expect(env.last()).toMatchObject({ inChat: true, typing: true });
+    await goOnlineInChat(env);
+    expect(await env.viewing()).toBe(true);
+    expect(Object.keys(env.fake.read(`chatMeta/${CHAT}`))).toEqual(["inChat"]);
+  });
+
+  test("SON GÖRÜLME TUTULMAZ: hiçbir yolda yazılmaz, eski değer ilk bağlantıda silinir", async () => {
+    const env = boot();
+    env.fake.seed("presence/me", { lastSeen: 12345 });
+    await goOnlineInChat(env);
+    expect(env.fake.read("presence/me/lastSeen") ?? null).toBeNull();
+    expect(env.fake.pendingDisconnectOps().every((op) => !op.path.includes("lastSeen"))).toBe(true);
+
+    env.fake.emitAppState("background"); // arka plan
+    await flush();
+    expect(env.fake.read("presence/me/lastSeen") ?? null).toBeNull();
+
+    env.fake.emitAppState("active");
+    await flush();
+    env.fake.kill(); // ani kapanış
+    await flush();
+    expect(env.fake.read("presence/me") ?? null).toBeNull();
   });
 
   test("eski şemanın takılı isOnline kalıntısı ilk çevrimiçi yazımda temizlenir", async () => {
     const env = boot();
     env.fake.seed("presence/me", { isOnline: true, lastActiveAt: 5 });
-    expect(env.presence.isOnlineEffective(env.fake.read("presence/me"))).toBe(false);
 
     env.presence.startPresence("me");
     env.fake.connect();
@@ -85,20 +102,18 @@ describe("çevrimiçi olma", () => {
 });
 
 describe("KÖK HATA: sohbetteyken uygulama kapatılınca", () => {
-  test("süreç öldürülür (AppState olayı YOK): çevrimiçi/Sohbette/yazıyor düşer, takılı bayrak geçersiz", async () => {
+  test("süreç öldürülür (AppState olayı YOK): kayıt düşer, takılı bayrak geçersiz", async () => {
     const env = boot();
-    await goOnlineInChat(env, { typing: true });
-    expect(env.last()).toMatchObject({ inChat: true, typing: true });
+    await goOnlineInChat(env);
+    expect(await env.viewing()).toBe(true);
 
     env.fake.kill(); // swipe-kill: istemci kodu çalışmaz, yalnız sunucu temizler
     await flush();
 
     expect(connIds(env.fake)).toEqual([]);
-    expect(typeof env.fake.read("presence/me/lastSeen")).toBe("number");
-    expect(env.presence.isOnlineEffective(env.last().presence)).toBe(false);
-    // Ham bayraklar hâlâ yazılı (temizlenememiş olabilir) — ama GEÇERSİZ sayılır:
+    // Ham bayrak hâlâ yazılı (temizlenememiş olabilir) — ama GEÇERSİZ sayılır:
     expect(env.fake.read(`chatMeta/${CHAT}/inChat/me`)).not.toBeNull();
-    expect(env.last()).toMatchObject({ inChat: false, typing: false });
+    expect(await env.viewing()).toBe(false);
   });
 
   test("sunucu push'u: sohbetteyken susar, kapatınca (bayrak takılı olsa da) GİDER", async () => {
@@ -122,12 +137,12 @@ describe("KÖK HATA: sohbetteyken uygulama kapatılınca", () => {
     await flush();
     expect(connIds(env.fake)).toHaveLength(1);
     expect(env.fake.pendingDisconnectOps().length).toBeGreaterThan(0); // yeniden kuruldu
-    expect(env.last()).toMatchObject({ inChat: true });
+    expect(await env.viewing()).toBe(true);
 
     env.fake.kill(); // şimdi uygulama kapandı
     await flush();
     expect(connIds(env.fake)).toEqual([]);
-    expect(env.last()).toMatchObject({ inChat: false });
+    expect(await env.viewing()).toBe(false);
   });
 
   test("yeni soket yeni kimlik alır: ölen eski soketin gecikmeli temizliği yeni oturumu EZMEZ", async () => {
@@ -154,7 +169,7 @@ describe("KÖK HATA: sohbetteyken uygulama kapatılınca", () => {
 });
 
 describe("arka plan", () => {
-  test("arka plana geçince kayıt silinir, onDisconnect iptal edilir; sonraki ölüm son görülmeyi EZMEZ", async () => {
+  test("arka plana geçince kayıt silinir, onDisconnect iptal edilir, sunucu 'ekranda değil' görür", async () => {
     const env = boot();
     await goOnlineInChat(env);
 
@@ -162,12 +177,11 @@ describe("arka plan", () => {
     await flush();
     expect(connIds(env.fake)).toEqual([]);
     expect(env.fake.pendingDisconnectOps()).toEqual([]);
-    expect(env.last()).toMatchObject({ inChat: false });
+    expect(await env.viewing()).toBe(false);
 
-    const lastSeenAtBackground = env.fake.read("presence/me/lastSeen");
-    env.fake.kill(); // süreç sonradan öldürüldü
+    env.fake.kill(); // süreç sonradan öldürüldü: geride hiçbir şey kalmaz
     await flush();
-    expect(env.fake.read("presence/me/lastSeen")).toBe(lastSeenAtBackground);
+    expect(env.fake.read("presence/me") ?? null).toBeNull();
   });
 
   test("arka plandayken bağlantı yenilenirse çevrimiçi YAZILMAZ", async () => {
@@ -193,8 +207,7 @@ describe("arka plan", () => {
     await flush();
     expect(connIds(env.fake)).toHaveLength(1);
     expect(env.fake.pendingDisconnectOps().length).toBeGreaterThan(0);
-    expect(env.last()).toMatchObject({ inChat: true });
-    expect(await isRecipientViewingChat(env.fake.adminRtdb, CHAT, "me")).toBe(true);
+    expect(await env.viewing()).toBe(true);
   });
 
   test("arka planda başlayan süreç çevrimiçi yazmaz", async () => {
@@ -218,7 +231,7 @@ describe("çıkış", () => {
 
     await env.fake.fakeAuth.guard(null); // auth.signOut() bunu çağırır
     expect(connIds(env.fake)).toEqual([]);
-    expect(typeof env.fake.read("presence/me/lastSeen")).toBe("number");
+    expect(env.fake.read("presence/me") ?? null).toBeNull();
     expect(env.fake.pendingDisconnectOps()).toEqual([]);
   });
 
@@ -241,33 +254,23 @@ describe("çıkış", () => {
   });
 });
 
-describe("yazıyor", () => {
-  test("sohbetten ayrılınca bayraklar silinir", async () => {
+describe("sohbetten ayrılma", () => {
+  test("ayrılınca bayrak silinir, sunucu 'ekranda değil' görür", async () => {
     const env = boot();
-    await goOnlineInChat(env, { typing: true });
+    await goOnlineInChat(env);
     env.chat.leaveChat(CHAT, "me");
     await flush();
-    expect(env.fake.read(`chatMeta/${CHAT}`)).toBeNull();
-    expect(env.last()).toMatchObject({ inChat: false, typing: false });
+    expect(env.fake.read(`chatMeta/${CHAT}`) ?? null).toBeNull();
+    expect(await env.viewing()).toBe(false);
   });
+});
 
-  test("uzun süre boşta kalan 'yazıyor' denetleyici ile kapanır", async () => {
-    jest.useFakeTimers();
-    try {
-      const env = boot();
-      await goOnlineInChat(env);
-      const ctrl = env.chat.createTypingController({
-        send: (v) => env.chat.setTyping(CHAT, "me", v),
-      });
-      ctrl.input(true);
-      await flush();
-      expect(env.last().typing).toBe(true);
-
-      jest.advanceTimersByTime(5000);
-      await flush();
-      expect(env.last().typing).toBe(false);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
+test("okuyucu ve 'yazıyor' API'si yok (çevrimiçi durumu özelliği kaldırıldı)", () => {
+  const env = boot();
+  expect(Object.keys(env.chat).sort()).toEqual(["enterChat", "leaveChat"]);
+  expect(Object.keys(env.presence).sort()).toEqual([
+    "getPresenceSession",
+    "startPresence",
+    "stopPresence",
+  ]);
 });

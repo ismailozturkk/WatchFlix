@@ -144,6 +144,7 @@ export const BACKUP_EXCLUDED = Object.freeze({
   notificationPrimeShown: "İşletim sistemi bildirim iznine bağlı, cihaza özel.",
   recentUsers: "Hızlı giriş çipleri kullanıcı kimlikleri içerir; dosyada dolaşmamalı.",
   usageStats: "Tanılama sayaçları.",
+  usageSharing: "Gizlilik rızası cihaza ve kişiye özel; bir yedek dosyası paylaşımı sessizce yeniden açmamalı.",
   appIcon: "Gerçek simge işletim sisteminde; yalnızca önbelleği tutuluyor.",
   homeMediaType: "Film/Dizi sekmesinde son bakılan bölüm; gezinme durumu, ayar değil.",
   discoverFilters: "Ne izlesem? ekranında en son kullanılan süzgeç; gezinme durumu (kayıtlı süzgeçler yedeğe girer).",

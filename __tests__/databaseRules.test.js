@@ -11,9 +11,13 @@ const rules = require("../database.rules.json").rules;
 describe("presence", () => {
   const node = rules.presence.$uid;
 
-  test("yalnız sahibi yazar, giriş yapan herkes okur", () => {
+  test("yalnız sahibi yazar ve okur (çevrimiçi durumu özelliği yok)", () => {
     expect(node[".write"]).toBe("auth != null && auth.uid === $uid");
-    expect(node[".read"]).toBe("auth != null");
+    // 10 Kas 2026: eskiden "auth != null" idi — hesabı olan herkes herkesin
+    // çevrimiçi olup olmadığını ve son görülmesini okuyabiliyordu.
+    expect(node[".read"]).toBe("auth != null && auth.uid === $uid");
+    expect(node.conns[".read"]).toBeUndefined();
+    expect(node.lastSeen[".read"]).toBeUndefined();
   });
 
   test("yalnız bilinen alanlar yazılabilir (bağlantılar + son görülme)", () => {
@@ -39,9 +43,14 @@ describe("chatMeta", () => {
   const memberOnly =
     "auth != null && ($chatId.beginsWith(auth.uid + '_') || $chatId.endsWith('_' + auth.uid))";
 
-  test("yalnız sohbetin iki üyesi okur ve yazar", () => {
-    expect(node[".read"]).toBe(memberOnly);
+  test("yalnız sohbetin iki üyesi yazar; KİMSE okuyamaz", () => {
     expect(node[".write"]).toBe(memberOnly);
+    // Bayrağı yalnız sunucu (Admin SDK) okur: karşı taraf "sohbette/yazıyor" göremez.
+    expect(node[".read"]).toBeUndefined();
+    expect(node.inChat[".read"]).toBeUndefined();
+    expect(node.inChat.$uid[".read"]).toBeUndefined();
+    expect(node.typing[".read"]).toBeUndefined();
+    expect(node.typing.$uid[".read"]).toBeUndefined();
   });
 
   test.each(["typing", "inChat"])(

@@ -30,6 +30,11 @@ beforeEach(() => {
   resetUsageStats();
 });
 
+// Sayaç yalnız geliştirme build'inde sayar (yayın denetimi P-1); jest __DEV__'i false tanımlıyor.
+const previousDev = global.__DEV__;
+beforeAll(() => { global.__DEV__ = true; });
+afterAll(() => { global.__DEV__ = previousDev; });
+
 describe("Usage Tracker Backup & Restore System - Exhaustive Verification", () => {
   it("exports a pristine backup envelope with all stats, sessions, and logs", () => {
     // 1. Kapsamlı işlem simülasyonu

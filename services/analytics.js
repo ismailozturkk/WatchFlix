@@ -49,7 +49,11 @@ function getAnalyticsApi() {
 }
 
 // Gerçekten Firebase'e gönderilsin mi? (Geliştirmede varsayılan hayır.)
-const shouldSend = () => !__DEV__ || SEND_IN_DEV;
+// Kullanıcı tercihi (services/usageSharing.js). Kapalıyken hiçbir olay, ekran ya da kullanıcı
+// özelliği gönderilmez; native toplama da kapatılır (aşağıda setAnalyticsEnabled).
+let collectionAllowed = true;
+
+const shouldSend = () => collectionAllowed && (!__DEV__ || SEND_IN_DEV);
 
 /**
  * Olay gönderir. Ad geçersizse olay DÜŞER (Firebase'in sessiz atmasındansa
@@ -128,10 +132,21 @@ export function setAnalyticsUserProperty(name, value) {
   return true;
 }
 
-/** Kullanıcı ölçümü reddederse (gelecekteki consent akışı) toplamayı kapatır. */
+/**
+ * Kullanıcı tercihi: toplamayı açar/kapatır. Bayrak HEMEN geçerlidir (native çağrı
+ * tamamlanmasa ya da modül olmasa bile bu modülden olay çıkmaz); native tarafta
+ * otomatik toplanan olaylar (ekran, oturum) da kapanır ve tercih orada kalıcıdır.
+ * Çağıran: services/usageSharing.js — doğrudan çağırma.
+ */
 export function setAnalyticsEnabled(enabled) {
+  collectionAllowed = Boolean(enabled);
   const analyticsApi = getAnalyticsApi();
   if (!analyticsApi || !instance) return false;
-  analyticsApi.setAnalyticsCollectionEnabled(instance, Boolean(enabled)).catch(() => {});
+  try {
+    const pending = analyticsApi.setAnalyticsCollectionEnabled(instance, collectionAllowed);
+    pending?.catch?.(() => {});
+  } catch {
+    /* native modül eski/eksik: bayrak yine de geçerli */
+  }
   return true;
 }

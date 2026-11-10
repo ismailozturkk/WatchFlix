@@ -30,6 +30,19 @@ let sentry = null;      // yüklenmiş modül
 let resolved = false;   // yükleme denendi mi
 let initialized = false;
 let navigationIntegration = null; // ekran geçiş izleme (React Navigation)
+// Kullanıcı tercihi (services/usageSharing.js). Kapalıyken: açılışta Sentry hiç
+// başlatılmaz; oturum sırasında kapatılırsa beforeSend her olayı düşürür.
+let sharingAllowed = true;
+
+/** Çağıran: services/usageSharing.js — initCrashReporting'den ÖNCE de çağrılabilir. */
+export function setCrashReportingEnabled(enabled) {
+  sharingAllowed = Boolean(enabled);
+  if (!sharingAllowed && initialized) {
+    try {
+      sentry?.setUser?.(null);
+    } catch {}
+  }
+}
 
 function loadSentry() {
   if (resolved) return sentry;
@@ -55,6 +68,9 @@ function loadSentry() {
  */
 export function initCrashReporting() {
   if (initialized) return true;
+  // Kullanıcı kapattıysa SDK hiç başlamaz (native çökme raporları da gitmez).
+  // Oturum içinde yeniden açılırsa usageSharing bu fonksiyonu tekrar çağırır.
+  if (!sharingAllowed) return false;
   if (!DSN) {
     if (__DEV__) {
       console.info("[crashReporting] EXPO_PUBLIC_SENTRY_DSN yok — kapalı.");
@@ -89,6 +105,9 @@ export function initCrashReporting() {
       // Kişisel veri gönderme (IP, kullanıcı adı vb.) — KVKK/GDPR beyanını
       // dar tutmak için kapalı. Kullanıcıyı yalnız uid ile etiketliyoruz.
       sendDefaultPii: false,
+      // Oturum sırasında paylaşım kapatılırsa: hiçbir olay/performans kaydı çıkmaz.
+      beforeSend: (event) => (sharingAllowed ? event : null),
+      beforeSendTransaction: (event) => (sharingAllowed ? event : null),
     });
     initialized = true;
     return true;
@@ -100,7 +119,7 @@ export function initCrashReporting() {
 
 /** Oturum açan kullanıcıyı etiketler; çıkışta `null` ile temizlenir. */
 export function setCrashUser(uid) {
-  if (!initialized) return;
+  if (!initialized || !sharingAllowed) return;
   try {
     sentry?.setUser?.(uid ? { id: uid } : null);
   } catch {}
@@ -115,7 +134,7 @@ export function setCrashUser(uid) {
  * `extra` → uzun bağlam (component stack, payload özeti...).
  */
 export function captureError(error, { tags, extra } = {}) {
-  if (!initialized) return;
+  if (!initialized || !sharingAllowed) return;
   try {
     sentry?.captureException?.(
       error instanceof Error ? error : new Error(String(error?.message || error)),
@@ -126,7 +145,7 @@ export function captureError(error, { tags, extra } = {}) {
 
 /** Hata öncesi izi bırakır (hangi ekran, hangi aksiyon). */
 export function addBreadcrumb(message, data) {
-  if (!initialized) return;
+  if (!initialized || !sharingAllowed) return;
   try {
     sentry?.addBreadcrumb?.({ message, data, level: "info" });
   } catch {}

@@ -3,7 +3,7 @@
 // Profile / Lists / Posts / Online Status için privacy seçenekleri.
 // Tüm değerler Users/{uid}.privacy map'inde saklanır.
 
-import React, { memo, useCallback, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,10 @@ import {
   summarizeListVisibility,
 } from "../../../utils/listVisibility";
 import { getListVisibilityCopy } from "./listVisibilityCopy";
+import {
+  isUsageSharingEnabled,
+  setUsageSharingEnabled,
+} from "../../../services/usageSharing";
 
 
 // Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
@@ -117,6 +121,19 @@ export default function PrivacySettingsScreen({ navigation }) {
         buildListVisibilityRows(combinedLists, normalizeListVisible(profile?.listVisible)),
       ),
     [combinedLists, profile?.listVisible],
+  );
+
+  // Cihaza özel tercih (hesaba bağlı değil): anında uygulanır.
+  const [usageSharing, setUsageSharing] = useState(isUsageSharingEnabled);
+  const handleUsageSharing = useCallback(
+    (value) => {
+      try {
+        setUsageSharing(setUsageSharingEnabled(value, profile?.uid || null));
+      } catch (e) {
+        Toast.show({ type: "error", text1: i18nText("autoI18n.ayar_kaydedilemedi", "Ayar kaydedilemedi") });
+      }
+    },
+    [profile?.uid],
   );
 
   const handleChange = useCallback(
@@ -241,6 +258,38 @@ export default function PrivacySettingsScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
           </GlassTouchable>
         </View>
+
+        {/* Kullanım verisi: analitik + hata raporu gönderimini kapatma (cihaza özel). */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <MaterialCommunityIcons name="chart-box-outline" size={16} color={theme.accent} />
+            <Text style={[styles.sectionTitle, { color: theme.text.primary }]}>
+              {i18nText("autoI18n.kullanim_verisi", "Kullanım verisi")}
+            </Text>
+          </View>
+          <View style={[styles.linkRow, styles.usageRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <View style={[styles.optionIcon, { backgroundColor: theme.primary }]}>
+              <Ionicons name="analytics-outline" size={18} color={theme.text.secondary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.optionLabel, { color: theme.text.primary, fontWeight: "600" }]}>
+                {i18nText("autoI18n.kullanim_verisi_paylas", "İstatistik ve hata raporlarını paylaş")}
+              </Text>
+              <Text style={[styles.optionDesc, { color: theme.text.secondary }]}>
+                {i18nText(
+                  "autoI18n.kullanim_verisi_paylas_alt",
+                  "Uygulamayı geliştirmek için anonim kullanım istatistikleri ve çökme raporları gönderilir. Kapatırsan bu cihazdan gönderilmez.",
+                )}
+              </Text>
+            </View>
+            <Switch
+              testID="usage-sharing-toggle"
+              value={usageSharing}
+              onValueChange={handleUsageSharing}
+              trackColor={{ true: theme.accent, false: theme.border }}
+            />
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -296,6 +345,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 6,
   },
+  usageRow: { marginTop: 0 },
   optionLabel: { fontSize: 15 },
   optionDesc: { fontSize: 12, marginTop: 2, lineHeight: 16 },
 });

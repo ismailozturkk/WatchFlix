@@ -93,6 +93,7 @@ import SplashLensIntro from "./components/SplashLensIntro";
 import { FALLBACK_EXIT_MS, MIN_VISIBLE_MS } from "./utils/splashMotion";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
+import { installAxiosDefaults } from "./utils/axiosDefaults";
 import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
 import { installTmdbKeyHealth } from "./utils/tmdbKeyHealth";
 import { installTmdbTitleFallback } from "./utils/tmdbTitleFallback";
@@ -105,6 +106,7 @@ import {
   setCrashUser,
   wrapRoot,
 } from "./services/crashReporting";
+import { applyUsageSharingPreference } from "./services/usageSharing";
 import {
   USER_PROPERTIES,
   setAnalyticsUser,
@@ -126,6 +128,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 // kararını eziyordu.
 
 enableFreeze(true);
+// Süre vermeyen isteklere 15 sn tavan (axios varsayılanı sınırsız).
+installAxiosDefaults();
 installAxiosDataCache();
 // SIRA: önbellekten SONRA kurulmalı — önbelleğe ham cevap yazılsın, yetişkin
 // süzmesi hem taze hem önbellekten gelen cevaba uygulansın.
@@ -152,6 +156,9 @@ try {
 
 // Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font
 // yükleme, provider'lar) hatası yakalanabilsin. DSN yoksa sessiz no-op.
+// Önce kullanıcının paylaşım tercihi: kapalıysa Sentry hiç başlamaz, analitik
+// toplaması kapatılır (Gizlilik Ayarları → services/usageSharing.js).
+applyUsageSharingPreference();
 initCrashReporting();
 // Sessizce yutulan Firestore snapshot hatalarını raporlayıcıya bağla
 // (utils/firestoreError.js saf kalsın diye enjeksiyonla).

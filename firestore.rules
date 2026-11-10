@@ -1140,11 +1140,11 @@ service cloud.firestore {
     }
 
     // ─── Presence (online status, ayrı koleksiyon) ──────────────────────
-    // Heartbeat'i Users üzerindeki listener fan-out'undan kaçırmak için
-    // ayrı koleksiyon. Tüm signed-in kullanıcılar okur (privacy filtresi
-    // UI tarafında); sadece sahibi yazar.
+    // ESKİ modelin kalıntısı: çevrimiçi durumu özelliği kaldırıldı (10 Kas 2026),
+    // güncel istemci bu koleksiyonu yalnız hesap silerken temizler. Eskiden oturum
+    // açan herkes herkesin durumunu okuyabiliyordu; artık yalnız sahibi.
     match /Presence/{uid} {
-      allow read: if isSignedIn();
+      allow read: if isOwner(uid);
       allow create, update, delete: if isOwner(uid);
     }
 
