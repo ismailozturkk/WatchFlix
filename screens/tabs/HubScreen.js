@@ -52,12 +52,14 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { i18nText } from "@utils/i18nText";
 import { getWatchChallengesCopy } from "@utils/watchChallengesCopy";
 import { getTierListCopy } from "@utils/tierListCopy";
+import { isBetaFeature } from "@utils/betaFeatures";
 
 // Başlık + kart: bölüm genişliği ve başlık hizası tek yerde.
-function HubSection({ title, theme, children }) {
+// `id`: bölüm anahtarı; utils/betaFeatures.js'te varsa başlığın yanında BETA rozeti.
+function HubSection({ id, title, theme, children }) {
   return (
     <View style={styles.section}>
-      <SectionHeader title={title} theme={theme} style={styles.sectionHeader} />
+      <SectionHeader title={title} theme={theme} style={styles.sectionHeader} beta={isBetaFeature(id)} />
       {children}
     </View>
   );
@@ -131,63 +133,63 @@ export default function HubScreen({ navigation }) {
 
         {/* Haftalık Lig — en üstte: sıran, XP'n, kalan süre */}
         {show("league") && (
-          <HubSection title={i18nText("autoI18n.haftalik_lig_bolum", "Haftalık Lig")} theme={theme}>
+          <HubSection id="league" title={i18nText("autoI18n.haftalik_lig_bolum", "Haftalık Lig")} theme={theme}>
             <LeagueWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Sosyal */}
         {show("feed") && (
-          <HubSection title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
+          <HubSection id="feed" title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
             <FeedWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Turnuva — Sosyal'in hemen altında (2. sıra) */}
         {show("tournament") && (
-          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
+          <HubSection id="tournament" title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
             <TournamentWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* CineSwipe (Birlikte Ne İzlesek?) */}
         {show("cineswipe") && (
-          <HubSection title="CINESWIPE" theme={theme}>
+          <HubSection id="cineswipe" title="CINESWIPE" theme={theme}>
             <CineSwipeWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Sinema Bingosu (haftalık kart) */}
         {show("bingo") && (
-          <HubSection title="BINGO" theme={theme}>
+          <HubSection id="bingo" title="BINGO" theme={theme}>
             <BingoWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Günün Sorusu (iki seçenekli günlük anket) */}
         {show("poll") && (
-          <HubSection title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
+          <HubSection id="poll" title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
             <DailyPollWidget />
           </HubSection>
         )}
 
         {/* Seelogd Top 100 (film + dizi topluluk sıralaması; oy, liste kaydı, sohbete gönder) */}
         {show("top100") && (
-          <HubSection title="SEELOGD TOP 100" theme={theme}>
+          <HubSection id="top100" title="SEELOGD TOP 100" theme={theme}>
             <Top100Widget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Meydan okumalar (52 haftada 52 film, her on yıldan bir film, yönetmen filmografisi…) */}
         {show("challenges") && (
-          <HubSection title={getWatchChallengesCopy(language).sectionTitle} theme={theme}>
+          <HubSection id="challenges" title={getWatchChallengesCopy(language).sectionTitle} theme={theme}>
             <ChallengesWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Tier list (film / dizi kademeli sıralama; görsel ve sohbet paylaşımı) */}
         {show("tierlist") && (
-          <HubSection title={getTierListCopy(language).sectionTitle} theme={theme}>
+          <HubSection id="tierlist" title={getTierListCopy(language).sectionTitle} theme={theme}>
             <TierListWidget navigation={navigation} />
           </HubSection>
         )}

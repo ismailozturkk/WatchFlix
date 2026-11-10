@@ -6,6 +6,7 @@ import { GlowBackdrop } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import BackButton from "@components/BackButton";
+import BetaBadge from "@components/common/BetaBadge";
 
 /**
  * Oyun ekranlarının ortak kabuğu: üstte vurgu ışığı, geri + başlık satırı,
@@ -24,6 +25,7 @@ export function GameScreenShell({
   headerRight,
   footer,
   glow = true,
+  beta = false,
 }) {
   const { theme } = useTheme();
   // scroll=false durumunda icerik tum alani kaplar; boylece icerideki bir
@@ -36,9 +38,12 @@ export function GameScreenShell({
       <View style={styles.header}>
         <BackButton absolute={false} onPress={onBack || (() => navigation.goBack())} />
         <View style={styles.headerCopy}>
-          <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>
-            {title}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.title, styles.titleText, { color: theme.text.primary }]} numberOfLines={1}>
+              {title}
+            </Text>
+            {beta ? <BetaBadge /> : null}
+          </View>
           {subtitle ? (
             <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
               {subtitle}
@@ -78,6 +83,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { minHeight: 70, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   headerCopy: { flex: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  titleText: { flexShrink: 1 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { fontSize: 24, fontWeight: "900", letterSpacing: -0.3 },
   subtitle: { fontSize: 12, fontWeight: "650", marginTop: 2 },

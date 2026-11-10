@@ -17,6 +17,8 @@ import { formatRemaining, nextDayStartMs } from "@utils/dailyChallenge";
 import { FRAME_MAX_GUESSES } from "@utils/dailyFrame";
 import { getFrameCopy } from "@utils/dailyFrameCopy";
 import { PressableScale } from "./ui";
+import BetaBadge from "../common/BetaBadge";
+import { isBetaFeature } from "@utils/betaFeatures";
 import { upperText } from "@utils/i18nText";
 
 const COLORS = ["#312E81", "#4F46E5", "#7C3AED"];
@@ -74,8 +76,11 @@ function DailyFrameCard({ onPlay, locked = false }) {
               {upperText(copy.title)}
             </Text>
           </View>
-          <View style={styles.numberBadge}>
-            <Text style={styles.numberText} allowFontScaling={false}>{`#${summary.number}`}</Text>
+          <View style={styles.topRight}>
+            {isBetaFeature("daily_frame") ? <BetaBadge tone="onDark" compact /> : null}
+            <View style={styles.numberBadge}>
+              <Text style={styles.numberText} allowFontScaling={false}>{`#${summary.number}`}</Text>
+            </View>
           </View>
         </View>
 
@@ -156,6 +161,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
   },
   badgeText: { flexShrink: 1, color: "#FFFFFF", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.9 },
+  topRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   numberBadge: { minWidth: 40, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, alignItems: "center", backgroundColor: "rgba(255,255,255,0.14)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
   numberText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900" },
   title: { color: "#FFFFFF", fontSize: 20, lineHeight: 24, fontWeight: "900", letterSpacing: -0.35, marginTop: 11, maxWidth: "78%" },

@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { alpha } from "../../theme/colors";
 import useGlassChrome from "../common/useGlassChrome";
+import BetaBadge from "../common/BetaBadge";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING = { mass: 0.4, damping: 14, stiffness: 220 };
@@ -89,12 +90,22 @@ export function StatPill({ icon, iconColor, value, label, theme, tone = "surface
 }
 
 /** Bölüm başlığı + (isteğe bağlı) sağ aksiyon. */
-export function SectionHeader({ title, action, onAction, theme, style }) {
+export function SectionHeader({ title, action, onAction, theme, style, beta = false }) {
+  const titleNode = (
+    <Text style={[styles.sectionTitle, { color: theme.text.muted }]} allowFontScaling={false}>
+      {title}
+    </Text>
+  );
   return (
     <View style={[styles.sectionHeader, style]}>
-      <Text style={[styles.sectionTitle, { color: theme.text.muted }]} allowFontScaling={false}>
-        {title}
-      </Text>
+      {beta ? (
+        <View style={styles.sectionTitleRow}>
+          {titleNode}
+          <BetaBadge />
+        </View>
+      ) : (
+        titleNode
+      )}
       {action ? (
         <Pressable accessibilityRole="button" hitSlop={10} onPress={onAction} style={styles.sectionActionWrap}>
           <Text style={[styles.sectionAction, { color: theme.accent }]} allowFontScaling={false}>
@@ -139,6 +150,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionTitle: { fontSize: 12, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
   sectionActionWrap: { flexDirection: "row", alignItems: "center", gap: 2 },
   sectionAction: { fontSize: 12, fontWeight: "800" },
 });

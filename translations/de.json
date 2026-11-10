@@ -3304,6 +3304,8 @@
     "sinema_karti_paylas_baslik": "Teile deine Kinokarte",
     "paylasim_desteklenmiyor": "Teilen wird auf diesem Gerät nicht unterstützt.",
     "language_coming_soon": "Demnächst",
+    "beta_rozet": "Beta",
+    "beta_rozet_aciklama": "Diese Funktion ist noch in Entwicklung (Beta)",
     "language_more_soon_hint": "Wir arbeiten an weiteren Sprachen",
     "filtre_tur_tumunu_goster": "Alle anzeigen ({{n}})",
     "profil_duzenleme_modu_baslik": "Bearbeitungsmodus",

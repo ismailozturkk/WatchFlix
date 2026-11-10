@@ -28,6 +28,8 @@ import { getFilmChainCopy } from "@utils/filmChainCopy";
 import { QUICK_GAME_IDS, QUICK_GAME_META, normalizeQuickStats } from "@utils/quickGames";
 import { getQuickCopy } from "@utils/quickGamesCopy";
 import GamePreview from "./GamePreviews";
+import BetaBadge from "../common/BetaBadge";
+import { isBetaFeature } from "@utils/betaFeatures";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const GOLD = "#FFD76A";
@@ -78,6 +80,12 @@ function GameCard({ tile, best, copy, onOpen, style }) {
             style={StyleSheet.absoluteFillObject}
           />
         </View>
+
+        {isBetaFeature(tile.id) ? (
+          <View pointerEvents="none" style={styles.betaCorner}>
+            <BetaBadge tone="onDark" compact />
+          </View>
+        ) : null}
 
         <View pointerEvents="none" style={styles.gameIcon}>
           <AppIcon family="Ionicons" name={cardIcon} size={14} color="#FFFFFF" />
@@ -273,6 +281,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
+  betaCorner: { position: "absolute", top: 15, left: 15, zIndex: 2 },
   gameIcon: {
     position: "absolute",
     top: 16,

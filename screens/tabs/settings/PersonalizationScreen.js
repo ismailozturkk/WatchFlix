@@ -29,6 +29,8 @@ import {
   useEffectMode,
 } from "@services/effectSettings";
 import { i18nText } from "@utils/i18nText";
+import BetaBadge from "@components/common/BetaBadge";
+import { isBetaFeature } from "@utils/betaFeatures";
 import useWeatherSettings from "@hooks/useWeatherSettings";
 import { WEATHER_ICONS, weatherChoiceLabel } from "@components/settings/AtmosphereControls";
 import { isDecorCustomized } from "@utils/decorScopes";
@@ -280,6 +282,7 @@ export default function PersonalizationScreen() {
           background={showSnow ? null : <SnowPreview />}
           right={
             <View style={ps.rowRightGroup}>
+              {isBetaFeature("atmosphere") ? <BetaBadge /> : null}
               {snowAllowed ? null : <PremiumPill />}
               <Chevron color={C.muted} />
             </View>

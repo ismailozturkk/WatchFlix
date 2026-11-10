@@ -40,6 +40,8 @@ import Constants from "expo-constants";
 import CountryFlag from "react-native-country-flag";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import BetaBadge from "../../components/common/BetaBadge";
+import { isBetaFeature } from "../../utils/betaFeatures";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
@@ -752,7 +754,16 @@ export default function SettingsScreen() {
             title={t.snow}
             subtitle={t.snowSubtitle}
             onPress={() => navigation.navigate("AtmosphereScreen")}
-            right={<Chevron color={C.muted} />}
+            right={
+              isBetaFeature("atmosphere") ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <BetaBadge />
+                  <Chevron color={C.muted} />
+                </View>
+              ) : (
+                <Chevron color={C.muted} />
+              )
+            }
           />
           <SettingRow
             colors={C}

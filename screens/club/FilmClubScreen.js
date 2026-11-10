@@ -68,6 +68,7 @@ import { canManageGroup } from "@utils/groupRoles";
 import { GLASS_PRESS_ROOM } from "@utils/liquidGlass";
 import { buildTmdbUrl } from "@utils/tmdbImageUtils";
 import { GameScreenShell, gameSharedStyles } from "../game/GameScreenShell";
+import { isBetaFeature } from "@utils/betaFeatures";
 import usePosterCorner from "@hooks/usePosterCorner";
 import { percentText } from "@utils/i18nText";
 
@@ -809,7 +810,7 @@ export default function FilmClubScreen({ navigation, route }) {
   }
 
   return (
-    <GameScreenShell navigation={navigation} title={copy.title} subtitle={subtitle}>
+    <GameScreenShell navigation={navigation} title={copy.title} subtitle={subtitle} beta={isBetaFeature("film_club")}>
       {body}
       <ClubCandidatePicker
         visible={pickerOpen}
