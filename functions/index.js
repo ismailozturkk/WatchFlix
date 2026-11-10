@@ -70,6 +70,7 @@ const {
 const { createSocialPush } = require("./socialPush");
 const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
+const betaAccess = require("./betaAccess");
 const userSearch = require("./userSearch");
 const publicBoards = require("./publicBoards");
 const siteStats = require("./siteStats");
@@ -799,6 +800,110 @@ exports.expirePromoGrants = onSchedule(
       }
     }
     console.log(`[expirePromoGrants] ${cleared}/${expired.size} cleared`);
+  },
+);
+
+// ─── Beta dönemi: herkes Premium Max ─────────────────────────────────────────
+// Kural ve açma/kapatma: functions/betaAccess.js. Yazım promosyon mekanizmasıyla yapılır.
+
+/** Hesaba beta Max'ini yazar; verilen hak BetaGrants/{uid}'de izlenir. @returns {Promise<boolean>} */
+async function grantBetaAccess(uid, entitlements) {
+  const nowMs = Date.now();
+  if (!betaAccess.needsBetaGrant(entitlements, betaAccess.BETA_ACCESS, nowMs)) return false;
+  let state = FREE_PLAN_STATE;
+  if (referral.hasActiveStoreSubscription(entitlements)) {
+    // Abone olanın mağaza planı bilinmeden Free yazılmaz; ulaşılamazsa sonraki süpürmede denenir.
+    state = await fetchRevenueCatPremiumState(uid);
+  }
+  const untilMs = betaAccess.betaGrantUntilMs(entitlements, betaAccess.BETA_ACCESS, nowMs);
+  const batch = db.batch();
+  writeEntitlements(batch, uid, state, {
+    source: "promo",
+    currentEntitlements: entitlements,
+    promoUntilMs: untilMs,
+    promoPlan: betaAccess.BETA_ACCESS.plan,
+  });
+  batch.set(db.doc(`BetaGrants/${uid}`), {
+    untilMs,
+    grantedAt: FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+  return true;
+}
+
+// Yeni hesap açılır açılmaz Max (süpürmeyi beklemeden).
+exports.grantBetaOnUserCreated = onDocumentCreated(
+  { ...CAPACITY.trigger, document: "Users/{uid}", secrets: [REVENUECAT_SECRET_API_KEY] },
+  async (event) => {
+    if (!betaAccess.isBetaActive()) return;
+    try {
+      await grantBetaAccess(event.params.uid, event.data?.get("entitlements"));
+    } catch (error) {
+      console.warn(`[grantBetaOnUserCreated] uid=${event.params.uid}:`, error?.message);
+    }
+  },
+);
+
+// Mevcut hesaplar: beta açıkken hepsine verir, kapanınca betadan gelen hakları geri alır.
+exports.applyBetaAccess = onSchedule(
+  {
+    ...CAPACITY.singleton,
+    schedule: "every 60 minutes",
+    timeZone: "Etc/UTC",
+    timeoutSeconds: 540,
+    secrets: [REVENUECAT_SECRET_API_KEY],
+  },
+  async () => {
+    const nowMs = Date.now();
+    if (betaAccess.isBetaActive(betaAccess.BETA_ACCESS, nowMs)) {
+      let granted = 0;
+      let scanned = 0;
+      let last = null;
+      for (;;) {
+        let query = db.collection("Users").select("entitlements").orderBy("__name__").limit(300);
+        if (last) query = query.startAfter(last);
+        const page = await query.get();
+        if (page.empty) break;
+        for (const doc of page.docs) {
+          scanned += 1;
+          try {
+            if (await grantBetaAccess(doc.id, doc.get("entitlements"))) granted += 1;
+          } catch (error) {
+            console.warn(`[applyBetaAccess] uid=${doc.id}:`, error?.message);
+          }
+        }
+        last = page.docs[page.docs.length - 1];
+      }
+      console.log(`[applyBetaAccess] açık: ${granted} verildi / ${scanned} hesap`);
+      return;
+    }
+    // Beta kapalı ya da bitti: izlenen hakları geri al (bitişi değişmiş olanlara dokunma).
+    const grants = await db.collection("BetaGrants").limit(200).get();
+    let revoked = 0;
+    for (const grantDoc of grants.docs) {
+      try {
+        const userSnap = await db.doc(`Users/${grantDoc.id}`).get();
+        const entitlements = userSnap.get("entitlements");
+        if (userSnap.exists && betaAccess.shouldRevokeBetaGrant(grantDoc.data(), entitlements, nowMs)) {
+          let state = FREE_PLAN_STATE;
+          if (referral.hasActiveStoreSubscription(entitlements)) {
+            state = await fetchRevenueCatPremiumState(grantDoc.id);
+          }
+          const batch = db.batch();
+          writeEntitlements(batch, grantDoc.id, state, {
+            source: "revenuecat_sync",
+            currentEntitlements: entitlements,
+            promoUntilMs: nowMs - 1,
+          });
+          await batch.commit();
+          revoked += 1;
+        }
+        await grantDoc.ref.delete();
+      } catch (error) {
+        console.warn(`[applyBetaAccess] geri alma uid=${grantDoc.id}:`, error?.message);
+      }
+    }
+    console.log(`[applyBetaAccess] kapalı: ${revoked} geri alındı / ${grants.size} kayıt`);
   },
 );
 
