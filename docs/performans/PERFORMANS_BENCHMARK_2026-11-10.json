@@ -1,0 +1,129 @@
+{
+  "method": "Synthetic Node/V8 microbenchmark; 3 warmups, 7 samples; no disk/network/UI/GPU measurement",
+  "node": "v22.21.1",
+  "cpu": "Intel(R) Core(TM) Ultra 7 155H",
+  "platform": "win32",
+  "seasonRows": [
+    {
+      "totalEpisodes": 24,
+      "renderedRows": 24,
+      "repeatedMaterialization": {
+        "medianMs": 1.508,
+        "maxMs": 4.119
+      },
+      "buildIndexAndLookup": {
+        "medianMs": 0.015,
+        "maxMs": 0.016
+      }
+    },
+    {
+      "totalEpisodes": 240,
+      "renderedRows": 24,
+      "repeatedMaterialization": {
+        "medianMs": 8.133,
+        "maxMs": 8.569
+      },
+      "buildIndexAndLookup": {
+        "medianMs": 0.078,
+        "maxMs": 0.083
+      }
+    },
+    {
+      "totalEpisodes": 1000,
+      "renderedRows": 50,
+      "repeatedMaterialization": {
+        "medianMs": 86.651,
+        "maxMs": 90.001
+      },
+      "buildIndexAndLookup": {
+        "medianMs": 0.471,
+        "maxMs": 0.657
+      }
+    }
+  ],
+  "libraryRows": [
+    {
+      "movieCount": 100,
+      "totalEpisodes": 1000,
+      "jsonBytes": 162192,
+      "doubleParse": {
+        "medianMs": 3.056,
+        "maxMs": 5.04
+      },
+      "sameJson": {
+        "medianMs": 1.926,
+        "maxMs": 2.268
+      },
+      "profileDerivations": {
+        "medianMs": 4.42,
+        "maxMs": 8.605
+      },
+      "watchScore": {
+        "medianMs": 5.476,
+        "maxMs": 7.211
+      }
+    },
+    {
+      "movieCount": 1000,
+      "totalEpisodes": 5000,
+      "jsonBytes": 872332,
+      "doubleParse": {
+        "medianMs": 13.473,
+        "maxMs": 17.034
+      },
+      "sameJson": {
+        "medianMs": 10.561,
+        "maxMs": 11.71
+      },
+      "profileDerivations": {
+        "medianMs": 15.505,
+        "maxMs": 22.665
+      },
+      "watchScore": {
+        "medianMs": 16.238,
+        "maxMs": 20.95
+      }
+    },
+    {
+      "movieCount": 5000,
+      "totalEpisodes": 20000,
+      "jsonBytes": 3624182,
+      "doubleParse": {
+        "medianMs": 31.036,
+        "maxMs": 34.163
+      },
+      "sameJson": {
+        "medianMs": 32.852,
+        "maxMs": 34.732
+      },
+      "profileDerivations": {
+        "medianMs": 60.512,
+        "maxMs": 94.965
+      },
+      "watchScore": {
+        "medianMs": 65.07,
+        "maxMs": 76.154
+      }
+    }
+  ],
+  "imageExamplesAtDpr3": [
+    {
+      "type": "still",
+      "width": 300,
+      "quality": "good",
+      "result": "original"
+    },
+    {
+      "type": "backdrop",
+      "width": 1000,
+      "quality": "good",
+      "result": "original"
+    },
+    {
+      "type": "poster",
+      "width": 200,
+      "quality": "good",
+      "result": "w780"
+    }
+  ]
+}
