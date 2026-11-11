@@ -23,6 +23,7 @@
 import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
 import { POSTER_CORNER_SCALES } from "../../utils/posterCorners";
 import { POSTER_SIZES } from "../../utils/posterSizes";
+import { IMAGE_QUALITY_LEVELS } from "../../utils/imageQuality";
 import { WEATHER_CHOICES } from "../../utils/weatherParticles";
 import {
   DEFAULT_HAPTIC_INTENSITY,
@@ -208,7 +209,10 @@ const settingsKeys = {
   imageQualityLevel: {
     key: "imageQualityLevel",
     type: TYPES.string,
-    default: "good",
+    // "auto": afiş boyutu + ekran + bağlantıya göre (utils/imageQuality). Kayıtlı
+    // elle seçim korunur; yalnız hiç seçmemiş kullanıcı otomatiğe geçer.
+    default: "auto",
+    validate: (v) => IMAGE_QUALITY_LEVELS.includes(v),
     // Eski kayıt TMDB genişliğini tutuyordu ("w500"); yeni kayıt kalite adını.
     legacy: [
       {

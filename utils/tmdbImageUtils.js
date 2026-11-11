@@ -1,4 +1,5 @@
 import { PixelRatio } from 'react-native';
+import { IMAGE_QUALITY_AUTO, autoImageDensity } from './imageQuality';
 
 /**
  * TMDB Image Sizes
@@ -32,10 +33,11 @@ const QUALITY_MULTIPLIERS = {
  * 
  * @param {string} type - 'poster' | 'backdrop' | 'logo' | 'profile' | 'still'
  * @param {number} expectedWidth - The width of the image component on the screen in logical pixels.
- * @param {string} qualityLevel - 'low' | 'medium' | 'good' | 'high' | 'original'
+ * @param {string} qualityLevel - 'auto' | 'low' | 'medium' | 'good' | 'high' | 'original'
+ * @param {object} [autoContext] - 'auto' için { pixelRatio, metered, tier } (utils/imageQuality)
  * @returns {string} - The exact TMDB size path part (e.g., 'w185', 'w780', 'original')
  */
-export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good') => {
+export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good', autoContext) => {
   if (qualityLevel === 'original') return 'original';
   // Bilinçli tam boy isteği (galeri yakınlaştırma / indirme): genişlik yerine "original".
   if (expectedWidth === 'original') return 'original';
@@ -47,7 +49,10 @@ export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good') =
   // hiçbir kartın ihtiyaç duymadığı 2–6 MB'lık dosya iniyordu).
   if (!Number.isFinite(expectedWidth) || expectedWidth <= 0) return largestSize;
 
-  const multiplier = QUALITY_MULTIPLIERS[qualityLevel] || QUALITY_MULTIPLIERS.good;
+  const isAuto = qualityLevel === IMAGE_QUALITY_AUTO;
+  const multiplier = isAuto
+    ? autoImageDensity({ pixelRatio: PixelRatio.get(), ...autoContext }, expectedWidth)
+    : QUALITY_MULTIPLIERS[qualityLevel] || QUALITY_MULTIPLIERS.good;
   const targetPixels = expectedWidth * multiplier;
 
   // Find the smallest size that is greater than or equal to targetPixels
@@ -77,8 +82,8 @@ export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good') =
  * @param {string} qualityLevel - The user's preferred quality string.
  * @returns {string|null} - The full URI, or null if no path.
  */
-export const buildTmdbUrl = (path, type, expectedWidth, qualityLevel) => {
+export const buildTmdbUrl = (path, type, expectedWidth, qualityLevel, autoContext) => {
   if (!path) return null;
-  const sizeString = getOptimalTmdbSize(type, expectedWidth, qualityLevel);
+  const sizeString = getOptimalTmdbSize(type, expectedWidth, qualityLevel, autoContext);
   return `https://image.tmdb.org/t/p/${sizeString}${path}`;
 };

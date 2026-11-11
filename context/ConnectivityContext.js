@@ -26,9 +26,15 @@ export const subscribeOnline = (listener) => {
   return () => onlineListeners.delete(listener);
 };
 
+// Ölçülü bağlantı (mobil veri / ölçülü Wi‑Fi): otomatik görsel kalitesi bunu
+// görünce yoğunluğu kısar (utils/imageQuality.js).
+export const isMeteredConnection = (state) =>
+  state?.type === "cellular" || state?.details?.isConnectionExpensive === true;
+
 const ConnectivityContext = createContext({
   isOnline: true,
   isInternetReachable: true,
+  isMetered: false,
 });
 
 export const useConnectivity = () => useContext(ConnectivityContext);
@@ -36,6 +42,7 @@ export const useConnectivity = () => useContext(ConnectivityContext);
 export const ConnectivityProvider = ({ children }) => {
   const [isOnline, setIsOnline] = useState(true);
   const [isInternetReachable, setIsInternetReachable] = useState(true);
+  const [isMetered, setIsMetered] = useState(false);
 
   useEffect(() => {
     const apply = (state) => {
@@ -55,6 +62,8 @@ export const ConnectivityProvider = ({ children }) => {
       }
       setIsOnline(online);
       setIsInternetReachable(reachable);
+      // Çevrimdışıyken son bilinen değer korunur (görsel adresleri boşuna değişmesin).
+      if (state?.isConnected) setIsMetered(isMeteredConnection(state));
     };
 
     NetInfo.fetch().then(apply).catch(() => {});
@@ -63,8 +72,8 @@ export const ConnectivityProvider = ({ children }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ isOnline, isInternetReachable }),
-    [isOnline, isInternetReachable],
+    () => ({ isOnline, isInternetReachable, isMetered }),
+    [isOnline, isInternetReachable, isMetered],
   );
 
   return (

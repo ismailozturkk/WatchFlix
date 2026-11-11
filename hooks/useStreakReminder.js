@@ -5,7 +5,8 @@
 // ya da kullanıcı alevin sayfasından hatırlatıcıyı kapatınca bildirim iptal olur.
 // Ne zaman gideceği utils/streakReminder.js'te (saf); zamanlama köprü üzerinden
 // (utils/streakBridge → services/streakRuntime). OS izni yoksa hiçbir şey olmaz;
-// izin İSTENMEZ (izin akışı bildirim ayarlarının işi).
+// izin İSTENMEZ (izin akışı bildirim ayarlarının işi). Bildirim ana anahtarı ya da
+// hatırlatma anahtarı kapalıysa da planlanmaz.
 //
 // WatchProgressProvider içinde, seri kutlamasıyla aynı yerde koşar.
 
@@ -22,7 +23,14 @@ export default function useStreakReminder({ seriler }) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const uid = user?.uid;
-  const on = useStored(Keys.streakReminder, { uid }) !== false;
+  const streakOn = useStored(Keys.streakReminder, { uid }) !== false;
+  // Ayarlar > Bildirimler: "Tüm bildirimler" ve "Hatırlatma bildirimleri"
+  // kapalıysa seri hatırlatması da gitmez (film/dizi/not hatırlatmalarıyla aynı
+  // kural, bkz. DeviceNotificationsContext). Depodan okunur — sağlayıcıya bağlı
+  // değil; kayıt yoksa (null) ikisi de varsayılan açık.
+  const notif = useStored(Keys.notificationSettings);
+  const on =
+    streakOn && notif?.enabled !== false && notif?.remindersEnabled !== false;
 
   useEffect(() => {
     if (!uid || !seriler) return;

@@ -1,7 +1,7 @@
 // screens/tabs/settings/ReminderNotificationsScreen.js
 //
 // Ayarlar > Bildirimler > Hatırlatmalar. Yerel hatırlatma bildirimleri
-// (film/dizi/not) + zamanlama (lead-time) + Android pil optimizasyonu uyarısı.
+// (film/dizi/not/haftalık seri) + zamanlama (lead-time) + Android pil optimizasyonu uyarısı.
 // Ana anahtar (tüm bildirimler) burada da var — hem hatırlatma hem sosyal onu paylaşır.
 
 import React from "react";
@@ -19,6 +19,9 @@ import {
   useNotificationSettings,
 } from "@context/AppSettingsContext";
 import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
+import { useAuth } from "@context/AuthContext";
+import { Keys, useStored, set as setStored } from "@services/storage";
+import { getStreakFlameCopy } from "@utils/streakFlameCopy";
 import { i18nText } from "@utils/i18nText";
 import { pickByLanguage } from "@utils/appLanguages";
 import { getFeatureLimit } from "@utils/premiumFeatures";
@@ -71,6 +74,14 @@ export default function ReminderNotificationsScreen() {
   const remindersEnabled =
     notificationsEnabled && notificationSettings.remindersEnabled;
   const updateNotifications = (patch) => changeNotificationSettings(patch);
+
+  // Haftalık seri hatırlatması: hesaba bağlı ayrı anahtar (alevin sayfasındakiyle
+  // AYNI kayıt, bkz. hooks/useStreakActions.js). Ana/hatırlatma anahtarı kapalıysa
+  // planlanmaz (hooks/useStreakReminder.js).
+  const { user } = useAuth();
+  const uid = user?.uid;
+  const streakReminderOn = useStored(Keys.streakReminder, { uid }) !== false;
+  const streakCopy = getStreakFlameCopy(language);
 
   const handleToggleMaster = async (enabled) => {
     updateNotifications({ enabled });
@@ -182,6 +193,24 @@ export default function ReminderNotificationsScreen() {
             />
           }
         />
+        {uid ? (
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="flame-outline"
+            title={streakCopy.reminderTitle}
+            subtitle={streakCopy.reminderHint}
+            right={
+              <SwitchToggle
+                value={remindersEnabled && streakReminderOn}
+                onValueChange={(v) => setStored(Keys.streakReminder, v, { uid })}
+                disabled={!remindersEnabled}
+                size={36}
+              />
+            }
+          />
+        ) : null}
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}

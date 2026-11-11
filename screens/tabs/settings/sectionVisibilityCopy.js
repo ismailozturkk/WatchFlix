@@ -99,7 +99,7 @@ const tr = {
     profile: {
       banner: ["Arka plan afişi", "Profilinin üstündeki kapak görseli. Yalnız sende gizlenir, arkadaşların görmeye devam eder"],
       goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
-      streak: ["Seri alevi", "Art arda 3 gün ve üzeri izleyince adının yanında yanan alev"],
+      streak: ["Seri alevi", "Haftada en az 2 farklı gün izledikçe adının yanında yanan haftalık seri alevi"],
       socialLinks: ["Hesap bağlantıları", "Adının altındaki sosyal hesap bağlantıların. Yalnız sende gizlenir; kimin göreceği Gizlilik ayarlarında"],
       badges: ["Rozetler", "İzleme puanın, Perde seviyen ve rozet şeridin"],
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
@@ -197,7 +197,7 @@ const en = {
     profile: {
       banner: ["Background poster", "The cover image at the top of your profile. Hidden only for you, friends still see it"],
       goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
-      streak: ["Streak flame", "The flame next to your name after watching 3 or more days in a row"],
+      streak: ["Streak flame", "Your weekly streak flame next to your name, kept alive by watching on at least 2 different days a week"],
       socialLinks: ["Account links", "Your social account links under your name. Hidden only for you; who can see them is set in Privacy"],
       badges: ["Badges", "Your watch score, Perde level and badge strip"],
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
@@ -295,7 +295,7 @@ const es = {
     profile: {
       banner: ["Póster de fondo", "La imagen de portada arriba de tu perfil. Solo se oculta para ti, tus amigos la siguen viendo"],
       goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
-      streak: ["Llama de racha", "La llama junto a tu nombre al ver 3 días o más seguidos"],
+      streak: ["Llama de racha", "La llama de tu racha semanal junto a tu nombre; sigue encendida si ves algo al menos 2 días distintos por semana"],
       socialLinks: ["Enlaces de cuentas", "Los enlaces a tus redes bajo tu nombre. Solo se ocultan para ti; quién los ve se elige en Privacidad"],
       badges: ["Insignias", "Tu puntuación de visionado, tu nivel Perde y tus insignias"],
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
@@ -393,7 +393,7 @@ const pt = {
     profile: {
       banner: ["Pôster de fundo", "A imagem de capa no topo do seu perfil. Só fica oculta para você, seus amigos continuam vendo"],
       goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
-      streak: ["Chama da sequência", "A chama ao lado do seu nome ao assistir 3 dias ou mais seguidos"],
+      streak: ["Chama da sequência", "A chama da sua sequência semanal ao lado do seu nome; continua acesa se você assistir em pelo menos 2 dias diferentes por semana"],
       socialLinks: ["Links de contas", "Os links das suas redes abaixo do seu nome. Só ficam ocultos para você; quem vê é definido em Privacidade"],
       badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
@@ -491,7 +491,7 @@ const de = {
     profile: {
       banner: ["Hintergrundposter", "Das Titelbild oben in deinem Profil. Nur für dich ausgeblendet, Freunde sehen es weiterhin"],
       goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
-      streak: ["Serienflamme", "Die Flamme neben deinem Namen, wenn du 3 oder mehr Tage in Folge schaust"],
+      streak: ["Serienflamme", "Die Flamme deiner Wochenserie neben deinem Namen; sie brennt weiter, wenn du an mindestens 2 verschiedenen Tagen pro Woche schaust"],
       socialLinks: ["Kontoverknüpfungen", "Deine Social-Media-Links unter deinem Namen. Nur für dich ausgeblendet; wer sie sieht, legst du unter Datenschutz fest"],
       badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],

@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-glass-effect/ios/GlassView.swift b/node_modules/expo-glass-effect/ios/GlassView.swift
-index 1130937..687d3e0 100644
+index 862c16a..0815de0 100644
 --- a/node_modules/expo-glass-effect/ios/GlassView.swift
 +++ b/node_modules/expo-glass-effect/ios/GlassView.swift
 @@ -11,6 +11,11 @@ public final class GlassView: ExpoView {
@@ -116,7 +116,7 @@ index 1130937..687d3e0 100644
    private func waitForVisibility() {
      guard visibilityLink == nil else {
        return
-@@ -295,7 +351,9 @@ public final class GlassView: ExpoView {
+@@ -304,7 +360,9 @@ public final class GlassView: ExpoView {
      super.didMoveToWindow()
      if (self.window == nil) {
        isMounted = false
@@ -126,7 +126,7 @@ index 1130937..687d3e0 100644
      } else {
        // https://github.com/expo/expo/issues/43732
        // UIGlassEffect must be created during layoutSubviews
-@@ -338,6 +396,54 @@ public final class GlassView: ExpoView {
+@@ -347,6 +405,54 @@ public final class GlassView: ExpoView {
    }
  }
  

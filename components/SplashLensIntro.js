@@ -584,6 +584,17 @@ function SplashStage({ exiting = false, onExited, onIntroStart, background, chil
           </Animated.View>
         ) : null}
 
+        {/* Hava/atmosfer katmanı (kar vb.) yıldızların üstünde ama Lens işareti,
+            yörüngeler ve yazının ALTINDA: splash animasyonu her zaman en önde. */}
+        {children ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, { opacity: nodes.exitOpacity }]}
+          >
+            {children}
+          </Animated.View>
+        ) : null}
+
         {!still ? (
           <Animated.View style={StyleSheet.absoluteFill}>
             {trail}
@@ -666,10 +677,6 @@ function SplashStage({ exiting = false, onExited, onIntroStart, background, chil
             </Svg>
           </Animated.View>
         ))}
-
-        {children ? (
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: nodes.exitOpacity }]}>{children}</Animated.View>
-        ) : null}
       </Animated.View>
       <SplashStatusBar paletteStyle={palette.statusBar} still={still} />
     </View>
@@ -696,12 +703,12 @@ function StaticSplash({ exiting, onExited, onIntroStart, background, children })
       style={[StyleSheet.absoluteFill, { backgroundColor: palette.background }]}
       pointerEvents="none"
     >
+      {children}
       <Image
         source={getAppLogoSources(DEFAULT_APP_ICON_ID).logo}
         resizeMode="contain"
         style={centered(0, 0, STATIC_LOGO_SIZE, STATIC_LOGO_SIZE)}
       />
-      {children}
       <StatusBar style={palette.statusBar} />
     </View>
   );

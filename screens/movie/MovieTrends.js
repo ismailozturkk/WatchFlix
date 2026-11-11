@@ -127,7 +127,7 @@ const MovieTrendCard = memo(function MovieTrendCard({
 
   const posterUri = usePosterUri();
   const source = useMemo(
-    () => ({ uri: posterUri("movie", item.id, item.poster_path) }),
+    () => ({ uri: posterUri("movie", item.id, item.poster_path, ITEM_SIZE) }),
     [item.id, item.poster_path, posterUri]
   );
 

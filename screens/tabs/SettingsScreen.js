@@ -32,6 +32,7 @@ import {
   useApiSettings,
 } from "../../context/AppSettingsContext";
 import SwitchToggle from "@components/SwitchToggle";
+import ImageQualityPanel, { imageQualityLabel } from "@components/settings/ImageQualityPanel";
 import SwipeCard from "@components/SwipeCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -89,13 +90,6 @@ const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 // translations/<kod>.json). Rehber: docs/mimari/DIL_DESTEGI_REHBERI.md
 const LANGUAGES = APP_LANGUAGES;
 
-const IMAGE_QUALITIES = [
-  { labelKey: "imageQualityLow", value: "low" },
-  { labelKey: "imageQualityMedium", value: "medium" },
-  { labelKey: "imageQualityGood", value: "good" },
-  { labelKey: "imageQualityHigh", value: "high" },
-  { labelKey: "imageQualityOriginal", value: "original" },
-];
 
 function buildUiColors(theme) {
   return {
@@ -560,8 +554,7 @@ export default function SettingsScreen() {
     setLangSearch("");
   };
 
-  const currentQualityLabel =
-    t[IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.labelKey] ?? "—";
+  const currentQualityLabel = imageQualityLabel(imageQualityLevel, t);
   const selectedProviderNames = providerCatalog
     .filter((provider) => streamingProviderIds.includes(provider.id))
     .map((provider) => provider.name);
@@ -1030,34 +1023,11 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-          <View
-            style={[
-              s.segment,
-              { backgroundColor: C.cardAlt, borderTopColor: C.border },
-            ]}
-          >
-            {IMAGE_QUALITIES.map((q) => {
-              const active = imageQualityLevel === q.value;
-              return (
-                <GlassTouchable
-                  key={q.value}
-                  style={[s.segOpt, active && { backgroundColor: C.accent }]}
-                  onPress={() => changeImageQuality(q.value)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      s.segText,
-                      { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
-                    ]}
-                  >
-                    {t[q.labelKey]}
-                  </Text>
-                </GlassTouchable>
-              );
-            })}
-          </View>
+          <ImageQualityPanel
+            colors={C}
+            compact
+            onOpenDetails={() => navigation.navigate("PosterSettingsScreen", { tab: "quality" })}
+          />
         </View>
         <GlassBox role="card"
           style={[

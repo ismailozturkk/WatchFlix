@@ -22,7 +22,11 @@ import { usePosterResolver } from "../context/PosterChoicesContext";
  * @param {"movie"|"tv"} type    İkon seçimi (film / dizi) ve özel afiş türü
  * @param {number|string} mediaId TMDB kimliği (özel afiş için)
  * @param {object|array} style   Kutu stili (görsele ve yer tutucuya uygulanır)
- * @param {number} size          TMDB görsel boyutu (varsayılan 200)
+ * @param {number} size          Yedek genişlik (pt): style'da sayısal genişlik yoksa
+ *                               kullanılır. Varsa İSTENEN görsel ekrandaki gerçek
+ *                               genişlikten seçilir — poster boyutu (raf Küçük/Daha
+ *                               küçük, ızgara sütunu) küçüldükçe inen dosya da küçülür
+ *                               ve kalite ayarı (Otomatik dahil) bu ölçüye uygulanır.
  * @param {number} iconSize      İkon boyutu override (yoksa style.width'ten türetilir)
  * @param {string} iconName      İkon adı override (varsayılan film-outline / tv-outline)
  */
@@ -40,11 +44,13 @@ export default function PosterImage({
   const { getTmdbUrl } = useImageQualitySettings();
   const resolvePoster = usePosterResolver();
   const path = mediaId != null ? resolvePoster(type, mediaId, basePath) : basePath;
+  const flat = StyleSheet.flatten(style) || {};
 
   if (path) {
+    const displayWidth = typeof flat.width === "number" && flat.width > 0 ? flat.width : size;
     return (
       <Image
-        source={{ uri: getTmdbUrl(path, "poster", size) }}
+        source={{ uri: getTmdbUrl(path, "poster", displayWidth) }}
         style={style}
         {...rest}
       />
@@ -52,7 +58,6 @@ export default function PosterImage({
   }
 
   // İkon yer tutucu — kutu boyutu style ile aynı kalır.
-  const flat = StyleSheet.flatten(style) || {};
   const resolvedIconSize =
     iconSize ||
     (typeof flat.width === "number" ? Math.round(flat.width * 0.42) : 34);

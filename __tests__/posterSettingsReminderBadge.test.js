@@ -35,7 +35,17 @@ jest.mock("../components/AppIcon", () => {
 });
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: {} }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
-jest.mock("../context/AppSettingsContext", () => ({ useListLayoutSettings: () => mockSettings }));
+jest.mock("../context/AppSettingsContext", () => ({
+  useListLayoutSettings: () => mockSettings,
+  useImageQualitySettings: () => ({ imageQualityLevel: "auto", imageAutoContext: { metered: false, tier: "high" } }),
+}));
+// Kalite sekmesi paneli (Reanimated'li SwitchToggle) bu testin konusu değil.
+jest.mock("../components/settings/ImageQualityPanel", () => ({
+  __esModule: true,
+  default: () => null,
+  imageQualityLabel: () => "Otomatik",
+}));
+jest.mock("../utils/tmdbImageUtils", () => ({ getOptimalTmdbSize: () => "w500" }));
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 jest.mock("../screens/tabs/settings/settingsUi", () => {
   const React = require("react");

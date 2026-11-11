@@ -94,3 +94,6 @@ nul
 assets/oldicon/
 assets/oldicon1/
 assets/unused-lottie/
+
+# Yük testi betikleri (uygulama kodu değil)
+load-test/

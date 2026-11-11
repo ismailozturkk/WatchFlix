@@ -130,7 +130,7 @@ const TvTrendCard = memo(function TvTrendCard({
 
   const posterUri = usePosterUri();
   const source = useMemo(
-    () => ({ uri: posterUri("tv", item.id, item.poster_path) }),
+    () => ({ uri: posterUri("tv", item.id, item.poster_path, ITEM_SIZE) }),
     [item.id, item.poster_path, posterUri]
   );
 

@@ -123,7 +123,7 @@ export const SECTION_SCREENS = Object.freeze(
         section("banner", "image-outline", "purple"),
         // Başlıktaki (Düzenle / Paylaş'ın yanındaki) halka düğmesi: ekranda en üstte.
         section("goal", "flag-outline", "amber"),
-        // Adın yanındaki günlük seri alevi (components/streak/StreakFlameBadge.js).
+        // Adın yanındaki haftalık seri alevi (components/streak/StreakFlameBadge.js).
         section("streak", "flame-outline", "amber"),
         // Adın altındaki hesap bağlantıları (Instagram, Letterboxd…). Yalnız KENDİ profil
         // sekmesinde gizlenir; kimlerin göreceği Gizlilik > Hesap Bağlantıları'nda.

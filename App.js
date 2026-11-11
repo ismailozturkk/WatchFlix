@@ -975,12 +975,15 @@ function AppContent() {
           getComponent={() => require("./screens/tabs/setting/CustomThemeScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
-        <Stack.Screen
-          name="UsageDebugScreen"
-          getComponent={() => require("./screens/tabs/UsageDebugScreen").default}
-          options={{ headerShown: true, title: "Debug", animation: "slide_from_right" }}
-        />
-        {/* Geliştirici Laboratuvarı: yalnız geliştirme build'inde kayıtlı (Ayarlar > DEV). */}
+        {/* Geliştirici ekranları: yalnız geliştirme build'inde kayıtlı (Ayarlar > DEV).
+            Yayın bundle'ında __DEV__ dalı katlanır, modüller pakete girmez. */}
+        {__DEV__ ? (
+          <Stack.Screen
+            name="UsageDebugScreen"
+            getComponent={() => require("./screens/tabs/UsageDebugScreen").default}
+            options={{ headerShown: true, title: "Debug", animation: "slide_from_right" }}
+          />
+        ) : null}
         {__DEV__ ? (
           <Stack.Screen
             name="DevLabScreen"
@@ -1203,7 +1206,9 @@ export default wrapRoot(function App() {
                           </AiChatRequestProvider>
                             {splashVisible && (
                               <View
-                                style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+                                // Android'de elevation'lı kardeşler (sekme çubuğu,
+                                // yüzen şeritler) zIndex'i ezer; splash hep en üstte.
+                                style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]}
                                 pointerEvents="none"
                               >
                                 <SplashScreen

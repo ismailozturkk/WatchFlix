@@ -119,6 +119,7 @@ import { toast } from "@components/AppToast";
 import MessageBubble, { openMediaDetail } from "@components/chat/MessageBubble";
 import SharedListSheet from "@components/chat/SharedListSheet";
 import ChatHeader, { CHAT_HEADER_AVATAR_SIZE } from "@components/chat/ChatHeader";
+import ChatEmptyState from "@components/chat/ChatEmptyState";
 import useReduceMotion from "../../hooks/useReduceMotion";
 import useAppActive from "../../hooks/useAppActive";
 import useDecorVisibility from "../../hooks/useDecorVisibility";
@@ -1533,12 +1534,15 @@ export default function ChatScreen({ route, navigation }) {
     [isLink],
   );
 
-  const sendMessage = useCallback(async () => {
-    if (text.trim() === "") return;
-    const outgoing = text;
+  // `presetText`: boş sohbetteki hazır ilk mesaj önerisi (ChatEmptyState). O
+  // yolda yazı kutusundaki taslak SİLİNMEZ; düğmeden gelen olay nesnesi yok sayılır.
+  const sendMessage = useCallback(async (presetText) => {
+    const isPreset = typeof presetText === "string";
+    const outgoing = isPreset ? presetText : text;
+    if (outgoing.trim() === "") return;
     const replySnapshot = replyingTo;
 
-    if (editingMessage) {
+    if (editingMessage && !isPreset) {
       const targetMessage = editingMessage;
       const previousText = targetMessage.text || "";
       // Düzenleme de ağ onayını beklemeden balona ve inputa yansır.
@@ -1605,8 +1609,10 @@ export default function ChatScreen({ route, navigation }) {
       messages: [optimisticMessage, ...prev.messages],
     }));
     Haptics.haptic("send");
-    setText("");
-    setTextLink(false);
+    if (!isPreset) {
+      setText("");
+      setTextLink(false);
+    }
     setReplyingTo(null);
     setSearchOption(false);
     setSearchModalVisible(false);
@@ -1628,8 +1634,10 @@ export default function ChatScreen({ route, navigation }) {
         ...prev,
         messages: removeOptimisticMessage(prev.messages, clientId),
       }));
-      setText((current) => current || outgoing);
-      setTextLink(isLink(outgoing));
+      if (!isPreset) {
+        setText((current) => current || outgoing);
+        setTextLink(isLink(outgoing));
+      }
       if (replySnapshot) setReplyingTo((current) => current || replySnapshot);
       console.error(i18nText("autoI18n.mesaj_gonderme_hatasi", "Mesaj gönderme hatası:"), error);
       toastSendError(error);
@@ -2621,6 +2629,36 @@ export default function ChatScreen({ route, navigation }) {
           />
 
           </ComposerBlurTarget>
+
+          {/* Hiç mesaj yoksa ortada "Mesajlaşmaya başla" kartı + hazır ilk
+              mesajlar. Yalnız ilk sayfa geldikten SONRA (loaded) — yüklenirken
+              dolu sohbette bir an görünüp kaybolmasın. */}
+          {chatData.loaded && chatData.messages.length === 0 ? (
+            <ChatEmptyState
+              isGroup={isGroup}
+              name={isGroup ? groupData?.name || groupName || "" : resolvedFriendName}
+              reduceMotion={reduceMotion}
+              onSuggestion={sendMessage}
+              style={{ paddingTop: topStripsHeight + 12, paddingBottom: composerHeight + 12 }}
+              avatar={
+                isGroup ? (
+                  <GroupAvatar
+                    avatarIndex={groupData?.avatarIndex ?? groupAvatarIndex}
+                    color={groupData?.color || theme.accent || ACCENT}
+                    size={84}
+                    iconSize={52}
+                  />
+                ) : (
+                  <UserAvatar
+                    avatarIndex={resolvedFriendAvatarIndex}
+                    photoURL={friendIdentity?.photoURL || chatData?.friendPhotoURL}
+                    isCustomPhoto
+                    size={84}
+                  />
+                )
+              }
+            />
+          ) : null}
 
           {/* Kulüp + sabitlenmiş: mesaj listesinin ÜSTÜNDE YÜZEN tek satır (yan yana ince haplar).
               Blur hedefinin KARDEŞİ (içinde değil) → Android buzlu cam / iOS 26 cam arkadaki mesajları

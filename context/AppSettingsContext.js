@@ -30,6 +30,8 @@ import {
 } from "../utils/decorScopes";
 import { POSTER_CORNER_SCALES } from "../utils/posterCorners";
 import { isPosterSize } from "../utils/posterSizes";
+import { isImageQualityLevel, DEFAULT_IMAGE_QUALITY } from "../utils/imageQuality";
+import { useConnectivity } from "./ConnectivityContext";
 import {
   DECOR_DENSITIES,
   clampAmbientOpacity,
@@ -73,6 +75,7 @@ export const STREAMING_PROVIDERS = Object.freeze([
  * in `utils/tmdbImageUtils.js` based on component width.
  */
 export const IMAGE_QUALITY_PRESETS = {
+  auto: { poster: "auto", backdrop: "auto", logo: "auto" },
   low: { poster: "low", backdrop: "low", logo: "low" },
   medium: { poster: "medium", backdrop: "medium", logo: "medium" },
   good: { poster: "good", backdrop: "good", logo: "good" },
@@ -213,6 +216,19 @@ const GORUNUM_HATASI = () => i18nText(
   "Görünüm ayarı kaydedilemedi",
 );
 
+// Cihaz sınıfı (otomatik görsel kalitesi). services/deviceTier expo-device'a
+// dayanır; jest/kısmi ortamda yüklenemezse "orta" sayılır.
+let cachedImageTier;
+export function imageDeviceTier() {
+  if (cachedImageTier !== undefined) return cachedImageTier;
+  try {
+    cachedImageTier = require("../services/deviceTier").deviceTier || "mid";
+  } catch {
+    cachedImageTier = "mid";
+  }
+  return cachedImageTier;
+}
+
 export const AppSettingsProvider = ({ children }) => {
   // MMKV GEÇİŞİ — açılışta ayar okuma artık SENKRON.
   //
@@ -290,7 +306,7 @@ export const AppSettingsProvider = ({ children }) => {
   );
   const [imageQualityLevel, setImageQualityLevel] = useState(() => {
     const level = get(Keys.imageQualityLevel);
-    return IMAGE_QUALITY_PRESETS[level] ? level : "good";
+    return isImageQualityLevel(level) ? level : DEFAULT_IMAGE_QUALITY;
   });
   const [selectedAvatar, setSelectedAvatar] = useState(() => get(Keys.selectedAvatar));
   const [hapticsEnabled, setHapticsEnabled] = useState(() => get(Keys.haptics));
@@ -356,7 +372,7 @@ export const AppSettingsProvider = ({ children }) => {
   // services/storage/migration.js.
 
   const imageQuality = useMemo(
-    () => IMAGE_QUALITY_PRESETS[imageQualityLevel] ?? IMAGE_QUALITY_PRESETS.good,
+    () => IMAGE_QUALITY_PRESETS[imageQualityLevel] ?? IMAGE_QUALITY_PRESETS.auto,
     [imageQualityLevel],
   );
 
@@ -561,7 +577,7 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeImageQuality = useCallback((level) => {
-    if (!IMAGE_QUALITY_PRESETS[level]) return;
+    if (!isImageQualityLevel(level)) return;
     setImageQualityLevel(level);
     persist(Keys.imageQualityLevel, level, "Kalite kaydedilemedi");
   }, []);
@@ -899,21 +915,31 @@ export const AppSettingsProvider = ({ children }) => {
     [decorHidden, changeDecorVisible, changeDecorEffectVisible, resetDecorScopes, replaceDecorScopes],
   );
 
+  // Otomatik kalite girdileri: bağlantı ölçülü mü + cihaz sınıfı. Elle seçilmiş
+  // kademede null — ağ türü değişince adresler (ve indirilen görseller) değişmesin.
+  const { isMetered = false } = useConnectivity() || {};
+  const imageAutoContext = useMemo(
+    () => (imageQualityLevel === "auto" ? { metered: isMetered, tier: imageDeviceTier() } : null),
+    [imageQualityLevel, isMetered],
+  );
+
   const getTmdbUrl = useCallback(
     (path, type, expectedWidth) => {
-      return buildTmdbUrl(path, type, expectedWidth, imageQualityLevel);
+      return buildTmdbUrl(path, type, expectedWidth, imageQualityLevel, imageAutoContext);
     },
-    [imageQualityLevel]
+    [imageQualityLevel, imageAutoContext]
   );
 
   const imageQualityValue = useMemo(
     () => ({
       imageQuality,
       imageQualityLevel,
+      imageAutoContext,
+      isMeteredConnection: isMetered,
       changeImageQuality,
       getTmdbUrl,
     }),
-    [imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl],
+    [imageQuality, imageQualityLevel, imageAutoContext, isMetered, changeImageQuality, getTmdbUrl],
   );
 
   const avatarValue = useMemo(

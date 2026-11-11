@@ -8,12 +8,19 @@
 //     karıştırıyordu. Köşe beş kademeli (utils/posterCorners); önizleme gerçek ekran
 //     oranıyla çizilir, seçici simgeleri ise kademeler ayırt edilsin diye abartılıdır.
 //   • Poster Rozetleri — açıklamalı satırlar + rozet yığınının canlı önizlemesi.
+//   • Kalite — Otomatik / elle kalite (components/settings/ImageQualityPanel) ve
+//     kullanıcının poster boyutlarıyla her alanda inen çözünürlük. Düzen sekmesindeki
+//     boyut/sütun seçicisi de seçili boyutta inen türevi gösterir.
 
 import React, { useMemo, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
-import { useListLayoutSettings } from "@context/AppSettingsContext";
+import { useListLayoutSettings, useImageQualitySettings } from "@context/AppSettingsContext";
+import ImageQualityPanel, { imageQualityLabel } from "@components/settings/ImageQualityPanel";
+import { getOptimalTmdbSize } from "../../../utils/tmdbImageUtils";
+import { approxImageKb } from "../../../utils/imageQuality";
+import { posterWidthFor } from "../../../utils/listPosterLayout";
 import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "../../../utils/i18nText";
 import { REMINDER_BADGE } from "../../../utils/reminderBadge";
@@ -594,9 +601,10 @@ function MiniGrid({ columns, ink }) {
   );
 }
 
-export default function PosterSettingsScreen() {
+export default function PosterSettingsScreen({ route }) {
   const { theme } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
+  const { imageQualityLevel, imageAutoContext } = useImageQualitySettings();
   const { width: windowWidth } = useWindowDimensions();
   const C = buildUiColors(theme);
   const AREAS = useMemo(buildAreas, [language]);
@@ -629,7 +637,9 @@ export default function PosterSettingsScreen() {
     changePosterBadge,
   } = useListLayoutSettings();
 
-  const [activeTab, setActiveTab] = useState("layout"); // "layout" | "badges"
+  const [activeTab, setActiveTab] = useState(() =>
+    ["layout", "badges", "quality"].includes(route?.params?.tab) ? route.params.tab : "layout",
+  ); // "layout" | "badges" | "quality"
   const [areaId, setAreaId] = useState("lists"); // "lists" | "seeAll" | "rails"
   const [stageWidth, setStageWidth] = useState(0);
 
@@ -740,7 +750,25 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
       label: i18nText("autoI18n.rozetler", "Rozetler"),
       count: `${enabledBadgeCount}/${POSTER_BADGE_OPTIONS.length}`,
     },
+    {
+      id: "quality",
+      icon: "sparkles-outline",
+      label: i18nText("autoI18n.gorsel_kalite_sekme", "Kalite"),
+    },
   ];
+
+  // Seçili boyut/sütunda bir afiş için inen TMDB türevi (kalite ayarıyla).
+  const resolutionOf = (posterWidth) => {
+    const size = getOptimalTmdbSize("poster", posterWidth, imageQualityLevel, imageAutoContext || undefined);
+    const kb = approxImageKb(size);
+    return kb ? `${size} · ≈${kb} KB` : size;
+  };
+  const currentPosterWidth =
+    area.kind === "columns"
+      ? posterWidthFor({ windowWidth, columns: current.columns || 3 })
+      : area.kind === "relative"
+        ? null
+        : railPosterWidth(windowWidth, current.size);
 
   return (
     <SettingsSubScreen title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}>
@@ -864,6 +892,24 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
                   onChange={area.kind === "columns" ? current.onColumns : current.onSize}
                   colors={C}
                 />
+                {currentPosterWidth ? (
+                  <GlassTouchable
+                    glass={false}
+                    style={ps.resolutionRow}
+                    onPress={() => setActiveTab("quality")}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                  >
+                    <AppIcon family="Ionicons" name="sparkles-outline" size={13} color={C.accent} />
+                    <Text allowFontScaling={false} style={[ps.resolutionText, { color: C.muted }]} numberOfLines={1}>
+                      {`${i18nText("autoI18n.gorsel_kalite_afis_cozunurlugu", "Afiş çözünürlüğü")}: ${resolutionOf(currentPosterWidth)}`}
+                    </Text>
+                    <Text allowFontScaling={false} style={[ps.resolutionLevel, { color: C.accent }]}>
+                      {imageQualityLabel(imageQualityLevel, t)}
+                    </Text>
+                    <AppIcon family="Ionicons" name="chevron-forward" size={13} color={C.accent} />
+                  </GlassTouchable>
+                ) : null}
               </View>
             )}
 
@@ -924,6 +970,18 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
               onChange={changePostListPosterLayout}
               colors={C}
             />
+          </View>
+        </>
+      )}
+
+      {/* ── SEKME 3: KALİTE ── */}
+      {activeTab === "quality" && (
+        <>
+          <SectionLabel color={C.muted}>
+            {i18nText("autoI18n.gorsel_kalite_baslik", "Görsel kalitesi").toUpperCase()}
+          </SectionLabel>
+          <View style={[ps.card, { backgroundColor: C.card, borderColor: C.border }]}>
+            <ImageQualityPanel colors={C} />
           </View>
         </>
       )}
@@ -1037,6 +1095,9 @@ const ps = StyleSheet.create({
   editorHeadingCopy: { flex: 1, minWidth: 0 },
   editorTitle: { fontSize: 16, fontWeight: "800", marginBottom: 2 },
   hintText: { flexShrink: 1, fontSize: 12, lineHeight: 16 },
+  resolutionRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
+  resolutionText: { flex: 1, fontSize: 12 },
+  resolutionLevel: { fontSize: 12, fontWeight: "600" },
   controlHint: { marginTop: -4, marginBottom: 10 },
   primaryControl: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 16, marginBottom: 16 },
 

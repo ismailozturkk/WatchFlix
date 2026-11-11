@@ -27,6 +27,7 @@ import { normalizeFontRoles } from "./typographyRoles";
 import { EFFECT_MODES } from "./deviceTier";
 import { DATA_CACHE_CATEGORIES } from "./dataCacheSettings";
 import { isSupportedAppLanguage } from "./appLanguages";
+import { IMAGE_QUALITY_LEVELS } from "./imageQuality";
 
 export const BACKUP_FORMAT = "seelogd-settings-backup";
 export const BACKUP_VERSION = 1;
@@ -190,7 +191,7 @@ const RULES = {
   language: { check: isSupportedAppLanguage },
   theme: { check: isThemeId },
   effectMode: { check: (v) => EFFECT_MODES.includes(v) },
-  imageQualityLevel: { check: (v) => ["low", "medium", "good", "high", "original"].includes(v) },
+  imageQualityLevel: { check: (v) => IMAGE_QUALITY_LEVELS.includes(v) },
   streamingProviderIds: { check: isPositiveIntList },
   fontRoles: { check: isPlain, normalize: normalizeFontRoles },
   decorScopes: { check: isPlain, normalize: normalizeDecorScopes },
