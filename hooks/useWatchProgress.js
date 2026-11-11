@@ -39,9 +39,10 @@ import { Keys, set as setStored, useStored } from "@services/storage";
 import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import {
-  kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerReset,
+  kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerChange, subscribeLedgerReset,
 } from "@utils/watchBadgeLedger";
-import { ayniSeriler, serileriHesapla, seriGunuAnahtari } from "@utils/watchActivity";
+import { ayniSeriler } from "@utils/watchActivity";
+import { seriDurumu, seriGunu } from "@utils/streakState";
 import useAppActive from "@hooks/useAppActive";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
 import useKesifSignals from "@hooks/useKesifSignals";
@@ -157,11 +158,22 @@ export default function useWatchProgress() {
       setMakaraFloor(l.earned.makaraFloor);
       setKazanilmis(l.earned.badgeIds);
       setTohumRozetSayisi(l.baseline?.badgeIds.length || 0);
-      setSeriler(serileriHesapla(l.aktiflik.gunler, l.aktiflik));
+      setSeriler(seriDurumu(l.aktiflik));
       setAktifGunler(l.aktiflik.gunler);
     }).catch(() => {});
     return () => { iptal = true; };
   }, [uid, sifirlamaNo]);
+
+  // Defter mutabakat DIŞINDA değişti (mola verildi): seriyi hemen yenile.
+  useEffect(() => {
+    if (!uid) return undefined;
+    return subscribeLedgerChange((degisenUid, l) => {
+      if (degisenUid !== uid || !l) return;
+      setDefter(l);
+      const s = seriDurumu(l.aktiflik);
+      setSeriler((o) => (ayniSeriler(o, s) ? o : s));
+    });
+  }, [uid]);
 
   // ── SERİ GÜNÜ DÖNÜMÜ ───────────────────────────────────────────────────────
   // Mutabakat yalnız izleme verisi değişince koşar. Uygulama geceyi arka planda
@@ -170,14 +182,16 @@ export default function useWatchProgress() {
   // döndüyse seriler bellekteki defterden YAZMADAN yeniden hesaplanır; kesinleşen
   // kararlar bir sonraki mutabakatta diske iner (seriKorumasiniIlerlet idempotent).
   const appActive = useAppActive();
-  const seriGunuRef = useRef(seriGunuAnahtari());
+  const seriGunuRef = useRef(null);
   useEffect(() => {
     if (!appActive || !defter) return undefined;
     const yenile = () => {
-      const gun = seriGunuAnahtari();
+      // Sunucu saati + ev saat dilimi (utils/streakState): cihaz saatini değiştirmek
+      // seri gününü döndürmez.
+      const gun = seriGunu(defter.aktiflik);
       if (gun === seriGunuRef.current) return;
       seriGunuRef.current = gun;
-      const s = serileriHesapla(defter.aktiflik.gunler, defter.aktiflik);
+      const s = seriDurumu(defter.aktiflik);
       setSeriler((o) => (ayniSeriler(o, s) ? o : s));
     };
     yenile();
@@ -337,7 +351,9 @@ export default function useWatchProgress() {
     // adedi arttı mı" sinyalinden türüyor; imza yalnızca Perde+rozetten
     // oluşsaydı, hiçbir rozeti açmayan sıradan bir işaretleme (ki neredeyse
     // hepsi öyle) mutabakatı hiç tetiklemez ve o gün SERİYE HİÇ YAZILMAZDI.
-    const icerikSayisi = sonuc.stats.filmSayisi + sonuc.stats.bolumSayisi;
+    // TEKRAR İZLEME DE SAYILIR: filmler izleme OLAYLARIYLA sayılır (filmIzlemeSayisi);
+    // aynı filmi yeniden izlendi işaretlemek sayıyı artırır ve seri gününü damgalar.
+    const icerikSayisi = (sonuc.stats.filmIzlemeSayisi ?? sonuc.stats.filmSayisi) + sonuc.stats.bolumSayisi;
     // Hangi Keşif kaynaklarının hazır olduğu da imzada: bir kaynak hazır olduğunda
     // açık rozet kümesi DEĞİŞMEYEBİLİR (0 arkadaş, hazır) ama `tumIds` değişir; imza
     // bunu görmezse id `known`a hiç yazılmaz ve kullanıcının İLK arkadaşı geldiğinde

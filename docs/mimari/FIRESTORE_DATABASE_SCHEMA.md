@@ -49,6 +49,9 @@ Firestore Root
 │   │   │                                      // YAZAN: Profili Düzenle (Kaydet) veya tanıtımdan taşıma (services/fourFavoritesService.adoptPendingFavorites)
 │   │   │                                      // OKUYAN: arkadaş profili + kendi profil kartı (privacy.profile'a tabi), Film/Dizi sekmesi "Favorilerine Göre" rayı, AI bağlamı
 │   │   │                                      // Boş yapı ({movies:[],shows:[],people:[]}) "hepsini kaldırdı" demek; alanı SİLME — tanıtım kopyası geri sızar
+│   │   ├── profileBanner: map | null = {     // Profil kapağı (banner): profilin en üstündeki film/dizi sahnesi
+│   │   │     id: number, type: "movie"|"tv", title: string, path: "/abc.jpg"   // yalnız TMDB YOLU, tam adres değil
+│   │   │   }                                  // kural: firestore.rules → profileBannerOk; YAZAN: profil düzenleme modu (useOwnProfileEditor)
 │   │   ├── notificationSettings: map = {
 │   │   │     streamingEnabled: true,
 │   │   │     sound: true,

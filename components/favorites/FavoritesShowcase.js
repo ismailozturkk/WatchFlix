@@ -1,7 +1,6 @@
 // components/favorites/FavoritesShowcase.js
 //
-// Arkadaş profilindeki salt-okunur "favori seçimleri" kartı. KOMPAKT: tek kart,
-// kategori başına tek satır — solda tür ikonu + etiket, sağda küçük posterler
+// Profildeki "favori seçimleri" kartı. Kategori başlığı altında küçük posterler
 // (oyuncuda yuvarlak portre). Görsele dokunmak detay sayfasını açar; başlıklar
 // görünmez ama erişilebilirlik etiketinde (ve detayda) duruyor. Hiç favori yoksa
 // HİÇBİR ŞEY çizilmez (boş kart, "bu kişi henüz seçmemiş" demek yerine profili
@@ -35,10 +34,10 @@ import GlassBox from "../common/GlassBox";
 const ROUTE = { movies: "MovieDetails", shows: "TvShowsDetails", people: "ActorViewScreen" };
 
 // Yuva genişliği satırdan türer ama bu tavanı aşmaz: geniş ekranda posterler
-// şişip kartı uzatmasın. 54 → poster 54x81.
-const THUMB_MAX_WIDTH = 54;
-const THUMB_GAP = 8;
-const THUMB_RADIUS = 10;
+// şişip kartı uzatmasın.
+const THUMB_MAX_WIDTH = 48;
+const THUMB_GAP = 7;
+const THUMB_RADIUS = 9;
 
 const paramsFor = (kind, entry) =>
   kind === "people" ? { personId: entry.id } : { id: entry.id };
@@ -85,24 +84,13 @@ function FavoritesShowcase({ favorites, navigation, editing = false, onChange })
       {kinds.map((kind, index) => {
         const kindCopy = copy.kinds[kind];
         return (
-          <View
-            key={kind}
-            style={[
-              styles.row,
-              index > 0 && {
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: alpha(theme.border, 0.9),
-              },
-            ]}
-          >
-            <View style={styles.kind}>
-              <View style={[styles.kindIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
-                <Ionicons name={kindCopy.icon} size={15} color={theme.accent} />
-              </View>
+          <View key={kind} style={[styles.row, index > 0 && { borderTopColor: alpha(theme.border, 0.7), borderTopWidth: StyleSheet.hairlineWidth }]}>
+            <View style={[styles.kind, { borderLeftColor: alpha(theme.accent, 0.65) }]}>
+              <Ionicons name={kindCopy.icon} size={16} color={theme.accent} />
               <Text
                 allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.kindLabel, { color: theme.text.secondary }]}
+                numberOfLines={2}
+                style={[styles.kindLabel, { color: theme.text.primary }]}
               >
                 {kindCopy.label}
               </Text>
@@ -146,22 +134,14 @@ export default memo(FavoritesShowcase);
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 2,
     marginBottom: 6,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
-  kind: { width: 64, alignItems: "center", gap: 6 },
-  kindIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  kindLabel: { fontSize: 11, fontWeight: "800", textAlign: "center" },
-  // Soldaki etiket sütunundan kalan genişlik: FavoriteSlots bunu ölçüp yuvalar.
+  row: { flexDirection: "row", alignItems: "center", gap: 9, minHeight: 87, paddingVertical: 8 },
+  kind: { width: 84, minWidth: 84, gap: 5, paddingLeft: 7, borderLeftWidth: 2 },
+  kindLabel: { fontSize: 11, lineHeight: 14, fontWeight: "800" },
   slots: { flex: 1, minWidth: 0 },
 });

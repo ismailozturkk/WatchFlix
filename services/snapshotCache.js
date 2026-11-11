@@ -64,12 +64,13 @@ export function seed(anahtar) {
   if (memory.has(id)) return memory.get(id);
 
   const [ns, key] = anahtar;
-  const data = cacheStore.getJSON(ns, key);
+  const record = cacheStore.getRecord(ns, key);
+  const data = record ? record.v : null;
   if (data === null || data === undefined) {
     memory.set(id, EMPTY);
     return EMPTY;
   }
-  const age = cacheStore.getAge(ns, key);
+  const age = record.age;
   const sonuc = Object.freeze({
     data,
     ts: age === null ? 0 : Date.now() - age,

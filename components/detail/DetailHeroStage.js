@@ -18,6 +18,13 @@
 // YALNIZ o şeridi koyulaştırır, `bottomFadeHeight` tema zeminine geçişi hapların
 // altına sıkıştırır (açık temada beyaz yazı açık zemine düşmesin). Üçü de verilmezse
 // film/dizi düzeni birebir aynı kalır.
+//
+// `scrollY` (native sürücülü Animated.Value) verilirse yuva, profil kapağıyla
+// ORTAK hareketi yapar (components/common/heroScrollMotion.js): aşağı kaydırınca
+// içerikten yavaş yükselip kararır ve söner, üstten çekince esner. Yuva içerikte
+// kaldığı için hareket içeriğe karşı ötelenerek üretilir (inContentHeroMotion).
+// Hareket yalnız GÖRSEL katmana uygulanır; `children` (oyuncu sayfasında ad +
+// eylem hapları) içerikle birlikte normal kayar, kararmaz/sönmez.
 
 import React, { memo } from "react";
 import {
@@ -34,6 +41,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { alpha } from "@theme/colors";
 import { isLightSurface } from "@utils/colorUtils";
 import { measureWindowRect } from "@utils/measureWindowRect";
+import { HeroDarkenOverlay, heroMotionTuning, inContentHeroMotion } from "../common/heroScrollMotion";
 
 const DEFAULT_WIDTH = Dimensions.get("window").width;
 
@@ -42,6 +50,19 @@ const AMBIENT_BLUR_BASE = Platform.OS === "ios" ? 28 : 20;
 const AMBIENT_BLUR_MIRROR = Platform.OS === "ios" ? 22 : 16;
 const EDGE_BLUR_OUTER = Platform.OS === "ios" ? 13 : 10;
 const EDGE_BLUR_INNER = Platform.OS === "ios" ? 6 : 5;
+// `ambientUri` (küçük görsel, ~w300) verildiğinde ambiyans katmanlarının yarıçapı:
+// görsel ~4 kat küçük olduğu için aynı yumuşaklık ~4 kat küçük yarıçapla gelir.
+// Isınma denetimi (11 Kas): bulanıklık CPU'da, görselin KENDİ pikselleri üzerinde
+// yapılıyor (Android'de her yarıçap ayrı bir çözme + bulanıklaştırma); tam boy
+// görseli üç kez bulanıklaştırmak yerine küçüğünü bulanıklaştırmak çok ucuz.
+const AMBIENT_SMALL_BLUR_BASE = Platform.OS === "ios" ? 8 : 6;
+const AMBIENT_SMALL_BLUR_MIRROR = Platform.OS === "ios" ? 6 : 5;
+// Kenar geçiş şeritleri (4 adet) de küçük görselden: tam boy görseli 4 kez
+// ayrı ayrı çözüp bulanıklaştırmak detay açılışının en pahalı işiydi (yol
+// haritası Y3). Şeritler 5–13 px yüksekliğinde; küçük kaynak + ~4 kat küçük
+// yarıçap gözle aynı yumuşaklığı verir.
+const EDGE_SMALL_BLUR_OUTER = Platform.OS === "ios" ? 4 : 3;
+const EDGE_SMALL_BLUR_INNER = Platform.OS === "ios" ? 2 : 2;
 
 const TOP_FEATHER_OUTER_H = 5;
 const TOP_FEATHER_INNER_H = 11;
@@ -98,6 +119,9 @@ export function computeDetailHeroMetrics({
 
 const DetailHeroStage = memo(function DetailHeroStage({
   uri,
+  // İsteğe bağlı: ambiyans (derin bulanık) katmanları için KÜÇÜK görsel adresi.
+  // Verilmezse `uri` kullanılır (eski davranış).
+  ambientUri,
   theme,
   topInset = 0,
   width = DEFAULT_WIDTH,
@@ -116,6 +140,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
   // İsteğe bağlı Animated.Value: galeri açıkken net görsel yuvadan "kalkmış"
   // görünsün diye 0'a çekilir (altta bulanık ambiyans kalır).
   centerOpacity,
+  // İsteğe bağlı: kaydırma konumu (bkz. dosya başı).
+  scrollY,
   children,
 }) {
   // Kanca yok (bileşen testlerde doğrudan fonksiyon olarak çağrılıyor): düğüm
@@ -149,7 +175,16 @@ const DetailHeroStage = memo(function DetailHeroStage({
     stageHeight,
   } = computeDetailHeroMetrics({ width, topInset, imageHeight, bottomBandHeight });
 
+  // Kaydırma hareketi yuva boyuna orantılı: uzun oyuncu portresi daha uzun
+  // mesafede ve daha çok yükselerek kararır (film/dizi yuvası temel değerlerde).
+  const motionTuning = heroMotionTuning(stageHeight);
+
   const lightSurface = isLightSurface(theme.primary);
+  const ambientSource = ambientUri || uri;
+  const ambientBlurBase = ambientUri ? AMBIENT_SMALL_BLUR_BASE : AMBIENT_BLUR_BASE;
+  const ambientBlurMirror = ambientUri ? AMBIENT_SMALL_BLUR_MIRROR : AMBIENT_BLUR_MIRROR;
+  const edgeBlurInner = ambientUri ? EDGE_SMALL_BLUR_INNER : EDGE_BLUR_INNER;
+  const edgeBlurOuter = ambientUri ? EDGE_SMALL_BLUR_OUTER : EDGE_BLUR_OUTER;
   const bottomGradientHeight =
     Number.isFinite(bottomFadeOverride) && bottomFadeOverride > 0
       ? Math.round(bottomFadeOverride)
@@ -162,17 +197,28 @@ const DetailHeroStage = memo(function DetailHeroStage({
         styles.stage,
         {
           height: stageHeight,
-          backgroundColor: theme.secondary,
+          backgroundColor: scrollY ? "transparent" : theme.secondary,
         },
+        // Görsel katman aşağı ötelenirken kırpılmasın (kırpma görsel katmanın kendisinde).
+        scrollY ? styles.stageMoving : null,
       ]}
     >
+      <Animated.View
+        testID="detail-hero-visual"
+        pointerEvents="box-none"
+        style={[
+          styles.visual,
+          { backgroundColor: theme.secondary },
+          scrollY ? inContentHeroMotion(scrollY, stageHeight, motionTuning) : null,
+        ]}
+      >
       {uri ? (
         <>
           {/* 1) Tüm yuvayı dolduran derin bulanık zemin */}
           <Image
             testID="detail-hero-ambient-base"
-            source={{ uri }}
-            blurRadius={AMBIENT_BLUR_BASE}
+            source={{ uri: ambientSource }}
+            blurRadius={ambientBlurBase}
             style={styles.ambientBase}
             resizeMode="cover"
           />
@@ -185,8 +231,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
             style={[styles.topAmbientSlot, { height: topAmbientHeight }]}
           >
             <Image
-              source={{ uri }}
-              blurRadius={AMBIENT_BLUR_MIRROR}
+              source={{ uri: ambientSource }}
+              blurRadius={ambientBlurMirror}
               style={[
                 styles.mirroredBackdrop,
                 {
@@ -212,8 +258,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
             ]}
           >
             <Image
-              source={{ uri }}
-              blurRadius={AMBIENT_BLUR_MIRROR}
+              source={{ uri: ambientSource }}
+              blurRadius={ambientBlurMirror}
               style={[
                 styles.mirroredBackdrop,
                 {
@@ -280,8 +326,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
               style={[styles.topFeatherStrip, { height: TOP_FEATHER_INNER_H }]}
             >
               <Image
-                source={{ uri }}
-                blurRadius={EDGE_BLUR_INNER}
+                source={{ uri: ambientSource }}
+                blurRadius={edgeBlurInner}
                 style={[styles.featherImageTop, { height: backdropHeight }]}
                 resizeMode={imageFit}
               />
@@ -291,8 +337,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
               style={[styles.topFeatherStrip, { height: TOP_FEATHER_OUTER_H }]}
             >
               <Image
-                source={{ uri }}
-                blurRadius={EDGE_BLUR_OUTER}
+                source={{ uri: ambientSource }}
+                blurRadius={edgeBlurOuter}
                 style={[styles.featherImageTop, { height: backdropHeight }]}
                 resizeMode={imageFit}
               />
@@ -307,8 +353,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
               ]}
             >
               <Image
-                source={{ uri }}
-                blurRadius={EDGE_BLUR_INNER}
+                source={{ uri: ambientSource }}
+                blurRadius={edgeBlurInner}
                 style={[styles.featherImageBottom, { height: backdropHeight }]}
                 resizeMode={imageFit}
               />
@@ -321,8 +367,8 @@ const DetailHeroStage = memo(function DetailHeroStage({
               ]}
             >
               <Image
-                source={{ uri }}
-                blurRadius={EDGE_BLUR_OUTER}
+                source={{ uri: ambientSource }}
+                blurRadius={edgeBlurOuter}
                 style={[styles.featherImageBottom, { height: backdropHeight }]}
                 resizeMode={imageFit}
               />
@@ -349,6 +395,9 @@ const DetailHeroStage = memo(function DetailHeroStage({
         </View>
       )}
 
+      {/* Kaydırınca kararma örtüsü (scrollY verilmişse) */}
+      <HeroDarkenOverlay scrollY={scrollY} fadeAt={motionTuning.fadeAt} />
+
       {/* Üst bildirim çubuğu okunabilirlik tülü (ambiayans renklerini korur) */}
       <LinearGradient
         colors={["rgba(0,0,0,0.32)", "rgba(0,0,0,0.08)", "rgba(0,0,0,0)"]}
@@ -368,6 +417,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
         style={[styles.bottomGradient, { height: bottomGradientHeight }]}
         pointerEvents="none"
       />
+      </Animated.View>
 
       {children}
     </View>
@@ -378,6 +428,11 @@ const styles = StyleSheet.create({
   stage: {
     width: "100%",
     position: "relative",
+    overflow: "hidden",
+  },
+  stageMoving: { overflow: "visible" },
+  visual: {
+    ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
   },
   ambientBase: {

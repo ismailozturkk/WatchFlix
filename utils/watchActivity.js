@@ -71,10 +71,55 @@ export const bugunAnahtari = (simdi = Date.now()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** Seri günü cihazın yerel gece yarısında döner (istatistik takvimiyle aynı gün). */
+/** Seri günü yerel gece yarısında döner (istatistik takvimiyle aynı gün). */
 export const SERI_GUN_DONUMU_SAAT = 0;
-export const seriGunuAnahtari = (simdi = Date.now()) =>
-  bugunAnahtari(Number(simdi) - SERI_GUN_DONUMU_SAAT * 3600000);
+
+// ── SAAT DİLİMİ ─────────────────────────────────────────────────────────────
+// Seri günü, verilirse defterdeki "EV SAAT DİLİMİ"ne göre hesaplanır (UTC'den dakika
+// farkı, ör. İstanbul +180). Cihazın anlık dilimi DEĞİL: seyahatte ya da ayarlardan
+// dilimi değiştirmek seri gününü oynatmasın. Ev dilimi en fazla SAAT_DILIMI_ARALIK'ta
+// bir kez cihaza uyar (taşınan kullanıcı bir hafta içinde doğru güne geçer; dilim
+// zıplatarak fazladan gün kazanılamaz). Haftalık seride birkaç saatlik kayma zaten
+// bir haftayı bozmaz.
+export const SAAT_DILIMI_ARALIK_MS = 7 * 86400000;
+const DILIM_MIN = -12 * 60;
+const DILIM_MAX = 14 * 60;
+export const gecerliDilim = (v) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= DILIM_MIN && n <= DILIM_MAX ? n : null;
+};
+/** Cihazın şu anki dilimi (UTC'den dakika farkı; İstanbul = +180). */
+export const cihazDilimi = (simdi = Date.now()) => gecerliDilim(-new Date(simdi).getTimezoneOffset()) ?? 0;
+
+/** Ev dilimi kaydını cihaz dilimine göre (kısıtlı) günceller. Saf. */
+export function saatDilimiGuncelle(mevcut, cihazDakika, simdiMs) {
+  const cihaz = gecerliDilim(cihazDakika);
+  const simdi = Number(simdiMs);
+  const kayit = mevcut && gecerliDilim(mevcut.dakika) !== null
+    ? { dakika: gecerliDilim(mevcut.dakika), degisti: Number(mevcut.degisti) || 0 }
+    : null;
+  if (cihaz === null || !Number.isFinite(simdi)) return kayit;
+  if (!kayit) return { dakika: cihaz, degisti: simdi };
+  if (kayit.dakika === cihaz) return kayit;
+  // Gelecekte bir "değişti" damgası (saat geri alınmış) uyumu sonsuza dek kilitlemesin.
+  if (kayit.degisti > simdi || simdi - kayit.degisti >= SAAT_DILIMI_ARALIK_MS) {
+    return { dakika: cihaz, degisti: simdi };
+  }
+  return kayit;
+}
+
+/**
+ * Seri gününün anahtarı. `dilimDakika` verilirse o dilimin gece yarısı, verilmezse
+ * cihazın yerel gece yarısı (eski davranış). `simdi` sunucu saati olmalı
+ * (services/serverClock → utils/streakBridge.simdi).
+ */
+export const seriGunuAnahtari = (simdi = Date.now(), dilimDakika) => {
+  const ms = Number(simdi) - SERI_GUN_DONUMU_SAAT * 3600000;
+  const dilim = gecerliDilim(dilimDakika);
+  if (dilim === null || dilimDakika === undefined || dilimDakika === null) return bugunAnahtari(ms);
+  const d = new Date(ms + dilim * 60000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+};
 
 /** Gün indeksi → "YYYY-MM-DD" (gunIndexi'nin tersi). */
 export const indekstenGun = (gi) => {
@@ -279,10 +324,12 @@ export function seriKorumasiniIlerlet({ gunler = [], gunluk = {}, koruma } = {},
  *   `koruma` VERİLİRSE (defter yolu) günlük seri telafi/kalkan günlerini de sayar ve
  *   koruma alanları döner; verilmezse davranış eskisiyle birebir aynıdır.
  */
-export function serileriHesapla(gunler = [], { simdi = Date.now(), rekorGun = 0, rekorHafta = 0, koruma, gunluk } = {}) {
+export function serileriHesapla(gunler = [], {
+  simdi = Date.now(), rekorGun = 0, rekorHafta = 0, koruma, gunluk, saatDilimi,
+} = {}) {
   const gunIdx = idxListesi(gunler);
 
-  const bugunKey = seriGunuAnahtari(simdi);
+  const bugunKey = seriGunuAnahtari(simdi, saatDilimi?.dakika);
   const bugunIdx = gunIndexi(bugunKey);
   const buHaftaIdx = haftaIndexi(bugunIdx);
 
@@ -370,10 +417,10 @@ export function ayniSeriler(a, b) {
   if (!a || !b) return false;
   const anahtarlar = [
     "gunSerisi", "haftaSerisi", "rekorGun", "rekorHafta", "bugunAktif", "aktifGunSayisi",
-    "kalkan", "telafiHazir", "telafiYenilenme", "bugunKazanim",
+    "kalkan", "telafiHazir", "telafiYenilenme", "bugunKazanim", "seriGunu", "dilim",
   ];
   if (anahtarlar.some((ad) => a[ad] !== b[ad])) return false;
   const j = (v) => JSON.stringify(v ?? null);
   return j(a.bekleyen) === j(b.bekleyen) && j(a.sonYama) === j(b.sonYama)
-    && j(a.haftaKutulari) === j(b.haftaKutulari);
+    && j(a.haftaKutulari) === j(b.haftaKutulari) && j(a.alev) === j(b.alev);
 }

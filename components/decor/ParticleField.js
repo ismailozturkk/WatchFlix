@@ -16,7 +16,7 @@
 //   • Saat çerçeve zaman damgasıdır (`frameInfo.timestamp`): her örnek aynı
 //     saati okur → ekran geçişinde iki ekranın efekti aynı karede durur.
 //   • `playing` false olunca saat durur, son kare ekranda kalır (sıfır iş).
-//   • Kare hızı sınırı: 60 fps (120 Hz ekranda da), "Kapalı" efekt modunda 30.
+//   • Kare hızı sınırı (frameIntervalMs): "Tam"/"Orta" 60 fps, "Kapalı" 30.
 //   • Büyük çizilen şimşek ve kıyı dokuda değil, vektör (VectorLayers.js),
 //     aynı saat ve aynı tuvalde. Tür ışık katmanları (sis, vinyet, ekolayzer…)
 //     da vektör (OverlayLayers.js): OVERLAY_FRONT Atlas'ın önünde, gerisi

@@ -24,11 +24,15 @@ import {
 } from "../context/AppSettingsContext";
 import { buildHomeContentSettings } from "../utils/homeContentSettings";
 
-/** @returns {{ adultContent: boolean, adultScope: string, providersKey: string }} */
+/** @returns {{ adultContent: boolean, contentFilter: string, adultScope: string, providersKey: string }} */
 export function useHomeDataSettings() {
   // `adultContent` ETKİN değerdir: ayar açık VE hesap yaş kısıtlı değil
   // (bkz. AppSettingsContext, utils/ageGate.js).
-  const { adultContent } = useContentSettings();
+  const { adultContent, contentFilter: storedFilter } = useContentSettings();
+  // Hassas içerik imzası ("" = hepsi gizli). Eski bağlam/sahte nesnelerde
+  // yoksa yalnız yetişkin bayrağından türetilir.
+  const contentFilter =
+    typeof storedFilter === "string" ? storedFilter : adultContent === true ? "adult" : "";
   const { streamingProviderIds } = useStreamingProviderSettings();
   return useMemo(
     () => {
@@ -36,9 +40,9 @@ export function useHomeDataSettings() {
         adultContent,
         streamingProviderIds,
       });
-      return { adultContent: adultContent === true, adultScope, providersKey };
+      return { adultContent: adultContent === true, contentFilter, adultScope, providersKey };
     },
-    [adultContent, streamingProviderIds],
+    [adultContent, contentFilter, streamingProviderIds],
   );
 }
 

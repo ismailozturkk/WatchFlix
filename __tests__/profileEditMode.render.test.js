@@ -1,5 +1,6 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
+import { StyleSheet } from "react-native";
 
 // Profil önizlemesinin DÜZENLEME MODU parçaları (9 Kas kullanıcı kararı: ayrı
 // "Profili Düzenle" ekranı yerine arkadaşın gördüğü düzen yerinde düzenlenir,
@@ -8,7 +9,7 @@ import { act, create } from "react-test-renderer";
 //   • Hero: ad / kullanıcı adı / hakkında aynı stilde TextInput'a döner.
 //   • Sosyal şerit: sekiz platformun hepsi; bağlı olmayan soluk; dokununca
 //     altında kayıtlı değerle dolu alan açılır.
-//   • Vitrin rozetleri: 4 yuva — dolu yuvada ×, boşta +.
+//   • Vitrin rozetleri: 6 yuva — dolu yuvada ×, boşta +.
 //   • Favoriler: üç kategori; dolu yuvada ×, boşta + (seçiciyi açar).
 
 jest.mock("react-native", () => {
@@ -60,6 +61,7 @@ jest.mock("../components/friends/PillButton", () => ({ __esModule: true, default
 jest.mock("../components/profile/SocialLinksRow", () => ({ __esModule: true, default: "SocialLinksRow" }));
 jest.mock("../components/favorites/FavoriteArt", () => ({ __esModule: true, default: "FavoriteArt" }));
 jest.mock("../components/favorites/FavoritePickerSheet", () => ({ __esModule: true, default: "FavoritePickerSheet" }));
+jest.mock("../components/profile/ProfileBannerBackdrop", () => ({ __esModule: true, default: "ProfileBannerBackdrop" }));
 jest.mock("../components/auth/AuthKit", () => {
   const React = require("react");
   return {
@@ -147,8 +149,9 @@ describe("ProfileHero", () => {
     // Boş hakkında yine çizilir (yazılabilsin); yer tutucu görünür.
     expect(bio.props.value).toBe("");
     expect(bio.props.placeholder).toBe("Kendinden bahset…");
-    // Ad, okuma modundaki yazı stiliyle aynı boyda.
-    expect(flat(name.props.style).fontSize).toBe(26);
+    // Ad alanı formun en belirgini: kalın, büyük yazı; sayaç etiket satırında.
+    expect(flat(name.props.style).fontSize).toBe(20);
+    expect(texts()).toContain("8/40");
     expect(texts()).toContain("Bu kullanıcı adı alınmış");
     expect(flat(byTestId("profile-edit-username-hint")[0].props.style).color).toBe("#e11");
 
@@ -212,7 +215,7 @@ describe("FriendBadgeShowcase", () => {
     expect(renderer.toJSON()).toBeNull();
   });
 
-  it("düzenleme modunda 4 yuva: dolularda ×, boşlarda +", async () => {
+  it("düzenleme modunda 6 yuva: dolularda ×, boşlarda +", async () => {
     const onRemoveBadge = jest.fn();
     const onPressEmpty = jest.fn();
     await mount(
@@ -225,11 +228,25 @@ describe("FriendBadgeShowcase", () => {
       (n) => n.type === "TouchableOpacity" && n.props.accessibilityLabel === "Rozet Seç",
     );
     expect(remove).toHaveLength(1);
-    expect(empty).toHaveLength(3);
+    expect(empty).toHaveLength(5);
     await act(() => remove[0].props.onPress());
     expect(onRemoveBadge).toHaveBeenCalledWith(expect.objectContaining({ id: "ilk_kare" }));
     await act(() => empty[0].props.onPress());
     expect(onPressEmpty).toHaveBeenCalled();
+  });
+
+  it("dar ekranda 6 rozet yatay sığar, 4 rozet ortalanır", async () => {
+    await mount(<FriendBadgeShowcase badges={Array.from({ length: 6 }, (_, i) => badge(`badge_${i}`))} />);
+    const row = renderer.root.findAll((n) => n.type === "View" && typeof n.props.onLayout === "function")[0];
+    await act(() => row.props.onLayout({ nativeEvent: { layout: { width: 280 } } }));
+    const tiles = renderer.root.findAll((n) => n.type === "TouchableOpacity" && String(n.props.accessibilityLabel).includes("badge_"));
+    expect(tiles).toHaveLength(6);
+    const widths = tiles.map((tile) => StyleSheet.flatten(tile.props.style).width);
+    expect(widths.reduce((sum, width) => sum + width, 0) + 5 * 7).toBeLessThanOrEqual(280);
+
+    await mount(<FriendBadgeShowcase badges={Array.from({ length: 4 }, (_, i) => badge(`badge_${i}`))} />);
+    const fourRow = renderer.root.findAll((n) => n.type === "View" && typeof n.props.onLayout === "function")[0];
+    expect(StyleSheet.flatten(fourRow.props.style).justifyContent).toBe("center");
   });
 });
 

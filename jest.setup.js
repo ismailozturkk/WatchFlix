@@ -70,3 +70,11 @@ jest.mock("./components/LensLoader", () => ({
 
 // Marka ikonları (profil sosyal hesap şeridi): paket ESM; testte düz bileşen yeter.
 jest.mock("@expo/vector-icons/FontAwesome6", () => ({ __esModule: true, default: "FontAwesome6" }));
+
+// Skia alevi node'da yüklenemez (yerel modül): testler SVG yedek çizimini görür.
+// Seçimin kendisi __tests__/skiaStreakFlame.test.js'te ayrıca denenir.
+jest.mock("./components/streak/SkiaStreakFlame", () => ({
+  __esModule: true,
+  default: "SkiaStreakFlame",
+  SKIA_FLAME_READY: false,
+}));

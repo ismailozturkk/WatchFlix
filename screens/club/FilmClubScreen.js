@@ -696,7 +696,7 @@ export default function FilmClubScreen({ navigation, route }) {
   if (loading) {
     body = (
       <View style={styles.center}>
-        <LensLoader color={CLUB_ACCENT} />
+        <LensLoader size="screen" color={CLUB_ACCENT} />
         <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.loading}</Text>
       </View>
     );

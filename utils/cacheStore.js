@@ -169,6 +169,16 @@ export function getJSON(ns, key, { maxAge } = {}) {
   return entry.v;
 }
 
+/**
+ * Veri + yaş TEK okumayla: `{ v, age }` ya da null. getJSON + getAge ardı ardına
+ * çağrılınca aynı dosya iki kez okunup ayrıştırılıyordu (yol haritası Y6).
+ */
+export function getRecord(ns, key) {
+  const entry = getEntry(ns, key);
+  if (!entry) return null;
+  return { v: entry.v, age: Number.isFinite(entry.t) ? Date.now() - entry.t : null };
+}
+
 /** Kaydın yaşı (ms) ya da null. */
 export function getAge(ns, key) {
   const entry = getEntry(ns, key);

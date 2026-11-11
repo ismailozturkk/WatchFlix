@@ -1,6 +1,7 @@
 import { tmdbLanguageOf } from "../../utils/appLanguages";
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import {
+  Animated,
   StyleSheet,
   View,
   Text,
@@ -315,6 +316,8 @@ const SectionTitle = memo(({ label, theme, count }) => (
 ));
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
+const episodeKeyExtractor = (episode) => String(episode.id);
+
 export default function SeasonDetails({ route, navigation }) {
   const {
     showId,
@@ -335,6 +338,17 @@ export default function SeasonDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  // Üst görsel kaydırmaya bağlı: yavaş yükselir, kararır, söner; çekince esner
+  // (DetailHeroStage scrollY · components/common/heroScrollMotion.js — film/dizi,
+  // oyuncu ve profil kapağıyla ortak). Üstündeki etiketler içerikle normal kayar.
+  const heroScrollY = useRef(new Animated.Value(0)).current;
+  const onHeroScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: heroScrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [heroScrollY],
+  );
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
@@ -455,303 +469,318 @@ export default function SeasonDetails({ route, navigation }) {
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
     {/* Dekor İÇERİĞİN ARKASINDA: eskiden kar ScrollView'ın ÜSTÜNDE çiziliyordu. */}
     <ScreenDecor scope="details" iconOpacity={0.25} genres={genres} titleType="tv" titleId={showId} />
-    <ScrollView
+    {/* Bölümler sanallaştırılmış liste (yol haritası Y15): uzun sezonda tüm
+        kartlar ve görselleri bir anda kurulmaz. Kahraman + özet ListHeader. */}
+    <Animated.FlatList
+      onScroll={onHeroScroll}
+      scrollEventThrottle={16}
       style={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-    >
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
-
-      {/* Konfeti */}
-      {isSeasonWatched === 1 && (
-        <LottieView
-          style={styles.confetti}
-          source={require("@lottie/confetti_2.json")}
-          autoPlay
-          loop={false}
-        />
-      )}
-
-      {/* ── Hero: Poster Yuvası ───────────────────────────────────────────── */}
-      <DetailHeroStage
-        uri={
-          details.poster_path
-            ? getTmdbUrl(details.poster_path, 'poster', 200)
-            : null
-        }
-        theme={theme}
-        topInset={insets.top}
-        width={width}
-        imageHeight={SEASON_HERO_IMAGE_HEIGHT}
-        placeholderIcon="image"
-        placeholderSize={90}
-      >
-        {/* Sezon adı – sol alt, orta posterin alt kenarı üzerinde */}
-        <View
-          style={[
-            styles.seasonHeroBadge,
-            { bottom: heroMetrics.bottomAmbientHeight + 14, zIndex: 2 },
-          ]}
-        >
-          <Text style={styles.seasonHeroBadgeText}>{details.name}</Text>
-        </View>
-      </DetailHeroStage>
-
-      {/* ── İçerik ───────────────────────────────────────────────────────── */}
-      <View
-        style={[
-          styles.content,
-          { marginTop: -heroMetrics.contentOverlap },
-        ]}
-      >
-        {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
-        <View style={styles.titleBlock}>
-          <Text
-            style={[
-              styles.showNameText,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-          >
-            {showName}
-          </Text>
-          <View style={styles.metaRow}>
-            {details.air_date && (
-              <View
-                style={[
-                  styles.metaBadge,
-                  { backgroundColor: "rgba(255,255,255,0.08)" },
-                ]}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={12}
-                  color={theme.text?.secondary ?? "#aaa"}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.metaBadgeText,
-                    { color: theme.text?.secondary ?? "#aaa" },
-                  ]}
-                >
-                  {formatDate(details.air_date)}
-                </Text>
-              </View>
-            )}
-            <View
-              style={[
-                styles.metaBadge,
-                { backgroundColor: "rgba(255,255,255,0.08)" },
-              ]}
-            >
-              <Ionicons
-                name="play-circle-outline"
-                size={12}
-                color={theme.text?.secondary ?? "#aaa"}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={[
-                  styles.metaBadgeText,
-                  { color: theme.text?.secondary ?? "#aaa" },
-                ]}
-              >
-                {details.episodes.length} {details.episodes.length === 1 ? t.episode : t.episodes || t.episode}
-              </Text>
-            </View>
-            {seasonTotal.minutes > 0 && (
-              <View
-                style={[
-                  styles.metaBadge,
-                  { backgroundColor: "rgba(255,255,255,0.08)" },
-                ]}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={12}
-                  color={theme.text?.secondary ?? "#aaa"}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.metaBadgeText,
-                    { color: theme.text?.secondary ?? "#aaa" },
-                  ]}
-                >
-                  {seasonTotal.minutes}
-                  {seasonTotal.partial ? "+" : ""} {t.time}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* ── Puan ─────────────────────────────────────────────────────── */}
-        {details.vote_average > 0 && (
-          <View style={styles.ratingRow}>
-            <View
-              style={[
-                styles.ratingPill,
-                {
-                  borderColor: getRatingColor(details.vote_average) + "55",
-                  backgroundColor: getRatingColor(details.vote_average) + "18",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.ratingPillStar,
-                  { color: getRatingColor(details.vote_average) },
-                ]}
-              >
-                ★
-              </Text>
-              <Text
-                style={[
-                  styles.ratingPillScore,
-                  { color: getRatingColor(details.vote_average) },
-                ]}
-              >
-                {details.vote_average.toFixed(1)}
-              </Text>
-              <Text
-                style={[
-                  styles.ratingPillMax,
-                  { color: theme.text?.secondary ?? "#aaa" },
-                ]}
-              >
-                /10
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── İzlenme Çubuğu ───────────────────────────────────────────── */}
-        <WatchProgressBar
-          watched={watchedSeasonCount}
-          total={details.episodes?.length || 0}
-          startColor={progressColor}
-          endColor={theme.accent}
-          trackColor={theme.border}
-          style={styles.progressWrapper}
-        />
-
-        {/* ── Sezon yorumları ──────────────────────────────────────────── */}
-        {/* Dizinin ortak yorum sayfasını bu sezona süzülmüş açar. */}
-        <ScopedCommentButton
-          theme={theme}
-          showId={showId}
-          showName={showName}
-          showPosterPath={showPosterPath}
-          seasonCount={showSeasonCount}
-          scope={{
-            scope: COMMENT_SCOPE.SEASON,
-            seasonNumber,
-            scopeTitle: details.name || "",
-          }}
-          style={styles.commentButton}
-        />
-
-        <View
-          style={[
-            styles.divider,
-            { backgroundColor: "rgba(255,255,255,0.07)" },
-          ]}
-        />
-
-        {/* ── Özet ─────────────────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <SectionTitle label={t.overview} theme={theme} />
-          <Text
-            style={[
-              styles.overviewText,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-            numberOfLines={expanded ? undefined : 5}
-            ellipsizeMode="tail"
-            onTextLayout={(e) => setLineCount(e.nativeEvent.lines.length)}
-          >
-            {details.overview || t.noOverviewAvailable}
-          </Text>
-          {lineCount > 5 && (
-            <TouchableOpacity
-              onPress={() => setExpanded((v) => !v)}
-              style={styles.expandBtn}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.expandBtnInner,
-                  { backgroundColor: theme.secondary },
-                ]}
-              >
-                <MaterialIcons
-                  name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
-                  size={22}
-                  color={theme.text?.primary ?? "#fff"}
-                />
-              </View>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Bölüm Listesi ────────────────────────────────────────────── */}
-        <View style={[styles.section, { paddingBottom: 30 }]}>
-          <SectionTitle
-            label={t.episodes || t.episode}
-            theme={theme}
-            count={details.episodes.length}
+      data={details.episodes}
+      keyExtractor={episodeKeyExtractor}
+      initialNumToRender={6}
+      maxToRenderPerBatch={6}
+      windowSize={7}
+      ListFooterComponent={<View style={styles.episodesFooter} />}
+      ListHeaderComponent={
+        <>
+          <StatusBar
+            barStyle="light-content"
+            translucent
+            backgroundColor="transparent"
           />
-          {details.episodes.map((episode) => {
-            const dateDiff = calculateDateDifference(episode.air_date);
-            return (
-              <EpisodeCard
-                key={episode.id}
-                episode={episode}
-                showId={showId}
-                showName={showName}
-                seasonNumber={seasonNumber}
-                showEpisodeCount={showEpisodeCount}
-                showSeasonCount={showSeasonCount}
-                showPosterPath={showPosterPath}
-                seasonPosterPath={details.poster_path}
-                seasonEpisodeCount={details.episodes.length}
-                genres={genres}
-                theme={theme}
-                imageQuality={imageQuality}
-                getTmdbUrl={getTmdbUrl}
-                t={t}
-                isPlaying={episode.id === play}
-                dateDiff={dateDiff}
-                isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
-                watchEvents={watched.episodeWatchEvents(
-                  seasonNumber,
-                  episode.episode_number,
+
+          {/* Konfeti */}
+          {isSeasonWatched === 1 && (
+            <LottieView
+              style={styles.confetti}
+              source={require("@lottie/confetti_2.json")}
+              autoPlay
+              loop={false}
+            />
+          )}
+
+          {/* ── Hero: Poster Yuvası ───────────────────────────────────────────── */}
+          <DetailHeroStage
+            uri={
+              details.poster_path
+                ? getTmdbUrl(details.poster_path, 'poster', 200)
+                : null
+            }
+            theme={theme}
+            topInset={insets.top}
+            width={width}
+            imageHeight={SEASON_HERO_IMAGE_HEIGHT}
+            placeholderIcon="image"
+            placeholderSize={90}
+            scrollY={heroScrollY}
+          >
+            {/* Sezon adı – sol alt, orta posterin alt kenarı üzerinde */}
+            <View
+              style={[
+                styles.seasonHeroBadge,
+                { bottom: heroMetrics.bottomAmbientHeight + 14, zIndex: 2 },
+              ]}
+            >
+              <Text style={styles.seasonHeroBadgeText}>{details.name}</Text>
+            </View>
+          </DetailHeroStage>
+
+          {/* ── İçerik ───────────────────────────────────────────────────────── */}
+          <View
+            style={[
+              styles.content,
+              { marginTop: -heroMetrics.contentOverlap },
+            ]}
+          >
+            {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
+            <View style={styles.titleBlock}>
+              <Text
+                style={[
+                  styles.showNameText,
+                  { color: theme.text?.secondary ?? "#aaa" },
+                ]}
+              >
+                {showName}
+              </Text>
+              <View style={styles.metaRow}>
+                {details.air_date && (
+                  <View
+                    style={[
+                      styles.metaBadge,
+                      { backgroundColor: "rgba(255,255,255,0.08)" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={12}
+                      color={theme.text?.secondary ?? "#aaa"}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.metaBadgeText,
+                        { color: theme.text?.secondary ?? "#aaa" },
+                      ]}
+                    >
+                      {formatDate(details.air_date)}
+                    </Text>
+                  </View>
                 )}
-                onPress={() =>
-                  navigation.navigate("EpisodeDetails", {
-                    showId,
-                    showName,
-                    seasonNumber,
-                    seasonEpisodes: details.episodes.length,
-                    episodeNumber: episode.episode_number,
-                    showEpisodeCount,
-                    showSeasonCount,
-                    showPosterPath,
-                    seasonPosterPath: details.poster_path,
-                    genres,
-                  })
-                }
+                <View
+                  style={[
+                    styles.metaBadge,
+                    { backgroundColor: "rgba(255,255,255,0.08)" },
+                  ]}
+                >
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={12}
+                    color={theme.text?.secondary ?? "#aaa"}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text
+                    style={[
+                      styles.metaBadgeText,
+                      { color: theme.text?.secondary ?? "#aaa" },
+                    ]}
+                  >
+                    {details.episodes.length} {details.episodes.length === 1 ? t.episode : t.episodes || t.episode}
+                  </Text>
+                </View>
+                {seasonTotal.minutes > 0 && (
+                  <View
+                    style={[
+                      styles.metaBadge,
+                      { backgroundColor: "rgba(255,255,255,0.08)" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="time-outline"
+                      size={12}
+                      color={theme.text?.secondary ?? "#aaa"}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.metaBadgeText,
+                        { color: theme.text?.secondary ?? "#aaa" },
+                      ]}
+                    >
+                      {seasonTotal.minutes}
+                      {seasonTotal.partial ? "+" : ""} {t.time}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* ── Puan ─────────────────────────────────────────────────────── */}
+            {details.vote_average > 0 && (
+              <View style={styles.ratingRow}>
+                <View
+                  style={[
+                    styles.ratingPill,
+                    {
+                      borderColor: getRatingColor(details.vote_average) + "55",
+                      backgroundColor: getRatingColor(details.vote_average) + "18",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.ratingPillStar,
+                      { color: getRatingColor(details.vote_average) },
+                    ]}
+                  >
+                    ★
+                  </Text>
+                  <Text
+                    style={[
+                      styles.ratingPillScore,
+                      { color: getRatingColor(details.vote_average) },
+                    ]}
+                  >
+                    {details.vote_average.toFixed(1)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.ratingPillMax,
+                      { color: theme.text?.secondary ?? "#aaa" },
+                    ]}
+                  >
+                    /10
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* ── İzlenme Çubuğu ───────────────────────────────────────────── */}
+            <WatchProgressBar
+              watched={watchedSeasonCount}
+              total={details.episodes?.length || 0}
+              startColor={progressColor}
+              endColor={theme.accent}
+              trackColor={theme.border}
+              style={styles.progressWrapper}
+            />
+
+            {/* ── Sezon yorumları ──────────────────────────────────────────── */}
+            {/* Dizinin ortak yorum sayfasını bu sezona süzülmüş açar. */}
+            <ScopedCommentButton
+              theme={theme}
+              showId={showId}
+              showName={showName}
+              showPosterPath={showPosterPath}
+              seasonCount={showSeasonCount}
+              scope={{
+                scope: COMMENT_SCOPE.SEASON,
+                seasonNumber,
+                scopeTitle: details.name || "",
+              }}
+              style={styles.commentButton}
+            />
+
+            <View
+              style={[
+                styles.divider,
+                { backgroundColor: "rgba(255,255,255,0.07)" },
+              ]}
+            />
+
+            {/* ── Özet ─────────────────────────────────────────────────────── */}
+            <View style={styles.section}>
+              <SectionTitle label={t.overview} theme={theme} />
+              <Text
+                style={[
+                  styles.overviewText,
+                  { color: theme.text?.secondary ?? "#aaa" },
+                ]}
+                numberOfLines={expanded ? undefined : 5}
+                ellipsizeMode="tail"
+                onTextLayout={(e) => setLineCount(e.nativeEvent.lines.length)}
+              >
+                {details.overview || t.noOverviewAvailable}
+              </Text>
+              {lineCount > 5 && (
+                <TouchableOpacity
+                  onPress={() => setExpanded((v) => !v)}
+                  style={styles.expandBtn}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.expandBtnInner,
+                      { backgroundColor: theme.secondary },
+                    ]}
+                  >
+                    <MaterialIcons
+                      name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                      size={22}
+                      color={theme.text?.primary ?? "#fff"}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* ── Bölüm Listesi ────────────────────────────────────────────── */}
+            <View style={styles.episodesHeader}>
+              <SectionTitle
+                label={t.episodes || t.episode}
+                theme={theme}
+                count={details.episodes.length}
               />
-            );
-          })}
-        </View>
-      </View>
-    </ScrollView>
+            </View>
+          </View>
+        </>
+      }
+      renderItem={({ item: episode }) => {
+        const dateDiff = calculateDateDifference(episode.air_date);
+        return (
+          <View style={styles.episodeRow}>
+            <EpisodeCard
+              episode={episode}
+              showId={showId}
+              showName={showName}
+              seasonNumber={seasonNumber}
+              showEpisodeCount={showEpisodeCount}
+              showSeasonCount={showSeasonCount}
+              showPosterPath={showPosterPath}
+              seasonPosterPath={details.poster_path}
+              seasonEpisodeCount={details.episodes.length}
+              genres={genres}
+              theme={theme}
+              imageQuality={imageQuality}
+              getTmdbUrl={getTmdbUrl}
+              t={t}
+              isPlaying={episode.id === play}
+              dateDiff={dateDiff}
+              isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
+              watchEvents={watched.episodeWatchEvents(
+                seasonNumber,
+                episode.episode_number,
+              )}
+              onPress={() =>
+                navigation.navigate("EpisodeDetails", {
+                  showId,
+                  showName,
+                  seasonNumber,
+                  seasonEpisodes: details.episodes.length,
+                  episodeNumber: episode.episode_number,
+                  showEpisodeCount,
+                  showSeasonCount,
+                  showPosterPath,
+                  seasonPosterPath: details.poster_path,
+                  genres,
+                })
+              }
+            />
+          </View>
+        );
+      }}
+    />
 
     <BackButton variant="blur" />
     </View>
@@ -853,6 +882,9 @@ const styles = StyleSheet.create({
 
   // ── Seksiyon ──────────────────────────────────────────────────────────────
   section: { marginBottom: 16 },
+  episodesHeader: { marginBottom: 0 },
+  episodeRow: { paddingHorizontal: 18 },
+  episodesFooter: { height: 30 },
   sectionTitleRow: {
     flexDirection: "row",
     alignItems: "center",

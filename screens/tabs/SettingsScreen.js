@@ -81,6 +81,7 @@ import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
 import useHapticPrefs from "../../hooks/useHapticPrefs";
 import { getHapticsCopy, hapticsRowSubtitle } from "./settings/hapticsCopy";
+import { getSensitiveContentCopy, sensitiveRowSubtitle } from "./settings/sensitiveContentCopy";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
@@ -447,7 +448,9 @@ export default function SettingsScreen() {
   // alttaki ayrı satır yalnız vitrin gören Free kullanıcıda kalır.
   const { plan: premiumPlan } = usePremium();
   const hasMemberBar = shouldShowMemberBar(premiumPlan);
-  const { adultContent, chaneAdultContent, ageRestricted } = useContentSettings();
+  const { sensitiveContent, ageRestricted } = useContentSettings();
+  const sensitiveCopy = getSensitiveContentCopy(language);
+  const sensitiveShownCount = Object.values(sensitiveContent || {}).filter(Boolean).length;
   const { showOngoingTvShows, changeShowOngoingTvShows } =
     useOngoingTvShowsSettings();
   const { imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl } =
@@ -930,25 +933,21 @@ export default function SettingsScreen() {
               />
             }
           />
-          {/* Yetişkin içerik — 18 altı hesapta satır HİÇ ÇİZİLMEZ. Kapalı bir
-              anahtar göstermek "neden açamıyorum" sorusunu doğuruyor; içerik
-              süzgeci zaten ayrıca kilitli (bkz. utils/tmdbAdultGuard.js). */}
+          {/* Hassas içerikler (yetişkin, uyuşturucu, kan/vahşet, savaş) — 18 altı
+              hesapta satır HİÇ ÇİZİLMEZ. Kilitli anahtarlar göstermek "neden
+              açamıyorum" sorusunu doğuruyor; süzgeç zaten ayrıca kilitli (bkz.
+              utils/sensitiveContent.js, utils/tmdbAdultGuard.js). */}
           {!ageRestricted && (
             <SettingRow
               colors={C}
               iconBg={C.iconPurple}
               iconColor={C.purple}
-              iconName={adultContent ? "eye-outline" : "eye-off-outline"}
-              title={t.adultContent}
-              subtitle={t.adultContentSubtitle}
+              iconName={sensitiveShownCount > 0 ? "eye-outline" : "eye-off-outline"}
+              title={sensitiveCopy.title}
+              subtitle={sensitiveRowSubtitle(sensitiveCopy, sensitiveContent)}
               last
-              right={
-                <SwitchToggle
-                  value={adultContent}
-                  onValueChange={() => chaneAdultContent(!adultContent)}
-                  size={36}
-                />
-              }
+              onPress={() => navigation.navigate("SensitiveContentScreen")}
+              right={<Chevron color={C.muted} />}
             />
           )}
         </GlassBox>
@@ -1226,8 +1225,18 @@ export default function SettingsScreen() {
         {__DEV__ ? (
           <GlassBox role="card" style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
             <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
+              iconName="flask-outline" title="Geliştirici Laboratuvarı"
+              subtitle="Yükleme, seri, turnuva, toast denemeleri"
+              onPress={() => __DEV__ && navigation.navigate("DevLabScreen")}
+              right={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <DevBadge />
+                  <Chevron color={C.muted} />
+                </View>
+              } />
+            <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
               iconName="analytics-outline" title="Debug"
-              onPress={() => navigation.navigate("UsageDebugScreen")}
+              onPress={() => __DEV__ && navigation.navigate("UsageDebugScreen")}
               right={
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <DevBadge />
@@ -1312,7 +1321,7 @@ export default function SettingsScreen() {
               </View>
               {providerCatalogLoading ? (
                 <View style={s.providerLoading}>
-                  <LensLoader size="small" color={C.accent} />
+                  <LensLoader size="medium" color={C.accent} />
                 </View>
               ) : (
                 <FlatList

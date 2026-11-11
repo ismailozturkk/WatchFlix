@@ -377,7 +377,7 @@ export default function TvShowsEmmy({ navigation }) {
     if (emmyMode !== "category" || !loadingMoreEmmy) return null;
     return (
       <View style={styles.footerLoader}>
-        <LensLoader size="small" color="#ffd700" />
+        <LensLoader size="medium" color="#ffd700" />
       </View>
     );
   };

@@ -7,7 +7,8 @@ Gereken:   Pillow + numpy
 Simge seti (5 Kas 2026): üç Lens + üç S.
   Lens: default (varsayılan, düz), lens3d (kabarık 3B), lensglass (iOS 26 tarzı cam) — üretilir.
   S:    classic (eski 3B "S", elle çizilmiş özgün set), glass (elle çizilmiş cam S) — ÜRETİLMEZ;
-        flat (düz 2B: classic'in silüeti, düz renkler, gölge/ışık yok) — üretilir.
+        flat (düz 2B: classic'in silüeti ve ZEMİNİ, classic'in mor→mavi→turkuaz renkleri;
+        gölge/ışık/hacim yok) — üretilir.
 30 Eki'de eklenen S renk temaları (gold, midnight, sunset, aurora, cinema, light) 5 Kas'ta kaldırıldı.
 
 Arka plan çapraz gradyandır (sol alt koyu → sağ üst açık) + işaretin arkasında yumuşak ışık; düz
@@ -56,11 +57,19 @@ THEMES = {
         "bg": ["#06070c", "#10121b", "#23263a"], "glow": ("#14c8e8", 0.24, (0.5, 0.30)),
         "glow2": ("#ff3d5e", 0.22, (0.5, 0.70)),
     },
-    # Düz 2B S: klasik S'nin silüeti, tek renk dolgu, tek renk zemin; gölge, ışık, gradyan yok.
+    # Düz 2B S (11 Kas): klasik/cam S ile aynı aile — zemin classic'in koyu lacivert→mor zemini
+    # (dosyadan birebir), S'nin rengi classic'teki gibi üst kol mor → gövde mavi → alt kol
+    # turkuaz; yalnız YAPI düz: gölge, parlama, hacim yok. Noktalar classic'teki renklerinde.
+    # Eskisi (beyaz S, düz #6d4aff zemin) S ailesine hiç benzemiyordu.
     "flat": {
         "draw": "flat",
-        "bg": ["#6d4aff", "#6d4aff", "#6d4aff"], "glow": None,
-        "fill": "#ffffff",
+        "bg_from": "icon_classic",
+        "bg": ["#04061a", "#1b195a", "#502f90"], "glow": None,
+        # S boyunca (sağ üst → sol alt) renk durakları; classic'ten örneklenip doygunlaştırıldı.
+        "fill_axis": ((650, 300), (350, 720)),
+        "fill_stops": ["#a47cf0", "#5a8ff2", "#3fb8e6", "#4fdcc4"],
+        # Üç nokta (classic'te ayrı bileşenler): mor, turkuaz, açık mavi.
+        "dot_colors": {"purple": "#a274f0", "teal": "#4fd0d0", "blue": "#7cc8f6"},
     },
 }
 
@@ -110,10 +119,42 @@ def crisp_silhouette(alpha):
 
 
 def draw_flat(theme):
-    """Düz 2B S: (ön plan, tek renk beyaz siluet)."""
+    """Düz 2B S: (ön plan, tek renk beyaz siluet).
+
+    Dolgu S boyunca düz bir renk geçişi (hacim/ışık yok); classic'teki üç nokta ayrı
+    bileşen olarak bulunup her biri kendi düz rengiyle boyanır.
+    """
+    from scipy import ndimage
+
     a = crisp_silhouette(Image.open(SRC_FG).convert("RGBA").getchannel("A"))
-    fg = Image.new("RGBA", (SIZE, SIZE), tuple(hexrgb(theme["fill"]).astype(int)) + (0,))
-    fg.putalpha(a)
+    alpha = np.asarray(a)
+    (x0, y0), (x1, y1) = theme["fill_axis"]
+    y, x = np.mgrid[0:SIZE, 0:SIZE].astype(float)
+    dx, dy = x1 - x0, y1 - y0
+    t = np.clip(((x - x0) * dx + (y - y0) * dy) / (dx * dx + dy * dy), 0, 1)
+    rgb = gradient_map(t, theme["fill_stops"])
+
+    # Noktalar: S gövdesi en büyük bileşen; kalanlar konumlarına göre (classic düzeni).
+    lab, n = ndimage.label(alpha > 128)
+    sizes = ndimage.sum(np.ones_like(alpha), lab, range(1, n + 1))
+    body = int(np.argmax(sizes)) + 1
+    dots = []
+    for i in range(1, n + 1):
+        if i == body:
+            continue
+        ys, xs = np.where(lab == i)
+        dots.append((i, xs.mean(), ys.mean()))
+    cols = theme["dot_colors"]
+    # En üstteki mor, en soldaki (kalan) turkuaz, en sağdaki açık mavi.
+    if len(dots) == 3:
+        dots.sort(key=lambda d: d[2])
+        top, rest = dots[0], sorted(dots[1:], key=lambda d: d[1])
+        for (i, _, _), name in ((top, "purple"), (rest[0], "teal"), (rest[1], "blue")):
+            # Kenar yumuşatması kaybolmasın: bileşeni biraz genişletip o bölgeyi boya.
+            region = ndimage.binary_dilation(lab == i, iterations=4)
+            rgb[region] = hexrgb(cols[name])
+
+    fg = Image.fromarray(np.dstack([np.clip(rgb, 0, 255), alpha]).astype(np.uint8), "RGBA")
     mono = Image.new("RGBA", (SIZE, SIZE), (255, 255, 255, 0))
     mono.putalpha(a)
     return fg, mono
@@ -186,7 +227,12 @@ def soft_shadow(fg, strength):
 def build(name, theme):
     out_dir = ROOT / "assets" / f"icon_{name}"
     out_dir.mkdir(exist_ok=True)
-    bg = background(theme)
+    if theme.get("bg_from"):
+        # Aynı ailenin elle çizilmiş zemini birebir (ör. düz S → classic'in zemini).
+        bg = Image.open(ROOT / "assets" / theme["bg_from"] / "android-icon-background.png").convert("RGBA")
+        bg = bg.resize((SIZE, SIZE), Image.LANCZOS) if bg.size != (SIZE, SIZE) else bg
+    else:
+        bg = background(theme)
     if theme.get("draw") == "lens":
         fg, mono = draw_lens(), draw_lens(mono=True)
     elif theme.get("draw") == "lens3d":

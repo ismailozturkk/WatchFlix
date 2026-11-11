@@ -301,6 +301,31 @@ describe("useOwnProfileEditor", () => {
     });
   });
 
+  describe("profile banner", () => {
+    const banner = { id: 27205, type: "movie", title: "Inception", path: "/abc.jpg" };
+
+    it("saves a picked banner and removing it writes null", async () => {
+      await render();
+      await run((e) => e.setBanner(banner));
+      expect(ed().dirty).toBe(true);
+      await save();
+      expect(mockUpdateField).toHaveBeenCalledWith({ profileBanner: banner }, { stampIdentity: false });
+
+      mockUpdateField.mockClear();
+      mockProfile = { ...SAVED, profileBanner: banner };
+      await render();
+      await run((e) => e.setBanner(null));
+      await save();
+      expect(mockUpdateField).toHaveBeenCalledWith({ profileBanner: null }, { stampIdentity: false });
+    });
+
+    it("an invalid banner is ignored (not dirty)", async () => {
+      await render();
+      await run((e) => e.setBanner({ ...banner, path: "https://x.example/a.jpg" }));
+      expect(ed().dirty).toBe(false);
+    });
+  });
+
   describe("social accounts", () => {
     it("saves a resolved handle to the links document", async () => {
       await render();

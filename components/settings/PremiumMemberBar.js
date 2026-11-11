@@ -18,7 +18,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+import useScreenFocused from "@hooks/useScreenFocused";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import useReduceMotion from "@hooks/useReduceMotion";
@@ -40,7 +41,8 @@ const SWEEP_MS = 1300;
 
 export default function PremiumMemberBar() {
   const navigation = useNavigation();
-  const focused = useIsFocused();
+  // Sekme farkında odak (gizli sekmede döngü dönmesin; useIsFocused kök rotayı okur).
+  const focused = useScreenFocused();
   const reduceMotion = useReduceMotion();
   const { theme } = useTheme();
   const { language } = useLanguage();

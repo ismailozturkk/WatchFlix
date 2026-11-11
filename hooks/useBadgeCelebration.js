@@ -27,45 +27,63 @@ import { haptic } from "@services/hapticsService";
 import { PERDE_ADLARI, perdeAdlariOf } from "@utils/watchScoring";
 import { i18nText } from "@utils/i18nText";
 
+/**
+ * Kutlamayı gösterir (toast + titreşim). Hook ve Ayarlar > Geliştirici
+ * Laboratuvarı aynı yolu kullanır.
+ * @param {{ rozetler?: string[], perdeAtladi?: boolean, yeniPerde?: number,
+ *   makaraAtladi?: boolean, yeniMakara?: number }} kutlama
+ * @returns {boolean} bir şey gösterildi mi
+ */
+export function showBadgeCelebration(kutlama, language) {
+  if (!kutlama) return false;
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const baslik = baslikOdulu(kutlama.rozetler, lang);
+
+  if (baslik) {
+    const { gorunum, ek } = baslik;
+    toast.badge(
+      gorunum.baslik,
+      gorunum.ad,
+      { gorunum, ek, ipucu: i18nText("autoI18n.rozet_toast_ipucu", "Görmek için dokun") },
+      { onPress: () => navigateRoot("WatchBadgesScreen", { openId: gorunum.id }) },
+    );
+    haptic("badge");
+    return true;
+  }
+  if (kutlama.perdeAtladi) {
+    const adlar = perdeAdlariOf(lang);
+    toast.success(
+      i18nText("autoI18n.perde_atlandi", `Perde ${kutlama.yeniPerde}'e yükseldin`, {
+        n: kutlama.yeniPerde,
+      }),
+      adlar[kutlama.yeniPerde - 1] || "",
+      { onPress: () => navigateRoot("WatchBadgesScreen") },
+    );
+    haptic("celebrate");
+    return true;
+  }
+  if (kutlama.makaraAtladi) {
+    // Makara ayrı bildirilir: zirvedeki kullanıcının Perdesi değişmiyor,
+    // "Perde 20'e yükseldin" demek yanlış olurdu.
+    toast.success(
+      i18nText("autoI18n.makara_atlandi", `${kutlama.yeniMakara}. Makara`, {
+        n: kutlama.yeniMakara,
+      }),
+      perdeAdlariOf(lang)[PERDE_ADLARI.length - 1],
+      { onPress: () => navigateRoot("WatchBadgesScreen") },
+    );
+    haptic("celebrate");
+    return true;
+  }
+  return false;
+}
+
 export default function useBadgeCelebration({ kutlama, kutlamayiKapat }) {
   const { language } = useLanguage();
 
   useEffect(() => {
     if (!kutlama) return;
-    const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
-    const baslik = baslikOdulu(kutlama.rozetler, lang);
-
-    if (baslik) {
-      const { gorunum, ek } = baslik;
-      toast.badge(
-        gorunum.baslik,
-        gorunum.ad,
-        { gorunum, ek, ipucu: i18nText("autoI18n.rozet_toast_ipucu", "Görmek için dokun") },
-        { onPress: () => navigateRoot("WatchBadgesScreen", { openId: gorunum.id }) },
-      );
-      haptic("badge");
-    } else if (kutlama.perdeAtladi) {
-      const adlar = perdeAdlariOf(lang);
-      toast.success(
-        i18nText("autoI18n.perde_atlandi", `Perde ${kutlama.yeniPerde}'e yükseldin`, {
-          n: kutlama.yeniPerde,
-        }),
-        adlar[kutlama.yeniPerde - 1] || "",
-        { onPress: () => navigateRoot("WatchBadgesScreen") },
-      );
-      haptic("celebrate");
-    } else if (kutlama.makaraAtladi) {
-      // Makara ayrı bildirilir: zirvedeki kullanıcının Perdesi değişmiyor,
-      // "Perde 20'e yükseldin" demek yanlış olurdu.
-      toast.success(
-        i18nText("autoI18n.makara_atlandi", `${kutlama.yeniMakara}. Makara`, {
-          n: kutlama.yeniMakara,
-        }),
-        perdeAdlariOf(lang)[PERDE_ADLARI.length - 1],
-        { onPress: () => navigateRoot("WatchBadgesScreen") },
-      );
-      haptic("celebrate");
-    }
+    showBadgeCelebration(kutlama, language);
     kutlamayiKapat();
   }, [kutlama, kutlamayiKapat, language]);
 }

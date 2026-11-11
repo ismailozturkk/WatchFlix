@@ -598,7 +598,7 @@ function StreakTile({ ctx, style }) {
         <CardText numberOfLines={1} style={styles.streakNumber}>
           {value}
         </CardText>
-        <CardText style={styles.streakUnit}>{str.dayUnit}</CardText>
+        <CardText style={styles.streakUnit}>{str.weekUnit || str.dayUnit}</CardText>
       </View>
       <View style={styles.weekDots}>
         {streak.week.map((on, index) => (

@@ -22,6 +22,7 @@ import React, { memo, useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
+import LensLoader from "../LensLoader";
 import Animated, {
   Easing,
   Extrapolation,
@@ -47,8 +48,6 @@ const STROKE = "#FFFFFF";
 const CHECK_LEN = 18;
 const CROSS_LEN = 12;
 const BAR_LEN = 7.5;
-const RING_R = 8.6;
-const RING_LEN = 2 * Math.PI * RING_R;
 
 const STAR_PATH =
   "M12 3.3 L14.55 9.05 L20.8 9.65 L16.1 13.8 L17.5 19.95 L12 16.75 L6.5 19.95 L7.9 13.8 L3.2 9.65 L9.45 9.05 Z";
@@ -156,29 +155,13 @@ function StarGlyph() {
   return <Path d={STAR_PATH} fill={STROKE} stroke={STROKE} strokeWidth={1.2} strokeLinejoin="round" />;
 }
 
+// Yükleniyor: uygulamanın ortak göstergesi (iki karadelik). Orb renkli zemin →
+// mono ton (beyaz halka + çekirdek), ActivityIndicator benzeri döner halka yerine.
 function LoadingGlyph() {
-  const spin = useSharedValue(0);
-  useEffect(() => {
-    spin.value = withRepeat(withTiming(360, { duration: 900, easing: Easing.linear }), -1, false);
-  }, [spin]);
-  const style = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.center, style]}>
-      <Svg width={24} height={24} viewBox="0 0 24 24">
-        <Circle cx={12} cy={12} r={RING_R} stroke={STROKE} strokeOpacity={0.28} strokeWidth={2.7} fill="none" />
-        <Circle
-          cx={12}
-          cy={12}
-          r={RING_R}
-          stroke={STROKE}
-          strokeWidth={2.7}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={[RING_LEN * 0.28, RING_LEN]}
-          transform="rotate(-90 12 12)"
-        />
-      </Svg>
-    </Animated.View>
+    <View style={[StyleSheet.absoluteFill, styles.center]}>
+      <LensLoader tone="mono" size={26} color={STROKE} />
+    </View>
   );
 }
 

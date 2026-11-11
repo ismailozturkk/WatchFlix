@@ -1,8 +1,8 @@
 // Oyuncu / yönetmen sayfası hero'su (screens/actor/ActorViewScreen.js):
 //   • fotoğraf film/dizi detayındaki bulanık katmanlı yuvada (DetailHeroStage) — uzun
 //     koyulaştırılmış alt şerit + kısa tema geçişi,
-//   • "Takip et" / "Avatarım yap" yanında Yapay Zeka ve Sohbete gönder düğmeleri:
-//     AI paneli kişi sorusuyla açılır, gönder seçilen sohbete kişi kartını taşır.
+//   • "Takip et" / "Avatarım yap" yanında yazılı "Gönder" düğmesi (Yapay Zeka 11 Kas'ta
+//     kaldırıldı): gönder seçilen sohbete kişi kartını taşır.
 // Görsel düzen cihazda görülür; bu test neyin bağlandığını kilitler.
 
 import React from "react";
@@ -150,7 +150,7 @@ describe("ActorViewScreen hero", () => {
     expect(stage.findAll((n) => n.type === "Text" && n.props.children === "Brad Pitt")).toHaveLength(1);
   });
 
-  it("Takip et ve Avatarım yap'ın yanında Yapay Zeka ve Sohbete gönder", async () => {
+  it("Takip et ve Avatarım yap'ın yanında yalnız yazılı Gönder (Yapay Zeka yok)", async () => {
     await renderScreen();
     // Eylem satırı = hero içindeki sarmalı yatay satır; host düğümlerini sırasıyla oku.
     const row = renderer.root.find(
@@ -159,19 +159,9 @@ describe("ActorViewScreen hero", () => {
     const kinds = row
       .findAll((n) => ["FollowPersonButton", "PersonAvatarButton", "Pressable"].includes(n.type))
       .map((n) => (n.type === "Pressable" ? n.props.accessibilityLabel : n.type));
-    expect(kinds).toEqual(["FollowPersonButton", "PersonAvatarButton", "Yapay Zeka", "Sohbete gönder"]);
-  });
-
-  it("Yapay Zeka paneli kişi sorusuyla ilk dokunuşta kurulur ve açılır", async () => {
-    await renderScreen();
+    expect(kinds).toEqual(["FollowPersonButton", "PersonAvatarButton", "Sohbete gönder"]);
+    expect(row.findAll((n) => n.type === "Text" && n.props.children === "Gönder")).toHaveLength(1);
     expect(renderer.root.findAllByType("AIChatScreen")).toHaveLength(0);
-    await act(async () => byLabel("Yapay Zeka").props.onPress());
-    const ai = renderer.root.findByType("AIChatScreen");
-    expect(ai.props.visible).toBe(true);
-    expect(ai.props.initialPrompt).toContain("Brad Pitt (Fight Club)");
-    expect(ai.props.initialDisplay).toBe("Brad Pitt hakkında bilgi verir misin?");
-    await act(async () => ai.props.onClose());
-    expect(renderer.root.findByType("AIChatScreen").props.visible).toBe(false);
   });
 
   it("Sohbete gönder: seçilen arkadaş/grup sohbeti kişi kartıyla açılır", async () => {

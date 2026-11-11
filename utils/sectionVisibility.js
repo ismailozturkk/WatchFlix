@@ -118,10 +118,18 @@ export const SECTION_SCREENS = Object.freeze(
       id: "profile",
       icon: "person-circle-outline",
       sections: [
+        // Profil kapağı (arka plan afişi): yalnız KENDİ profil sekmesinde gizlenir;
+        // arkadaşların gördüğü profil (FriendProfileScreen) kapağı göstermeye devam eder.
+        section("banner", "image-outline", "purple"),
         // Başlıktaki (Düzenle / Paylaş'ın yanındaki) halka düğmesi: ekranda en üstte.
         section("goal", "flag-outline", "amber"),
         // Adın yanındaki günlük seri alevi (components/streak/StreakFlameBadge.js).
         section("streak", "flame-outline", "amber"),
+        // Adın altındaki hesap bağlantıları (Instagram, Letterboxd…). Yalnız KENDİ profil
+        // sekmesinde gizlenir; kimlerin göreceği Gizlilik > Hesap Bağlantıları'nda.
+        // Eskiden Gizlilik ekranındaki "Profil sekmemde göster" anahtarıydı
+        // (privacy.showSocialLinksOnOwnProfile) — ProfileScreen eski değeri bir kez buraya taşır.
+        section("socialLinks", "link-outline", "blue"),
         section("badges", "ribbon-outline", "amber"),
         // Mesajlar, arkadaş listesi ve istekler uygulamada YALNIZ buradan açılıyor.
         section("friends", "people-outline", "blue", { confirmHide: true }),

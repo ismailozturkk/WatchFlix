@@ -47,7 +47,9 @@ const RAW_TOUCHABLE_ALLOWED = {
   // Duvarı). Kartın kendisi zaten dokunulur, cam iç içe kalabalık olur ve seçili
   // çipin turuncu tonunu bozar.
   "screens/tabs/profile/ProfileLists.js": 2,
-  "components/badges/BadgeShowcaseCard.js": 2, // kart gibi vitrin yuvası + yuvanın köşesindeki sil rozeti
+  // Kart gibi vitrin yuvası + yuvanın köşesindeki sil rozeti + arkadaş görünümü
+  // düzenlemesinde dokunulur karonun İÇİNDEKİ sil rozeti (iç içe cam kalabalık olur).
+  "components/badges/BadgeShowcaseCard.js": 3,
   // Düğmenin KENDİSİ renk örneği / tema önizlemesi: cam tonu gösterdiği rengi bozar.
   "components/theme/ThemeShuffleDeck.js": 2,
   "components/theme/ThemeToneKit.js": 1,
@@ -83,9 +85,7 @@ const RAW_INPUT_ALLOWED = {
   "components/profile/StatsComponents.js": 1,
   // Not kâğıdı alanları: kutu yok, cam olacak şey yok.
   "screens/tabs/profile/notes/NoteEditorSheet.js": 3,
-  // Profil düzenleme modu: okuma metniyle (ad / kullanıcı adı / hakkında / sosyal bağlantı)
-  // aynı stilde yerinde alanlar — "UI aynı kalsın" kararı; kutu yok, cam olacak şey yok.
-  "components/friends/FriendProfileSections.js": 3,
+  // Profil düzenleme modu: sosyal bağlantı alanı okuma şeridiyle aynı stilde yerinde (kutu yok).
   "components/profile/SocialLinksEditRow.js": 1,
   // Opaklığı animasyonlu atası olan alan (cam opaklıkla soldurulamaz).
   "screens/lists/ListsViewScreen.js": 1,

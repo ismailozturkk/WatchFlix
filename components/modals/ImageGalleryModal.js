@@ -296,11 +296,7 @@ const GalleryImageItem = ({ item, status, uri, viewSize, pageSize, underlayUri, 
             pointerEvents="none"
           >
             {isLoading ? (
-              <LensLoader tone="mono"
-                size="small"
-                color="#fff"
-                style={styles.hintSpinner}
-              />
+              <LensLoader tone="mono" size={16} color="#fff" />
             ) : (
               <Ionicons name={hintIcon} size={14} color="#fff" />
             )}
@@ -926,7 +922,7 @@ const ImageGalleryModal = ({
         pointerEvents="box-none"
       >
         {loading && !initialImage ? (
-          <LensLoader size="large" color="#FFD700" />
+          <LensLoader size="screen" color="#FFD700" />
         ) : (
           <>
             <Animated.FlatList
@@ -1287,7 +1283,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(150,40,44,0.85)",
   },
   // Ikon 14px; spinner'i ayni kutuya sigdirmazsak ipucu hapi zipliyor.
-  hintSpinner: { width: 14, height: 14, transform: [{ scale: 0.7 }] },
   downloadHintText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   gridImage: {
     borderRadius: 8,

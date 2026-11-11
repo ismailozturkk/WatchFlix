@@ -4,7 +4,7 @@
 // zamanlayıcılar).
 import React from "react";
 import { act, create } from "react-test-renderer";
-import { CYCLE_MS, BREATHE_MS, LENS_COLORS, LOADER_SIZES, PHASE } from "../utils/lensLoaderMotion";
+import { CYCLE_MS, BREATHE_MS, LENS_COLORS, LOADER_SIZES } from "../utils/lensLoaderMotion";
 
 jest.unmock("../components/LensLoader");
 
@@ -52,14 +52,13 @@ jest.mock("react-native", () => {
       }),
     },
     View: host("View"),
+    useWindowDimensions: () => global.__window || { width: 390, height: 844 },
     Easing: { linear: (x) => x },
-    StyleSheet: { absoluteFill: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 } },
+    StyleSheet: {
+      absoluteFill: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
+      create: (s) => s,
+    },
   };
-});
-jest.mock("react-native-svg", () => {
-  const mockReact = require("react");
-  const host = (name) => (props) => mockReact.createElement(name, props, props.children);
-  return { __esModule: true, default: host("Svg"), Path: host("Path") };
 });
 jest.mock("../hooks/useReduceMotion", () => ({ __esModule: true, default: () => global.__reduced === true }));
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
@@ -104,6 +103,7 @@ afterEach(() => {
   renderer = null;
   registry.length = 0;
   global.__reduced = false;
+  global.__window = undefined;
 });
 
 function mount(props) {
@@ -114,13 +114,53 @@ function mount(props) {
 }
 
 describe("LensLoader", () => {
-  test("ActivityIndicator boyları ve erişilebilirlik", () => {
-    mount({ size: "large" });
+  test("ActivityIndicator gibi: style dış kaba, içerik ortada; erişilebilirlik", () => {
+    mount({ size: "large", style: { flex: 1, marginTop: 8 } });
     const root = byId(renderer, "ld");
-    expect(flatten(root.props.style)).toMatchObject({ width: LOADER_SIZES.large, height: LOADER_SIZES.large });
+    const outer = flatten(root.props.style);
+    // Dış kap sabit px DEĞİL: sütunda yayılır, göstergeyi ortalar (kenara yapışma hatası).
+    expect(outer).toMatchObject({ alignItems: "center", justifyContent: "center", flex: 1, marginTop: 8 });
+    expect(outer.width).toBeUndefined();
+    expect(flatten(byId(renderer, "ld-box").props.style)).toMatchObject({
+      width: LOADER_SIZES.large,
+      height: LOADER_SIZES.large,
+    });
     expect(root.props.accessibilityRole).toBe("progressbar");
     expect(root.props.accessibilityLabel).toBe("Yükleniyor...");
     expect(root.props.pointerEvents).toBe("none");
+  });
+
+  test("boy verilmezse: brand medium, mono small", () => {
+    mount({});
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(LOADER_SIZES.medium);
+    act(() => renderer.unmount());
+    mount({ tone: "mono", color: "#fff" });
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(LOADER_SIZES.small);
+  });
+
+  test("kademeler ekranla ölçeklenir; small düğmede küçülmez", () => {
+    global.__window = { width: 820, height: 1180 }; // tablet: kısa kenar 820 → ×1,5
+    mount({ size: "large" });
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(Math.round(LOADER_SIZES.large * 1.5));
+    act(() => renderer.unmount());
+    global.__window = { width: 320, height: 568 }; // küçük telefon → ×0,9 (small hariç)
+    mount({ size: "small" });
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(LOADER_SIZES.small);
+    act(() => renderer.unmount());
+    mount({ size: 30 });
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(30);
+  });
+
+  test("fill: kabını doldurur, ölçünce kısa kenara göre büyür", () => {
+    mount({ size: "fill" });
+    const root = () => byId(renderer, "ld");
+    expect(flatten(root().props.style)).toMatchObject({ flex: 1, alignSelf: "stretch" });
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(LOADER_SIZES.medium);
+    act(() => root().props.onLayout({ nativeEvent: { layout: { width: 200, height: 300 } } }));
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(60);
+    // Kap çok küçükse medium'a döner.
+    act(() => root().props.onLayout({ nativeEvent: { layout: { width: 30, height: 30 } } }));
+    expect(flatten(byId(renderer, "ld-box").props.style).width).toBe(LOADER_SIZES.medium);
   });
 
   test("tek native döngü kurar, sökülünce durur", () => {
@@ -133,58 +173,58 @@ describe("LensLoader", () => {
     expect(live()).toHaveLength(0);
   });
 
-  test("döngüde daireler ayrılıp küçülür, dönüş işaretten işarete", () => {
+  test("karadelikler yaklaşır, iç içe geçer, öbür tarafa uzaklaşır", () => {
     mount({ size: 40 });
     const driver = live()[0].value;
     const cyan = () => transformOf(byId(renderer, "ld-cyan"));
     const red = () => transformOf(byId(renderer, "ld-red"));
     act(() => driver.setValue(0));
-    const startHalf = cyan().translateX;
-    expect(startHalf).toBeGreaterThan(0);
-    expect(red().translateX).toBeCloseTo(-startHalf, 5);
-    expect(cyan().scale).toBeCloseTo(1, 3);
-    act(() => driver.setValue((PHASE.splitEnd + PHASE.merge) / 2));
-    expect(cyan().translateX).toBeGreaterThan(startHalf);
-    expect(cyan().scale).toBeLessThan(0.75);
+    const start = cyan().translateX;
+    expect(start).toBeGreaterThan(0);
+    expect(red().translateX).toBeCloseTo(-start, 5);
+    act(() => driver.setValue(0.5));
+    expect(Math.abs(cyan().translateX)).toBeLessThan(start * 0.1);
+    expect(cyan().scaleX).toBeGreaterThan(1.1); // gelgit gerilmesi
+    act(() => driver.setValue(1));
+    expect(cyan().translateX).toBeCloseTo(-start, 3);
   });
 
-  test("brand: marka renkleri, color yok sayılır; mono: halka + renkli göz, bebek yok", () => {
+  test("brand: marka renkleri + koyu çekirdek, color yok sayılır; mono: halka + renkli çekirdek", () => {
     mount({ color: "#123456" });
     expect(flatten(byId(renderer, "ld-cyan").props.style).backgroundColor).toBe(LENS_COLORS.cyan);
     expect(flatten(byId(renderer, "ld-red").props.style).backgroundColor).toBe(LENS_COLORS.red);
-    expect(find(renderer.toJSON(), (n) => n.type === "Path")[0].props.fill).toBe(LENS_COLORS.ink);
-    const paper = find(renderer.toJSON(), (n) => flatten(n.props?.style).backgroundColor === LENS_COLORS.paper);
-    expect(paper).toHaveLength(1);
+    expect(flatten(byId(renderer, "ld-cyan-core").props.style).backgroundColor).toBe(LENS_COLORS.ink);
+    expect(find(renderer.toJSON(), (n) => JSON.stringify(n.props?.style || "").includes("#123456"))).toHaveLength(0);
     act(() => renderer.unmount());
 
     mount({ color: "#FFFFFF", tone: "mono" });
     const ring = flatten(byId(renderer, "ld-cyan").props.style);
     expect(ring.borderColor).toBe("#FFFFFF");
     expect(ring.backgroundColor).toBeUndefined();
-    expect(find(renderer.toJSON(), (n) => n.type === "Path")[0].props.fill).toBe("#FFFFFF");
-    expect(find(renderer.toJSON(), (n) => flatten(n.props?.style).backgroundColor === LENS_COLORS.paper)).toHaveLength(0);
+    expect(flatten(byId(renderer, "ld-red-core").props.style).backgroundColor).toBe("#FFFFFF");
   });
 
   test("animating=false: döngü yok, yer tutucu kutu kalır", () => {
-    mount({ animating: false });
+    mount({ animating: false, size: "small" });
     expect(live()).toHaveLength(0);
     const root = byId(renderer, "ld");
-    expect(flatten(root.props.style)).toMatchObject({ width: LOADER_SIZES.small, height: LOADER_SIZES.small });
-    expect(root.children).toBeNull();
+    expect(root.children).toHaveLength(1);
+    expect(flatten(root.children[0].props.style)).toMatchObject({ width: LOADER_SIZES.small, height: LOADER_SIZES.small });
   });
 
-  test("Hareketi Azalt: işaret pozunda durur, yalnız saydamlık nefes alır", () => {
+  test("Hareketi Azalt: sabit pozda durur, yalnız saydamlık nefes alır", () => {
     global.__reduced = true;
     mount({ size: "large" });
     expect(live()).toHaveLength(1);
     expect(live()[0].config.duration).toBe(BREATHE_MS);
     const driver = live()[0].value;
-    const root = () => byId(renderer, "ld");
+    const box = () => byId(renderer, "ld-box");
     act(() => driver.setValue(0.5));
-    expect(resolve(flatten(root().props.style).opacity)).toBeLessThan(0.6);
-    expect(root().props.needsOffscreenAlphaCompositing).toBe(true);
+    expect(resolve(flatten(box().props.style).opacity)).toBeLessThan(0.6);
+    expect(box().props.needsOffscreenAlphaCompositing).toBe(true);
     const cyan = transformOf(byId(renderer, "ld-cyan"));
     expect(isAnimated(cyan.translateX)).toBe(false);
-    expect(cyan.scale).toBeUndefined();
+    expect(cyan.scaleX).toBeUndefined();
+    expect(byId(renderer, "ld-wave")).toBeUndefined();
   });
 });

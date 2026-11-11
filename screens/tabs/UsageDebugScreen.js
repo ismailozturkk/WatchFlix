@@ -491,7 +491,7 @@ export default function UsageDebugScreen({ navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
         <View style={styles.center}>
-          <LensLoader size="large" color={theme.accent} />
+          <LensLoader size="screen" color={theme.accent} />
           <Text style={{ color: theme.text?.secondary || "#888", marginTop: 12 }}>
             İstatistikler yükleniyor...
           </Text>

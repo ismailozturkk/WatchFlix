@@ -267,6 +267,13 @@ describe("görünüm", () => {
     expect(has("sort-filter-radius-10")).toBe(false);
   });
 
+  it("`view` verilmezse görünüm kartı hiç çizilmez (Etkinliklerim)", () => {
+    render({ view: undefined });
+    expect(has("sort-filter-view-toggle")).toBe(false);
+    expect(has("sort-filter-view-summary")).toBe(false);
+    expect(has("sort-filter-apply")).toBe(true);
+  });
+
   it("özet sütun ve köşe değerini yansıtır", () => {
     render({ view: { ...baseProps().view, columns: 4, radius: 20 } });
     expect(textOf("sort-filter-view-summary")).toBe("4'lü · Yuvarlak");

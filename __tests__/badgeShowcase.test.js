@@ -57,7 +57,7 @@ describe("vitrin rozetleri (utils/badgeShowcase)", () => {
     expect(isValidShowcaseBadgeId("prestij_film_1")).toBe(false);
   });
 
-  test("normalizeShowcaseBadges: en fazla 4 rozet tutar, tekrarları ve geçersizleri eler", () => {
+  test("normalizeShowcaseBadges: en fazla 6 rozet tutar, tekrarları ve geçersizleri eler", () => {
     const raw = [
       "film_10",
       "korku_25",
@@ -66,12 +66,16 @@ describe("vitrin rozetleri (utils/badgeShowcase)", () => {
       "set_uzman",
       "muhur_2026_yaz",
       "komedi_75",
+      "aksiyon_50",
+      "animasyon_40",
     ];
     expect(normalizeShowcaseBadges(raw)).toEqual([
       "film_10",
       "korku_25",
       "set_uzman",
       "muhur_2026_yaz",
+      "komedi_75",
+      "aksiyon_50",
     ]);
     expect(normalizeShowcaseBadges(raw)).toHaveLength(MAX_SHOWCASE_BADGES);
     expect(normalizeShowcaseBadges(null)).toEqual([]);
@@ -82,7 +86,7 @@ describe("vitrin rozetleri (utils/badgeShowcase)", () => {
     expect(normalizeShowcaseBadges(raw)).toEqual(["film_150", "korku_25"]);
   });
 
-  test("toggleShowcaseBadge: açık rozeti ekler, tekrar dokununca çıkarır, 4 doluyken 'full' döner, kilitliyi reddeder", () => {
+  test("toggleShowcaseBadge: açık rozeti ekler, tekrar dokununca çıkarır, 6 doluyken 'full' döner, kilitliyi reddeder", () => {
     let current = [];
 
     // Kilitli rozet eklenemez
@@ -90,23 +94,23 @@ describe("vitrin rozetleri (utils/badgeShowcase)", () => {
     expect(lockedRes.action).toBe("locked");
     expect(lockedRes.next).toEqual([]);
 
-    // 4 açık rozet sırayla eklenir
-    for (const id of ["film_50", "korku_25", "set_uzman", "muhur_2026_yaz"]) {
+    // 6 açık rozet sırayla eklenir
+    for (const id of ["film_50", "korku_25", "set_uzman", "muhur_2026_yaz", "komedi_75", "aksiyon_50"]) {
       const r = toggleShowcaseBadge(current, { id, acik: true });
       expect(r.action).toBe("added");
       current = r.next;
     }
-    expect(current).toEqual(["film_50", "korku_25", "set_uzman", "muhur_2026_yaz"]);
+    expect(current).toEqual(["film_50", "korku_25", "set_uzman", "muhur_2026_yaz", "komedi_75", "aksiyon_50"]);
 
-    // 5. rozet eklenmek istendiğinde 'full' döner ve liste değişmez
-    const fullRes = toggleShowcaseBadge(current, { id: "komedi_75", acik: true });
+    // 7. rozet eklenmek istendiğinde 'full' döner ve liste değişmez
+    const fullRes = toggleShowcaseBadge(current, { id: "animasyon_40", acik: true });
     expect(fullRes.action).toBe("full");
     expect(fullRes.next).toEqual(current);
 
     // Aynı ailenin başka bir kademesiyle (film_150) toggle çağrılırsa aileyi vitrinden çıkarır
     const removeFamilyRes = toggleShowcaseBadge(current, { id: "film_150", family: "film", acik: true });
     expect(removeFamilyRes.action).toBe("removed");
-    expect(removeFamilyRes.next).toEqual(["korku_25", "set_uzman", "muhur_2026_yaz"]);
+    expect(removeFamilyRes.next).toEqual(["korku_25", "set_uzman", "muhur_2026_yaz", "komedi_75", "aksiyon_50"]);
   });
 
   test("isBadgeInShowcase ve removeShowcaseBadge aile düzeyinde de eşleşir", () => {
@@ -217,7 +221,8 @@ describe("firestore.rules showcaseBadges doğrulaması", () => {
     const rules = fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8");
     expect(rules).toContain("function showcaseBadgesOk()");
     expect(rules).toContain("request.resource.data.get('showcaseBadges', null)");
-    expect(rules).toContain("b.size() <= 4");
+    expect(rules).toContain("b.size() <= 6");
+    expect(rules).toContain("showcaseBadgeItemOk(b[5])");
     expect(rules).toMatch(/allow create:[\s\S]*?showcaseBadgesOk\(\)/);
     expect(rules).toMatch(/allow update:[\s\S]*?showcaseBadgesOk\(\)/);
   });

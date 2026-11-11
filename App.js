@@ -58,6 +58,9 @@ import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
 import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
 import { auth } from "./firebase";
+import { startStreakRuntime } from "./services/streakRuntime";
+// Seri: sunucu saati, bulut eşitlemesi, hatırlatma (utils/streakBridge).
+startStreakRuntime();
 import { i18nText } from "./utils/i18nText";
 import { toast } from "@components/AppToast";
 import ToastHost from "@components/toast/ToastHost";
@@ -409,6 +412,8 @@ function AppContent() {
             headerTintColor: "#fff",
             headerTitle: "",
             headerShadowVisible: false,
+            // Geri oku görünürse yanına önceki rotanın adı yazılmasın.
+            headerBackButtonDisplayMode: "minimal",
           }}
         />
         <Stack.Screen
@@ -741,6 +746,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="SensitiveContentScreen"
+          getComponent={() => require("./screens/tabs/settings/SensitiveContentScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="HapticsSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/HapticsSettingsScreen").default}
           options={{ headerShown: false }}
@@ -970,6 +980,14 @@ function AppContent() {
           getComponent={() => require("./screens/tabs/UsageDebugScreen").default}
           options={{ headerShown: true, title: "Debug", animation: "slide_from_right" }}
         />
+        {/* Geliştirici Laboratuvarı: yalnız geliştirme build'inde kayıtlı (Ayarlar > DEV). */}
+        {__DEV__ ? (
+          <Stack.Screen
+            name="DevLabScreen"
+            getComponent={() => require("./screens/tabs/settings/DevLabScreen").default}
+            options={{ headerShown: false, animation: "slide_from_right" }}
+          />
+        ) : null}
       </Stack.Navigator>
 
       {showChatModal && swipeViewReady && <SwipeViewHost />}

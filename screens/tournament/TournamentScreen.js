@@ -20,7 +20,8 @@ import {
 import LensLoader from "../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { TOURNAMENT_DEV_PRESETS, findTournamentDevPreset } from "@utils/tournamentDevPresets";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
@@ -232,22 +233,12 @@ const NomineeCell = React.memo(function NomineeCell({
   );
 });
 
-// __DEV__ faz önizleme: gerçek zamanı (setDebugNow) bu ayın ilgili gününe sabitler.
-const DEV_PRESETS = [
-  { key: "real",  label: "Gerçek", offset: null, tab: null },
-  { key: "sel",   label: "Seçim",  offset: 2,  tab: 0 },
-  { key: "r32",   label: "Son 32", offset: 8,  tab: 0 },
-  { key: "r16",   label: "Son 16", offset: 10, tab: 1 },
-  { key: "qf",    label: "Çeyrek", offset: 12, tab: 2 },
-  { key: "sf",    label: "Yarı",   offset: 14, tab: 3 },
-  { key: "final", label: "Final",  offset: 18, tab: 4 },
-  { key: "res",   label: "Sonuç",  offset: 24, tab: 4 },
-];
 
 export default function TournamentScreen() {
   const corner = usePosterCorner("fun");
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const route = useRoute();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { hapticsEnabled } = useHapticsSettings();
@@ -286,6 +277,24 @@ export default function TournamentScreen() {
   const [treeFullscreen, setTreeFullscreen] = useState(false); // yatay tam ekran ağaç
   const [infoVisible, setInfoVisible] = useState(false);       // liste/ağaç kullanım ipucu modalı
   const nomTimer = useRef(null);
+
+  // __DEV__ faz önizleme (utils/tournamentDevPresets): saati o güne sabitler.
+  const applyDevPreset = useCallback((p) => {
+    const ms = p.offset == null ? null : getPeriodStartMs(periodId) + p.offset * DAY;
+    setDebugNow(ms);
+    setNowMs(ms == null ? Date.now() : ms);
+    if (p.tab != null) setTab(p.tab);
+  }, [periodId]);
+
+  // Ayarlar > Geliştirici Laboratuvarı buradan bir faza / kupa sayfasına açar.
+  const devPresetParam = __DEV__ ? route?.params?.devPreset : undefined;
+  const devPodiumParam = __DEV__ ? route?.params?.devOpenPodium : undefined;
+  useEffect(() => {
+    if (!__DEV__) return;
+    const preset = findTournamentDevPreset(devPresetParam);
+    if (preset) applyDevPreset(preset);
+    if (devPodiumParam) setPodiumVisible(true);
+  }, [devPresetParam, devPodiumParam, applyDevPreset]);
 
   // Canlı saat (geri sayım + tur geçişleri için). Dakika hassasiyeti yeterli.
   useEffect(() => {
@@ -1122,7 +1131,7 @@ export default function TournamentScreen() {
   if (loading) {
     body = (
       <View style={styles.center}>
-        <LensLoader color={theme.accent} size="large" />
+        <LensLoader size="screen" color={theme.accent} />
         <Text style={[styles.muted, { color: theme.text.muted }]}>
           {i18nText("autoI18n.tournament_loading", "Turnuva hazırlanıyor…")}
         </Text>
@@ -1298,15 +1307,10 @@ export default function TournamentScreen() {
       {__DEV__ && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devStrip}>
           <DevBadge />
-          {DEV_PRESETS.map((p) => (
+          {TOURNAMENT_DEV_PRESETS.map((p) => (
             <GlassTouchable
               key={p.key}
-              onPress={() => {
-                const ms = p.offset == null ? null : getPeriodStartMs(periodId) + p.offset * DAY;
-                setDebugNow(ms);
-                setNowMs(ms == null ? Date.now() : ms);
-                if (p.tab != null) setTab(p.tab);
-              }}
+              onPress={() => applyDevPreset(p)}
               style={[styles.devChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
             >
               <Text style={{ color: theme.text.secondary, fontSize: 11, fontWeight: "700" }}>{p.label}</Text>

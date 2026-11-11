@@ -19,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
+import { detailCacheKey, isAbortError, readDetail, writeDetail } from "@services/tmdbDetailCache";
 import { DetailsSkeleton } from "../../components/Skeleton";
 import DetailLoadError from "../../components/detail/DetailLoadError";
 import DetailHeroStage, {
@@ -373,6 +374,16 @@ export default function MovieDetails({ navigation, route }) {
   // Galeri açıkken kaynak görsel yuvadan "kalkmış" görünür (bkz. ImageGalleryModal).
   const posterSlotOpacity = useRef(new Animated.Value(1)).current;
   const backdropSlotOpacity = useRef(new Animated.Value(1)).current;
+  // Arka plan posteri kaydırmaya bağlı: yavaş yükselir, kararır, söner; çekince
+  // esner (DetailHeroStage scrollY · components/common/heroScrollMotion.js).
+  const heroScrollY = useRef(new Animated.Value(0)).current;
+  const onHeroScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: heroScrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [heroScrollY],
+  );
   const openPosterGallery = useCallback(() => {
     measureWindowRect(posterSlotRef.current, (origin) =>
       setGallery({ visible: true, kind: "poster", origin }),
@@ -440,8 +451,18 @@ export default function MovieDetails({ navigation, route }) {
 
   useEffect(() => {
     // Aynı ekran örneği yeni id ile yeniden kullanılabildiği için geç gelen
-    // eski yanıtın yeni filmi ezmemesi adına cancelled bayrağı gerekli.
+    // eski yanıtın yeni filmi ezmemesi adına cancelled bayrağı gerekli; ayrıca
+    // istek AbortController ile gerçekten iptal edilir (yol haritası Y12).
     let cancelled = false;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const cacheKey = detailCacheKey("movie", id, language);
+    // TTL içindeki tekrar açılış ağ beklemez (yenile hariç).
+    const cached = reloadKey === 0 ? readDetail(cacheKey) : null;
+    if (cached) {
+      setDetails(cached);
+      setLoading(false);
+      return undefined;
+    }
     const fetchDetails = async () => {
       setLoading(true);
       try {
@@ -450,21 +471,27 @@ export default function MovieDetails({ navigation, route }) {
           url: `https://api.themoviedb.org/3/movie/${id}`,
           params: {
             language: tmdbLanguageOf(language),
+            // account_states / alternative_titles / changes / lists hiçbir yerde
+            // okunmuyordu: cevabı şişirip JSON ayrıştırmayı uzatıyordu.
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
+              "credits,external_ids,images,keywords,recommendations,release_dates,translations,videos,watch/providers",
             include_image_language: tmdbImageLanguageOrderOf(language),
           },
           headers: { accept: "application/json", Authorization: API_KEY },
+          signal: controller?.signal,
         });
-        if (!cancelled) setDetails(localizeMediaDetails(response.data, language));
+        if (cancelled) return;
+        const next = localizeMediaDetails(response.data, language);
+        if (!response.__fromCache) writeDetail(cacheKey, next);
+        setDetails(next);
       } catch (error) {
+        if (cancelled || isAbortError(error)) return;
         // Ham hata metni kullanıcıya değil Sentry'ye (bkz. captureError).
         captureError(error, { tags: { source: "movie_detail_fetch" } });
-        if (!cancelled)
-          Toast.show({
-            type: "error",
-            text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
-          });
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
+        });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -472,6 +499,7 @@ export default function MovieDetails({ navigation, route }) {
     fetchDetails();
     return () => {
       cancelled = true;
+      controller?.abort();
     };
   }, [id, language, reloadKey]);
 
@@ -954,7 +982,9 @@ export default function MovieDetails({ navigation, route }) {
         titleId={details.id}
         collectionId={details.belongs_to_collection?.id}
       />
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={onHeroScroll}
+        scrollEventThrottle={16}
         style={styles.container}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
@@ -962,13 +992,17 @@ export default function MovieDetails({ navigation, route }) {
       >
         {/* ─── HERO / BACKDROP YUVASI ─── */}
         <DetailHeroStage
-          uri={backdropUri("movie", details.id, details.backdrop_path)}
+          // Genişlik dp: getTmdbUrl piksel oranını kendisi uygular (varsayılan 1000 → ×3 →
+          // "original" iniyordu). Ambiyans katmanları küçük görselle (ısınma denetimi, 11 Kas).
+          uri={backdropUri("movie", details.id, details.backdrop_path, width)}
+          ambientUri={backdropUri("movie", details.id, details.backdrop_path, 100)}
           theme={theme}
           topInset={insets.top}
           width={width}
           placeholderIcon="film-outline"
           onPress={openBackdropGallery}
           centerOpacity={backdropSlotOpacity}
+          scrollY={heroScrollY}
         />
 
         {/* ─── POSTER + INFO HEADER ─── */}
@@ -1367,7 +1401,7 @@ export default function MovieDetails({ navigation, route }) {
           {/* TMDB kritikleri kaldırıldı — yorumlar uygulamanın kendi yorum
               modalında gösteriliyor. */}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
       </LocalBlurTarget>
 
 
@@ -1526,7 +1560,7 @@ export default function MovieDetails({ navigation, route }) {
         originUri={
           gallery.kind === "poster"
             ? posterUri("movie", details.id, details.poster_path)
-            : backdropUri("movie", details.id, details.backdrop_path)
+            : backdropUri("movie", details.id, details.backdrop_path, width)
         }
         originRadius={gallery.kind === "poster" ? mainPosterRadius : 0}
         originOpacity={gallery.kind === "poster" ? posterSlotOpacity : backdropSlotOpacity}

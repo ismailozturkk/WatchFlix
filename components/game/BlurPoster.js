@@ -119,7 +119,7 @@ export default function BlurPoster({ uri, durationMs, running, revealed, resetKe
       </Animated.View>
       {!loaded && !revealed ? (
         <View style={[styles.fill, styles.center, { backgroundColor: theme.secondary }]} pointerEvents="none">
-          <LensLoader color={theme.text.muted} />
+          <LensLoader size="fill" color={theme.text.muted} />
         </View>
       ) : null}
       {children}

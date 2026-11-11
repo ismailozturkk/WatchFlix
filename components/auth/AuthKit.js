@@ -34,6 +34,7 @@ import Animated, {
   FadeInDown,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -79,14 +80,35 @@ export function onAccentColor(accent) {
 
 // ── Açılış hareketi ───────────────────────────────────────────────────────────
 
+// iOS 26 cam kuralı 1: camın ATASININ opaklığı animasyonlanamaz — saydamken
+// kurulan UIGlassEffect düşer ve opaklık 1'e çıkınca kendiliğinden geri
+// çizilmez (giriş ekranında alanlar/kart/düğmeler dokunana kadar "yok" görünür;
+// ilk açılışta hep, sonraki girişlerde bazen). Gerçek cam yolunda yalnız kayma.
+const REVEAL_DURATION = 420;
+const slideUpOnly = (delay) => () => {
+  "worklet";
+  return {
+    initialValues: { transform: [{ translateY: 25 }] },
+    animations: {
+      transform: [
+        { translateY: withDelay(delay, withTiming(0, { duration: REVEAL_DURATION })) },
+      ],
+    },
+  };
+};
+
 /** Çocuğunu hafifçe yukarı kayarak belirtir. `delay` ms. */
 export function Reveal({ delay = 0, style, children }) {
   const reduceMotion = useReduceMotion();
+  const glass = useLiquidGlass();
+  let entering;
+  if (!reduceMotion) {
+    entering = glass
+      ? slideUpOnly(delay)
+      : FadeInDown.delay(delay).duration(REVEAL_DURATION);
+  }
   return (
-    <Animated.View
-      entering={reduceMotion ? undefined : FadeInDown.delay(delay).duration(420)}
-      style={style}
-    >
+    <Animated.View entering={entering} style={style}>
       {children}
     </Animated.View>
   );

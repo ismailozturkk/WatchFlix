@@ -133,7 +133,7 @@ function VideoSkeleton({ theme }) {
   return (
     <View style={styles.skeleton}>
       <View style={[styles.featuredThumb, styles.skeletonHero, block]}>
-        <LensLoader size="small" color={theme.accent} />
+        <LensLoader size="fill" color={theme.accent} />
       </View>
       {[0, 1].map((index) => (
         <View key={index} style={[styles.row, styles.skeletonRow, block]} />

@@ -1,6 +1,6 @@
 // utils/badgeShowcaseCopy.js
 //
-// Profil vitrini (4 rozet seçimi) ve rozet ekranı arama çubuğu metinleri (TR / EN / ES / PT / DE).
+// Profil vitrini (6 rozet seçimi) ve rozet ekranı arama çubuğu metinleri (TR / EN / ES / PT / DE).
 
 import { copyLanguage } from "./appLanguages";
 
@@ -8,7 +8,7 @@ export const BADGE_SHOWCASE_COPY = {
   tr: {
     profileTitle: "Vitrin Rozetleri",
     cardTitle: "Profil Vitrini",
-    cardSubtitle: "Arkadaş profilinde görünecek en fazla 4 rozet seç",
+    cardSubtitle: "Arkadaş profilinde görünecek en fazla 6 rozet seç",
     selectingHint: "Aşağıdaki açık rozetlere dokunarak vitrine ekle veya çıkar",
     edit: "Düzenle",
     done: "Bitti",
@@ -16,8 +16,8 @@ export const BADGE_SHOWCASE_COPY = {
     addToShowcase: "Profil Vitrinine Ekle",
     inShowcaseRemove: "Vitrinde · Kaldır",
     showcaseBadgeTag: "VİTRİN",
-    showcaseFullTitle: "Vitrin dolu (4/4)",
-    showcaseFullBody: "Yeni bir rozet eklemek için önce vitrindeki 4 rozetten birini çıkarın.",
+    showcaseFullTitle: "Vitrin dolu (6/6)",
+    showcaseFullBody: "Yeni bir rozet eklemek için önce vitrindeki 6 rozetten birini çıkarın.",
     lockedBadgeHint: "Yalnızca kazandığın açık rozetleri vitrine ekleyebilirsin.",
     searchPlaceholder: "Rozet adı, açıklama veya kategori ara…",
     searchClear: "Aramayı temizle",
@@ -29,7 +29,7 @@ export const BADGE_SHOWCASE_COPY = {
   en: {
     profileTitle: "Featured Badges",
     cardTitle: "Profile Showcase",
-    cardSubtitle: "Pick up to 4 badges to display on your friend profile",
+    cardSubtitle: "Pick up to 6 badges to display on your friend profile",
     selectingHint: "Tap unlocked badges below to add or remove from your showcase",
     edit: "Edit",
     done: "Done",
@@ -37,8 +37,8 @@ export const BADGE_SHOWCASE_COPY = {
     addToShowcase: "Add to Profile Showcase",
     inShowcaseRemove: "In Showcase · Remove",
     showcaseBadgeTag: "PINNED",
-    showcaseFullTitle: "Showcase full (4/4)",
-    showcaseFullBody: "Remove one of your 4 showcased badges first to add another.",
+    showcaseFullTitle: "Showcase full (6/6)",
+    showcaseFullBody: "Remove one of your 6 showcased badges first to add another.",
     lockedBadgeHint: "Only unlocked badges you have earned can be added to your showcase.",
     searchPlaceholder: "Search badge name, description or section…",
     searchClear: "Clear search",
@@ -50,7 +50,7 @@ export const BADGE_SHOWCASE_COPY = {
   es: {
     profileTitle: "Insignias destacadas",
     cardTitle: "Vitrina del perfil",
-    cardSubtitle: "Elige hasta 4 insignias para mostrar en tu perfil de amigos",
+    cardSubtitle: "Elige hasta 6 insignias para mostrar en tu perfil de amigos",
     selectingHint: "Toca las insignias desbloqueadas abajo para añadirlas o quitarlas",
     edit: "Editar",
     done: "Listo",
@@ -58,8 +58,8 @@ export const BADGE_SHOWCASE_COPY = {
     addToShowcase: "Añadir a la vitrina",
     inShowcaseRemove: "En vitrina · Quitar",
     showcaseBadgeTag: "VITRINA",
-    showcaseFullTitle: "Vitrina llena (4/4)",
-    showcaseFullBody: "Quita primero una de tus 4 insignias de la vitrina para añadir otra.",
+    showcaseFullTitle: "Vitrina llena (6/6)",
+    showcaseFullBody: "Quita primero una de tus 6 insignias de la vitrina para añadir otra.",
     lockedBadgeHint: "Solo puedes añadir a la vitrina las insignias que hayas desbloqueado.",
     searchPlaceholder: "Buscar por nombre, descripción o sección…",
     searchClear: "Borrar búsqueda",
@@ -71,7 +71,7 @@ export const BADGE_SHOWCASE_COPY = {
   pt: {
     profileTitle: "Emblemas em destaque",
     cardTitle: "Vitrine do perfil",
-    cardSubtitle: "Escolha até 4 emblemas para exibir no seu perfil de amigos",
+    cardSubtitle: "Escolha até 6 emblemas para exibir no seu perfil de amigos",
     selectingHint: "Toque nos emblemas desbloqueados abaixo para adicionar ou remover",
     edit: "Editar",
     done: "Concluir",
@@ -79,8 +79,8 @@ export const BADGE_SHOWCASE_COPY = {
     addToShowcase: "Adicionar à vitrine",
     inShowcaseRemove: "Na vitrine · Remover",
     showcaseBadgeTag: "VITRINE",
-    showcaseFullTitle: "Vitrine cheia (4/4)",
-    showcaseFullBody: "Remova primeiro um dos 4 emblemas da vitrine para adicionar outro.",
+    showcaseFullTitle: "Vitrine cheia (6/6)",
+    showcaseFullBody: "Remova primeiro um dos 6 emblemas da vitrine para adicionar outro.",
     lockedBadgeHint: "Apenas emblemas desbloqueados podem ser adicionados à vitrine.",
     searchPlaceholder: "Buscar por nome, descrição ou categoria…",
     searchClear: "Limpar busca",
@@ -92,7 +92,7 @@ export const BADGE_SHOWCASE_COPY = {
   de: {
     profileTitle: "Ausgewählte Abzeichen",
     cardTitle: "Profil-Vitrine",
-    cardSubtitle: "Wähle bis zu 4 Abzeichen für dein Freundesprofil aus",
+    cardSubtitle: "Wähle bis zu 6 Abzeichen für dein Freundesprofil aus",
     selectingHint: "Tippe unten auf freigeschaltete Abzeichen zum Hinzufügen oder Entfernen",
     edit: "Bearbeiten",
     done: "Fertig",
@@ -100,8 +100,8 @@ export const BADGE_SHOWCASE_COPY = {
     addToShowcase: "Zur Profil-Vitrine hinzufügen",
     inShowcaseRemove: "In Vitrine · Entfernen",
     showcaseBadgeTag: "VITRINE",
-    showcaseFullTitle: "Vitrine voll (4/4)",
-    showcaseFullBody: "Entferne zuerst eines deiner 4 Abzeichen aus der Vitrine, um ein neues hinzuzufügen.",
+    showcaseFullTitle: "Vitrine voll (6/6)",
+    showcaseFullBody: "Entferne zuerst eines deiner 6 Abzeichen aus der Vitrine, um ein neues hinzuzufügen.",
     lockedBadgeHint: "Nur freigeschaltete Abzeichen können zur Vitrine hinzugefügt werden.",
     searchPlaceholder: "Nach Name, Beschreibung oder Bereich suchen…",
     searchClear: "Suche löschen",

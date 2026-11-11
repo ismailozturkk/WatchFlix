@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from "react";
+import React, { useContext, useEffect } from "react";
 import {
   View,
   Animated,
@@ -12,7 +12,42 @@ import useRailPosterStyle from "../hooks/useRailPosterStyle";
 import { trendPosterRadius } from "../utils/posterCorners";
 import { PosterBadgeSkeleton, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import { computeDetailHeroMetrics } from "./detail/DetailHeroStage";
+import useLoopActive from "../hooks/useLoopActive";
 const { width } = Dimensions.get("window");
+
+// ── Paylaşılan nabız (yol haritası Y18) ─────────────────────────────────────
+// Eskiden her iskelet parçası KENDİ sonsuz döngüsünü kuruyordu (bir sayfa
+// iskeletinde 20–40 döngü). Artık tek değer, tek döngü: görünen (odakta)
+// iskelet sayısı 0'a inince döngü durur. `isInteraction: false`: döngü
+// InteractionManager'ı tutmasın (runAfterInteractions bekleyen işler —
+// atmosfer kurulumu gibi — iskelet görünürken ertelenmesin).
+const sharedPulse = new Animated.Value(0);
+let pulseUsers = 0;
+let pulseLoop = null;
+
+function retainPulse() {
+  pulseUsers += 1;
+  if (pulseLoop) return;
+  pulseLoop = Animated.loop(
+    Animated.sequence([
+      Animated.timing(sharedPulse, { toValue: 1, duration: 1000, useNativeDriver: true, isInteraction: false }),
+      Animated.timing(sharedPulse, { toValue: 0, duration: 1000, useNativeDriver: true, isInteraction: false }),
+    ]),
+  );
+  pulseLoop.start();
+}
+
+function releasePulse() {
+  pulseUsers = Math.max(0, pulseUsers - 1);
+  if (pulseUsers > 0 || !pulseLoop) return;
+  pulseLoop.stop();
+  pulseLoop = null;
+}
+
+const SHARED_OPACITY = sharedPulse.interpolate({
+  inputRange: [0, 1],
+  outputRange: [0.3, 0.7],
+});
 
 export default function Skeleton({
   width: skeletonWidth,
@@ -21,34 +56,15 @@ export default function Skeleton({
   children,
 }) {
   const { theme } = useTheme();
-  const animatedValue = useRef(new Animated.Value(0)).current;
+  const active = useLoopActive();
 
   useEffect(() => {
-    // Sonsuz döngü unmount'ta durdurulmazsa iskelet kaybolduktan sonra da
-    // çalışmaya devam ediyor; iskeletler her liste/ekran yüklemesinde monte
-    // edildiği için oturum boyunca birikiyorlar.
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(animatedValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedValue, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [animatedValue]);
+    if (!active) return undefined;
+    retainPulse();
+    return releasePulse;
+  }, [active]);
 
-  const opacity = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
+  const opacity = SHARED_OPACITY;
 
   return (
     <Animated.View
@@ -849,7 +865,7 @@ export const MyPostsSkeleton = ({ count = 4 }) => {
 };
 
 // ── Etkinlik listesi satırı (MyActivityScreen Row ile aynı ölçü):
-// yuvarlak kart, sol poster 56×84, rozet/tarih + başlık satırları, sağda puan rozeti.
+// kompakt kart (11 Kas), sol poster 40×60, rozet/tarih + başlık + alıntı satırları.
 export const ActivityListSkeleton = ({ count = 7 }) => {
   const { theme } = useTheme();
   return (
@@ -860,25 +876,24 @@ export const ActivityListSkeleton = ({ count = 7 }) => {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            gap: 12,
-            padding: 12,
-            borderRadius: 22,
+            gap: 10,
+            padding: 9,
+            borderRadius: 18,
             borderWidth: StyleSheet.hairlineWidth,
-            marginBottom: 12,
+            marginBottom: 8,
             backgroundColor: theme.secondary,
             borderColor: theme.border,
           }}
         >
-          <Skeleton width={56} height={84} style={{ borderRadius: 12 }} />
-          <View style={{ flex: 1, gap: 8 }}>
+          <Skeleton width={40} height={60} style={{ borderRadius: 9 }} />
+          <View style={{ flex: 1, gap: 6 }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Skeleton width={52} height={16} style={{ borderRadius: 8 }} />
-              <Skeleton width={44} height={10} style={{ borderRadius: 4, marginLeft: "auto" }} />
+              <Skeleton width={44} height={14} style={{ borderRadius: 7 }} />
+              <Skeleton width={40} height={9} style={{ borderRadius: 4, marginLeft: "auto" }} />
             </View>
-            <Skeleton width={"78%"} height={15} style={{ borderRadius: 5 }} />
-            <Skeleton width={"45%"} height={12} style={{ borderRadius: 4 }} />
+            <Skeleton width={"72%"} height={13} style={{ borderRadius: 5 }} />
+            <Skeleton width={"50%"} height={11} style={{ borderRadius: 4 }} />
           </View>
-          <Skeleton width={58} height={52} style={{ borderRadius: 16 }} />
         </View>
       ))}
     </View>

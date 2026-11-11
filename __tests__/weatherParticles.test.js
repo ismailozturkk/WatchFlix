@@ -384,9 +384,10 @@ describe("weatherParticles — seçim çözümü", () => {
     expect(previewParticleCount(70, W * 70, W * H)).toBeGreaterThanOrEqual(6);
   });
 
-  it("Kapalı modda 30 fps, diğerlerinde 60 fps", () => {
-    expect(frameIntervalMs("off")).toBeCloseTo(1000 / 30);
+  it("Tam/Orta 60 fps, Kapalı 30 fps", () => {
     expect(frameIntervalMs("full")).toBeCloseTo(1000 / 60);
+    expect(frameIntervalMs("balanced")).toBeCloseTo(1000 / 60);
+    expect(frameIntervalMs("off")).toBeCloseTo(1000 / 30);
   });
 });
 

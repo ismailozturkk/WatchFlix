@@ -19,7 +19,6 @@ import {
   useSnowSettings,
   useIconBackgroundSettings,
   useAmbientBackgroundSettings,
-  useDecorScopeSettings,
   useOngoingTvShowsSettings,
 } from "@context/AppSettingsContext";
 import { useSectionVisibilityMap } from "@hooks/useSectionVisibility";
@@ -33,7 +32,6 @@ import BetaBadge from "@components/common/BetaBadge";
 import { isBetaFeature } from "@utils/betaFeatures";
 import useWeatherSettings from "@hooks/useWeatherSettings";
 import { WEATHER_ICONS, weatherChoiceLabel } from "@components/settings/AtmosphereControls";
-import { isDecorCustomized } from "@utils/decorScopes";
 import { countHiddenSections } from "@utils/sectionVisibility";
 import { alpha } from "@theme/colors";
 import {
@@ -53,7 +51,6 @@ export default function PersonalizationScreen() {
   const { choice: weatherChoice, effect: weatherEffect } = useWeatherSettings();
   const { showAmbientBackground } = useAmbientBackgroundSettings();
   const { showIconBackground } = useIconBackgroundSettings();
-  const { decorHidden } = useDecorScopeSettings();
   // Ekran bölümleri: gizlenen bölüm sayısı satırdaki rozeti besler. "Devam Edenler"in
   // kendi ayarı (Dil ve içerik) de aynı listeye girdiği için o da sayılır.
   const sectionCopy = getSectionVisibilityCopy(language);
@@ -156,13 +153,16 @@ export default function PersonalizationScreen() {
                     ? C.iconBlue
                     : C.iconAmber;
 
+              // Yatay 3'lü karo: simge + ad; "Önerilen" adın altında küçük hap, seçili
+              // karoda sağ üstte onay. Uzun açıklama yalnız SEÇİLİ mod için altta.
               return (
                 <GlassTouchable
                   key={o.value}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
+                  accessibilityLabel={`${o.label}. ${o.hint}`}
                   style={[
-                    ps.effectOptionCard,
+                    ps.effectTile,
                     {
                       backgroundColor: active
                         ? alpha(C.accent, 0.08)
@@ -178,65 +178,54 @@ export default function PersonalizationScreen() {
                   >
                     <AppIcon name={iconName} size={15} color={iconColor} />
                   </View>
-
-                  <View style={ps.effectOptContent}>
-                    <View style={ps.effectOptTitleRow}>
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          ps.effectOptTitle,
-                          { color: active ? C.accentStrong : C.text },
-                        ]}
-                      >
-                        {o.label}
-                      </Text>
-                      {isOnerilen ? (
-                        <View
-                          style={[
-                            ps.recBadge,
-                            { backgroundColor: C.accentDim },
-                          ]}
-                        >
-                          <Text
-                            allowFontScaling={false}
-                            style={[
-                              ps.recBadgeText,
-                              { color: C.accentStrong },
-                            ]}
-                          >
-                            {i18nText(
-                              "autoI18n.efekt_onerilen_rozet",
-                              "Önerilen",
-                            )}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text
-                      allowFontScaling={false}
-                      style={[ps.effectOptHint, { color: C.muted }]}
-                    >
-                      {o.hint}
-                    </Text>
-                  </View>
-
-                  <View
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
                     style={[
-                      ps.radioOuter,
-                      {
-                        borderColor: active ? C.accent : C.borderMuted,
-                        backgroundColor: active ? C.accent : "transparent",
-                      },
+                      ps.effectOptTitle,
+                      { color: active ? C.accentStrong : C.text },
                     ]}
                   >
-                    {active ? (
-                      <AppIcon name="checkmark" size={10} color={C.white} />
-                    ) : null}
-                  </View>
+                    {o.label}
+                  </Text>
+
+                  {isOnerilen ? (
+                    <View
+                      style={[
+                        ps.recBadge,
+                        { backgroundColor: C.accentDim },
+                      ]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        style={[ps.recBadgeText, { color: C.accentStrong }]}
+                      >
+                        {i18nText("autoI18n.efekt_onerilen_rozet", "Önerilen")}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {active ? (
+                    <View style={[ps.tileCheck, { backgroundColor: C.accent }]}>
+                      <AppIcon name="checkmark" size={9} color={C.white} />
+                    </View>
+                  ) : null}
                 </GlassTouchable>
               );
             })}
           </View>
+
+          {/* Seçili modun ne yaptığı — tek satırlık açıklama (eski kartlardaki ipucu). */}
+          {efektSecenekleri.some((o) => o.value === effectMode) ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={[ps.effectOptHint, { color: C.muted }]}
+            >
+              {efektSecenekleri.find((o) => o.value === effectMode).hint}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -290,44 +279,8 @@ export default function PersonalizationScreen() {
         />
       </View>
 
-      {/* Efektlerin HANGİ ekran gruplarında görüneceği ayrı sayfada (bkz.
-          DecorScopesScreen). Üstteki anahtarlar genel kapı; bu onun üstünde süzgeç. */}
-      <View style={ps.personalizationGap} />
-      <View
-        style={[
-          ps.card,
-          { backgroundColor: C.card, borderColor: C.border },
-        ]}
-      >
-        <SettingRow
-          colors={C}
-          iconBg={C.iconBlue}
-          iconColor={C.blue}
-          iconName="layers-outline"
-          title={i18nText("autoI18n.dekor_kapsam_satir_baslik", "Ekran bazında ayarla")}
-          subtitle={i18nText(
-            "autoI18n.dekor_kapsam_satir_alt",
-            "Kar, ikon ve ambiyans hangi ekranlarda görünsün",
-          )}
-          onPress={() => navigation.navigate("DecorScopesScreen")}
-          last
-          right={
-            <View style={ps.rowRightGroup}>
-              <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
-                <Text
-                  allowFontScaling={false}
-                  style={[ps.qualityBadgeText, { color: C.accentStrong }]}
-                >
-                  {isDecorCustomized(decorHidden)
-                    ? i18nText("autoI18n.dekor_kapsam_ozel", "Özel")
-                    : i18nText("autoI18n.dekor_kapsam_her_yerde", "Her yerde")}
-                </Text>
-              </View>
-              <Chevron color={C.muted} />
-            </View>
-          }
-        />
-      </View>
+      {/* "Ekran bazında ayarla" (DecorScopesScreen) Atmosfer ekranına taşındı:
+          ayarladığı katmanların yanında duruyor (BackgroundLayerCards → DecorScopesCard). */}
 
       {/* Film, Dizi, Hub ve Profil'de hangi BÖLÜMLERİN görüneceği ayrı sayfada
           (bkz. SectionVisibilityScreen). */}
@@ -392,59 +345,61 @@ const ps = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+  // Yatay 3'lü karo sırası (eski: alt alta üç uzun kart)
   effectOptionsWrap: {
+    flexDirection: "row",
     gap: 8,
   },
-  effectOptionCard: {
-    flexDirection: "row",
+  effectTile: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    padding: 12,
+    justifyContent: "center",
+    gap: 6,
+    paddingTop: 12,
+    paddingBottom: 10,
+    paddingHorizontal: 6,
     borderRadius: 14,
     borderWidth: 1,
-    gap: 12,
   },
   effectOptIconWrap: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-  },
-  effectOptContent: {
-    flex: 1,
-  },
-  effectOptTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
   },
   effectOptTitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: "700",
   },
+  // Karonun İÇİNDE (cam kabuk kenardan taşanı kırpabilir); sıra alignItems:stretch
+  // olduğu için rozetli karo diğerlerini de aynı boya çeker.
   recBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    maxWidth: "100%",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     borderRadius: 6,
   },
   recBadgeText: {
-    fontSize: 9,
-    fontWeight: "700",
+    fontSize: 8.5,
+    fontWeight: "800",
+  },
+  tileCheck: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   effectOptHint: {
     fontSize: 11,
     lineHeight: 15,
-    marginTop: 2.5,
-  },
-  radioOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    marginTop: 8,
+    textAlign: "center",
   },
   qualityBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   qualityBadgeText: { fontSize: 11, fontWeight: "700" },

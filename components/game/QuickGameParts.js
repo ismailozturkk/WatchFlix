@@ -87,7 +87,7 @@ export function QuestionPrompt({ children, theme, accent, icon = "help-circle-ou
 export function LoadingState({ theme, copy }) {
   return (
     <View style={styles.center} accessibilityLabel={copy.loading}>
-      <LensLoader size="large" color={theme.accent} />
+      <LensLoader size="screen" color={theme.accent} />
       <Text style={[styles.note, { color: theme.text.secondary }]}>{copy.loading}</Text>
     </View>
   );

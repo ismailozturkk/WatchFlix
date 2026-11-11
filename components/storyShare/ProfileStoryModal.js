@@ -724,6 +724,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
       streak: i18nText("autoI18n.profil_story_seri", "SERİ"),
       streakRecord: i18nText("autoI18n.profil_story_seri_rekor", "REKOR"),
       dayUnit: i18nText("autoI18n.profil_story_gun_birim", "GÜN"),
+      weekUnit: i18nText("autoI18n.profil_story_hafta_birim", "HAFTA"),
       badges: i18nText("autoI18n.profil_story_rozetler", "ROZETLER"),
       cta: i18nText("autoI18n.profil_story_cta", "İzlediklerini sen de kaydet"),
       favTitle: i18nText("autoI18n.profil_story_baslik_dort_fav", "DÖRT FAVORİM"),

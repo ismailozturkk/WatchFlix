@@ -91,7 +91,18 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   };
 
-  const goLogin = () => navigation.navigate("LoginScreen");
+  // React Navigation 7'de `navigate` artık yığındaki ekrana GERİ DÖNMEZ, yeni
+  // bir Giriş ekranı iter → orada başlıkta geri oku ve önceki rotanın adı
+  // ("RegisterScreen") çıkıyordu. Yığında Giriş varsa ona geri sar, yoksa
+  // bu ekranı Giriş ile değiştir.
+  const goLogin = () => {
+    const routes = navigation.getState()?.routes ?? [];
+    if (routes.some((r) => r.name === "LoginScreen")) {
+      navigation.popTo("LoginScreen");
+    } else {
+      navigation.replace("LoginScreen");
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>

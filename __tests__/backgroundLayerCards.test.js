@@ -20,6 +20,8 @@ jest.spyOn(console, "error").mockImplementation((msg, ...rest) => {
 const mockAmbient = {};
 const mockIcon = {};
 const mockUpsell = jest.fn();
+const mockNavigate = jest.fn();
+let mockDecorHidden = null;
 const mockReshuffle = jest.fn();
 
 function resetSettings() {
@@ -110,6 +112,10 @@ jest.mock("../context/LanguageContext", () => ({
 jest.mock("../context/AppSettingsContext", () => ({
   useAmbientBackgroundSettings: () => mockAmbient,
   useIconBackgroundSettings: () => mockIcon,
+  useDecorScopeSettings: () => ({ decorHidden: mockDecorHidden }),
+}));
+jest.mock("@react-navigation/native", () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
 }));
 jest.mock("../services/effectSettings", () => ({
   useEffectPreset: () => require("../utils/deviceTier").getEffectPreset("full"),
@@ -125,6 +131,7 @@ const {
   AmbientLayerCard,
   IconLayerCard,
   RegenerateBackgroundCard,
+  DecorScopesCard,
 } = require("../components/settings/BackgroundLayerCards");
 
 const colors = new Proxy({}, { get: () => "#000" });
@@ -199,6 +206,25 @@ describe("Yeniden oluştur", () => {
     const tree = render(<RegenerateBackgroundCard colors={colors} />);
     act(() => all(tree, "Touchable")[0].props.onPress());
     expect(mockReshuffle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DecorScopesCard (Ekran bazında ayarla)", () => {
+  test("rozet durumu gösterir, dokununca DecorScopesScreen açılır", () => {
+    mockDecorHidden = null;
+    let tree = render(<DecorScopesCard colors={colors} />);
+    expect(texts(tree)).toContain("Her yerde");
+    act(() => all(tree, "Touchable")[0].props.onPress());
+    expect(mockNavigate).toHaveBeenCalledWith("DecorScopesScreen");
+    mockDecorHidden = { snow: ["home"] };
+    tree = render(<DecorScopesCard colors={colors} />);
+    expect(texts(tree)).toContain("Özel");
+  });
+
+  test("Kişiselleştirme'de kopyası yok, Atmosfer'de var", () => {
+    const read = (p) => fs.readFileSync(path.join(__dirname, "..", p), "utf8");
+    expect(read("screens/tabs/settings/PersonalizationScreen.js")).not.toContain('navigate("DecorScopesScreen")');
+    expect(read("screens/tabs/settings/AtmosphereScreen.js")).toContain("<DecorScopesCard");
   });
 });
 

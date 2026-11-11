@@ -297,26 +297,23 @@ export function buildStoryGenres(items, language = "tr", limit = 3) {
 // ── Seri ─────────────────────────────────────────────────────────────────────
 
 /**
- * `useWatchProgress().seriler` → kart özeti. Hiç aktiflik yoksa null (kart
- * "0 günlük seri" diye boş bir karo çizmesin).
+ * `useWatchProgress().seriler` → kart özeti. Hiç seri yoksa null (kart
+ * "0 haftalık seri" diye boş bir karo çizmesin).
  *
- * `showRecord`: şu an seri yok ama geçmişte vardı → karo REKORU gösterir
- * ("rekor 12 gün"); kırık bir seriyi "0" diye paylaşmak kimseye yaramaz.
- *
- * Güncel seri profildeki alevle AYNI sayıdır (streakFlameState): telafi/kalkan
- * beklerken ham `gunSerisi` 0 ya da 1'dir ama alev kurtarılacak seriyi gösterir;
- * eskiden kart "rekor 10 gün" derken profil "10 🔥" gösteriyordu.
+ * Birim HAFTA: profildeki alev haftalık seridir (11 Kas). `showRecord`: şu an seri
+ * yok ama geçmişte vardı → karo REKORU gösterir; kırık bir seriyi "0" diye
+ * paylaşmak kimseye yaramaz. Güncel seri profildeki alevle AYNI sayıdır
+ * (streakFlameState): telafi/kalkan beklerken kurtarılacak seri gösterilir.
+ * Nokta satırı bu haftanın 7 günüdür.
  */
 export function buildStoryStreak(seriler) {
   if (!seriler || typeof seriler !== "object") return null;
   const n = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : 0);
-  const current = n(streakFlameState(seriler).days);
-  const record = Math.max(n(seriler.rekorGun), current);
+  const state = streakFlameState(seriler);
+  const current = n(state.weeks);
+  const record = Math.max(n(state.record), current);
   if (!current && !record) return null;
-  const week =
-    Array.isArray(seriler.haftaKutulari) && seriler.haftaKutulari.length === 7
-      ? seriler.haftaKutulari.map(Boolean)
-      : Array(7).fill(false);
+  const week = state.week.boxes;
   return {
     current,
     record,

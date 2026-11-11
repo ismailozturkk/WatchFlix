@@ -202,6 +202,8 @@ export function computeWatchScore({
   let cuma13 = 0, mayis4 = 0, nisan1 = 0;
   // Tekrar izleme: film başına izleme olayı sayısından türer (puana girmez).
   let tekrarFilm = 0, enCokTekrar = 0;
+  // Tekrar izlemeler DAHİL film izleme olayı sayısı: seri damgasının girdisi (puana girmez).
+  let filmIzlemeSayisi = 0;
   let izlenenSezon = 0;
 
   const gunKaydi = (g) => {
@@ -256,6 +258,7 @@ export function computeWatchScore({
     // Tekrar izleme. Puana GİRMEZ (puan türetilmişliği ve formülü değişmedi);
     // yalnızca "Bağlılık" rozetlerinin ölçütü.
     const adet = filmIzlemeAdedi(m);
+    filmIzlemeSayisi += adet;
     if (adet >= 2) tekrarFilm++;
     if (adet > enCokTekrar) enCokTekrar = adet;
 
@@ -436,7 +439,7 @@ export function computeWatchScore({
       cadilar, yilDevri, sevgililer, yazGun, kisGun,
       // v2 katalog (140+ rozet): hiçbiri puana girmez.
       ilkbaharGun, sonbaharGun, haftaSonuGun, cuma13, mayis4, nisan1,
-      tekrarFilm, enCokTekrar, izlenenSezon, enCokTur, tur10,
+      tekrarFilm, enCokTekrar, izlenenSezon, enCokTur, tur10, filmIzlemeSayisi,
     },
   };
 }

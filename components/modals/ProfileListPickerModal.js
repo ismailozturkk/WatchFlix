@@ -129,7 +129,7 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
             ListEmptyComponent={
               <View style={styles.empty}>
                 {isLoading ? (
-                  <LensLoader size="small" color={theme.accent} />
+                  <LensLoader size="medium" color={theme.accent} />
                 ) : (
                   <Ionicons name="albums-outline" size={30} color={theme.text.muted} />
                 )}

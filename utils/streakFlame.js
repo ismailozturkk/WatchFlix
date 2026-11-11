@@ -1,44 +1,46 @@
 // utils/streakFlame.js
 //
-// GÜNLÜK SERİ ALEVİ — art arda en az 3 gün bir şey işaretleyince profilde adın
-// yanında yanan alev (Snapchat'teki 🔥 sayacı gibi). Bu modül yalnız KARARLARI
+// HAFTALIK SERİ ALEVİ — profilde adın yanında yanan 🔥. Bu modül yalnız KARARLARI
 // verir: alev görünsün mü, hangi kademede, nasıl görünsün, durumu ne (yandı / risk /
-// telafi bekliyor / kalkan koruyor), sonraki kademeye kaç gün var. Çizim
-// components/streak/StreakFlame.js'te.
+// telafi / kalkan / mola). Çizim components/streak/StreakFlame.js'te.
 //
-// KAYNAK: `useWatchProgress().seriler` (utils/watchActivity.js serileriHesapla).
-// Gün listesi kullanıcının SEÇTİĞİ izleme tarihinden değil, cihaz saatiyle gerçek
-// işaretleme anından ve NET yeni içerikten üretilir. Telafi ve kalkan kararları da
-// orada (seriKorumasiniIlerlet); bu modül onları yalnız okur.
+// KAYNAK: `useWatchProgress().seriler.alev` (utils/streakWeekly.js alevHesapla).
+// Seri BAŞARILI HAFTA sayar (haftada en az 2 farklı gün); kurallar orada.
 //
-// KADEME HİYERARŞİSİ — saat gibi iç içe üç sayaç:
-//   AY   (her 30 gün)  → alevin RENGİ. 13 renk: ilk ay turuncu … 12. ay Efsane.
-//   HAFTA (ay içinde her 7 gün: 7·14·21·28) → yeni EFEKT (kor → hale → yıldız → taç).
-//   GÜN  (hafta içinde her gün) → alevin ISISI: titreme enerjisi ve parıltı artar,
-//        boyu da hiç küçülmeden her gün biraz büyür.
-// Seri sayısı bu üçünün toplamıdır: 47 gün = 1 ay + 2 hafta + 3 gün.
-// Yeni ay kademesinde haftalık efektler baştan sayılır (oyunlardaki lig + kademe
-// gibi), ama ay ilerledikçe efektlerin bir kısmı KALICI olur (MONTH_BASE): yüksek
-// aylar her hafta daha zengin başlar.
+// KADEME HİYERARŞİSİ (11 Kas):
+//   RENK   (her 4 başarılı hafta) → 13 palet: 1–4. hafta turuncu … 49. hafta Efsane;
+//          52. haftadan sonra dönen gökkuşağı halkası.
+//   KIVILCIM (HER hafta)          → kıvılcımın BİÇİMİ haftadan haftaya değişir
+//          (kor → yıldız → elmas → kar tanesi, sonra yeni renkte yeniden), sayısı da
+//          renk kademesiyle artar.
+//   İHTİŞAM (bu haftanın günleri) → haftada kaç FARKLI gün işaretlediysen alev o kadar
+//          görkemli: 1 gün tek alev dili (en küçük) · 2 iki katman · 3 üç katman ·
+//          4 kıvılcımlar · 5 uçuşan minik kıvılcımlar · 6 taç · 7 yıldız ışıltısı.
+//          Boy da büyür.
+// Yeni hafta başında ihtişam 1'den yeniden başlar; renk ve kıvılcım kalıcıdır.
 //
 // SAF MODÜL: React / React Native importu YOKTUR (jest'te doğrudan koşar).
 
-import { KALKAN_TAVANI, KORUMA_MIN_SERI, TELAFI_ESIGI } from "./watchActivity";
+import { HAFTA_ESIGI, KALKAN_TAVANI_HAFTA, TELAFI_GUN_ESIGI } from "./streakWeekly";
 
-/** Alevin yandığı en kısa seri. Altında hiçbir şey gösterilmez. */
-export const STREAK_MIN_DAYS = KORUMA_MIN_SERI;
+/** Alevin göründüğü en kısa seri (başarılı hafta). */
+export const STREAK_MIN_WEEKS = 1;
 export const DAYS_PER_WEEK = 7;
-export const DAYS_PER_MONTH = 30;
-/** Bir ay içinde ulaşılan en yüksek hafta kademesi (7·14·21·28). */
-export const WEEKS_PER_MONTH = 4;
-/** Rengi olan en yüksek ay kademesi; ötesi Efsane'de kalır. */
-export const MAX_MONTH_TIER = 12;
+/** Bir renk kademesi kaç hafta sürer. */
+export const WEEKS_PER_TIER = 4;
+/** Rengi olan en yüksek kademe; ötesi Efsane'de kalır. */
+export const MAX_TIER = 12;
+/** Gökkuşağı halkasının açıldığı hafta (13 renk × 4 hafta = bir yıl). */
+export const RAINBOW_WEEK = (MAX_TIER + 1) * WEEKS_PER_TIER;
 
 /** Efektler, çizim sırasıyla. */
-export const STREAK_EFFECTS = Object.freeze(["embers", "halo", "sparkles", "corona", "rainbow"]);
+export const STREAK_EFFECTS = Object.freeze(["sparks", "flurry", "corona", "sparkles", "rainbow"]);
 
-// Ay paletleri. Dış alevin ALT tonu her zaman daha koyu: alev aşağıda yoğun, uçta
-// açık okunur. `text`: açık ve koyu temada okunabilen sayı/etiket rengi.
+/** Kıvılcım biçimleri: her başarılı hafta bir sonrakine geçer (döngü). */
+export const SPARK_SHAPES = Object.freeze(["ember", "star", "diamond", "flake"]);
+
+// Paletler. Dış alevin ALT tonu her zaman daha koyu: alev aşağıda yoğun, uçta açık
+// okunur. `text`: açık ve koyu temada okunabilen sayı/etiket rengi.
 const P = (id, outer, mid, core, glow, ember, text) =>
   Object.freeze({ id, outer: Object.freeze(outer), mid: Object.freeze(mid), core: Object.freeze(core), glow, ember, text });
 
@@ -58,189 +60,221 @@ export const STREAK_MONTHS = Object.freeze([
   P("legendary", ["#FF6F00", "#FFC400"], ["#FFB300", "#FFE57F"], ["#FFF8D6", "#FFFFFF"], "#FFC400", "#FFF59D", "#D99A00"),
 ]);
 
+/** Mola: alev griye döner (seri durur, kaybolmaz). */
+export const PAUSED_PALETTE = P(
+  "paused", ["#5B5F69", "#8A8F9B"], ["#7A7F8B", "#A9AEB8"], ["#C4C7CE", "#E6E8EC"], "#9AA0AC", "#C9CDD4", "#8A909C",
+);
+
 export const STREAK_MONTH_IDS = Object.freeze(STREAK_MONTHS.map((p) => p.id));
 
-/** Ay kademesinin paleti (0 = ilk ay). 12'nin ötesi Efsane'de kalır. */
-export const streakPalette = (month) =>
-  STREAK_MONTHS[Math.max(0, Math.min(MAX_MONTH_TIER, Math.floor(Number(month) || 0)))];
+/** Renk kademesinin paleti (0 = ilk). 12'nin ötesi Efsane'de kalır. */
+export const streakPalette = (tier) =>
+  STREAK_MONTHS[Math.max(0, Math.min(MAX_TIER, Math.floor(Number(tier) || 0)))];
 
-// Hafta kademesinin (ay içinde 0..4) getirdiği efektler.
-const WEEK_EFFECTS = Object.freeze([
+const toInt = (value) => Math.max(0, Math.floor(Number(value) || 0));
+
+/**
+ * Başarılı hafta sayısı → kademe. `index` monoton artar (= hafta) ve kutlamanın
+ * "yeni kademeye çıktı mı" ölçüsüdür.
+ *   tier       renk kademesi (0..12): (hafta − 1) / 4
+ *   sparkStage kıvılcım biçimi (0..3): her hafta bir sonraki
+ *   weekInTier renk kademesi içindeki hafta (1..4)
+ */
+export function streakLevel(weeks) {
+  const n = toInt(weeks);
+  const k = Math.max(0, n - 1);
+  const tier = Math.min(MAX_TIER, Math.floor(k / WEEKS_PER_TIER));
+  return {
+    weeks: n,
+    tier,
+    weekInTier: n === 0 ? 0 : (k % WEEKS_PER_TIER) + 1,
+    sparkStage: k % SPARK_SHAPES.length,
+    index: n,
+  };
+}
+
+/** Sonraki renk kademesi: kaçıncı haftada, kaç hafta kaldı, hangi palet. */
+export function nextStreakMilestones(weeks) {
+  const n = toInt(weeks);
+  const { tier } = streakLevel(n);
+  if (tier >= MAX_TIER) return { tierAt: null, weeksToTier: null, nextPalette: null };
+  const tierAt = (tier + 1) * WEEKS_PER_TIER + 1;
+  return { tierAt, weeksToTier: tierAt - n, nextPalette: streakPalette(tier + 1) };
+}
+
+// Günlük ihtişam kademesinin (1..7) getirdikleri.
+const STAGE_EFFECTS = Object.freeze([
   [],
-  ["embers"],
-  ["embers", "halo"],
-  ["embers", "halo", "sparkles"],
-  ["embers", "halo", "sparkles", "corona"],
+  [],
+  [],
+  [],
+  ["sparks"],
+  ["sparks", "flurry"],
+  ["sparks", "flurry", "corona"],
+  ["sparks", "flurry", "corona", "sparkles"],
 ]);
 
-// Ay kademesiyle KALICI olan efektler: yüksek aylar her haftaya daha zengin başlar.
-const monthBaseEffects = (month) => [
-  month >= 1 && "embers",
-  month >= 2 && "halo",
-  month >= 3 && "sparkles",
-  month >= 6 && "corona",
-  month >= MAX_MONTH_TIER && "rainbow",
-].filter(Boolean);
+/** Bu haftanın farklı gün sayısı → ihtişam kademesi (1..7). */
+export const dayStage = (days) => Math.max(1, Math.min(DAYS_PER_WEEK, toInt(days)));
 
-const toDays = (value) => Math.max(0, Math.floor(Number(value) || 0));
+// Boy: ihtişamla büyür (1 gün en küçük), uzun seride çok hafif bir taban artışı.
+const stageGrowth = (stage, weeks) => {
+  const base = 0.7 + 0.05 * (stage - 1); // 1 → 0.70 … 7 → 1.00
+  const bonus = Math.min(0.04, Math.log1p(toInt(weeks)) * 0.01);
+  return Math.round(Math.min(1.04, base + bonus) * 1000) / 1000;
+};
 
 /**
- * Seri uzunluğu → iç içe kademe. `index` monoton artar (ay × 5 + hafta) ve
- * kutlamanın "yeni kademeye çıktı mı" ölçüsüdür.
+ * Hafta sayısı + bu haftanın gün sayısı → alevin görünüşü. Çizim bu nesneyi olduğu
+ * gibi kullanır.
+ *   palette   renk (4 haftada bir; mola → gri)
+ *   stage     ihtişam (1..7)
+ *   layers    alev katmanı sayısı (1..3)
+ *   effects   ihtişamın getirdiği efektler (+ 52. haftadan sonra gökkuşağı)
+ *   spark     { shape, count } — biçim her hafta değişir, sayı renkle artar
+ *   heat      titreme enerjisi, growth boy
  */
-export function streakLevel(days) {
-  const n = toDays(days);
-  const month = Math.floor(n / DAYS_PER_MONTH);
-  const rest = n - month * DAYS_PER_MONTH;
-  const week = Math.min(WEEKS_PER_MONTH, Math.floor(rest / DAYS_PER_WEEK));
-  const day = rest - week * DAYS_PER_WEEK;
-  return { days: n, month, week, day, index: month * (WEEKS_PER_MONTH + 1) + week };
-}
-
-/** Sonraki hafta ve ay kademeleri (gün sayısı ve kaç gün kaldığı). */
-export function nextStreakMilestones(days) {
-  const { month, week } = streakLevel(days);
-  const n = toDays(days);
-  const monthAt = (month + 1) * DAYS_PER_MONTH;
-  const weekAt = week < WEEKS_PER_MONTH ? month * DAYS_PER_MONTH + (week + 1) * DAYS_PER_WEEK : null;
+export function streakLook(weeks, days = DAYS_PER_WEEK, { paused = false } = {}) {
+  const level = streakLevel(weeks);
+  const stage = dayStage(days);
+  const effects = new Set(STAGE_EFFECTS[stage]);
+  if (level.weeks >= RAINBOW_WEEK && !paused) effects.add("rainbow");
   return {
-    weekAt,
-    daysToWeek: weekAt === null ? null : weekAt - n,
-    monthAt,
-    daysToMonth: monthAt - n,
-    nextPalette: month >= MAX_MONTH_TIER ? null : streakPalette(month + 1),
+    palette: paused ? PAUSED_PALETTE : streakPalette(level.tier),
+    stage,
+    layers: Math.min(3, stage),
+    effects: STREAK_EFFECTS.filter((e) => effects.has(e)),
+    spark: {
+      shape: SPARK_SHAPES[level.sparkStage],
+      count: Math.min(7, 3 + Math.floor(level.tier / 2) + (stage >= 6 ? 1 : 0)),
+    },
+    heat: paused ? 0.45 : Math.round((0.78 + 0.06 * (stage - 1)) * 100) / 100,
+    intensity: Math.min(4, Math.floor(level.tier / 3)),
+    growth: stageGrowth(stage, level.weeks),
+    paused,
   };
 }
 
-// Alevin boyu seri uzadıkça HER GÜN biraz büyür; kademe atlayınca küçülmez.
-// Logaritmik: ilk günler gözle görülür büyür, ilk yıldan sonra büyüme durur.
-// 3 gün → 0.78, 7 → ~0.82, 30 → ~0.89, 90 → ~0.93, 360+ → 1.
-const GROWTH_MIN = 0.78;
-const GROWTH_FULL = MAX_MONTH_TIER * DAYS_PER_MONTH;
-const GROWTH_SPAN = Math.log(GROWTH_FULL / STREAK_MIN_DAYS);
-export function streakFlameGrowth(days) {
-  const n = toDays(days);
-  if (n <= STREAK_MIN_DAYS) return GROWTH_MIN;
-  const ratio = Math.min(1, Math.log(n / STREAK_MIN_DAYS) / GROWTH_SPAN);
-  return Math.round((GROWTH_MIN + (1 - GROWTH_MIN) * ratio) * 1000) / 1000;
-}
-
-/**
- * Seri uzunluğu → alevin görünüşü: palet (ay), efektler (hafta + ayın kalıcıları),
- * ısı (gün), boy (toplam). Çizim bu nesneyi olduğu gibi kullanır.
- */
-export function streakLook(days) {
-  const level = streakLevel(days);
-  const set = new Set([...WEEK_EFFECTS[level.week], ...monthBaseEffects(level.month)]);
-  return {
-    palette: streakPalette(level.month),
-    effects: STREAK_EFFECTS.filter((e) => set.has(e)),
-    // Günlük kademe: haftanın her günü alev biraz daha harlı titrer ve parlar.
-    heat: Math.round((0.82 + 0.05 * level.day) * 100) / 100,
-    // Hafta kademesi efektlerin YOĞUNLUĞUNU da artırır (daha çok kor, yıldız).
-    intensity: level.week,
-    growth: streakFlameGrowth(level.days),
-  };
-}
-
-/** Görünüşün efekti var mı (ör. "embers", "halo", "sparkles", "corona", "rainbow"). */
+/** Görünüşün efekti var mı. */
 export const lookHasEffect = (look, effect) => Boolean(look?.effects?.includes(effect));
 
 /**
- * Seri durumu:
- *   "lit"    bugün işaretlendi
- *   "risk"   seri canlı, bugün henüz bir şey yok (gün bitince kopar ya da korunur)
- *   "repair" dün kaçtı; bugün 2 içerikle telafi edilebilir
- *   "shield" dün kaçtı; telafi hakkı yok ama gün sonunda kalkan koruyacak
- *
- * Kalkan beklerken bugün işaretlendiyse sonuç KESİNDİR (kalkan gün sonunda dünü
- * her durumda kapatır): alev "lit" yanar ve sayı kalkan + bugünle birlikte gösterilir.
- * Eskiden gün dönene kadar sönük "shield"de kalıyor, içerik eklemek hiçbir şeyi
- * değiştirmiyor görünüyordu.
+ * Durum:
+ *   "lit"    bu hafta 2 farklı güne ulaştı — hafta kazanıldı
+ *   "risk"   seri canlı, bu hafta henüz 2 gün yok
+ *   "repair" geçen hafta kaçtı; bu hafta 4 gün işaretlersen kurtulur (kalkan yok)
+ *   "shield" geçen hafta kaçtı; telafi edilmezse hafta sonunda kalkan koruyacak
+ *   "paused" mola: alev gri, seri durdu (yeniden işaretleyince renk döner)
  */
-function statusOf(seriler) {
-  const bekleyen = seriler?.bekleyen;
-  if (bekleyen && bekleyen.telafi) return "repair";
-  if (bekleyen && bekleyen.kalkan && !seriler?.bugunAktif) return "shield";
-  return seriler?.bugunAktif ? "lit" : "risk";
+function statusOf(alev) {
+  if (alev?.mola?.aktif) return "paused";
+  const bekleyen = alev?.bekleyen;
+  // Kalkan geçen haftayı hafta sonunda her durumda kapatacak ve bu hafta zaten
+  // kazanıldı: sonuç kesin, alev yanar.
+  if (bekleyen?.kalkan && alev?.buHaftaBasarili) return "lit";
+  if (bekleyen) return bekleyen.kalkan ? "shield" : "repair";
+  return alev?.buHaftaBasarili ? "lit" : "risk";
 }
 
-// Kalkanın gün sonunda kapatacağı dün + bugün işaretlenmiş: seri kesin olarak sürüyor.
-const shieldSettled = (seriler) =>
-  Boolean(seriler?.bekleyen?.kalkan && !seriler.bekleyen.telafi && seriler.bugunAktif);
-
 /**
- * `seriler` → alevin tüm görünür durumu. Seri yoksa / 3 günün altındaysa
- * `visible: false` döner ve çağıran HİÇBİR ŞEY çizmez.
- *
- * Telafi/kalkan beklerken gösterilen sayı KURTARILACAK seridir (dünkü kopuştan
- * önceki kısım): kullanıcı neyi kaybetmek üzere olduğunu görür.
+ * `seriler` → alevin tüm görünür durumu. Seri yoksa `visible: false` döner ve çağıran
+ * HİÇBİR ŞEY çizmez. Telafi/kalkan beklerken sayı KURTARILACAK seridir; kalkan
+ * beklerken bu hafta zaten kazanıldıysa sonuç kesindir (kalkan geçen haftayı kapatır):
+ * sayı kurtarılan + 2 gösterilir, kalkan harcanmış sayılır.
  */
 export function streakFlameState(seriler) {
-  const status = statusOf(seriler);
-  const pending = status === "repair" || status === "shield";
-  const settled = shieldSettled(seriler);
-  // settled: kurtarılan seri + kalkanın kapatacağı dün + bugün.
-  const days = settled
-    ? toDays(seriler.bekleyen.korunanSeri) + 2
-    : pending ? toDays(seriler?.bekleyen?.korunanSeri) : toDays(seriler?.gunSerisi);
-  const level = streakLevel(days);
-  const look = streakLook(days);
-  const next = nextStreakMilestones(days);
-  const record = Math.max(days, toDays(seriler?.rekorGun));
-  // settled'da bir kalkan gün sonunda harcanacak; sayfa onu zaten harcanmış gösterir.
-  const shields = Math.min(KALKAN_TAVANI, Math.max(0, toDays(seriler?.kalkan) - (settled ? 1 : 0)));
+  const alev = seriler?.alev || null;
+  const status = statusOf(alev);
+  const bekleyen = alev?.bekleyen || null;
+  const settled = Boolean(bekleyen?.kalkan && alev?.buHaftaBasarili);
+  const weeks = settled
+    ? toInt(bekleyen.korunanSeri) + 2
+    : bekleyen ? toInt(bekleyen.korunanSeri) : toInt(alev?.seri);
+  const daysThisWeek = Math.min(DAYS_PER_WEEK, toInt(alev?.buHaftaGun));
+  const paused = status === "paused";
+  const level = streakLevel(weeks);
+  const look = streakLook(weeks, daysThisWeek, { paused });
+  const next = nextStreakMilestones(weeks);
+  const need = toInt(alev?.esik) || HAFTA_ESIGI;
+  const shields = Math.min(KALKAN_TAVANI_HAFTA, Math.max(0, toInt(alev?.kalkan) - (settled ? 1 : 0)));
   return {
-    visible: days >= STREAK_MIN_DAYS,
-    days,
-    record,
+    visible: weeks >= STREAK_MIN_WEEKS,
+    weeks,
+    // Eski adla da okunabilsin (hikâye kartı, geliştirici laboratuvarı).
+    days: weeks,
+    record: Math.max(weeks, toInt(alev?.rekor)),
     status,
     level,
     look,
     next,
-    // Ay içi ilerleme (0..1) ve hafta içi gün (0..6) — sayfadaki çubuklar.
-    monthProgress: Math.round(((days - level.month * DAYS_PER_MONTH) / DAYS_PER_MONTH) * 1000) / 1000,
-    litToday: Boolean(seriler?.bugunAktif),
+    week: {
+      days: daysThisWeek,
+      need,
+      won: Boolean(alev?.buHaftaBasarili),
+      boxes: Array.isArray(alev?.buHaftaKutulari) && alev.buHaftaKutulari.length === 7
+        ? alev.buHaftaKutulari.map(Boolean)
+        : Array(7).fill(false),
+    },
+    tierProgress: level.weekInTier / WEEKS_PER_TIER,
+    litToday: Boolean(alev?.bugunAktif),
     dimmed: status !== "lit",
+    paused,
     protection: {
       shields,
-      shieldMax: KALKAN_TAVANI,
-      repairReady: seriler?.telafiHazir !== false,
-      repairIn: toDays(seriler?.telafiYenilenme),
-      repairNeed: toDays(seriler?.bekleyen?.gerekli) || TELAFI_ESIGI,
-      repairHave: toDays(seriler?.bekleyen?.mevcut),
+      shieldMax: KALKAN_TAVANI_HAFTA,
+      weeksToShield: Math.max(1, toInt(alev?.kalkanaKalan) || 4),
+      repairNeed: toInt(bekleyen?.gerekli) || TELAFI_GUN_ESIGI,
+      repairHave: toInt(bekleyen?.mevcut),
+      breakAvailable: alev?.mola?.hakVar !== false,
+      breakThisWeek: Boolean(alev?.mola?.buHafta),
+      breakLastWeek: Boolean(alev?.mola?.gecenHafta),
+      // Mola verilebilir mi: hak var ve (seri var ya da geçen hafta karar bekliyor).
+      canBreak: alev?.mola?.hakVar !== false && !alev?.mola?.buHafta && (weeks >= 1),
     },
   };
 }
 
+// Kutlama kaydının biçim sürümü. Günlük seriden (ay×5+hafta) kalan eski kayıt
+// sessizce benimsenir: güncellemeden sonra sahte "yeni kademe" tostu çıkmasın.
+const KAYIT_SURUM = 2;
+
 /**
  * Kutlama kararı (saf): önceki kayıt + güncel seri → ne gösterilecek, ne yazılacak.
- *   stored: { seviye: number (-1 = alev yok), yama: string ("" = yok) }
- *   celebrate: { kind: "lit"|"week"|"month", state } — yeni kademe
+ *   stored: { v: 2, seviye: number (-1 = alev yok), yama: string ("" = yok) }
+ *   celebrate: { kind: "lit"|"week"|"tier", state } — yeni hafta / renk
  *   patch: { tur: "telafi"|"kalkan", gun, state } — seri kurtarıldı / korundu
  *   store: yeni kayıt (değişmiyorsa null)
- * Seri sönünce kayıt sessizce düşer; alev yeniden yanınca yine kutlanır.
  */
 export function streakCelebrationStep(stored, seriler) {
-  const prev = Number.isFinite(Number(stored?.seviye)) ? Math.floor(Number(stored.seviye)) : -1;
-  const prevPatch = typeof stored?.yama === "string" ? stored.yama : "";
   const state = streakFlameState(seriler);
   const seviye = state.visible ? state.level.index : -1;
-  const sonYama = seriler?.sonYama && typeof seriler.sonYama.gun === "string" ? seriler.sonYama : null;
+  const sonYama = seriler?.alev?.sonYama && typeof seriler.alev.sonYama.gun === "string" ? seriler.alev.sonYama : null;
+  const eski = !stored || typeof stored !== "object" || stored.v !== KAYIT_SURUM;
+  if (eski) {
+    // İlk kez (ya da eski biçim): durumu sessizce benimse. Hiç kayıt yoksa ve alev
+    // yanıyorsa bu GERÇEK ilk yanıştır → kutlanır.
+    const ilk = !stored && seviye >= 1;
+    return {
+      celebrate: ilk ? { kind: "lit", state } : null,
+      patch: null,
+      store: { v: KAYIT_SURUM, seviye, yama: sonYama ? sonYama.gun : "" },
+    };
+  }
+  const prev = Number.isFinite(Number(stored.seviye)) ? Math.floor(Number(stored.seviye)) : -1;
+  const prevPatch = typeof stored.yama === "string" ? stored.yama : "";
   const yama = sonYama ? sonYama.gun : prevPatch;
 
   let celebrate = null;
-  if (seviye > prev) {
-    const prevMonth = prev < 0 ? -1 : Math.floor(prev / (WEEKS_PER_MONTH + 1));
+  if (seviye > prev && seviye >= 1) {
     let kind = "week";
-    if (prev < 0 && state.level.index === 0) kind = "lit";
-    else if (state.level.month > 0 && state.level.month > prevMonth) kind = "month";
+    if (prev < 1) kind = "lit";
+    else if (streakLevel(seviye).tier > streakLevel(Math.max(prev, 1)).tier) kind = "tier";
     celebrate = { kind, state };
   }
   const patch = sonYama && sonYama.gun !== prevPatch && state.visible
     ? { tur: sonYama.tur, gun: sonYama.gun, state }
     : null;
 
-  const store = seviye !== prev || yama !== prevPatch ? { seviye, yama } : null;
+  const store = seviye !== prev || yama !== prevPatch ? { v: KAYIT_SURUM, seviye, yama } : null;
   return { celebrate, patch, store };
 }

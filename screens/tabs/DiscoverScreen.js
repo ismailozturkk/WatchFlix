@@ -61,6 +61,7 @@ import { ROW_GAP, discoverRowLayout } from "../../utils/discoverHeaderLayout";
 import { MEDIA_TYPES, normalizeMediaType } from "../../utils/discoverMedia";
 import { TAB_BAR_SCROLL_UNSET } from "../../utils/tabBarCollapse";
 import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
+import { useTabActive } from "../../context/TabActiveContext";
 
 /** Öteki bölümün arka planda kurulacağı gecikme (diğer sekmelerin ısınmasıyla aynı). */
 export const WARM_OTHER_MEDIA_MS = 6000;
@@ -73,6 +74,19 @@ const SWITCH_GAP = 12;
 const ACTION_GAP = ROW_GAP;
 /** Listelerin başlığına bırakılan yer: satırın yüksekliği + boşluk. */
 export const DISCOVER_HEADER_OFFSET = MEDIA_SWITCH_HEIGHT + SWITCH_GAP;
+
+// Cihaz sınıfı ilk ihtiyaçta okunur (native modül; testte yüklenemezse "zayıf değil").
+let lowTierCache = null;
+function isLowTierDevice() {
+  if (lowTierCache === null) {
+    try {
+      lowTierCache = require("../../services/deviceTier").deviceTier === "low";
+    } catch {
+      lowTierCache = false;
+    }
+  }
+  return lowTierCache;
+}
 
 export default function DiscoverScreen({ navigation }) {
   const { t, language } = useLanguage();
@@ -89,7 +103,14 @@ export default function DiscoverScreen({ navigation }) {
   // Kurulmuş sayfalar. Bir kez kurulan sayfa bir daha sökülmez.
   const [mounted, setMounted] = useState(() => new Set([mediaType]));
 
+  // Öteki bölüm yalnız Keşfet sekmesi GÖRÜNÜRKEN ve zayıf olmayan cihazda
+  // ısıtılır (yol haritası Y19): 6 sn dolmadan başka sekmeye geçen kullanıcı
+  // için görünmeyen MovieProvider/raflar boşuna veri çekip çizmez; zayıf
+  // cihazda öteki bölüm ilk geçişte kurulur.
+  const tabActive = useTabActive();
+  const warmAllowed = tabActive && !isLowTierDevice();
   useEffect(() => {
+    if (!warmAllowed) return undefined;
     let timer;
     const task = InteractionManager.runAfterInteractions(() => {
       timer = setTimeout(() => {
@@ -100,7 +121,7 @@ export default function DiscoverScreen({ navigation }) {
       task.cancel?.();
       clearTimeout(timer);
     };
-  }, []);
+  }, [warmAllowed]);
 
   const labels = useMemo(() => ({ tv: t.tvShows, movie: t.movies }), [t.tvShows, t.movies]);
   // Arama düğmesinin erişilebilirlik etiketi seçili bölümü söyler ("Dizi Ara" / "Film Ara").

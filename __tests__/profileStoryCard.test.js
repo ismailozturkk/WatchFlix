@@ -251,39 +251,40 @@ describe("buildStoryGenres", () => {
 });
 
 describe("buildStoryStreak", () => {
-  const week = [true, true, false, false, false, false, false];
+  // Birim HAFTA (11 Kas): kart profildeki haftalık alevle aynı sayıyı paylaşır.
+  const kutular = [true, true, false, false, false, false, false];
+  const alev = (ek) => ({ alev: { seri: 0, rekor: 0, buHaftaGun: 2, buHaftaKutulari: kutular, buHaftaBasarili: true, esik: 2, ...ek } });
 
-  test("geçerli seri ve hafta kutuları", () => {
-    const out = buildStoryStreak({ gunSerisi: 5, rekorGun: 12, aktifGunSayisi: 40, haftaKutulari: week });
-    expect(out).toEqual({ current: 5, record: 12, week, activeDays: 40, showRecord: false });
+  test("geçerli seri ve bu haftanın kutuları", () => {
+    const out = buildStoryStreak({ ...alev({ seri: 5, rekor: 12 }), aktifGunSayisi: 40 });
+    expect(out).toEqual({ current: 5, record: 12, week: kutular, activeDays: 40, showRecord: false });
   });
 
   test("seri koptuysa rekor gösterilir", () => {
-    const out = buildStoryStreak({ gunSerisi: 0, rekorGun: 9, haftaKutulari: week });
+    const out = buildStoryStreak(alev({ seri: 0, rekor: 9, buHaftaGun: 0, buHaftaBasarili: false }));
     expect(out.showRecord).toBe(true);
     expect(out.record).toBe(9);
   });
 
   test("rekor, mevcut seriden küçük olamaz", () => {
-    expect(buildStoryStreak({ gunSerisi: 7, rekorGun: 3 }).record).toBe(7);
+    expect(buildStoryStreak(alev({ seri: 7, rekor: 3 })).record).toBe(7);
   });
 
-  // Telafi/kalkan beklerken kart profildeki alevle AYNI sayıyı paylaşır.
-  test("telafi beklerken kurtarılacak seri gösterilir (ham gunSerisi değil)", () => {
-    const bekleyen = { gun: "2026-07-14", telafi: true, kalkan: false, gerekli: 2, mevcut: 1, korunanSeri: 10 };
-    const out = buildStoryStreak({ gunSerisi: 1, rekorGun: 10, bugunAktif: true, bekleyen, haftaKutulari: week });
+  test("telafi beklerken kurtarılacak seri gösterilir", () => {
+    const bekleyen = { hafta: 1, gerekli: 4, mevcut: 1, kalkan: false, korunanSeri: 10 };
+    const out = buildStoryStreak(alev({ seri: 0, rekor: 10, buHaftaGun: 1, buHaftaBasarili: false, bekleyen }));
     expect(out).toMatchObject({ current: 10, showRecord: false });
   });
 
-  test("hiç aktiflik yoksa ya da veri bozuksa null", () => {
+  test("hiç seri yoksa ya da veri bozuksa null", () => {
     expect(buildStoryStreak(null)).toBeNull();
     expect(buildStoryStreak(undefined)).toBeNull();
-    expect(buildStoryStreak({ gunSerisi: 0, rekorGun: 0 })).toBeNull();
+    expect(buildStoryStreak(alev({ buHaftaGun: 0, buHaftaBasarili: false }))).toBeNull();
     expect(buildStoryStreak({ gunSerisi: "x", rekorGun: -2 })).toBeNull();
   });
 
-  test("hafta kutuları yedi değilse boş yedi kutu", () => {
-    expect(buildStoryStreak({ gunSerisi: 1, haftaKutulari: [true] }).week).toEqual(Array(7).fill(false));
+  test("kutular her zaman yedi", () => {
+    expect(buildStoryStreak(alev({ seri: 1, buHaftaKutulari: [true] })).week).toHaveLength(7);
   });
 });
 

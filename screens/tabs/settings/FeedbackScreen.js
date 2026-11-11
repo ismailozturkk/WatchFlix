@@ -430,7 +430,7 @@ export default function FeedbackScreen() {
             ))
           ) : history.status === "loading" ? (
             <View style={s.loading}>
-              <LensLoader size="small" color={C.accent} />
+              <LensLoader size="medium" color={C.accent} />
             </View>
           ) : history.status === "error" ? (
             <HistoryNotice

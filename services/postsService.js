@@ -621,26 +621,75 @@ export async function editPostComment(postId, commentId, uid, text) {
   await batch.commit();
 }
 
+/** Yorum sayfası: canlı pencere ve her "daha eski" sayfası bu kadar belge. */
+export const POST_COMMENT_PAGE = 40;
+
+const commentFromDoc = (d) => ({ id: d.id, ...d.data() });
+
 /**
- * Bir post'un yorumlarını canlı dinler (createdAt artan — eskiden yeniye).
- * Flat model: hem üst yorumlar hem yanıtlar aynı koleksiyonda, parentId ile
- * ayrışır. UI parentId'ye göre gruplar.
+ * Bir post'un EN YENİ yorumlarını canlı dinler (callback'e createdAt artan —
+ * eskiden yeniye — verilir). Flat model: hem üst yorumlar hem yanıtlar aynı
+ * koleksiyonda, parentId ile ayrışır. UI parentId'ye göre gruplar.
+ *
+ * Yol haritası Y10: eskiden limitsizdi (binlerce yorumlu gönderide her
+ * snapshot'ta tüm belgeler). Artık canlı pencere `pageSize` belge; daha eskiler
+ * fetchOlderPostComments ile tek seferlik sayfalar halinde gelir.
+ *
+ * meta:
+ *   oldestDoc — penceredeki en eski belge (ilk "eski sayfa" imleci)
+ *   full      — pencere dolu (daha eski yorum olabilir)
+ *   shifted   — yeni yorum gelince pencereden TAŞAN belgeler (silinmedi; UI
+ *               bunları "eski" kümesinde tutar, kaybolmasın)
  *
  * @returns {Function} unsubscribe
  */
-export function subscribeToPostComments(postId, callback) {
+export function subscribeToPostComments(postId, callback, { pageSize = POST_COMMENT_PAGE } = {}) {
   if (!postId) return () => {};
   const q = query(
     collection(db, "Posts", postId, "comments"),
-    orderBy("createdAt", "asc"),
+    orderBy("createdAt", "desc"),
+    limit(pageSize),
   );
   return onSnapshot(
     q,
-    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => {
+      const full = snap.size >= pageSize;
+      // Limitli sorguda "removed" iki anlama gelir: belge silindi ya da yeni
+      // gelenler yüzünden pencereden taştı. Pencere hâlâ doluysa taşmadır.
+      const shifted = full
+        ? snap.docChanges().filter((ch) => ch.type === "removed").map((ch) => commentFromDoc(ch.doc))
+        : [];
+      callback(snap.docs.map(commentFromDoc).reverse(), {
+        oldestDoc: snap.docs[snap.docs.length - 1] || null,
+        full,
+        shifted,
+      });
+    },
     (err) => {
       if (__DEV__) console.warn("subscribeToPostComments error:", err.message);
     },
   );
+}
+
+/**
+ * `cursor` belgesinden daha eski yorumların bir sayfası (tek seferlik okuma).
+ * @returns {Promise<{items: object[], cursor: any, hasMore: boolean}>} items artan sırada
+ */
+export async function fetchOlderPostComments(postId, cursor, pageSize = POST_COMMENT_PAGE) {
+  if (!postId || !cursor) return { items: [], cursor: null, hasMore: false };
+  const snap = await getDocs(
+    query(
+      collection(db, "Posts", postId, "comments"),
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(pageSize),
+    ),
+  );
+  return {
+    items: snap.docs.map(commentFromDoc).reverse(),
+    cursor: snap.docs[snap.docs.length - 1] || cursor,
+    hasMore: snap.size >= pageSize,
+  };
 }
 
 /**

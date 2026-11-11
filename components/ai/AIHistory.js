@@ -154,7 +154,7 @@ function AIHistory({
       >
         <View style={s.emptyInner}>
           {loadingCloud ? (
-            <LensLoader color={theme.text.muted} />
+            <LensLoader size="large" color={theme.text.muted} />
           ) : (
             <MaterialCommunityIcons
               name={waitingCloud ? "cloud-off-outline" : "message-off-outline"}

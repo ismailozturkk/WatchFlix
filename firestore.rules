@@ -390,6 +390,19 @@ service cloud.firestore {
               && f.get('shows', []) is list && f.get('shows', []).size() <= 4
               && f.get('people', []) is list && f.get('people', []).size() <= 4);
     }
+    // Profil kapağı (utils/profileBanner.js): yalnız TMDB görsel YOLU saklanır,
+    // tam adres değil — keyfî bir resim adresi (izleme pikseli) yazılamaz.
+    function profileBannerOk() {
+      let b = request.resource.data.get('profileBanner', null);
+      return b == null
+          || (b is map
+              && b.keys().hasOnly(['id', 'type', 'title', 'path'])
+              && b.id is int && b.id > 0
+              && b.type in ['movie', 'tv']
+              && b.get('title', '') is string && b.get('title', '').size() <= 200
+              && b.path is string && b.path.size() <= 80
+              && b.path.matches('^/[A-Za-z0-9_-]+[.](jpg|jpeg|png|webp)$'));
+    }
     // Avatar fotoğrafı (utils/avatarPhotos.js): photoURL her arkadaşın, akışın,
     // sohbetin avatarında çizilir. İstemci yalnız iki kaynaktan adres yazar:
     // bağlı Google hesabı (googleusercontent / ggpht) ve oyuncu/yönetmen
@@ -428,7 +441,7 @@ service cloud.firestore {
               || avatarPhotoMetaOk());
     }
     // "Vitrin rozetleri" (utils/badgeShowcase.js): kullanıcının profilinde
-    // sergilemek üzere seçtiği en fazla 4 rozet id'si (string[]).
+    // sergilemek üzere seçtiği en fazla 6 rozet id'si (string[]).
     function showcaseBadgeItemOk(item) {
       return item is string
           && item.size() >= 2
@@ -439,11 +452,13 @@ service cloud.firestore {
       let b = request.resource.data.get('showcaseBadges', null);
       return b == null
           || (b is list
-              && b.size() <= 4
+              && b.size() <= 6
               && (b.size() < 1 || showcaseBadgeItemOk(b[0]))
               && (b.size() < 2 || showcaseBadgeItemOk(b[1]))
               && (b.size() < 3 || showcaseBadgeItemOk(b[2]))
-              && (b.size() < 4 || showcaseBadgeItemOk(b[3])));
+              && (b.size() < 4 || showcaseBadgeItemOk(b[3]))
+              && (b.size() < 5 || showcaseBadgeItemOk(b[4]))
+              && (b.size() < 6 || showcaseBadgeItemOk(b[5])));
     }
     // "Sosyal hesaplar" (utils/socialLinks.js): { instagram: "ad", x: "ad", … }
     // Yalnız bilinen platform anahtarları, her değer en fazla 30 karakterlik metin.
@@ -512,6 +527,7 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
                     && rootCreateWithoutPrivateFields()
                     && fourFavoritesOk()
+                    && profileBannerOk()
                     && showcaseBadgesOk()
                     && socialLinksOk()
                     && avatarPhotoCreateOk();
@@ -526,6 +542,7 @@ service cloud.firestore {
                         && birthDateKept(uid)
                         && rootUpdateWithoutPrivateFields()
                         && fourFavoritesOk()
+                        && profileBannerOk()
                         && showcaseBadgesOk()
                         && socialLinksOk()
                         && avatarPhotoUpdateOk())
@@ -668,9 +685,19 @@ service cloud.firestore {
     match /Users/{uid}/private/{docId} {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && docId != 'entitlements'
-                    && (docId != 'account' || accountCreateOk(uid));
+                    && (docId != 'account' || accountCreateOk(uid))
+                    && (docId != 'streak' || streakDocOk());
       allow update: if isOwner(uid) && docId != 'entitlements'
-                    && (docId != 'account' || accountUpdateOk(uid));
+                    && (docId != 'account' || accountUpdateOk(uid))
+                    && (docId != 'streak' || streakDocOk());
+      // private/streak: haftalık seri (services/streakRuntime). Damga sunucu saatiyle
+      // yazılır; son gün sunucu saatinin en fazla 14 saat ilerisinde olabilir.
+      function streakDocOk() {
+        let d = request.resource.data;
+        return d.guncellendi == request.time
+          && d.sonGunMs is int && d.sonGunMs <= request.time.toMillis() + 50400000
+          && d.gunler is list && d.gunler.size() <= 400;
+      }
     }
 
     // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────

@@ -573,7 +573,7 @@ export default function UpNextScreen({ navigation }) {
 
         {loading ? (
           <View style={styles.center}>
-            <LensLoader size="large" color={theme.accent} />
+            <LensLoader size="screen" color={theme.accent} />
           </View>
         ) : visibleItems.length === 0 ? (
           <View style={styles.center}>

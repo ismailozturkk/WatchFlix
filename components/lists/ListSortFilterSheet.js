@@ -198,8 +198,9 @@ function ListSortFilterSheet({
   const [viewOpen, setViewOpen] = useState(false);
 
   const sortValue = { key: sort.value, dir: sort.dir };
-  const radiusKey = radiusKeyOf(view.radius);
-  const viewSummary = `${copy.columnsOption[view.columns] || view.columns} · ${copy.radius[radiusKey]}`;
+  // `view` isteğe bağlı: görünüm ayarı olmayan ekranlar (Etkinliklerim) kartı hiç çizmez.
+  const radiusKey = view ? radiusKeyOf(view.radius) : null;
+  const viewSummary = view ? `${copy.columnsOption[view.columns] || view.columns} · ${copy.radius[radiusKey]}` : "";
   const showDir = sort.supportsDir && sort.value !== "default";
 
   return (
@@ -341,6 +342,7 @@ function ListSortFilterSheet({
         ))}
 
         {/* ── Görünüm (kapalı kart) ── */}
+        {view ? (
         <View style={[styles.viewCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
           <Pressable
             testID="sort-filter-view-toggle"
@@ -403,6 +405,7 @@ function ListSortFilterSheet({
             </View>
           ) : null}
         </View>
+        ) : null}
       </SheetScroll>
 
       <View style={[styles.footer, { borderTopColor: theme.border }]}>

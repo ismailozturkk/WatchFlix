@@ -20,6 +20,7 @@ import { PressableScale } from "./ui";
 import BetaBadge from "../common/BetaBadge";
 import { isBetaFeature } from "@utils/betaFeatures";
 import { upperText } from "@utils/i18nText";
+import useLoopActive from "../../hooks/useLoopActive";
 
 const COLORS = ["#312E81", "#4F46E5", "#7C3AED"];
 const INK = "#312E81";
@@ -27,10 +28,13 @@ const MARK_COLORS = { miss: "#EF4444", skip: "#CBD5E1", hit: "#4ADE80", empty: "
 
 function useClock() {
   const [now, setNow] = useState(() => Date.now());
+  const active = useLoopActive();
   useEffect(() => {
+    if (!active) return undefined;
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [active]);
   return now;
 }
 

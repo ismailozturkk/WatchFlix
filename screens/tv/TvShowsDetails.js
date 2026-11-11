@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
+import { detailCacheKey, isAbortError, readDetail, writeDetail } from "@services/tmdbDetailCache";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DetailsSkeleton } from "../../components/Skeleton";
@@ -251,6 +252,16 @@ export default function TvShowsDetails({ route, navigation }) {
   // Galeri açıkken kaynak görsel yuvadan "kalkmış" görünür (bkz. ImageGalleryModal).
   const posterSlotOpacity = useRef(new Animated.Value(1)).current;
   const backdropSlotOpacity = useRef(new Animated.Value(1)).current;
+  // Arka plan posteri kaydırmaya bağlı: yavaş yükselir, kararır, söner; çekince
+  // esner (DetailHeroStage scrollY · components/common/heroScrollMotion.js).
+  const heroScrollY = useRef(new Animated.Value(0)).current;
+  const onHeroScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: heroScrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [heroScrollY],
+  );
   const openPosterGallery = useCallback(() => {
     measureWindowRect(posterSlotRef.current, (origin) =>
       setGallery({ visible: true, kind: "poster", origin }),
@@ -314,8 +325,17 @@ export default function TvShowsDetails({ route, navigation }) {
   /* ── Fetch details ── */
   useEffect(() => {
     // Aynı ekran örneği yeni id ile yeniden kullanılabildiği için geç gelen
-    // eski yanıtın yeni diziyi ezmemesi adına cancelled bayrağı gerekli.
+    // eski yanıtın yeni diziyi ezmemesi adına cancelled bayrağı gerekli; ayrıca
+    // istek AbortController ile gerçekten iptal edilir (yol haritası Y12).
     let cancelled = false;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const cacheKey = detailCacheKey("tv", id, language);
+    const cached = reloadKey === 0 ? readDetail(cacheKey) : null;
+    if (cached) {
+      setDetails(cached);
+      setLoading(false);
+      return undefined;
+    }
     const fetch = async () => {
       setLoading(true);
       try {
@@ -324,14 +344,20 @@ export default function TvShowsDetails({ route, navigation }) {
           url: `https://api.themoviedb.org/3/tv/${id}`,
           params: {
             language: tmdbLanguageOf(language),
+            // account_states / alternative_titles / changes / lists okunmuyordu.
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,content_ratings,translations,videos,watch/providers",
+              "credits,external_ids,images,keywords,recommendations,content_ratings,translations,videos,watch/providers",
             include_image_language: tmdbImageLanguageOrderOf(language),
           },
           headers: { accept: "application/json", Authorization: API_KEY },
+          signal: controller?.signal,
         });
-        if (!cancelled) setDetails(localizeMediaDetails(res.data, language));
+        if (cancelled) return;
+        const next = localizeMediaDetails(res.data, language);
+        if (!res.__fromCache) writeDetail(cacheKey, next);
+        setDetails(next);
       } catch (e) {
+        if (cancelled || isAbortError(e)) return;
         console.error(e);
       } finally {
         if (!cancelled) setLoading(false);
@@ -340,6 +366,7 @@ export default function TvShowsDetails({ route, navigation }) {
     fetch();
     return () => {
       cancelled = true;
+      controller?.abort();
     };
   }, [id, language, reloadKey]);
 
@@ -763,20 +790,26 @@ export default function TvShowsDetails({ route, navigation }) {
 
       <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
       <ScreenDecor scope="details" iconOpacity={0.25} genres={details.genres} titleType="tv" titleId={details.id} />
-      <ScrollView
+      <Animated.ScrollView
+        onScroll={onHeroScroll}
+        scrollEventThrottle={16}
         style={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* ── HERO / BACKDROP YUVASI ── */}
         <DetailHeroStage
-          uri={backdropUri("tv", details.id, details.backdrop_path)}
+          // Genişlik dp: getTmdbUrl piksel oranını kendisi uygular (varsayılan 1000 → ×3 →
+          // "original" iniyordu). Ambiyans katmanları küçük görselle (ısınma denetimi, 11 Kas).
+          uri={backdropUri("tv", details.id, details.backdrop_path, width)}
+          ambientUri={backdropUri("tv", details.id, details.backdrop_path, 100)}
           theme={theme}
           topInset={insets.top}
           width={width}
           placeholderIcon="tv-outline"
           onPress={openBackdropGallery}
           centerOpacity={backdropSlotOpacity}
+          scrollY={heroScrollY}
         />
 
         {/* ── POSTER + INFO HEADER ── */}
@@ -1002,7 +1035,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 seasons={details.seasons}
                 posterPath={details.poster_path}
                 mediaId={details.id}
-                backdropUri={backdropUri("tv", details.id, details.backdrop_path)}
+                backdropUri={backdropUri("tv", details.id, details.backdrop_path, width)}
                 onPress={() => navigation.navigate("TvGraphDetailScreen", { id })}
               />
             </View>
@@ -1212,7 +1245,7 @@ export default function TvShowsDetails({ route, navigation }) {
           {/* TMDB kritikleri kaldırıldı — yorumlar uygulamanın kendi yorum
               modalında gösteriliyor. */}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
       </LocalBlurTarget>
 
 
@@ -1318,7 +1351,7 @@ export default function TvShowsDetails({ route, navigation }) {
         originUri={
           gallery.kind === "poster"
             ? posterUri("tv", details.id, details.poster_path)
-            : backdropUri("tv", details.id, details.backdrop_path)
+            : backdropUri("tv", details.id, details.backdrop_path, width)
         }
         originRadius={gallery.kind === "poster" ? mainPosterRadius : 0}
         originOpacity={gallery.kind === "poster" ? posterSlotOpacity : backdropSlotOpacity}

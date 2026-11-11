@@ -5,7 +5,7 @@
 // gördüğü düzenin AYNISI üzerinde yerinde düzenleniyor. Bu kanca yalnız taslağı
 // ve kaydetmeyi yönetir, çizim ekranındır.
 //
-// Taslak: ad, kullanıcı adı, hakkında, avatar, dört favori, sosyal hesaplar,
+// Taslak: ad, kullanıcı adı, hakkında, avatar, kapak (banner), dört favori, sosyal hesaplar,
 // vitrin rozetleri ve profilde görünen listeler. Hepsi Kaydet'e kadar yalnız
 // yerelde durur; Vazgeç taslağı atar.
 //
@@ -47,6 +47,7 @@ import {
 } from "@utils/socialLinks";
 import { SOCIAL_NAMES, getSocialCopy } from "@utils/socialLinksCopy";
 import { normalizeListVisible } from "@utils/listVisibility";
+import { profileBannersEqual, readProfileBanner, toBannerPayload } from "@utils/profileBanner";
 import { normalizeShowcaseBadges } from "@utils/badgeShowcase";
 import {
   isProfileEditDirty,
@@ -130,6 +131,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
   );
   const savedFavorites = useMemo(() => readProfileFavorites(profile), [profile]);
   const savedSocial = useMemo(() => readProfileSocialLinks(profile), [profile]);
+  const savedBanner = useMemo(() => readProfileBanner(profile), [profile]);
   const savedListVisible = useMemo(() => normalizeListVisible(profile?.listVisible), [profile?.listVisible]);
 
   const [editing, setEditing] = useState(false);
@@ -146,6 +148,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
       bio: profile.bio || "",
       avatar: savedAvatar,
       favorites: savedFavorites,
+      banner: savedBanner,
       social: { ...savedSocial },
       showcase: normalizeShowcaseBadges(showcaseIds),
       listVisible: { ...savedListVisible },
@@ -154,7 +157,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
     setUsernameStatus("same");
     setEditing(true);
     return true;
-  }, [enabled, profile, savedAvatar, savedFavorites, savedSocial, showcaseIds, savedListVisible]);
+  }, [enabled, profile, savedAvatar, savedFavorites, savedBanner, savedSocial, showcaseIds, savedListVisible]);
 
   const cancel = useCallback(() => {
     setEditing(false);
@@ -176,6 +179,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
   const setBio = useCallback((v) => setField("bio", String(v ?? "").slice(0, BIO_MAX)), [setField]);
   const setAvatar = useCallback((choice) => setField("avatar", toAvatarChoice(choice)), [setField]);
   const setFavorites = useCallback((next) => setField("favorites", next), [setField]);
+  const setBanner = useCallback((next) => setField("banner", toBannerPayload(next)), [setField]);
   const setShowcase = useCallback((next) => setField("showcase", normalizeShowcaseBadges(next)), [setField]);
   const setSocial = useCallback(
     (key, value) => {
@@ -227,6 +231,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
     [draft, savedListVisible],
   );
   const showcaseChanged = !!draft && !showcaseIdsEqual(draft.showcase, normalizeShowcaseBadges(showcaseIds));
+  const bannerChanged = !!draft && !profileBannersEqual(draft.banner, savedBanner);
 
   const dirty =
     !!draft &&
@@ -257,6 +262,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
       },
     }) ||
       showcaseChanged ||
+      bannerChanged ||
       Object.keys(listChanges).length > 0);
 
   const canSave = dirty && !usernameBlocked && !saving;
@@ -362,6 +368,8 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
       if (!favoritesEqual(draft.favorites, savedFavorites)) {
         patch.fourFavorites = toProfilePayload(draft.favorites);
       }
+      // Kapak: kaldırmak null yazar (alan silinmez; kural null'ı kabul eder).
+      if (bannerChanged) patch.profileBanner = toBannerPayload(draft.banner);
       if (Object.keys(patch).length) await updateField(patch, { stampIdentity: wantsNameChange });
       if (!socialLinksEqual(socialResolved.links, savedSocial)) {
         await saveSocialLinks(uid, toSocialPayload(socialResolved.links));
@@ -412,6 +420,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
     socialCopy,
     savedAvatar,
     savedFavorites,
+    bannerChanged,
     savedSocial,
     savedListVisible,
     listChanges,
@@ -440,6 +449,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
     setBio,
     setAvatar,
     setFavorites,
+    setBanner,
     setShowcase,
     setSocial,
     toggleList,

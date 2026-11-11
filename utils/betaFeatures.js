@@ -23,6 +23,7 @@ export const BETA_FEATURE_IDS = Object.freeze([
   "atmosphere", // Atmosfer (evren sahneleri, parçacıklar)
   "profile_banner", // Profil kapağı
   "app_icon", // Uygulama simgesi seçici
+  "streak_flame", // Haftalık seri alevi (ayrıntı sayfası)
 ]);
 
 const BETA_SET = new Set(BETA_FEATURE_IDS);

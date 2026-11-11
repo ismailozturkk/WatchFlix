@@ -10,7 +10,7 @@
 //   • Poster Rozetleri — açıklamalı satırlar + rozet yığınının canlı önizlemesi.
 
 import React, { useMemo, useState } from "react";
-import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
+import { ScrollView, View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useListLayoutSettings } from "@context/AppSettingsContext";
@@ -27,6 +27,7 @@ import {
 } from "../../../utils/posterCorners";
 import { SettingsSubScreen, SectionLabel, buildUiColors } from "./settingsUi";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 // Önizleme posterleri tek renk olunca "kart" gibi duruyor; birkaç ton dönüşümlü.
 const tileTone = (colors, index) =>
@@ -341,7 +342,7 @@ function OptionTiles({ options, value, onChange, colors, compact = false }) {
             <View style={ps.optionVisual}>{opt.renderVisual(ink, active)}</View>
             <Text
               allowFontScaling={false}
-              numberOfLines={1}
+              numberOfLines={compact ? 2 : 1}
               adjustsFontSizeToFit // beş sütunda "Redondeadas"/"Abgerundet" sığsın
               minimumFontScale={0.8}
               style={[ps.optionLabel, compact && ps.optionLabelCompact, { color: active ? colors.text : colors.muted }]}
@@ -760,6 +761,8 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
                 style={[ps.tabButtonText, { color: active ? C.text : C.muted }, active && ps.tabButtonTextActive]}
               >
                 {tab.label}
@@ -782,7 +785,7 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
           <SectionLabel color={C.muted}>
             {i18nText("autoI18n.poster_ayar_alani", "Düzenlenecek alan").toUpperCase()}
           </SectionLabel>
-          <View style={ps.areaRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ps.areaScroller} contentContainerStyle={ps.areaRow}>
             {AREAS.map((a) => {
               const active = a.id === area.id;
               return (
@@ -791,7 +794,7 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
                   style={[
                     ps.areaTile,
                     {
-                      backgroundColor: active ? C.accent : C.card,
+                      backgroundColor: active ? C.accentDim : C.card,
                       borderColor: active ? C.accent : C.border,
                     },
                   ]}
@@ -800,30 +803,34 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                 >
-                  <AppIcon family="Ionicons" name={a.icon} size={17} color={active ? C.white : C.accent} />
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={[ps.areaLabel, { color: active ? C.white : C.text }]}
-                  >
-                    {a.label}
-                  </Text>
+                  <View style={ps.areaTileTop}>
+                    <AppIcon family="Ionicons" name={a.icon} size={17} color={C.accent} />
+                    <Text allowFontScaling={false} numberOfLines={2} style={[ps.areaLabel, { color: C.text }]}>
+                      {a.label}
+                    </Text>
+                    {active ? <AppIcon family="Ionicons" name="checkmark-circle" size={16} color={C.accent} /> : null}
+                  </View>
                   <Text
                     allowFontScaling={false}
                     numberOfLines={2}
-                    style={[ps.areaSummary, { color: active ? C.white : C.muted }]}
+                    style={[ps.areaSummary, { color: C.muted }]}
                   >
                     {areaSummary(a)}
                   </Text>
                 </GlassTouchable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <View style={[ps.card, ps.editorCard, { backgroundColor: C.card, borderColor: C.border }]}>
-            <View style={ps.hintRow}>
-              <AppIcon family="Ionicons" name="information-circle-outline" size={15} color={C.muted} />
-              <Text style={[ps.hintText, { color: C.muted }]}>{area.hint}</Text>
+            <View style={ps.editorHeading}>
+              <View style={[ps.editorIcon, { backgroundColor: C.accentDim }]}>
+                <AppIcon family="Ionicons" name={area.icon} size={19} color={C.accent} />
+              </View>
+              <View style={ps.editorHeadingCopy}>
+                <Text style={[ps.editorTitle, { color: C.text }]}>{area.label}</Text>
+                <Text style={[ps.hintText, { color: C.muted }]}>{area.hint}</Text>
+              </View>
             </View>
 
             {/* Gerçek oranlı canlı önizleme */}
@@ -841,6 +848,24 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
                 />
               </View>
             </View>
+
+            {area.kind === "relative" ? null : (
+              <View style={[ps.primaryControl, { borderBottomColor: C.borderMuted }]}>
+                <ControlHeader
+                  title={area.kind === "columns"
+                    ? i18nText("autoI18n.sutun_sayisi", "Sütun sayısı")
+                    : i18nText("autoI18n.poster_boyutu", "Poster boyutu")}
+                  value={area.kind === "columns" ? COLUMN_LABELS[current.columns] : RAIL_SIZE_LABELS[current.size]}
+                  colors={C}
+                />
+                <OptionTiles
+                  options={secondOptions}
+                  value={area.kind === "columns" ? current.columns : current.size}
+                  onChange={area.kind === "columns" ? current.onColumns : current.onSize}
+                  colors={C}
+                />
+              </View>
+            )}
 
             <ControlHeader
               title={i18nText("autoI18n.kose_yuvarlakligi", "Köşe yuvarlaklığı")}
@@ -876,27 +901,6 @@ ${cornerLabelAt(cornerIndexOf(a))}`;
               </GlassTouchable>
             ) : null}
 
-            {area.kind === "relative" ? null : <View style={[ps.divider, { backgroundColor: C.borderMuted }]} />}
-
-            {area.kind === "relative" ? null : area.kind === "columns" ? (
-              <>
-                <ControlHeader
-                  title={i18nText("autoI18n.sutun_sayisi", "Sütun sayısı")}
-                  value={COLUMN_LABELS[current.columns]}
-                  colors={C}
-                />
-                <OptionTiles options={secondOptions} value={current.columns} onChange={current.onColumns} colors={C} />
-              </>
-            ) : (
-              <>
-                <ControlHeader
-                  title={i18nText("autoI18n.poster_boyutu", "Poster boyutu")}
-                  value={RAIL_SIZE_LABELS[current.size]}
-                  colors={C}
-                />
-                <OptionTiles options={secondOptions} value={current.size} onChange={current.onSize} colors={C} />
-              </>
-            )}
           </View>
 
           {/* Paylaşılan liste kapakları — alandan bağımsız tek ayar */}
@@ -1006,36 +1010,41 @@ const ps = StyleSheet.create({
   tabCount: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
   tabCountText: { fontSize: 10.5, fontWeight: "800" },
 
-  // Alan seçici
-  // Beş alan: 3 + 2 sarar; ikinci satırdakiler satırı paylaşır.
-  areaRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  // Alan seçici: diğer alanın ucu görünür, yatay kaydırma keşfedilir.
+  // Basılan cam karo yatay kaydırıcının kırpma sınırında kesilmesin: üst/alt GLASS_PRESS_ROOM
+  // dolgu, aynı kadar eksi marj (yerleşim değişmez).
+  areaScroller: { marginHorizontal: -4, marginTop: 8 - GLASS_PRESS_ROOM, marginBottom: 2 - GLASS_PRESS_ROOM },
+  areaRow: { flexDirection: "row", gap: 8, paddingHorizontal: 4, paddingVertical: GLASS_PRESS_ROOM },
   areaTile: {
-    flexGrow: 1,
-    flexBasis: "30%",
-    minWidth: 0,
-    borderRadius: 14,
+    width: 152,
+    minHeight: 86,
+    borderRadius: 13,
     borderWidth: 1,
-    paddingVertical: 11,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    gap: 3,
+    paddingVertical: 10,
+    paddingHorizontal: 11,
+    justifyContent: "center",
+    gap: 5,
   },
-  areaLabel: { fontSize: 13, fontWeight: "800", marginTop: 2 },
-  areaSummary: { fontSize: 10.5, lineHeight: 13, fontWeight: "600", opacity: 0.9, textAlign: "center" },
+  areaTileTop: { flexDirection: "row", alignItems: "center", gap: 6 },
+  areaLabel: { flex: 1, fontSize: 13, fontWeight: "800" },
+  areaSummary: { fontSize: 10.5, lineHeight: 13, fontWeight: "600" },
 
   // Kartlar
   card: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
-  editorCard: { marginTop: 10, padding: 14 },
-  hintRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  editorCard: { marginTop: 12, padding: 14 },
+  editorHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  editorIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  editorHeadingCopy: { flex: 1, minWidth: 0 },
+  editorTitle: { fontSize: 16, fontWeight: "800", marginBottom: 2 },
   hintText: { flexShrink: 1, fontSize: 12, lineHeight: 16 },
   controlHint: { marginTop: -4, marginBottom: 10 },
-  divider: { height: 1, marginVertical: 14 },
+  primaryControl: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 16, marginBottom: 16 },
 
   // Sahne (önizleme)
   stage: {
     borderRadius: 14,
     borderWidth: 1,
-    marginTop: 10,
+    marginTop: 14,
     marginBottom: 14,
     padding: 12,
     overflow: "hidden",
@@ -1064,7 +1073,7 @@ const ps = StyleSheet.create({
     alignItems: "center",
     gap: 7,
   },
-  optionTileCompact: { paddingHorizontal: 2, paddingVertical: 9 },
+  optionTileCompact: { paddingHorizontal: 2, paddingVertical: 9, minHeight: 74 },
   optionVisual: { minHeight: 28, alignItems: "center", justifyContent: "center" },
   optionLabel: { fontSize: 12.5, fontWeight: "700", textAlign: "center" },
   optionLabelCompact: { fontSize: 10.5 },

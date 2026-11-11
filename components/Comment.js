@@ -21,6 +21,7 @@ import {
   serverTimestamp,
   query,
   getDocs,
+  startAfter,
   where,
   orderBy,
   limit,
@@ -496,6 +497,7 @@ const CommentItem = memo(
 
 // Yorum sayfası: dinleyici en yeni bu kadar yorumu okur; "daha fazla" bir sayfa ekler.
 const COMMENT_PAGE = 20;
+const EMPTY_COMMENTS = Object.freeze([]);
 // Kapsam süzgecinde (sezon/bölüm) eşleşme aramak için kendiliğinden çekilecek üst sınır.
 const COMMENT_SCOPE_FILL_MAX = 200;
 
@@ -549,16 +551,25 @@ const Comment = ({
     photoURL: myPhotoURL,
   } = useUserProfile();
   const { isBlocked, block } = useFriends();
-  const [comments, setComments] = useState([]);
-  // Yorum sayfalama: sınır içerik anahtarına bağlı, başka içeriğe geçince ilk sayfaya döner.
+  // Yorum sayfalama (yol haritası Y11): en yeni COMMENT_PAGE yorum CANLI dinlenir;
+  // "daha fazla" artık sınırı büyütüp yeniden abone OLMAZ (her seferinde yüklü
+  // tüm yorumlar sunucudan yeniden okunuyordu), imleçle tek seferlik eski sayfa
+  // çeker. Durum içerik anahtarına bağlı: başka içeriğe geçince ilk sayfaya döner.
   const pageKey = `${collectionName}/${contextId}`;
-  const [pageState, setPageState] = useState({ key: pageKey, limit: COMMENT_PAGE });
-  const commentLimit = pageState.key === pageKey ? pageState.limit : COMMENT_PAGE;
-  // Son snapshot'ın hangi sınırla geldiği: sınır büyütülüp yeni snapshot gelmeden
-  // ikinci kez büyütülmesin (otomatik doldurma döngüye girmesin).
-  const [loaded, setLoaded] = useState({ key: null, limit: 0, hasMore: false });
-  const pageLoaded = loaded.key === pageKey && loaded.limit === commentLimit;
-  const hasMoreComments = loaded.key === pageKey && loaded.hasMore;
+  const [liveComments, setLiveComments] = useState([]);
+  const [liveReadyKey, setLiveReadyKey] = useState(null);
+  // Canlı pencerenin dışındaki eski yorumlar (timestamp azalan, canlıdakinden eski).
+  const [olderPage, setOlderPage] = useState({ key: pageKey, docs: [], hasMore: false, loading: false });
+  const olderCursorRef = useRef(null);
+  const olderDocs = olderPage.key === pageKey ? olderPage.docs : EMPTY_COMMENTS;
+  const comments = useMemo(() => {
+    if (!olderDocs.length) return liveComments;
+    const liveIds = new Set(liveComments.map((c) => c.id));
+    return [...liveComments, ...olderDocs.filter((c) => !liveIds.has(c.id))];
+  }, [liveComments, olderDocs]);
+  const olderLoading = olderPage.key === pageKey && olderPage.loading;
+  const pageLoaded = liveReadyKey === pageKey && !olderLoading;
+  const hasMoreComments = olderPage.key === pageKey && olderPage.hasMore;
   const [isSending, setIsSending] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
   const [repliesMap, setRepliesMap] = useState({});
@@ -803,37 +814,91 @@ const Comment = ({
     [scopeSheet.mode, handleScopeFilterChange],
   );
 
-  // ── Comments listener (sayfalı) ──────────────────────────
-  // Eskiden limit yoktu: popüler bir içeriğin sayfası açılınca TÜM yorumları okunuyordu
-  // (kullanıcı × yorum sayısı). Artık en yeni COMMENT_PAGE yorum dinlenir; "daha fazla"
-  // sınırı büyütür (sayfa durumu bileşenin başında: pageState / loaded).
+  // ── Comments listener (canlı pencere + imleçli eski sayfalar) ──
   useEffect(() => {
     if (!contextId) return;
     const cid = contextId.toString();
+    const key = pageKey;
+    olderCursorRef.current = null;
+    setOlderPage({ key, docs: [], hasMore: false, loading: false });
     const q = query(
       collection(db, collectionName, cid, "comments"),
       orderBy("timestamp", "desc"),
-      limit(commentLimit),
+      limit(COMMENT_PAGE),
     );
     const unsub = onSnapshot(
       q,
       (snapshot) => {
         const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setComments(docs);
-        // Sınır büyüyünce önce bellekteki eski sayfa (fromCache) gelebilir; "devamı var mı"
-        // yalnız sunucu onaylı snapshot'tan okunur, yoksa düğme bir an kaybolup geri gelirdi.
-        if (snapshot.metadata?.fromCache) return;
-        setLoaded({ key: pageKey, limit: commentLimit, hasMore: snapshot.size >= commentLimit });
+        setLiveComments(docs);
+        const full = snapshot.size >= COMMENT_PAGE;
+        // Limitli sorguda "removed": ya silindi ya yeni yorumlar yüzünden
+        // pencereden taştı. Pencere hâlâ doluysa taşmadır → eski kümede tut.
+        if (full) {
+          const shifted = snapshot
+            .docChanges()
+            .filter((ch) => ch.type === "removed")
+            .map((ch) => ({ id: ch.doc.id, ...ch.doc.data() }));
+          if (shifted.length) {
+            setOlderPage((p) => {
+              if (p.key !== key) return p;
+              const known = new Set(p.docs.map((c) => c.id));
+              const add = shifted.filter((c) => !known.has(c.id));
+              return add.length ? { ...p, docs: [...add, ...p.docs] } : p;
+            });
+          }
+        }
+        // "Devamı var mı" ve imleç yalnız sunucu onaylı İLK snapshot'tan.
+        if (snapshot.metadata?.fromCache || olderCursorRef.current) return;
+        olderCursorRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
+        setOlderPage((p) => (p.key === key ? { ...p, hasMore: full } : p));
+        setLiveReadyKey(key);
       },
       (err) => __DEV__ && console.warn("Comment comments:", err.message),
     );
     return () => unsub();
-  }, [contextId, collectionName, commentLimit, pageKey]);
+  }, [contextId, collectionName, pageKey]);
 
-  const loadMoreComments = useCallback(() => {
-    if (!pageLoaded || !hasMoreComments) return;
-    setPageState({ key: pageKey, limit: commentLimit + COMMENT_PAGE });
-  }, [pageLoaded, hasMoreComments, pageKey, commentLimit]);
+  // Eski sayfadaki yorumlar dinlenmiyor: kullanıcının kendi değişikliği
+  // (düzenleme, beğeni, yanıt sayısı) yerelde de uygulanır.
+  const patchOlder = useCallback((id, patch) => {
+    setOlderPage((p) => {
+      if (!p.docs.some((c) => c.id === id)) return p;
+      return { ...p, docs: p.docs.map((c) => (c.id === id ? { ...c, ...patch(c) } : c)) };
+    });
+  }, []);
+
+  const loadMoreComments = useCallback(async () => {
+    if (!pageLoaded || !hasMoreComments || !olderCursorRef.current) return;
+    const key = pageKey;
+    const cid = contextId.toString();
+    setOlderPage((p) => (p.key === key ? { ...p, loading: true } : p));
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, collectionName, cid, "comments"),
+          orderBy("timestamp", "desc"),
+          startAfter(olderCursorRef.current),
+          limit(COMMENT_PAGE),
+        ),
+      );
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setOlderPage((p) => {
+        if (p.key !== key) return p;
+        olderCursorRef.current = snap.docs[snap.docs.length - 1] || olderCursorRef.current;
+        const known = new Set(p.docs.map((c) => c.id));
+        return {
+          key,
+          docs: [...p.docs, ...docs.filter((c) => !known.has(c.id))],
+          hasMore: snap.size >= COMMENT_PAGE,
+          loading: false,
+        };
+      });
+    } catch (err) {
+      if (__DEV__) console.warn("Comment older:", err?.message);
+      setOlderPage((p) => (p.key === key ? { ...p, loading: false } : p));
+    }
+  }, [pageLoaded, hasMoreComments, pageKey, contextId, collectionName]);
 
   // Kapsam süzgeci (sezon/bölüm) istemcide çalışır: eski yorumlarda kapsam alanı yok,
   // sunucu sorgusuyla süzülemez. Süzgeç açıkken yüklenenlerde az eşleşme varsa sonraki
@@ -841,9 +906,9 @@ const Comment = ({
   useEffect(() => {
     if (!scopeEnabled || isAllFilter(scopeFilter)) return;
     if (scopedComments.length >= COMMENT_PAGE) return;
-    if (commentLimit >= COMMENT_SCOPE_FILL_MAX) return;
+    if (comments.length >= COMMENT_SCOPE_FILL_MAX) return;
     loadMoreComments();
-  }, [scopeEnabled, scopeFilter, scopedComments.length, commentLimit, loadMoreComments]);
+  }, [scopeEnabled, scopeFilter, scopedComments.length, comments.length, loadMoreComments]);
 
   // ── Moderasyon: şikâyet + engelle ────────────────────────
   // Yanıt ile üst yorum farklı yollarda duruyor; moderatör kaydı yalnız tam
@@ -931,38 +996,40 @@ const Comment = ({
   }, []);
 
   // ── Lazy reply subscription: open on expand, close on collapse ──
+  // Abonelik setState güncelleyicisinin DIŞINDA açılır: güncelleyici saf olmalı
+  // (StrictMode/eşzamanlı render onu iki kez çağırabilir → çift dinleyici).
+  const replyVisibilityRef = useRef(replyVisibility);
+  replyVisibilityRef.current = replyVisibility;
   const toggleReplyVisibility = useCallback(
     (id) => {
-      setReplyVisibility((prev) => {
-        const willBeVisible = !prev[id];
+      const willBeVisible = !replyVisibilityRef.current[id];
 
-        if (willBeVisible && !replyUnsubsRef.current[id]) {
-          const cid = contextId.toString();
-          const rq = query(
-            collection(db, collectionName, cid, "comments", id, "replies"),
-            orderBy("timestamp", "asc"),
-          );
-          replyUnsubsRef.current[id] = onSnapshot(
-            rq,
-            (snap) => {
-              setRepliesMap((rm) => ({
-                ...rm,
-                [id]: snap.docs.map((d) => ({
-                  id: d.id,
-                  ...d.data(),
-                  parentId: id,
-                })),
-              }));
-            },
-            (err) => __DEV__ && console.warn("Comment replies:", err.message),
-          );
-        } else if (!willBeVisible && replyUnsubsRef.current[id]) {
-          replyUnsubsRef.current[id]();
-          delete replyUnsubsRef.current[id];
-        }
+      if (willBeVisible && !replyUnsubsRef.current[id]) {
+        const cid = contextId.toString();
+        const rq = query(
+          collection(db, collectionName, cid, "comments", id, "replies"),
+          orderBy("timestamp", "asc"),
+        );
+        replyUnsubsRef.current[id] = onSnapshot(
+          rq,
+          (snap) => {
+            setRepliesMap((rm) => ({
+              ...rm,
+              [id]: snap.docs.map((d) => ({
+                id: d.id,
+                ...d.data(),
+                parentId: id,
+              })),
+            }));
+          },
+          (err) => __DEV__ && console.warn("Comment replies:", err.message),
+        );
+      } else if (!willBeVisible && replyUnsubsRef.current[id]) {
+        replyUnsubsRef.current[id]();
+        delete replyUnsubsRef.current[id];
+      }
 
-        return { ...prev, [id]: willBeVisible };
-      });
+      setReplyVisibility((prev) => ({ ...prev, [id]: willBeVisible }));
     },
     [contextId, collectionName],
   );
@@ -989,6 +1056,9 @@ const Comment = ({
           // düzenleme sırasında değiştirilmiş olabilir.
           ...(scopeFields || {}),
         });
+        if (!isReply) {
+          patchOlder(editId, () => ({ text: text.trim(), isSpoiler, ...(scopeFields || {}) }));
+        }
       } else if (isReply) {
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments", parentId, "replies"),
@@ -1012,6 +1082,7 @@ const Comment = ({
         await updateDoc(doc(db, collectionName, cid, "comments", parentId), {
           replyCount: increment(1),
         });
+        patchOlder(parentId, (c) => ({ replyCount: (c.replyCount || 0) + 1 }));
       } else {
         newRef = await addDoc(
           collection(db, collectionName, cid, "comments"),
@@ -1110,6 +1181,7 @@ const Comment = ({
         await updateDoc(doc(db, collectionName, cid, "comments", pid), {
           replyCount: increment(-1),
         }).catch(() => {});
+        patchOlder(pid, (c) => ({ replyCount: Math.max(0, (c.replyCount || 0) - 1) }));
       } else {
         // Close any open reply subscription before deleting the comment
         if (replyUnsubsRef.current[id]) {
@@ -1117,6 +1189,8 @@ const Comment = ({
           delete replyUnsubsRef.current[id];
         }
         await deleteDoc(doc(db, collectionName, cid, "comments", id));
+        // Canlı pencere dışındaki kopya dinlenmiyor: elle düş.
+        setOlderPage((p) => ({ ...p, docs: p.docs.filter((c) => c.id !== id) }));
       }
     } catch (e) {
       Toast.show({
@@ -1295,6 +1369,13 @@ const Comment = ({
                 const ref = doc(db, collectionName, contextId.toString(), "comments", id);
                 // Yorum bu arada silinmiş olabilir — reddi yut (unhandled
                 // rejection olmasın), snapshot listesi zaten güncellenir.
+                const uid = currentUser.uid;
+                patchOlder(id, (c) => {
+                  const likedBy = { ...(c.likedBy || {}) };
+                  if (liked) delete likedBy[uid];
+                  else likedBy[uid] = true;
+                  return { likedBy, likeCount: Math.max(0, (c.likeCount || 0) + (liked ? -1 : 1)) };
+                });
                 if (liked) {
                   updateDoc(ref, {
                     likeCount: increment(-1),

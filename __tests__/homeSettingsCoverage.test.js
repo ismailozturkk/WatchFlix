@@ -117,11 +117,11 @@ describe.each(BAGLAMLAR)("%s/%s", (...parca) => {
     }
   });
 
-  test("içerik ayarına bağlı efektler adultContent'i bağımlılık olarak taşır", () => {
+  test("içerik ayarına bağlı efektler contentFilter'ı bağımlılık olarak taşır", () => {
     // Her kapsamlı ailenin yüklendiği efekt, ayar değişince yeniden çalışmalı.
     expect(kaynak).toMatch(/useHomeDataSettings\(\)/);
     const efektBagimliliklari = kaynak.match(/\}, \[[^\]]*\]\);/g) || [];
-    const adultliEfekt = efektBagimliliklari.filter((b) => b.includes("adultContent"));
+    const adultliEfekt = efektBagimliliklari.filter((b) => b.includes("contentFilter"));
     // best/bests, genres, (film: upcoming) + tekil sağlayıcı efekti.
     expect(adultliEfekt.length).toBeGreaterThanOrEqual(3);
   });
@@ -135,16 +135,16 @@ describe.each(BAGLAMLAR)("%s/%s", (...parca) => {
 describe("keşif rayı (components/DiscoveryMediaRail)", () => {
   const kaynak = oku("components", "DiscoveryMediaRail.js");
 
-  test("önbellek anahtarı yetişkin izniyle kapsamlanır", () => {
-    expect(kaynak).toMatch(/adultScoped\(\s*`discovery_v2_/);
+  test("önbellek anahtarı hassas içerik imzasıyla kapsamlanır", () => {
+    expect(kaynak).toMatch(/contentScoped\(\s*`discovery_v2_/);
   });
 
-  test("yükleme geri çağrısı adultContent'e bağlı (ayar değişince ray yeniden yüklenir)", () => {
-    expect(kaynak).toMatch(/\[\s*API_KEY,\s*adultContent,/);
+  test("yükleme geri çağrısı contentFilter'a bağlı (ayar değişince ray yeniden yüklenir)", () => {
+    expect(kaynak).toMatch(/\[\s*API_KEY,\s*contentFilter,/);
   });
 
-  test("sonuçlar dropAdult'tan geçer", () => {
-    expect(kaynak).toMatch(/dropAdult\(data\.results/);
+  test("sonuçlar dropSensitive'ten geçer", () => {
+    expect(kaynak).toMatch(/dropSensitive\(data\.results/);
   });
 });
 
@@ -154,13 +154,13 @@ describe("çevrimdışı indirme (services/dataDownloader)", () => {
   // İndirilen kayıt, ekranların okuduğu ANAHTARA düşmeli; yoksa "Verileri indir"
   // yetişkin izni açık kullanıcıda hiç kullanılmaz ya da yanlış kovaya yazılır.
   test.each(KAPSAMLI.filter((a) => !a.includes("provider_") && !a.includes("upcoming_")))(
-    "%s anahtarı adultScoped ile yazılır",
+    "%s anahtarı contentScoped ile yazılır",
     (aile) => {
       const kullanimlar = [...kaynak.matchAll(new RegExp(`\`${aile}`, "g"))];
       expect(kullanimlar.length).toBeGreaterThan(0);
       for (const k of kullanimlar) {
-        const once = kaynak.slice(Math.max(0, k.index - 16), k.index);
-        expect({ aile, kapsamli: /adultScoped\(\s*$/.test(once) }).toEqual({
+        const once = kaynak.slice(Math.max(0, k.index - 18), k.index);
+        expect({ aile, kapsamli: /contentScoped\(\s*$/.test(once) }).toEqual({
           aile,
           kapsamli: true,
         });

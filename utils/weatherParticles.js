@@ -831,7 +831,11 @@ export function previewParticleCount(fullCount, area, screenArea) {
   return Math.min(n, Math.max(6, Math.round(n * ratio * 2.5)));
 }
 
-/** 30 fps sınırı yalnız "Kapalı" efekt modunda; diğerlerinde 60 (120 Hz ekranda da). */
+/**
+ * Atmosferin kare aralığı (ms). "Tam" ve "Orta" 60 fps (30 fps ve boşta 20 fps
+ * denendi, takılıyor gibi görünüyordu — 11 Kas); 30 fps yalnız kullanıcının
+ * seçtiği "Kapalı" modda. 120 Hz ekranda da aynı sınır.
+ */
 export const frameIntervalMs = (effectMode) => (effectMode === "off" ? 1000 / 30 : 1000 / 60);
 
 // ── Renk ────────────────────────────────────────────────────────────────────

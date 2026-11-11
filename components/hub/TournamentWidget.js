@@ -44,6 +44,7 @@ import CountdownTimer from "@components/tournament/CountdownTimer";
 import { GenreEmblem } from "@components/tournament/GenreGlyph";
 import { genreMetaFor } from "@components/tournament/genreMeta";
 import TournamentTreePreview, { TOTAL_MATCHES } from "@components/tournament/TournamentTreePreview";
+import useLoopActive from "../../hooks/useLoopActive";
 
 export default function TournamentWidget({ navigation }) {
   const { theme } = useTheme();
@@ -65,10 +66,13 @@ export default function TournamentWidget({ navigation }) {
   const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
   const [sendVisible, setSendVisible] = useState(false);
 
+  const clockActive = useLoopActive();
   useEffect(() => {
+    if (!clockActive) return undefined;
+    setNowMs(now());
     const id = setInterval(() => setNowMs(now()), 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [clockActive]);
 
   const phaseInfo = useMemo(() => getPhaseInfo(periodId, nowMs), [periodId, nowMs]);
 

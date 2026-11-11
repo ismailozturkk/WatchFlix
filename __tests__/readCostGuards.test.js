@@ -7,8 +7,12 @@ const read = (rel) => fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 
 test("film/dizi yorum dinleyicisi sınırsız değil (sayfalı)", () => {
   const src = read("components/Comment.js");
-  const listener = src.slice(src.indexOf("Comments listener (sayfalı)"));
-  expect(listener).toMatch(/collection\(db, collectionName, cid, "comments"\),\s*orderBy\("timestamp", "desc"\),\s*limit\(commentLimit\)/);
+  const listener = src.slice(src.indexOf("Comments listener (canlı pencere"));
+  // Canlı pencere sabit boyutlu; "daha fazla" sınırı büyütüp yeniden abone olmaz,
+  // imleçle tek seferlik eski sayfa çeker (yol haritası Y11).
+  expect(listener).toMatch(/collection\(db, collectionName, cid, "comments"\),\s*orderBy\("timestamp", "desc"\),\s*limit\(COMMENT_PAGE\)/);
+  expect(listener).toMatch(/startAfter\(olderCursorRef\.current\),\s*limit\(COMMENT_PAGE\)/);
+  expect(src).not.toMatch(/limit\(commentLimit\)/);
   expect(src).toMatch(/const COMMENT_PAGE = 20;/);
   expect(src).toMatch(/const COMMENT_SCOPE_FILL_MAX = \d+;/);
 });

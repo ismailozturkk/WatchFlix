@@ -1,0 +1,530 @@
+<!doctype html><html><head><meta charset="utf-8"><title>LensLoader önizleme</title>
+<style>
+body{margin:0;font:13px system-ui;background:#111;color:#ccc}
+.row{display:flex;gap:28px;align-items:center;padding:18px 24px;flex-wrap:wrap}
+.light{background:#f3f1ec;color:#333}
+.cell{display:flex;flex-direction:column;align-items:center;gap:6px}
+.box{position:relative}
+.box > div{position:absolute;left:50%;top:50%;border-radius:50%}
+.rot{position:absolute;inset:0}
+.rot > div{position:absolute;left:50%;top:50%;border-radius:50%}
+.btn{background:#e50914;border-radius:14px;padding:10px 22px;display:flex;align-items:center;gap:8px;color:#fff}
+</style></head><body>
+<div class="row" id="dark"></div><div class="row light" id="light"></div>
+<div class="row" id="mono"></div>
+<div class="row"><label>hız <input id="spd" type="range" min="0.1" max="1" step="0.05" value="1"></label>
+<label><input id="pause" type="checkbox"> durdur</label> x=<span id="xv"></span>
+<input id="scrub" type="range" min="0" max="1" step="0.005" value="0" style="width:400px"></div>
+<script>
+const SPL = (() => { // utils/splashMotion.js
+//
+// Açılış ekranının (components/SplashLensIntro.js) SAF hareket modeli. RN importu
+// yok, jest'te doğrudan test edilir (__tests__/splashMotion.test.js). Kademeler ve
+// ekrana göre yerleşim utils/splashPlan.js'te.
+//
+// Hikâye, Lens logo animasyonunun kısaltılmış hâli
+// (marketing/marka/yeni-logo/kaynak/anim2.cjs, video 6,4 sn → burada ~2,4 sn):
+//
+//   0 ──────────────────────────────────────────── MIN_VISIBLE_MS ──▶ hazırsa çıkış
+//   │ yerel splash: yalnız mürekkep zemin (yıldızlar JS'te ilk kareden doğar)
+//   │ yıldız alanı belirir                                   [0 … 0,4]
+//   │ camgöbeği + kırmızı yıldız sarmal çizerek yaklaşır,     [0,08 … 1,12]
+//   │   yaklaştıkça hızlanır, büyür ve ışık izi bırakır
+//   │ çarpışma: parlama, şok halkaları, kıvılcımlar          [1,12 … ~1,9]
+//   │ dönüş söner, iki daire dikey konumda göze oturur        [1,12 … 1,50]
+//   │ göz bebeği yaylanarak belirir, parıltı yanar            [1,45 … 1,85]
+//   │ işaret yukarı kayar, "seelogd" harf harf yükselir      [1,55 … 2,37]
+//   │ bekleme döngüsü: göz bir yana bakar ve kırpar (veri gelene kadar)
+//   └ çıkış (EXIT_MS): içerik hafif büyüyerek solar, zemin en son açılır
+//
+// Neden hepsi interpolate: tüm hareket tek bir doğrusal saat sürücüsünden (saniye)
+// MATEMATİKSEL türer ve native tarafta akar. Açılışta JS thread'i bloklansa da
+// animasyon takılmaz. Eğriler interpolate'in `easing` seçeneğiyle değil, tabloya
+// örneklenerek uygulanır (native sürücü yalnız doğrusal parçaları bilir).
+//
+// Birimler: işaret 512'lik tasarım ızgarasında (daire r 132, merkezler arası d 120);
+// bileşen birimi "giriş ölçeği" ile dp'ye çevirir (splashPlan.layoutSplash).
+
+// ── Renkler (Lens) ───────────────────────────────────────────────────────────
+const LENS_COLORS = Object.freeze({
+  ink: "#0D0E13",
+  paper: "#F5F2EB",
+  cyan: "#14C8E8",
+  red: "#FF3D5E",
+});
+
+// Yerel splash'in zemini (app.json → expo-splash-screen.backgroundColor ile AYNI).
+const NATIVE_SPLASH_BG = LENS_COLORS.ink;
+
+// ── İşaret ölçüleri (tasarım birimi) ─────────────────────────────────────────
+const LENS = Object.freeze({
+  r: 132, // daire yarıçapı
+  d: 120, // son düzende merkezler arası
+  pupil: 40,
+  glint: 9.6,
+  glintOff: 15, // parıltı bebeğin merkezinden sağ-üste
+});
+const CONTACT_SEP = 2 * LENS.r; // daireler bu ayrılıkta değer (264)
+const START_SEP = 640; // yıldızların ilk ayrılığı
+const TURNS = 2.6; // çarpışmaya kadar toplam tur
+const MARK_HEIGHT = 2 * LENS.r + LENS.d; // dikey işaretin boyu (384)
+// Göz: iki dairenin kesişimi. Eksen boyunca uzunluk 2r - d, enine genişlik 2·√(r² - (d/2)²).
+const EYE_LENGTH = 2 * LENS.r - LENS.d; // 144
+const EYE_WIDTH = 2 * Math.sqrt(LENS.r ** 2 - (LENS.d / 2) ** 2); // ≈ 235,2
+
+// ── Zaman çizelgesi (saniye, mount anından) ──────────────────────────────────
+const T = Object.freeze({
+  appear: 0.08, // yıldızlar belirir
+  grow: 0.3, // küçük parlak yıldız evresi biter, büyüme başlar
+  collide: 1.12, // çarpışma
+  settle: 1.5, // dönüş biter, göz yerinde
+  pupilAt: 1.45,
+  pupilDur: 0.4,
+  glintAt: 1.6,
+  glintDur: 0.15,
+  riseAt: 1.55, // işaret yukarı kayar (yazıya yer açar)
+  riseDur: 0.45,
+  lettersAt: 1.7,
+  letterStep: 0.045,
+  letterDur: 0.4,
+});
+// Saat tablolarında mutlaka bulunan anlar.
+const KEY_TIMES = Object.freeze([
+  T.appear,
+  T.grow,
+  T.collide,
+  T.settle,
+  T.pupilAt,
+  T.glintAt,
+  T.riseAt,
+  T.riseAt + T.riseDur,
+]);
+const INTRO_S = 2.4;
+const INTRO_MS = INTRO_S * 1000;
+const EXIT_MS = 600;
+// Veri çok hızlı gelse bile splash en az bu kadar görünür (giriş anından sayılır):
+// çarpışma, göz ve yazının neredeyse tamamı oynar. Veri geç gelirse splash zaten
+// APP_READY'ye kadar kalır ve bekleme döngüsü (bakış + kırpma) sürer.
+const MIN_VISIBLE_MS = 2150;
+// APP_READY hiç gelmezse zorla çıkış.
+const FALLBACK_EXIT_MS = 10000;
+// Native "bitti" geri çağrısı kaybolursa overlay en geç EXIT_MS + bu kadar sonra sökülür.
+const EXIT_GUARD_MS = 1200;
+// Döngüler.
+const IDLE_MS = 3600; // bekleme: bakış + kırpma
+const TWINKLE_MS = 2600; // yıldız alanı pırıltısı
+const DRIFT_MS = 14000; // yıldız alanının yavaş dönüşü (durur, sonsuz değil)
+const DRIFT_DEG = 40;
+
+// ── Yardımcılar ──────────────────────────────────────────────────────────────
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const ease = Object.freeze({
+  linear: (x) => x,
+  out: (x) => 1 - (1 - x) ** 3,
+  inOut: (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2),
+  // Sönümlü yay (aşımlı oturma): 0 → 1, birkaç küçük salınım.
+  spring: (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.exp(-5.5 * x) * Math.cos(9.5 * x)),
+});
+const round = (v, digits = 4) => {
+  const k = 10 ** digits;
+  return Math.round(v * k) / k;
+};
+
+// ── Hareket fonksiyonları (t saniye) ─────────────────────────────────────────
+
+/** İki yıldızın merkezleri arası (tasarım birimi). Çarpışmadan sonra yay ile d'ye oturur. */
+function sepAt(t) {
+  if (t < T.collide) {
+    const u = clamp01((t - T.appear) / (T.collide - T.appear));
+    return CONTACT_SEP + (START_SEP - CONTACT_SEP) * (1 - u) ** 1.6;
+  }
+  return CONTACT_SEP - (CONTACT_SEP - LENS.d) * ease.spring(clamp01((t - T.collide) / (T.settle - T.collide)));
+}
+
+// Kepler benzeri dönüş: açısal hız ayrılığın -1,5 kuvvetiyle artar, çarpışmadan sonra söner.
+// Toplam açı sayısal integralle bir kez hesaplanır; son açı -90° (cyan üstte, dikey kilit).
+const DT = 1 / 2000;
+let thetaCache = null;
+function thetaIntegral() {
+  if (thetaCache) return thetaCache;
+  const steps = Math.ceil((INTRO_S + 0.5) / DT);
+  const acc = new Float64Array(steps + 1);
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const t = i * DT;
+    let w = 0;
+    if (t >= T.appear && t < T.collide) w = sepAt(t) ** -1.5;
+    else if (t >= T.collide && t < T.settle) {
+      w = CONTACT_SEP ** -1.5 * (1 - (t - T.collide) / (T.settle - T.collide)) ** 2;
+    }
+    sum += w * DT;
+    acc[i] = sum;
+  }
+  const end = acc[Math.round(T.settle / DT)];
+  thetaCache = { acc, end, k: (TURNS * 2 * Math.PI) / end };
+  return thetaCache;
+}
+
+const WOBBLE_S = 0.6;
+
+/** Yıldız ekseninin açısı (radyan). Ekran koordinatı: y aşağı; -π/2 = cyan tam üstte. */
+function thetaAt(t) {
+  const { acc, end, k } = thetaIntegral();
+  const i = Math.max(0, Math.min(acc.length - 1, Math.round(t / DT)));
+  let th = -Math.PI / 2 - (end - acc[i]) * k;
+  if (t > T.settle && t < T.settle + WOBBLE_S) {
+    // Oturmanın küçük sallantısı; pencerenin sonunda TAM -90°'ye iner.
+    const q = t - T.settle;
+    th += 0.09 * Math.exp(-8 * q) * Math.sin(20 * q) * (1 - q / WOBBLE_S);
+  }
+  return th;
+}
+
+/** Yıldız boyu (0..1, r'nin oranı): küçük ve parlak başlar, çarpışmada tam boy. */
+function sizeAt(t) {
+  if (t < T.appear) return 0;
+  if (t < T.grow) return 0.3 * ease.out(clamp01((t - T.appear) / (T.grow - T.appear)));
+  if (t < T.collide) return 0.3 + 0.7 * ease.inOut(clamp01((t - T.grow) / (T.collide - T.grow)));
+  return 1;
+}
+
+/** Yıldız halesinin gücü: yaklaşırken yanar, çarpışmadan sonra söner. */
+function glowAt(t) {
+  if (t < T.collide) return clamp01((t - T.appear) / 0.2);
+  return 1 - ease.out(clamp01((t - T.collide) / 0.5));
+}
+
+/** Işık izinin gücü: çarpışmaya dek tam, sonra hızla söner. */
+const trailAt = (t) => (t < T.collide ? 1 : 1 - clamp01((t - T.collide) / 0.2));
+
+/** Çarpışma anında işaretin kısa "yumruk" büyümesi (oran, 0 = yok). */
+function punchAt(t) {
+  const tau = t - T.collide;
+  if (tau <= 0) return 0;
+  return 0.07 * Math.exp(-9 * tau) * Math.sin(Math.min(tau * 20, Math.PI));
+}
+
+/** İşaretin yukarı kayma ilerlemesi (0..1). */
+const riseAt = (t) => ease.inOut(clamp01((t - T.riseAt) / T.riseDur));
+
+/** Giriş ölçeği → son ölçek oranı: video gibi işaret önce %18 büyük, yazıyla birlikte küçülür. */
+const INTRO_TO_FINAL = 1 / 1.18;
+
+/** İşaret kabının ölçeği (giriş ölçeğine göre): kayarken küçülür, çarpışmada yumruk. */
+const markScaleAt = (t) => (1 + (INTRO_TO_FINAL - 1) * riseAt(t)) * (1 + punchAt(t));
+
+/** Göz bebeği yayı (0..1, aşımlı). */
+const pupilAt = (t) => ease.spring(clamp01((t - T.pupilAt) / T.pupilDur));
+const glintOpacityAt = (t) => clamp01((t - T.glintAt) / T.glintDur);
+
+/** i. harfin ilerlemesi (0..1). */
+const letterAt = (t, i) => ease.out(clamp01((t - T.lettersAt - i * T.letterStep) / T.letterDur));
+
+/** Yıldız alanının belirişi. */
+const starsInAt = (t) => clamp01(t / 0.4);
+
+/**
+ * Göz ölçeği, verilen ayrılıkta (son göze göre): [eksen boyunca, enine].
+ * Kesişim yoksa (ayrılık ≥ 2r) ikisi de 0.
+ */
+function eyeScaleForSep(sep) {
+  const along = Math.max(0, CONTACT_SEP - sep) / EYE_LENGTH;
+  const half = sep / 2;
+  const across = half >= LENS.r ? 0 : (2 * Math.sqrt(LENS.r ** 2 - half ** 2)) / EYE_WIDTH;
+  return [along, across];
+}
+
+// ── Çarpışma efektleri (tau = t - T.collide) ─────────────────────────────────
+const FLASH_S = 0.35;
+const flashOpacityAt = (t) => {
+  const tau = t - T.collide;
+  if (tau <= 0 || tau >= FLASH_S) return 0;
+  return 0.75 * (1 - tau / FLASH_S) ** 2;
+};
+// Parlamanın yarıçapı ekran genişliğinin oranı olarak (en büyük 0,42).
+const FLASH_MAX = 0.42;
+const flashRadiusAt = (t) => 0.12 + 0.3 * clamp01((t - T.collide) / FLASH_S);
+
+// Şok halkaları: [gecikme s, renk, en büyük yarıçap (ekran genişliği oranı)].
+const SHOCK_RINGS = Object.freeze([
+  Object.freeze([0, LENS_COLORS.paper, 0.75]),
+  Object.freeze([0.05, LENS_COLORS.cyan, 0.62]),
+  Object.freeze([0.09, LENS_COLORS.red, 0.55]),
+]);
+const SHOCK_S = 0.6;
+const SHOCK_MIN = 0.05;
+function shockProgressAt(t, ring) {
+  return clamp01((t - T.collide - SHOCK_RINGS[ring][0]) / SHOCK_S);
+}
+const shockRadiusAt = (t, ring) =>
+  SHOCK_MIN + SHOCK_RINGS[ring][2] * ease.out(shockProgressAt(t, ring));
+function shockOpacityAt(t, ring) {
+  const p = shockProgressAt(t, ring);
+  return p <= 0 || p >= 1 ? 0 : 0.6 * (1 - p) ** 1.4;
+}
+
+/** Kıvılcımın merkezden uzaklığı (ekran genişliği oranı) ve opaklığı. */
+const sparkDistanceAt = (t, v) => {
+  const tau = Math.max(0, t - T.collide);
+  return 0.62 * v * (1 - Math.exp(-4.5 * tau));
+};
+function sparkOpacityAt(t, life) {
+  const tau = t - T.collide;
+  if (tau <= 0 || tau >= life) return 0;
+  return (1 - tau / life) ** 1.3;
+}
+
+// ── Bekleme döngüsü (b ∈ [0,1], IDLE_MS) ─────────────────────────────────────
+const LOOK_WINDOW = Object.freeze([0.08, 0.3]);
+const BLINK_WINDOW = Object.freeze([0.5, 0.5 + 0.22 / (IDLE_MS / 1000)]);
+const LOOK_UNITS = -18; // bebek bu kadar sola bakar
+const BLINK_SEP = 148; // kırpışta daireler bu kadar ayrılır → göz kapanır
+const windowPhase = (b, [a, z]) => (b <= a || b >= z ? 0 : Math.sin((Math.PI * (b - a)) / (z - a)));
+const lookAt = (b) => LOOK_UNITS * windowPhase(b, LOOK_WINDOW);
+const blinkAt = (b) => windowPhase(b, BLINK_WINDOW); // 0..1..0
+const blinkSepAt = (b) => BLINK_SEP * blinkAt(b);
+// Göz kapanırken bebek ince bir şerit olarak kalmasın: kapanmanın sonunda solar.
+const blinkFadeAt = (b) => clamp01((blinkAt(b) - 0.55) / 0.3);
+
+// ── Pırıltı döngüsü (yıldız grubu başına faz) ────────────────────────────────
+const twinkleAt = (x, phase) => 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(2 * Math.PI * (x + phase)));
+
+// ── Tema zemini ──────────────────────────────────────────────────────────────
+// Yerel splash uygulamanın temasını okuyamaz (tema JS deposunda), bu yüzden sahne
+// HER temada mürekkep uzayda başlar. Çarpışmanın şok dalgası ekranı merkezden
+// temanın zeminine boyar; açık temada yıldızlar bu sırada söner. Hareketi Azalt'ta
+// dalga yok: zemin ilk anlarda kısa bir geçişle temaya döner.
+const WIPE_S = 0.55;
+const wipeProgressAt = (t) => clamp01((t - T.collide) / WIPE_S);
+const wipeAt = (t) => ease.out(wipeProgressAt(t)); // dalga yarıçapı (0 → ekranı örter)
+const wipeOpacityAt = (t) => ease.out(clamp01(wipeProgressAt(t) / 0.35));
+const STILL_WIPE_S = 0.35;
+const stillWipeAt = (t) => ease.inOut(clamp01(t / STILL_WIPE_S));
+
+// ── Çıkış (e ∈ [0,1], EXIT_MS) ───────────────────────────────────────────────
+const exitContentOpacityAt = (e) => 1 - ease.out(clamp01(e / 0.6));
+const exitContentScaleAt = (e) => 1 + 0.06 * ease.out(clamp01(e / 0.7));
+const exitBackdropOpacityAt = (e) => 1 - ease.inOut(clamp01((e - 0.35) / 0.65));
+
+// ── Tablolar ─────────────────────────────────────────────────────────────────
+
+/**
+ * Bir fonksiyonu [from, to] aralığında örnekleyip native interpolate tablosu kurar.
+ * Aralık dışında değer sabit kalsın diye çağıran `extrapolate: "clamp"` verir.
+ * `step` saniye (ya da sürücü birimi) aralıkla; uçlar her zaman dahil.
+ */
+function sampleTable(fn, { from = 0, to = INTRO_S, step = 1 / 60, map, knots = KEY_TIMES } = {}) {
+  const xs = [];
+  const n = Math.max(1, Math.ceil((to - from) / step - 1e-9));
+  for (let i = 0; i <= n; i++) xs.push(round(i === n ? to : from + i * step, 5));
+  // Kırılma anları (çarpışma, oturma...) örnek ızgarasına düşmese de tabloda olsun:
+  // yoksa doğrusal ara değer o anın değerini kaçırır (ör. çarpışmadaki ayrılık).
+  for (const k of knots) if (k > from && k < to) xs.push(round(k, 5));
+  xs.sort((p, q) => p - q);
+  const inputRange = [];
+  const outputRange = [];
+  for (const x of xs) {
+    if (inputRange.length && x - inputRange[inputRange.length - 1] < 1e-4) continue;
+    const v = fn(x);
+    inputRange.push(x);
+    outputRange.push(map ? map(v) : round(v));
+  }
+  return { inputRange, outputRange };
+}
+
+const toDeg = (rad) => `${round((rad * 180) / Math.PI, 3)}deg`;
+
+/** Bir tablonun bütün çıktıları sayısal ve sonlu mu (test ve geliştirme denetimi). */
+function isFiniteTable({ inputRange, outputRange }) {
+  if (inputRange.length !== outputRange.length || inputRange.length < 2) return false;
+  for (let i = 1; i < inputRange.length; i++) if (!(inputRange[i] > inputRange[i - 1])) return false;
+  return outputRange.every((v) =>
+    typeof v === "number" ? Number.isFinite(v) : /^-?\d+(\.\d+)?deg$/.test(v),
+  );
+}
+
+ return { LENS_COLORS, clamp01, ease }; })();
+const M = (() => { const { LENS_COLORS, clamp01, ease } = SPL; const COLORS = LENS_COLORS;
+ // utils/lensLoaderMotion.js
+//
+// Uygulama içi yükleme göstergesinin (components/LensLoader.js) SAF hareket modeli.
+// RN importu yok; jest'te doğrudan test edilir (__tests__/lensLoaderMotion.test.js).
+//
+// İKİ KARADELİK: Lens'in iki dairesi (camgöbeği + kırmızı) birer karadeliktir —
+// renkli halka (yığılma diski), koyu çekirdek (olay ufku), soluk hale.
+//
+//   x (0..1, CYCLE_MS'de bir tur, sonsuz)
+//   │ 0,00  uzakta, yavaş: camgöbeği üstte, kırmızı altta, ağır ağır dönerler
+//   │ 0,00–0,50  yavaşça yaklaşırlar, giderek hızlanırlar (dönüş de hızlanır)
+//   │ ~0,50  hızla iç içe geçerler: gelgit gerilmesi + kütleçekim dalgası halkası
+//   │ 0,50–1,00  öbür tarafa geçip yavaşlayarak uzaklaşırlar
+//   │ 1,00  yer değiştirmiş + yarım tur dönmüş = 0,00'daki pozun AYNISI (dikiş yok)
+//
+// Konum işaretli tek sayıdır: p ∈ [-1, 1] (camgöbeği +p, kırmızı -p, eksen boyunca).
+// Dönüş Kepler'e benzer: açısal hız ~ 1 / (p² + c) — yakınken çok hızlı, uzakta ağır.
+// Her şey tek doğrusal sürücüden (x) native interpolate ile türer; eğriler tabloya
+// örneklenir (native sürücü yalnız doğrusal parçaları bilir).
+
+
+// Aşağı çekip yenileme (RefreshControl) yerel bileşendir, içine Lens çizilemez.
+// Android spinner'ı `colors` dizisinde döner: Lens'in iki rengi. (iOS tintColor tek
+// renk alır; orada ekranın kendi rengi kalır.)
+const LENS_REFRESH_COLORS = Object.freeze([COLORS.cyan, COLORS.red]);
+
+const CYCLE_MS = 2200;
+// Hareketi Azalt: işaret yerinde durur, yalnız saydamlık nefes alır.
+const BREATHE_MS = 1400;
+const BREATHE_MIN = 0.45;
+
+const BASE_ANGLE = -90; // camgöbeği üstte (RN'de pozitif açı saat yönü)
+// Bir döngüde toplam dönüş: 180 + 360k olmalı (yer değiştirme + yarım tur = aynı poz).
+const TOTAL_TURN = 540;
+// Açısal hız: OMEGA_BASE + 1 / (p² + OMEGA_SOFT). Uzakta ~1,9, iç içeyken ~17,7.
+const OMEGA_BASE = 1;
+const OMEGA_SOFT = 0.06;
+
+// Geometri — kutu kenarına göre oran (kutu = px × px, merkez 0).
+const GEOM = Object.freeze({
+  amp: 0.23, // p = ±1'de merkezin kutu merkezinden uzaklığı
+  halo: 0.26, // soluk hale yarıçapı
+  ring: 0.19, // renkli halka (yığılma diski) yarıçapı
+  core: 0.1, // koyu çekirdek (olay ufku) yarıçapı
+  wave: 0.48, // kütleçekim dalgasının en geniş yarıçapı
+});
+// Küçük boy (düğme/satır içi): hale yok, gövdeler iri — 22 px'te de seçilsin.
+const GEOM_COMPACT = Object.freeze({ amp: 0.25, halo: 0, ring: 0.23, core: 0.115, wave: 0.48 });
+const HALO_OPACITY = 0.26;
+const TIDE_ALONG = 0.22; // iç içeyken eksen boyunca gerilme
+const TIDE_ACROSS = 0.1; // enine basılma
+
+// Kütleçekim dalgası: geçişten hemen sonra merkezden yayılan halka.
+const WAVE = Object.freeze({ start: 0.49, end: 0.8, from: 0.2, peak: 0.7 });
+
+// ActivityIndicator adları + "medium". Kademeler kullanım yerine göre:
+//   small  22 — düğme içi, satır içi (metin/simge yanında), arama alanı
+//   medium 32 — bölüm / sayfa durumu, liste sonu, kart içi
+//   large  48 — tam ekran ya da büyük alan
+const LOADER_SIZES = Object.freeze({ small: 22, medium: 32, large: 48 });
+// Bu boyun altında kompakt geometri: hale çizilmez (bulanık leke gibi kalıyor).
+const HALO_MIN_SIZE = 26;
+const geomFor = (px) => (px < HALO_MIN_SIZE ? GEOM_COMPACT : GEOM);
+
+/** size verilmezse: mono (dolu düğme içi) → small, brand (alan göstergesi) → medium. */
+function resolveLoaderSize(size, tone = "brand") {
+  if (typeof size === "number" && Number.isFinite(size) && size > 0) return size;
+  const fallback = tone === "mono" ? LOADER_SIZES.small : LOADER_SIZES.medium;
+  return LOADER_SIZES[size] ?? fallback;
+}
+
+// Yaklaşma eğrisi: kübik (yavaş başlar, ortada çok hızlı) + sinüs (uçlarda tamamen
+// durmasın) karışımı.
+const approach = (x) => 0.6 * ease.inOut(x) + 0.4 * (0.5 - 0.5 * Math.cos(Math.PI * x));
+
+/** İşaretli konum: 1 = camgöbeği tam uzakta (üstte), -1 = öbür tarafta. */
+const posAt = (x) => 1 - 2 * approach(clamp01(x));
+
+/** Yakınlık: 0 uzak, 1 tam iç içe. */
+const closeAt = (x) => 1 - Math.abs(posAt(x));
+
+// Açı: ω(x) = OMEGA_BASE + 1/(p²+c) integrali, TOTAL_TURN'e ölçeklenir. Bir kez
+// sayısal integral (yamuk), sonra doğrusal ara değer.
+const ANGLE_STEPS = 2000;
+const ANGLE_TABLE = (() => {
+  const omega = (x) => OMEGA_BASE + 1 / (posAt(x) ** 2 + OMEGA_SOFT);
+  const acc = [0];
+  for (let i = 1; i <= ANGLE_STEPS; i += 1) {
+    const a = (i - 1) / ANGLE_STEPS;
+    const b = i / ANGLE_STEPS;
+    acc.push(acc[i - 1] + ((omega(a) + omega(b)) / 2) * (b - a));
+  }
+  const total = acc[ANGLE_STEPS];
+  return acc.map((v) => (v / total) * TOTAL_TURN);
+})();
+
+/** Eksenin açısı (derece). 0'da BASE_ANGLE, 1'de BASE_ANGLE + TOTAL_TURN. */
+function angleAt(x) {
+  const f = clamp01(x) * ANGLE_STEPS;
+  const i = Math.min(ANGLE_STEPS - 1, Math.floor(f));
+  const t = f - i;
+  return BASE_ANGLE + ANGLE_TABLE[i] + (ANGLE_TABLE[i + 1] - ANGLE_TABLE[i]) * t;
+}
+
+/** Gelgit: iç içeyken eksen boyunca gerilir, enine basılır. [boyunca, enine] */
+function tideAt(x) {
+  const k = closeAt(x) ** 4;
+  return [1 + TIDE_ALONG * k, 1 - TIDE_ACROSS * k];
+}
+
+/** Kütleçekim dalgası: [ölçek (0..1 → GEOM.wave), saydamlık]. */
+function waveAt(x) {
+  if (x < WAVE.start || x > WAVE.end) return [WAVE.from, 0];
+  const t = (x - WAVE.start) / (WAVE.end - WAVE.start);
+  const grow = ease.out(t);
+  const fadeIn = clamp01(t / 0.12);
+  return [WAVE.from + (1 - WAVE.from) * grow, WAVE.peak * fadeIn * (1 - t) ** 1.4];
+}
+
+/** Bir karadeliğin kutu merkezinden en uzak noktası (kutu oranı): taşma bekçisi. */
+function reachAt(x, geom = GEOM) {
+  const [along] = tideAt(x);
+  return Math.abs(posAt(x)) * geom.amp + Math.max(geom.halo, geom.ring) * along;
+}
+
+// Hareketi Azalt pozu: dikey, yarı iç içe (Lens işaretine benzer).
+const STILL_POS = 0.55;
+
+// Tablo örneklemesinde kırılma anları (dalga sınırları) + geçiş çevresi sık ızgara.
+const KEY_XS = Object.freeze([WAVE.start, WAVE.end, 0.5]);
+
+/**
+ * Döngü tablosu: x ∈ [0,1] örneklenir, `map` ile dönüştürülür. Geçiş anı çok hızlı
+ * olduğundan 0,38–0,62 arası ayrıca sık örneklenir; yoksa doğrusal ara değer köşe yapar.
+ */
+function sampleLoop(fn, { steps = 120, dense = 60, map = (v) => v } = {}) {
+  const xs = new Set();
+  const add = (x) => xs.add(Math.round(x * 1e6) / 1e6);
+  for (let i = 0; i <= steps; i += 1) add(i / steps);
+  for (let i = 0; i <= dense; i += 1) add(0.38 + (0.24 * i) / dense);
+  KEY_XS.forEach(add);
+  const inputRange = [...xs].sort((a, b) => a - b);
+  const outputRange = inputRange.map((x) => map(fn(x)));
+  return { inputRange, outputRange };
+}
+
+/** Hareketi Azalt nefesi: 1 → BREATHE_MIN → 1. */
+const breatheAt = (x) => BREATHE_MIN + (1 - BREATHE_MIN) * (0.5 + 0.5 * Math.cos(2 * Math.PI * x));
+
+ return { LENS_COLORS, CYCLE_MS, geomFor, HALO_OPACITY, HALO_MIN_SIZE, BASE_ANGLE, posAt, angleAt, tideAt, waveAt }; })();
+const C = M.LENS_COLORS;
+function make(parent, px, mono, monoColor, label){
+  const cell=document.createElement('div');cell.className='cell';
+  const box=document.createElement('div');box.className='box';box.style.width=box.style.height=px+'px';
+  const G=M.geomFor(px);const disc=(r,css)=>{const d=document.createElement('div');Object.assign(d.style,{width:2*r+'px',height:2*r+'px',marginLeft:-r+'px',marginTop:-r+'px'},css);return d;};
+  const wave=disc(G.wave*px,{border:Math.max(1,px*0.035)+'px solid '+(mono?monoColor:C.cyan),boxSizing:'border-box'});
+  box.appendChild(wave);
+  const rot=document.createElement('div');rot.className='rot';box.appendChild(rot);
+  const bodies=[];
+  const add=(d,sign)=>{rot.appendChild(d);bodies.push([d,sign]);};
+  const cols=[[-1,C.red],[1,C.cyan]];
+  if(!mono && G.halo>0) cols.forEach(([s,c])=>add(disc(G.halo*px,{background:c,opacity:M.HALO_OPACITY}),s));
+  cols.forEach(([s,c])=>add(disc(G.ring*px, mono?{border:Math.max(1.5,px*0.07)+'px solid '+monoColor,boxSizing:'border-box'}:{background:c}),s));
+  cols.forEach(([s])=>add(disc(G.core*px*(mono?0.8:1),{background:mono?monoColor:C.ink}),s));
+  if(label){const l=document.createElement('div');l.textContent=label;cell.appendChild(box);cell.appendChild(l);parent.appendChild(cell);} else parent.appendChild(box);
+  return (x)=>{
+    rot.style.transform='rotate('+M.angleAt(x)+'deg)';
+    const off=M.posAt(x)*G.amp*px; const [a,b]=M.tideAt(x);
+    bodies.forEach(([d,s])=>d.style.transform='translateX('+(s*off)+'px) scale('+a+','+b+')');
+    const [ws,wo]=M.waveAt(x); wave.style.transform='scale('+ws+')'; wave.style.opacity=wo;
+  };
+}
+const fns=[];
+[22,32,48,96,160].forEach(s=>fns.push(make(dark,s,false,null,s+'px')));
+[22,32,48,96].forEach(s=>fns.push(make(light,s,false,null,s+'px')));
+const b=document.createElement('div');b.className='btn';mono.appendChild(b);fns.push(make(b,22,true,'#fff'));b.append('Kaydet');
+const b2=document.createElement('div');b2.className='btn';b2.style.background='#14C8E8';b2.style.color='#000';mono.appendChild(b2);fns.push(make(b2,22,true,'#000'));b2.append('Gönder');
+let x=0,last=performance.now();
+function tick(t){const dt=t-last;last=t;
+ if(!pause.checked){x=(x+dt*spd.value/M.CYCLE_MS)%1;scrub.value=x;} else x=+scrub.value;
+ xv.textContent=x.toFixed(3); fns.forEach(f=>f(x)); requestAnimationFrame(tick);}
+requestAnimationFrame(tick);
+</script></body></html>

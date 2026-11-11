@@ -150,7 +150,7 @@ export default function PosterReveal({
 
       {uri && !ready && !failed ? (
         <View style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: theme.secondary }]}>
-          <LensLoader color={theme.accent} />
+          <LensLoader size="fill" color={theme.accent} />
         </View>
       ) : null}
     </View>

@@ -206,27 +206,9 @@ export default function PrivacySettingsScreen({ navigation }) {
                 <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
               </GlassTouchable>
             ) : null}
-            {section.key === "socialLinks" ? (
-              <View style={[styles.linkRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                <View style={[styles.optionIcon, { backgroundColor: theme.primary }]}>
-                  <Ionicons name="eye-outline" size={18} color={theme.text.secondary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.optionLabel, { color: theme.text.primary, fontWeight: "600" }]}>
-                    {i18nText("autoI18n.profil_sekmemde_goster", "Profil sekmemde göster")}
-                  </Text>
-                  <Text style={[styles.optionDesc, { color: theme.text.secondary }]}>
-                    {i18nText("autoI18n.profil_sekmemde_goster_alt", "Yalnızca kendi profil sekmendeki bağlantı alanını gizler")}
-                  </Text>
-                </View>
-                <Switch
-                  testID="own-profile-social-links-toggle"
-                  value={privacy?.showSocialLinksOnOwnProfile !== false}
-                  onValueChange={(value) => handleChange("showSocialLinksOnOwnProfile", value)}
-                  trackColor={{ true: theme.accent, false: theme.border }}
-                />
-              </View>
-            ) : null}
+            {/* "Profil sekmemde göster" buradan Ayarlar > Kişiselleştirme > Ekran
+                bölümleri > Profil > "Hesap bağlantıları"na taşındı (11 Kas 2026):
+                bu bölüm yalnız KİMİN göreceğini seçer. */}
           </View>
         ))}
 

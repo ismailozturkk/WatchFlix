@@ -7,7 +7,13 @@
 // Görsel dil: her sekmenin KENDİ rengi var (profildeki MyActivityButton kısayol
 // hücreleriyle aynı) — aktif sekme başlıktaki ışığı ve boş durumu da o renge
 // boyar. Satırlar yumuşak yüzeyli kartlar; post kartları Hub akışı ve
-// Postlarım ile aynı dili (tip rengi, poster yığını, istatistik hapları) kullanır.
+// Postlarım ile aynı dili (tip rengi, poster yığını) kullanır.
+//
+// Yoğunluk (11 Kas): bu sekmeler yüzlerce kayıt tutar → dikeyde kompakt.
+//   • Puanlamalar + Etkileşimler: 2 sütunlu kutucuk ızgarası (RatingTile /
+//     InteractionTile) — liste boyu yarıya iner.
+//   • Yorumlar + Postlar/Taslaklar: tek sütun ama sıkı satır; düzenle/sil ve
+//     beğeni/yorum sayıları ayrı alt şerit yerine üst meta satırında.
 
 import { Image } from "expo-image";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
@@ -35,11 +41,28 @@ import usePosterUri from "../../../hooks/usePosterUri";
 import i18n from "../../../translations";
 import { i18nText, percentText } from "@utils/i18nText";
 import { intlLocaleOf } from "@utils/appLanguages";
-import { postPreviewPosters, tallyVotes } from "@utils/postComposer";
+import { postPreviewPosters, tallyVotes, tierListMediaOf } from "@utils/postComposer";
+import { tierInkOf } from "@utils/tierList";
+import { getTierListCopy } from "@utils/tierListCopy";
+import {
+  ACTIVITY_TAB_CONFIG,
+  ALL,
+  COMMENT_KIND_ORDER,
+  DATE_RANGES,
+  POST_TYPE_ORDER,
+  SCORE_BUCKETS,
+  applyActivityFilter,
+  countActiveActivityFilters,
+  emptyActivityFilter,
+  presentValues,
+} from "@utils/activityFilter";
+import { getActivityFilterCopy } from "@utils/activityFilterCopy";
+import { getListSortFilterCopy } from "@utils/listSortFilterCopy";
+import ListSortFilterSheet from "@components/lists/ListSortFilterSheet";
+import { getRatingColors } from "@utils/ratingColors";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
 import PosterStack from "@components/feed/PosterStack";
-import StatPill from "@components/feed/StatPill";
 import { postTypeMeta } from "@components/feed/postTypeMeta";
 import { ActivityListSkeleton } from "@components/Skeleton";
 import { appAlert } from "@components/AppAlert";
@@ -65,6 +88,7 @@ import { scopeShort } from "@components/comments/scopeTexts";
 import { normalizeScope, scopeKey } from "@utils/commentScope";
 import ScreenDecor from "@components/ScreenDecor";
 import { alpha } from "../../../theme/colors";
+import { isLightSurface } from "@utils/colorUtils";
 import BackButton from "@components/BackButton";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -135,13 +159,43 @@ const KIND_META = {
 const LIKE_RED = "#FF5A5F";
 const SPOILER_RED = "#f04f4f";
 
-// Puan tonu (0-10): yüksek yeşil, orta turuncu, düşük kırmızı.
-const scoreTone = (score, theme) =>
-  score >= 8
-    ? theme.colors?.green || "#22C55E"
-    : score >= 6
-      ? theme.colors?.orange || "#F97316"
-      : theme.colors?.red || "#EF4444";
+// Puan tonu (1–10): her tam puan kademesinin KENDİ rengi. Kademe = puanın tam kısmı
+// (8.5 → 8), 1–10 arasına kıstırılır.
+//   • 1–9 tek yönlü, sezgisel rampa: kırmızı (kötü) → turuncu → sarı (orta) → yeşil (iyi)
+//     → koyu zümrüt (çok iyi). Mavi/mor gibi "puan" anlamı taşımayan tonlar yok.
+//   • 10 = başyapıt: rampanın dışında, DOLU altın rozet (koyu yazı) — 9'la karışmaz.
+//   • İki tema için ayrı ton: koyu yüzeyde açık tonlar, açık yüzeyde koyu tonlar. 11 Kas'ta
+//     theme/colors.js'teki 11 tema yüzeyinin hepsinde (rozet zemini dahil) ≥3.1:1 kontrast ölçüldü;
+//     10'un altın rozetinde koyu yazı 9.4:1.
+const SCORE_TONES_ON_DARK = [
+  "#F43F5E", // 1 gül kırmızısı
+  "#F87171", // 2 kırmızı
+  "#FB923C", // 3 turuncu
+  "#FBBF24", // 4 amber
+  "#FDE047", // 5 sarı
+  "#BEF264", // 6 limon
+  "#86EFAC", // 7 açık yeşil
+  "#4ADE80", // 8 yeşil
+  "#34D399", // 9 zümrüt
+];
+const SCORE_TONES_ON_LIGHT = [
+  "#9F1239", // 1
+  "#C81E1E", // 2
+  "#C2410C", // 3
+  "#A85A04", // 4
+  "#8A6A00", // 5
+  "#4D7C0F", // 6
+  "#15803D", // 7
+  "#0F6B3A", // 8
+  "#065F46", // 9
+];
+const SCORE_GOLD = "#F5B301";
+const scoreStep = (score) => Math.min(10, Math.max(1, Math.floor(Number(score) || 0)));
+const scoreTone = (score, onLight) => {
+  const step = scoreStep(score);
+  if (step === 10) return SCORE_GOLD;
+  return (onLight ? SCORE_TONES_ON_LIGHT : SCORE_TONES_ON_DARK)[step - 1];
+};
 
 const STORY_COLS = 3;
 const STORY_GRID_PAD = 16;
@@ -152,6 +206,19 @@ const STORY_ITEM_W =
     STORY_GRID_GAP * (STORY_COLS - 1)) /
   STORY_COLS;
 const STORY_ITEM_H = (STORY_ITEM_W * 16) / 9;
+
+// Puanlamalar + Etkileşimler: 2 sütunlu kutucuk ızgarası. Genişlik sabit (flex:1
+// değil) — tek kalan son kutucuk tüm satıra yayılmasın.
+const PAIR_COLS = 2;
+const PAIR_PAD = 16;
+const PAIR_GAP = 10;
+const PAIR_ITEM_W = (Dimensions.get("window").width - PAIR_PAD * 2 - PAIR_GAP) / PAIR_COLS;
+const isPairTab = (key) => key === "ratings" || key === "interactions";
+
+// Arama + süzgeç (utils/activityFilter.js): sekme başına ayrı durum; dokunulmamış sekme bunu kullanır.
+const DEFAULT_FILTER = Object.freeze(emptyActivityFilter());
+// Sıralama karolarının Feather simgeleri (sayfa kabuğu Feather çizer).
+const SORT_ICONS = { date: "calendar", score: "star", name: "type", likes: "heart", comments: "message-circle" };
 
 export default function MyActivityScreen({ navigation, route }) {
   const { theme } = useTheme();
@@ -416,12 +483,64 @@ export default function MyActivityScreen({ navigation, route }) {
       ? storyDrafts
       : interactions;
 
+  // ── Arama + süzgeç + sıralama (sekme başına ayrı; sekme değişince korunur) ──
+  const [filters, setFilters] = useState({});
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterState = filters[tab] || DEFAULT_FILTER;
+  const updateFilter = useCallback(
+    (patch) => setFilters((prev) => ({ ...prev, [tab]: { ...(prev[tab] || DEFAULT_FILTER), ...patch } })),
+    [tab],
+  );
+  const resetFilter = useCallback(
+    () => setFilters((prev) => ({ ...prev, [tab]: { ...DEFAULT_FILTER, query: (prev[tab] || DEFAULT_FILTER).query } })),
+    [tab],
+  );
+  const clearAll = useCallback(() => setFilters((prev) => ({ ...prev, [tab]: DEFAULT_FILTER })), [tab]);
+  const shown = useMemo(() => applyActivityFilter(tab, data, filterState), [tab, data, filterState]);
+  const activeFilterCount = countActiveActivityFilters(tab, filterState);
+
+  const fc = getActivityFilterCopy(i18n.language);
+  const sheetCopy = getListSortFilterCopy(i18n.language);
+  const tabConfig = ACTIVITY_TAB_CONFIG[tab];
+  const optionList = (keys, labels) => [
+    { key: ALL, label: fc.all },
+    ...keys.map((key) => ({ key, label: labels?.[key] || key })),
+  ];
+  const filterSections = tabConfig.filters
+    .map((id) => {
+      if (id === "kind") {
+        const keys = tab === "ratings" ? ["movie", "tv"] : presentValues(tab, data, "kind", COMMENT_KIND_ORDER);
+        if (keys.length < 2 && filterState.kind === ALL) return null;
+        return { id, kind: "segment", title: fc.sections.kind, options: optionList(keys, fc.kinds), value: filterState.kind, onChange: (v) => updateFilter({ kind: v }) };
+      }
+      if (id === "score") {
+        return { id, kind: "chips", title: fc.sections.score, options: optionList(SCORE_BUCKETS, fc.scores), value: filterState.score, onChange: (v) => updateFilter({ score: v }) };
+      }
+      if (id === "postType") {
+        const keys = presentValues(tab, data, "postType", POST_TYPE_ORDER);
+        if (keys.length < 2 && filterState.postType === ALL) return null;
+        return { id, kind: "chips", title: fc.sections.postType, options: optionList(keys, fc.postTypes), value: filterState.postType, onChange: (v) => updateFilter({ postType: v }) };
+      }
+      if (id === "action") {
+        return { id, kind: "segment", title: fc.sections.action, options: optionList(["like", "bookmark"], fc.actions), value: filterState.action, onChange: (v) => updateFilter({ action: v }) };
+      }
+      return { id, kind: "chips", title: fc.sections.date, options: optionList(DATE_RANGES, fc.dates), value: filterState.date, onChange: (v) => updateFilter({ date: v }) };
+    })
+    .filter(Boolean);
+  const sortConfig = {
+    value: filterState.sort.key,
+    dir: filterState.sort.dir,
+    supportsDir: true,
+    options: tabConfig.sorts.map((key) => ({ key, label: fc.sorts[key], icon: SORT_ICONS[key] })),
+    onChange: (next) => updateFilter({ sort: { key: next.key, dir: next.dir } }),
+  };
+
   const renderItem = ({ item, index }) => {
     let node;
     switch (tab) {
       case "ratings":
         node = (
-          <Row
+          <RatingTile
             theme={theme}
             poster={posterUri(item.mediaType, item.mediaId, item.poster)}
             kind={item.mediaType}
@@ -475,6 +594,8 @@ export default function MyActivityScreen({ navigation, route }) {
             content={item.content}
             userRating={item.userRating}
             hasSpoiler={item.hasSpoiler}
+            tierList={item.type === "tierlist" ? item.tierList : null}
+            tvGraph={item.type === "tvgraph" ? item.tvGraph : null}
             date={item._createdAtMs}
             likes={item.likesCount}
             comments={item.commentsCount}
@@ -484,7 +605,10 @@ export default function MyActivityScreen({ navigation, route }) {
         break;
       }
       case "drafts": {
-        const posters = (item.selectedMedia || [])
+        // Tier list taslağının yapımları tablodadır (selectedMedia boş); diğerleri seçili yapımlardan.
+        const draftMedia =
+          item.postType === "tierlist" ? tierListMediaOf(item.tierList) : item.selectedMedia || [];
+        const posters = draftMedia
           .map((m) => m?.poster || (m?.poster_path ? getTmdbUrl(m.poster_path, "poster", 300) : null))
           .filter(Boolean);
         node = (
@@ -496,6 +620,8 @@ export default function MyActivityScreen({ navigation, route }) {
             content={item.content}
             userRating={item.userRating}
             hasSpoiler={item.hasSpoiler}
+            tierList={item.postType === "tierlist" ? item.tierList : null}
+            tvGraph={item.postType === "tvgraph" ? item.tvGraph : null}
             date={item.createdAt}
             draft
           />
@@ -521,20 +647,25 @@ export default function MyActivityScreen({ navigation, route }) {
       case "interactions":
       default:
         node = (
-          <PostMini
+          <InteractionTile
             theme={theme}
             type={item.postType}
-            posters={item.postPoster ? [item.postPoster] : []}
+            poster={item.postPoster || null}
             title={item.postTitle || i18nText("autoI18n.gonderi", "Gönderi")}
-            content={item.postAuthorName ? `@${item.postAuthorName}` : null}
+            author={item.postAuthorName || null}
             date={item._ts}
             action={item._kind === "like" ? "like" : "bookmark"}
+            onPress={() => navigation.navigate("PostDetailScreen", { postId: item.id })}
             onRemove={() => removeInteraction(item)}
           />
         );
         break;
     }
-    return <StaggerItem index={index}>{node}</StaggerItem>;
+    return (
+      <StaggerItem index={index} style={isPairTab(tab) ? st.pairCell : undefined}>
+        {node}
+      </StaggerItem>
+    );
   };
 
   const activeTab = TABS.find((tb) => tb.key === tab) || TABS[0];
@@ -576,7 +707,10 @@ export default function MyActivityScreen({ navigation, route }) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={st.tabRow}
-        style={{ flexGrow: 0 }}
+        // Yatay ScrollView'ın varsayılanı flexShrink:1 — alttaki içerik yer isteyince (klavye açık,
+        // "sonuç yok" görünümü, küçük ekran) şerit eziliyor ve arama çubuğu çiplerin üstüne biniyordu.
+        style={st.tabScroll}
+        keyboardShouldPersistTaps="handled"
       >
         {TABS.map((tb) => {
           const active = tab === tb.key;
@@ -626,8 +760,77 @@ export default function MyActivityScreen({ navigation, route }) {
         })}
       </ScrollView>
 
+      {/* ── Arama + filtre çubuğu (sekmede kayıt varken) ── */}
+      {!loading && data.length > 0 ? (
+        <View style={st.filterBar}>
+          <View style={st.searchWrap}>
+            <GlassTextInput
+              value={filterState.query}
+              onChangeText={(text) => updateFilter({ query: text })}
+              placeholder={fc.search}
+              placeholderTextColor={theme.text.muted}
+              returnKeyType="search"
+              autoCorrect={false}
+              style={[
+                st.searchInput,
+                { backgroundColor: theme.secondary, borderColor: theme.border, color: theme.text.primary },
+              ]}
+            />
+            <View style={st.searchIcon} pointerEvents="none">
+              <Ionicons name="search" size={15} color={theme.text.muted} />
+            </View>
+            {filterState.query ? (
+              <TouchableOpacity
+                onPress={() => updateFilter({ query: "" })}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={sheetCopy.reset}
+                style={st.searchClear}
+              >
+                <Ionicons name="close-circle" size={17} color={theme.text.muted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          <GlassTouchable
+            onPress={() => setFilterOpen(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={activeFilterCount > 0 ? `${fc.filter} · ${activeFilterCount}` : fc.filter}
+            style={[
+              st.filterBtn,
+              activeFilterCount > 0
+                ? { backgroundColor: alpha(activeColor, 0.16), borderColor: alpha(activeColor, 0.6) }
+                : { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="options-outline" size={17} color={activeFilterCount > 0 ? activeColor : theme.text.secondary} />
+            {activeFilterCount > 0 ? (
+              <View style={[st.filterBadge, { backgroundColor: activeColor, borderColor: theme.primary }]}>
+                <Text allowFontScaling={false} style={st.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            ) : null}
+          </GlassTouchable>
+        </View>
+      ) : null}
+
       {loading ? (
         <ActivityListSkeleton count={6} />
+      ) : data.length > 0 && shown.length === 0 ? (
+        <View style={st.center}>
+          <View style={[st.emptyCircle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+            <Ionicons name="search" size={32} color={activeColor} />
+          </View>
+          <Text style={[st.emptyText, { color: theme.text.primary }]}>{fc.noMatch}</Text>
+          <GlassTouchable
+            onPress={clearAll}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            style={[st.emptyChip, { backgroundColor: alpha(activeColor, 0.12), borderColor: alpha(activeColor, 0.35) }]}
+          >
+            <Ionicons name="refresh" size={12} color={activeColor} />
+            <Text style={[st.emptyChipText, { color: activeColor }]}>{fc.clear}</Text>
+          </GlassTouchable>
+        </View>
       ) : data.length === 0 ? (
         <View style={st.center}>
           <View
@@ -657,16 +860,25 @@ export default function MyActivityScreen({ navigation, route }) {
         </View>
       ) : (
         <FlatList
-          key={tab === "story" ? "story-grid" : "activity-list"}
-          data={data}
+          // numColumns değişince FlatList yeniden kurulmalı → düzen başına ayrı key.
+          key={tab === "story" ? "story-grid" : isPairTab(tab) ? "pair-grid" : "activity-list"}
+          data={shown}
+          // flex:1 (basis 0): liste kalan alanı doldurur; içerik boyuyla üstteki şeritleri sıkıştırmaz.
+          style={st.listFill}
           keyExtractor={(it, i) => `${tab}-${it._kind || ""}-${it.id || i}`}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           renderItem={renderItem}
-          numColumns={tab === "story" ? STORY_COLS : 1}
-          columnWrapperStyle={tab === "story" ? st.storyGridRow : undefined}
+          numColumns={tab === "story" ? STORY_COLS : isPairTab(tab) ? PAIR_COLS : 1}
+          columnWrapperStyle={
+            tab === "story" ? st.storyGridRow : isPairTab(tab) ? st.pairGridRow : undefined
+          }
           contentContainerStyle={
             tab === "story"
               ? st.storyGridList
-              : { padding: 16, paddingTop: 6, paddingBottom: 40 }
+              : isPairTab(tab)
+              ? st.pairGridList
+              : st.list
           }
           showsVerticalScrollIndicator={false}
         />
@@ -750,25 +962,169 @@ export default function MyActivityScreen({ navigation, route }) {
         </Animated.View>
         <ModalToastHost visible={!!editing} />
       </Modal>
+
+      {/* ── Sırala ve filtrele (liste ekranlarıyla ortak sayfa; görünüm kartı yok) ── */}
+      <ListSortFilterSheet
+        visible={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        theme={theme}
+        accent={activeColor}
+        copy={sheetCopy}
+        resultCount={shown.length}
+        activeCount={activeFilterCount}
+        onReset={resetFilter}
+        sort={sortConfig}
+        sections={filterSections}
+      />
     </SafeAreaView>
   );
 }
 
-// ─── Puanlamalar / Yorumlar satırı ───────────────────────────────────────────
-// [poster] [tür rozeti · tarih / başlık / yorum alıntısı] [puan rozeti | ok]
-// Yorum düzenle/sil aksiyonları (yalnız post yorumlarında) kartın altında.
-function Row({ theme, poster, kind, title, subtitle, date, score, onPress, badge, onEdit, onDelete }) {
+// ─── Kutucuk posteri (2 sütunlu ızgara) ─────────────────────────────────────
+// Poster (yoksa renkli ikon kutusu) + sol alt köşede tür/aksiyon noktası.
+function TilePoster({ theme, uri, color, icon, dotColor, dotIcon }) {
+  return (
+    <View style={st.tilePosterWrap}>
+      {uri ? (
+        <Image source={{ uri }} style={st.tilePoster} contentFit="cover" cachePolicy="memory-disk" transition={150} />
+      ) : (
+        <LinearGradient
+          colors={[alpha(color, 0.24), alpha(color, 0.08)]}
+          style={[st.tilePoster, st.tilePosterEmpty, { borderColor: alpha(color, 0.3) }]}
+        >
+          <Ionicons name={icon} size={18} color={color} />
+        </LinearGradient>
+      )}
+      <View style={[st.tileDot, { backgroundColor: dotColor || color, borderColor: theme.secondary }]}>
+        <Ionicons name={dotIcon || icon} size={8} color="#fff" />
+      </View>
+    </View>
+  );
+}
+
+// ─── Puanlama kutucuğu (2 sütun) ────────────────────────────────────────────
+// [poster • tür noktası] [başlık (2 satır) / ★ puan hapı · tarih]
+function RatingTile({ theme, poster, kind, title, date, score, onPress }) {
+  const km = KIND_META[kind] || { color: theme.accent, icon: "ellipse" };
+  const onLight = isLightSurface(theme.secondary);
+  const tone = scoreTone(score, onLight);
+  // 10: dolu altın rozet + koyu yazı; diğerleri tonlu zemin + ton renginde yazı.
+  const perfect = scoreStep(score) === 10;
+  const chipStyle = perfect
+    ? { backgroundColor: SCORE_GOLD, borderColor: SCORE_GOLD }
+    : { backgroundColor: alpha(tone, onLight ? 0.1 : 0.14), borderColor: alpha(tone, 0.4) };
+  const chipInk = perfect ? "#1A1A1A" : tone;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[st.tile, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    >
+      <LinearGradient
+        colors={[alpha(tone, 0.12), alpha(tone, 0)]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={st.rowWash}
+        pointerEvents="none"
+      />
+      <TilePoster theme={theme} uri={poster} color={km.color} icon={km.icon} />
+      <View style={st.tileInfo}>
+        <Text style={[st.tileTitle, { color: theme.text.primary }]} numberOfLines={2}>
+          {title}
+        </Text>
+        <View style={st.tileBottom}>
+          <View style={[st.scoreChip, chipStyle]}>
+            <Ionicons name="star" size={9} color={chipInk} />
+            <Text style={[st.scoreChipText, { color: chipInk }]}>{score.toFixed(1)}</Text>
+          </View>
+          {date ? (
+            <Text style={[st.tileDate, { color: theme.text.muted }]} numberOfLines={1}>
+              {fmtDate(date)}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Etkileşim kutucuğu (2 sütun) ───────────────────────────────────────────
+// [poster • beğeni/kayıt noktası] [gönderi başlığı (2 satır) / @yazar · tarih  ⊗]
+function InteractionTile({ theme, type, poster, title, author, date, action, onPress, onRemove }) {
+  const meta = postTypeMeta(type, theme.colors);
+  const isLike = action === "like";
+  const actionColor = isLike ? KIND_META.like.color : KIND_META.bookmark.color;
+  const actionIcon = isLike ? "heart" : "bookmark";
+  const sub = [author ? `@${author}` : null, date ? fmtDate(date) : null].filter(Boolean).join(" · ");
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={[st.tile, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    >
+      <LinearGradient
+        colors={[alpha(actionColor, 0.1), alpha(actionColor, 0)]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={st.rowWash}
+        pointerEvents="none"
+      />
+      <TilePoster
+        theme={theme}
+        uri={poster}
+        color={meta.color}
+        icon={meta.icon}
+        dotColor={actionColor}
+        dotIcon={actionIcon}
+      />
+      <View style={st.tileInfo}>
+        <Text style={[st.tileTitle, { color: theme.text.primary }]} numberOfLines={2}>
+          {title}
+        </Text>
+        <View style={st.tileBottom}>
+          {/* Gönderi tipi (tier list / bölüm grafiği / anket…): afişte görünmediği için küçük ikonla */}
+          {type ? (
+            <View style={[st.tileType, { backgroundColor: alpha(meta.color, 0.16) }]}>
+              <Ionicons name={meta.icon} size={9} color={meta.color} />
+            </View>
+          ) : null}
+          <Text style={[st.tileDate, { flex: 1, color: theme.text.muted }]} numberOfLines={1}>
+            {sub}
+          </Text>
+          {onRemove ? (
+            <TouchableOpacity
+              onPress={onRemove}
+              activeOpacity={0.8}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isLike
+                  ? i18nText("autoI18n.begeniyi_kaldir", "Beğeniyi kaldır")
+                  : i18nText("autoI18n.kaydi_kaldir", "Kaydı kaldır")
+              }
+              style={[st.iconBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+            >
+              <Ionicons name="close" size={13} color={theme.text.secondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Yorumlar satırı (kompakt, tek sütun) ───────────────────────────────────
+// [poster] [tür · kapsam · tarih · düzenle/sil / başlık (1 satır) / alıntı (2 satır)]
+// Düzenle/sil (yalnız post yorumlarında) ayrı alt şerit yerine meta satırında.
+function Row({ theme, poster, kind, title, subtitle, date, onPress, badge, onEdit, onDelete }) {
   const km = KIND_META[kind] || { label: "", color: theme.accent, icon: "ellipse" };
   const Wrapper = onPress ? TouchableOpacity : View;
-  const hasActions = !!(onEdit || onDelete);
-  const tone = score != null ? scoreTone(score, theme) : null;
 
   return (
     <Wrapper
       {...(onPress ? { onPress, activeOpacity: 0.85 } : {})}
       style={[st.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
     >
-      {/* Tür renginde yumuşak ışık */}
       <LinearGradient
         colors={[alpha(km.color, 0.1), alpha(km.color, 0)]}
         start={{ x: 0, y: 0 }}
@@ -777,117 +1133,104 @@ function Row({ theme, poster, kind, title, subtitle, date, score, onPress, badge
         pointerEvents="none"
       />
 
-      <View style={st.rowMain}>
-        {/* Poster veya gradient ikon */}
-        {poster ? (
-          <Image source={{ uri: poster }} style={st.poster} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-        ) : (
-          <LinearGradient
-            colors={[alpha(km.color, 0.24), alpha(km.color, 0.08)]}
-            style={[st.iconBox, { borderColor: alpha(km.color, 0.3) }]}
-          >
-            <Ionicons name={km.icon} size={24} color={km.color} />
-          </LinearGradient>
-        )}
+      {poster ? (
+        <Image source={{ uri: poster }} style={st.poster} contentFit="cover" cachePolicy="memory-disk" transition={150} />
+      ) : (
+        <LinearGradient
+          colors={[alpha(km.color, 0.24), alpha(km.color, 0.08)]}
+          style={[st.iconBox, { borderColor: alpha(km.color, 0.3) }]}
+        >
+          <Ionicons name={km.icon} size={18} color={km.color} />
+        </LinearGradient>
+      )}
 
-        {/* Orta */}
-        <View style={st.info}>
-          <View style={st.metaRow}>
-            {km.label ? (
-              <View style={[st.kindChip, { backgroundColor: alpha(km.color, 0.14), borderColor: alpha(km.color, 0.3) }]}>
-                <Ionicons name={km.icon} size={9} color={km.color} />
-                <Text style={[st.kindChipText, { color: km.color }]}>
-                  {km.labelKey ? i18nText(km.labelKey, km.label) : km.label}
-                </Text>
-              </View>
-            ) : null}
-            {badge ? (
-              <View style={[st.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-                <Text style={[st.badgeText, { color: theme.text.secondary }]}>{badge}</Text>
-              </View>
-            ) : null}
-            <View style={{ flex: 1 }} />
-            {date ? (
-              <View style={st.dateRow}>
-                <Ionicons name="time-outline" size={11} color={theme.text.muted} />
-                <Text style={[st.date, { color: theme.text.muted }]}>{fmtDate(date)}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <Text style={[st.title, { color: theme.text.primary }]} numberOfLines={2}>
-            {title}
-          </Text>
-
-          {subtitle ? (
-            <View
-              style={[
-                st.quote,
-                { backgroundColor: theme.primary, borderColor: theme.border, borderLeftColor: km.color },
-              ]}
-            >
-              <Text fontRole="body" style={[st.quoteText, { color: theme.text.secondary }]} numberOfLines={3}>
-                {subtitle}
+      <View style={st.info}>
+        <View style={st.metaRow}>
+          {km.label ? (
+            <View style={[st.kindChip, { backgroundColor: alpha(km.color, 0.14), borderColor: alpha(km.color, 0.3) }]}>
+              <Ionicons name={km.icon} size={8} color={km.color} />
+              <Text style={[st.kindChipText, { color: km.color }]}>
+                {km.labelKey ? i18nText(km.labelKey, km.label) : km.label}
               </Text>
             </View>
           ) : null}
-        </View>
-
-        {/* Sağ: puan rozeti ya da ok */}
-        {tone != null ? (
-          <View style={[st.score, { backgroundColor: alpha(tone, 0.12), borderColor: alpha(tone, 0.35) }]}>
-            <Text style={[st.scoreNum, { color: tone }]}>{score.toFixed(1)}</Text>
-            <RatingStars rating={score} max={10} size={8} color={tone} spacing={0} />
-          </View>
-        ) : onPress ? (
-          <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
-        ) : null}
-      </View>
-
-      {hasActions ? (
-        <View style={[st.rowActions, { borderTopColor: theme.border }]}>
+          {badge ? (
+            <View style={[st.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <Text style={[st.badgeText, { color: theme.text.secondary }]}>{badge}</Text>
+            </View>
+          ) : null}
+          {date ? (
+            <Text style={[st.date, { color: theme.text.muted }]} numberOfLines={1}>
+              {fmtDate(date)}
+            </Text>
+          ) : null}
+          <View style={{ flex: 1 }} />
           {onEdit ? (
             <TouchableOpacity
               onPress={onEdit}
               activeOpacity={0.8}
-              hitSlop={6}
-              style={[st.actionPill, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.35) }]}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={i18nText("autoI18n.duzenle", "Düzenle")}
+              style={[st.iconBtn, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.35) }]}
             >
-              <Ionicons name="create-outline" size={15} color={theme.accent} />
-              <Text style={[st.actionPillText, { color: theme.accent }]}>
-                {i18nText("autoI18n.duzenle", "Düzenle")}
-              </Text>
+              <Ionicons name="create-outline" size={13} color={theme.accent} />
             </TouchableOpacity>
           ) : null}
           {onDelete ? (
             <TouchableOpacity
               onPress={onDelete}
               activeOpacity={0.8}
-              hitSlop={6}
-              style={[st.actionPill, { backgroundColor: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.35)" }]}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={i18nText("autoI18n.sil", "Sil")}
+              style={[st.iconBtn, { backgroundColor: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.35)" }]}
             >
-              <Ionicons name="trash-outline" size={15} color="#EF4444" />
-              <Text style={[st.actionPillText, { color: "#EF4444" }]}>
-                {i18nText("autoI18n.sil", "Sil")}
-              </Text>
+              <Ionicons name="trash-outline" size={13} color="#EF4444" />
             </TouchableOpacity>
           ) : null}
+          {onPress && !onEdit && !onDelete ? (
+            <Ionicons name="chevron-forward" size={15} color={theme.text.muted} />
+          ) : null}
         </View>
-      ) : null}
+
+        <Text style={[st.title, { color: theme.text.primary }]} numberOfLines={1}>
+          {title}
+        </Text>
+
+        {subtitle ? (
+          <Text
+            fontRole="body"
+            style={[st.quoteText, { color: theme.text.secondary, borderLeftColor: alpha(km.color, 0.7) }]}
+            numberOfLines={2}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
     </Wrapper>
   );
 }
 
-// ── Post kartı (Postlar / Taslaklar / Etkileşimler) — Hub akışı + Postlarım ile aynı dil ──
-function PostMini({ theme, type, poll, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress, onRemove }) {
-  // Rozet + vurgu rengi feed'deki kartla ortak (review/list/text/poll).
+// ── Post kartı (Postlar / Taslaklar) — Hub akışı + Postlarım ile aynı dil, kompakt ──
+// Beğeni/yorum sayıları ayrı alt şerit yerine üst meta satırında (tarihin yanında).
+// Tipe özel gövde (tek satırlık özet, kart boyunu büyütmez):
+//   tierlist → kademe çipleri ("S 3 · A 5 …", tablo renkleriyle) — tablonun kendisi akışta/detayda
+//   tvgraph  → sezon ortalaması renk kareleri (bölüm grafiğiyle aynı renk ölçeği) + "N sezon · M bölüm"
+function PostMini({ theme, type, poll, posters = [], title, content, userRating, hasSpoiler, tierList, tvGraph, date, likes, comments, draft, onPress }) {
+  // Rozet + vurgu rengi feed'deki kartla ortak (review/list/text/poll/tierlist/tvgraph).
   const meta = postTypeMeta(type, theme.colors);
   const accent = meta.color;
   const Wrapper = onPress ? TouchableOpacity : View;
   const isText = type === "text";
+  const isTier = type === "tierlist" && Array.isArray(tierList?.tiers);
+  const isGraph = type === "tvgraph" && Array.isArray(tvGraph?.seasons);
   // Sohbet ve anket görselsiz tiplerdir: kart metne/çubuklara kalır.
-  const hasVisual = posters.length > 0 || type === "review" || type === "list" || (!type && !isText);
-  const actionColor = action === "like" ? KIND_META.like.color : theme.accent;
+  const hasVisual =
+    posters.length > 0 || type === "review" || type === "list" || isTier || isGraph || (!type && !isText);
+  const showStats = likes != null || comments != null;
+  // Özet şeridi olan tiplerde açıklama tek satır — kart dikeyde büyümesin.
+  const contentLines = isTier || isGraph ? 1 : 2;
 
   return (
     <Wrapper
@@ -900,69 +1243,83 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
         pointerEvents="none"
       />
 
-      {/* Rozet + zaman */}
+      {/* Rozet + sayılar + zaman */}
       <View style={st.pMeta}>
         <View style={[st.pBadge, { backgroundColor: alpha(accent, 0.13), borderColor: alpha(accent, 0.32) }]}>
-          <Ionicons name={meta.icon} size={10} color={accent} />
+          <Ionicons name={meta.icon} size={9} color={accent} />
           <Text style={[st.pBadgeText, { color: accent }]}>{meta.label}</Text>
         </View>
         {hasSpoiler ? (
           <View style={st.pSpoiler}>
-            <Ionicons name="eye-off" size={10} color={SPOILER_RED} />
+            <Ionicons name="eye-off" size={9} color={SPOILER_RED} />
             <Text style={st.pSpoilerText}>{i18nText("autoI18n.spoiler", "SPOİLER")}</Text>
           </View>
         ) : null}
         {draft ? (
           <View style={[st.pBadge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-            <Ionicons name="document-text-outline" size={10} color={theme.text.muted} />
+            <Ionicons name="document-text-outline" size={9} color={theme.text.muted} />
             <Text style={[st.pBadgeText, { color: theme.text.muted }]}>{i18nText("autoI18n.taslak_upper", "TASLAK")}</Text>
           </View>
         ) : null}
         <View style={{ flex: 1 }} />
-        {date ? (
-          <View style={st.dateRow}>
-            <Ionicons name="time-outline" size={11} color={theme.text.muted} />
-            <Text style={[st.pTime, { color: theme.text.muted }]}>{fmtDate(date)}</Text>
-          </View>
+        {showStats ? (
+          <>
+            <View style={st.pStat}>
+              <Ionicons
+                name={(likes || 0) > 0 ? "heart" : "heart-outline"}
+                size={11}
+                color={(likes || 0) > 0 ? LIKE_RED : theme.text.muted}
+              />
+              <Text style={[st.pStatText, { color: theme.text.secondary }]}>{likes || 0}</Text>
+            </View>
+            <View style={st.pStat}>
+              <Ionicons
+                name={(comments || 0) > 0 ? "chatbubble" : "chatbubble-outline"}
+                size={10}
+                color={(comments || 0) > 0 ? theme.accent : theme.text.muted}
+              />
+              <Text style={[st.pStatText, { color: theme.text.secondary }]}>{comments || 0}</Text>
+            </View>
+          </>
         ) : null}
+        {date ? <Text style={[st.pTime, { color: theme.text.muted }]}>{fmtDate(date)}</Text> : null}
       </View>
 
       {/* Gövde: [görsel] + başlık/içerik */}
       <View style={st.pBody}>
         {hasVisual ? (
           posters.length > 0 ? (
-            <PosterStack uris={posters} theme={theme} width={64} height={96} step={14} radius={12} />
+            <PosterStack uris={posters} theme={theme} width={44} height={66} step={9} radius={9} />
           ) : (
             <View style={[st.pFallback, { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.3) }]}>
-              <Ionicons name="film-outline" size={22} color={accent} />
+              <Ionicons name={isTier || isGraph ? meta.icon : "film-outline"} size={18} color={accent} />
             </View>
           )
         ) : null}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text fontRole="body" style={[st.pTitle, { color: theme.text.primary }]} numberOfLines={2}>
+          <Text fontRole="body" style={[st.pTitle, { color: theme.text.primary }]} numberOfLines={1}>
             {title}
           </Text>
           {content ? (
             isText ? (
               <View style={[st.pQuote, { backgroundColor: alpha(accent, 0.07), borderLeftColor: accent }]}>
-                <Text fontRole="body" style={[st.pQuoteText, { color: theme.text.primary }]} numberOfLines={3}>
+                <Text fontRole="body" style={[st.pQuoteText, { color: theme.text.primary }]} numberOfLines={2}>
                   {content}
                 </Text>
               </View>
             ) : (
-              <Text
-                fontRole="body"
-                style={[st.pContent, { color: action ? theme.text.muted : theme.text.secondary }]}
-                numberOfLines={2}
-              >
+              <Text fontRole="body" style={[st.pContent, { color: theme.text.secondary }]} numberOfLines={contentLines}>
                 {content}
               </Text>
             )
           ) : null}
 
+          {isTier ? <TierChipsMini tiers={tierList.tiers} theme={theme} /> : null}
+          {isGraph ? <GraphStripMini graph={tvGraph} theme={theme} /> : null}
+
           {type === "review" && userRating > 0 ? (
             <View style={[st.pRating, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <RatingStars rating={userRating} max={5} size={12} color={theme.colors.orange} />
+              <RatingStars rating={userRating} max={5} size={10} color={theme.colors.orange} />
               <Text style={[st.pRatingText, { color: theme.text.primary }]}>{userRating}/5</Text>
             </View>
           ) : null}
@@ -970,39 +1327,78 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
       </View>
 
       {type === "poll" && poll ? <PollMiniBody poll={poll} accent={accent} theme={theme} /> : null}
+    </Wrapper>
+  );
+}
 
-      {/* Alt satır: etkileşim aksiyonu ya da istatistikler */}
-      {action ? (
-        <View style={[st.pFooter, { borderTopColor: theme.border }]}>
-          <View style={[st.pActionPill, { backgroundColor: alpha(actionColor, 0.12), borderColor: alpha(actionColor, 0.35) }]}>
-            <Ionicons name={action === "like" ? "heart" : "bookmark"} size={14} color={actionColor} />
-            <Text style={[st.pActionText, { color: actionColor }]}>
-              {action === "like"
-                ? i18nText("autoI18n.begendin", "Beğendin")
-                : i18nText("autoI18n.kaydettin", "Kaydettin")}
+// ── Tier list özeti (PostMini içi): dolu kademeler, etiket rengiyle çip + yapım sayısı ──
+const TIER_CHIP_MAX = 5;
+function TierChipsMini({ tiers, theme }) {
+  const filled = tiers.filter((tier) => Array.isArray(tier?.items) && tier.items.length > 0);
+  const shown = filled.slice(0, TIER_CHIP_MAX);
+  const hidden = filled.length - shown.length;
+  const total = filled.reduce((sum, tier) => sum + tier.items.length, 0);
+  if (shown.length === 0) return null;
+  return (
+    <View style={st.miniStrip}>
+      {shown.map((tier, index) => (
+        <View key={`${tier.label}-${index}`} style={[st.tierChip, { backgroundColor: alpha(tier.color || theme.accent, 0.16) }]}>
+          <View style={[st.tierChipLabel, { backgroundColor: tier.color || theme.accent }]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[st.tierChipLabelText, { color: tierInkOf(tier.color || theme.accent) }]}
+            >
+              {tier.label}
             </Text>
           </View>
-          {onRemove ? (
-            <GlassTouchable
-              onPress={onRemove}
-              activeOpacity={0.8}
-              hitSlop={8}
-              style={[st.removePill, { backgroundColor: theme.primary, borderColor: theme.border }]}
-            >
-              <Ionicons name="close-circle" size={14} color={theme.text.secondary} />
-              <Text style={[st.removePillText, { color: theme.text.secondary }]}>
-                {i18nText("autoI18n.kaldir", "Kaldır")}
-              </Text>
-            </GlassTouchable>
-          ) : null}
+          <Text allowFontScaling={false} style={[st.tierChipCount, { color: theme.text.primary }]}>
+            {tier.items.length}
+          </Text>
         </View>
-      ) : likes != null || comments != null ? (
-        <View style={[st.pFooter, { borderTopColor: theme.border }]}>
-          <StatPill icon="heart" active={(likes || 0) > 0} activeColor={LIKE_RED} count={likes || 0} theme={theme} />
-          <StatPill icon="chatbubble" active={(comments || 0) > 0} activeColor={theme.accent} count={comments || 0} theme={theme} />
-        </View>
+      ))}
+      {hidden > 0 ? (
+        <Text allowFontScaling={false} style={[st.miniMore, { color: theme.text.muted }]}>{`+${hidden}`}</Text>
       ) : null}
-    </Wrapper>
+      <Text allowFontScaling={false} numberOfLines={1} style={[st.miniMore, { flexShrink: 1, color: theme.text.muted }]}>
+        {`· ${getTierListCopy(i18n.language).cardCount(total)}`}
+      </Text>
+    </View>
+  );
+}
+
+// ── Bölüm grafiği özeti (PostMini içi): sezon başına ortalama puan karesi + sayılar ──
+const GRAPH_CELL_MAX = 16;
+function GraphStripMini({ graph, theme }) {
+  const seasons = graph.seasons.slice(0, GRAPH_CELL_MAX);
+  const hidden = graph.seasons.length - seasons.length;
+  const counts = i18nText("autoI18n.tvgraph_n_sezon_bolum", "{{s}} sezon · {{e}} bölüm", {
+    s: graph.totalSeasons || graph.seasons.length,
+    e: graph.totalEpisodes || graph.seasons.reduce((sum, season) => sum + (season?.r?.length || 0), 0),
+  });
+  const rating = Number(graph.rating) > 0 ? ` · ★ ${Number(graph.rating).toFixed(1)}` : "";
+  return (
+    <View style={st.graphMini}>
+      <View style={st.miniStrip}>
+        {seasons.map((season) => {
+          const rated = (season?.r || []).filter((value) => value > 0);
+          const avg = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : 0;
+          const colors = avg > 0 ? getRatingColors(avg) : null;
+          return (
+            <View
+              key={season.s}
+              style={[st.graphCell, { backgroundColor: colors ? colors.bg : alpha(theme.text.muted, 0.25) }]}
+            />
+          );
+        })}
+        {hidden > 0 ? (
+          <Text allowFontScaling={false} style={[st.miniMore, { color: theme.text.muted }]}>{`+${hidden}`}</Text>
+        ) : null}
+      </View>
+      <Text allowFontScaling={false} numberOfLines={1} style={[st.graphCounts, { color: theme.text.muted }]}>
+        {counts + rating}
+      </Text>
+    </View>
   );
 }
 
@@ -1153,98 +1549,145 @@ const st = StyleSheet.create({
   },
   tabBadgeText: { fontSize: 10.5, fontWeight: "800" },
 
-  // Puanlamalar / Yorumlar satırı
-  row: {
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-  rowWash: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
-  rowMain: {
+  // Arama + filtre çubuğu
+  // Sekme şeridi + arama çubuğu ASLA küçülmez; yer darsa alttaki liste/boş durum daralır.
+  tabScroll: { flexGrow: 0, flexShrink: 0 },
+  listFill: { flex: 1 },
+  filterBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 12,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    flexShrink: 0,
+    zIndex: 1,
   },
-  poster: { width: 56, height: 84, borderRadius: 12 },
-  iconBox: {
-    width: 56,
-    height: 84,
-    borderRadius: 14,
+  searchWrap: { flex: 1, justifyContent: "center" },
+  searchInput: {
+    height: 38,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingLeft: 34,
+    paddingRight: 34,
+    fontSize: 13.5,
+  },
+  searchIcon: { position: "absolute", left: 12 },
+  searchClear: { position: "absolute", right: 10 },
+  filterBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  info: { flex: 1, minWidth: 0, gap: 5 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  filterBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: { color: "#fff", fontSize: 9.5, fontWeight: "900" },
+
+  // Liste (tek sütun) ve 2 sütunlu kutucuk ızgarası
+  list: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40 },
+  pairGridList: { paddingHorizontal: PAIR_PAD, paddingTop: 6, paddingBottom: 40 },
+  pairGridRow: { gap: PAIR_GAP },
+  pairCell: { width: PAIR_ITEM_W },
+
+  // Kutucuk (Puanlamalar / Etkileşimler)
+  tile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 7,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: PAIR_GAP,
+    overflow: "hidden",
+  },
+  tilePosterWrap: { width: 42, height: 63 },
+  tilePoster: { width: 42, height: 63, borderRadius: 9 },
+  tilePosterEmpty: { borderWidth: 1, justifyContent: "center", alignItems: "center" },
+  tileDot: {
+    position: "absolute",
+    right: -4,
+    bottom: -3,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    borderWidth: 2,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tileInfo: { flex: 1, minWidth: 0, alignSelf: "stretch", justifyContent: "space-between", paddingVertical: 1 },
+  tileTitle: { fontSize: 12.5, fontWeight: "800", lineHeight: 16, letterSpacing: -0.1 },
+  tileBottom: { flexDirection: "row", alignItems: "center", gap: 5 },
+  tileDate: { flexShrink: 1, fontSize: 10, fontWeight: "600" },
+  tileType: { width: 16, height: 16, borderRadius: 5, justifyContent: "center", alignItems: "center" },
+  scoreChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  scoreChipText: { fontSize: 11.5, fontWeight: "900", letterSpacing: -0.2 },
+  iconBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Yorumlar satırı (kompakt)
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 9,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  rowWash: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
+  poster: { width: 40, height: 60, borderRadius: 9 },
+  iconBox: {
+    width: 40,
+    height: 60,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  info: { flex: 1, minWidth: 0, gap: 3 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 24 },
   kindChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  kindChipText: { fontSize: 8.5, fontWeight: "900", letterSpacing: 0.6 },
-  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
-  badgeText: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.3 },
-  title: { fontSize: 15, fontWeight: "800", lineHeight: 20, letterSpacing: -0.1 },
-  quote: {
-    borderLeftWidth: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-  },
-  quoteText: { fontSize: 12.5, lineHeight: 18 },
-  dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  date: { fontSize: 10.5, fontWeight: "600" },
-
-  score: {
-    width: 58,
-    alignItems: "center",
-    gap: 3,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  scoreNum: { fontSize: 18, fontWeight: "900", letterSpacing: -0.4 },
-
-  // Satır aksiyonları (yorum düzenle/sil)
-  rowActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    marginHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  actionPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    height: 34,
-    paddingHorizontal: 12,
-    borderRadius: 17,
-    borderWidth: 1,
-  },
-  actionPillText: { fontSize: 12.5, fontWeight: "800" },
-
-  // Etkileşim "Kaldır" pili
-  removePill: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    height: 32,
-    paddingHorizontal: 11,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  removePillText: { fontSize: 12, fontWeight: "700" },
+  kindChipText: { fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  badgeText: { fontSize: 8, fontWeight: "800", letterSpacing: 0.3 },
+  title: { fontSize: 13.5, fontWeight: "800", lineHeight: 18, letterSpacing: -0.1 },
+  quoteText: { fontSize: 12, lineHeight: 16.5, borderLeftWidth: 2, paddingLeft: 7 },
+  date: { flexShrink: 1, fontSize: 10, fontWeight: "600" },
 
   // Yorum düzenleme modalı
   editBackdrop: {
@@ -1288,7 +1731,17 @@ const st = StyleSheet.create({
   editBtnText: { fontSize: 15, fontWeight: "800" },
 
   // Boş durum
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 40, paddingBottom: 60 },
+  // minHeight 0 + overflow hidden: klavye açıkken boş durum kendi alanında kırpılır, üstteki şeride taşmaz.
+  center: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    paddingHorizontal: 40,
+    paddingBottom: 60,
+  },
   emptyHalo: {
     width: 128,
     height: 128,
@@ -1317,106 +1770,101 @@ const st = StyleSheet.create({
   },
   emptyChipText: { fontSize: 12, fontWeight: "800" },
 
-  // PostMini (paylaşım kartı görünümü)
+  // PostMini (paylaşım kartı görünümü, kompakt)
   pCard: {
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginBottom: 12,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
+    marginBottom: 8,
   },
-  pWash: { position: "absolute", left: 0, right: 0, top: 0, height: 120 },
-  pMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
+  pWash: { position: "absolute", left: 0, right: 0, top: 0, height: 90 },
+  pMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 7 },
   pBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  pBadgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
+  pBadgeText: { fontSize: 8.5, fontWeight: "900", letterSpacing: 0.4 },
   pSpoiler: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
     backgroundColor: "rgba(240,79,79,0.12)",
   },
-  pSpoilerText: { color: SPOILER_RED, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.4 },
-  pTime: { fontSize: 10.5, fontWeight: "600" },
-  pBody: { flexDirection: "row", gap: 12 },
+  pSpoilerText: { color: SPOILER_RED, fontSize: 8, fontWeight: "900", letterSpacing: 0.4 },
+  pStat: { flexDirection: "row", alignItems: "center", gap: 3 },
+  pStatText: { fontSize: 10.5, fontWeight: "800" },
+  pTime: { fontSize: 10, fontWeight: "600" },
+  pBody: { flexDirection: "row", gap: 10 },
   pFallback: {
-    width: 64,
-    height: 96,
-    borderRadius: 12,
+    width: 44,
+    height: 66,
+    borderRadius: 9,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  pTitle: { fontSize: 15.5, lineHeight: 21, fontWeight: "800", letterSpacing: -0.1 },
-  pContent: { fontSize: 12.5, marginTop: 3, lineHeight: 18 },
+  pTitle: { fontSize: 14, lineHeight: 19, fontWeight: "800", letterSpacing: -0.1 },
+  pContent: { fontSize: 12, marginTop: 2, lineHeight: 16.5 },
   pQuote: {
     borderLeftWidth: 3,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    marginTop: 6,
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    marginTop: 4,
   },
-  pQuoteText: { fontSize: 13, lineHeight: 19 },
+  pQuoteText: { fontSize: 12.5, lineHeight: 17 },
   pRating: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    gap: 6,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    marginTop: 8,
+    marginTop: 5,
   },
-  pRatingText: { fontSize: 11.5, fontWeight: "800" },
+  pRatingText: { fontSize: 10.5, fontWeight: "800" },
+
+  // Tipe özel tek satırlık özetler (tier list çipleri / bölüm grafiği kareleri)
+  miniStrip: { flexDirection: "row", alignItems: "center", flexWrap: "nowrap", gap: 4, marginTop: 6, overflow: "hidden" },
+  miniMore: { fontSize: 10.5, fontWeight: "800" },
+  tierChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingRight: 6, height: 18, borderRadius: 5, overflow: "hidden" },
+  tierChipLabel: { minWidth: 18, maxWidth: 40, height: 18, paddingHorizontal: 4, justifyContent: "center", alignItems: "center" },
+  tierChipLabelText: { fontSize: 10, fontWeight: "900" },
+  tierChipCount: { fontSize: 10.5, fontWeight: "800" },
+  graphMini: { gap: 0 },
+  graphCell: { width: 11, height: 11, borderRadius: 3 },
+  graphCounts: { fontSize: 10.5, fontWeight: "700", marginTop: 4 },
 
   // Anket gövdesi (top-2 mini bar)
   pPollBody: {
-    gap: 9,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 10,
-    marginTop: 10,
-  },
-  pPollBarRow: { gap: 4 },
-  pPollBarHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  pPollBarLabel: { flex: 1, fontSize: 12, fontWeight: "700" },
-  pPollBarPct: { fontSize: 11.5, fontWeight: "900" },
-  pPollBarTrack: { height: 5, borderRadius: 3, overflow: "hidden" },
-  pPollBarFill: { height: "100%", borderRadius: 3 },
-  pPollSummary: { flexDirection: "row", alignItems: "center", gap: 5 },
-  pPollSummaryText: { fontSize: 10.5, fontWeight: "600" },
-
-  pFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  pActionPill: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 6,
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    marginTop: 7,
   },
-  pActionText: { fontSize: 12, fontWeight: "800" },
+  pPollBarRow: { gap: 3 },
+  pPollBarHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  pPollBarLabel: { flex: 1, fontSize: 11.5, fontWeight: "700" },
+  pPollBarPct: { fontSize: 11, fontWeight: "900" },
+  pPollBarTrack: { height: 4, borderRadius: 2, overflow: "hidden" },
+  pPollBarFill: { height: "100%", borderRadius: 2 },
+  pPollSummary: { flexDirection: "row", alignItems: "center", gap: 5 },
+  pPollSummaryText: { fontSize: 10, fontWeight: "600" },
 
   // StoryMini: 9:16 kutucuk ızgarası
   storyGridList: {

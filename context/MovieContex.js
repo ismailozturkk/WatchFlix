@@ -20,7 +20,7 @@ import {
   TTL,
 } from "../utils/apiCache";
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
-import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { contentScoped, dropSensitive } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import { useUpcomingFilters } from "../hooks/useUpcomingFilters";
 import { buildUpcomingUrl, upcomingQuerySignature } from "../utils/upcomingFilters";
@@ -126,10 +126,10 @@ export const MovieProvider = ({ children }) => {
   const { streamingProviderIds } = useStreamingProviderSettings();
   // Veriyi değiştiren ayarlar (yetişkin içerik, platform üyelikleri) — ana ekran
   // listeleri bunlara göre yeniden çekilir (bkz. utils/homeContentSettings.js).
-  const { adultContent, providersKey } = useHomeDataSettings();
+  const { adultContent, contentFilter, providersKey } = useHomeDataSettings();
   // `/discover` tabanlı listelerin önbellek anahtarı yetişkin izniyle kapsamlanır.
-  // trending/now_playing gibi uçlar ayardan bağımsız; onlar `dropAdult` ile süzülür.
-  const adultKey = (key) => adultScoped(key, adultContent);
+  // trending/now_playing gibi uçlar ayardan bağımsız; onlar `dropSensitive` ile süzülür.
+  const adultKey = (key) => contentScoped(key, contentFilter);
   const { language, t } = useLanguage();
   const tmdbLanguage = tmdbLanguageOf(language);
   const tmdbRegion = tmdbRegionOf(language);
@@ -236,7 +236,7 @@ export const MovieProvider = ({ children }) => {
     if (!activeSections.bests) return;
     setPageBest(1);
     fetchMoviesBests(1, false);
-  }, [activeSections.bests, selectedCategoryBests, language, adultContent]);
+  }, [activeSections.bests, selectedCategoryBests, language, contentFilter]);
 
   const loadMoreBests = () => {
     if (loadingBests || loadingMoreBests || pageBest >= totalPagesBest) return;
@@ -621,14 +621,14 @@ export const MovieProvider = ({ children }) => {
   // Yetişkin izni değişince sağlayıcı listesi aynı kalır ama seçili sağlayıcının
   // filmleri (`/discover`) değişir. fetchProviders'ı çağırmak kullanıcının seçimini
   // "ilk abone olunan sağlayıcı"ya sıfırlardı; yalnız seçili olanı yeniden çekiyoruz.
-  const lastAdultRef = useRef(adultContent);
+  const lastAdultRef = useRef(contentFilter);
   useEffect(() => {
-    if (lastAdultRef.current === adultContent) return;
-    lastAdultRef.current = adultContent;
+    if (lastAdultRef.current === contentFilter) return;
+    lastAdultRef.current = contentFilter;
     if (activeSections.providers && selectedProvider != null) {
       fetchMoviesByProvider(selectedProvider);
     }
-  }, [adultContent]);
+  }, [contentFilter]);
 
   const fetchProviders = async () => {
     const cacheKey = `movie_providers_${tmdbLanguage}_${tmdbRegion}`;
@@ -808,7 +808,7 @@ export const MovieProvider = ({ children }) => {
     movieGenres();
     setPageGenres(1);
     fetchMoviesByGenres(1, false);
-  }, [activeSections.genres, language, selectedGenres, adultContent]);
+  }, [activeSections.genres, language, selectedGenres, contentFilter]);
 
   const loadMoreGenres = () => {
     if (loadingGenres || loadingMoreGenres || pageGenres >= totalPagesGenres) return;
@@ -876,7 +876,7 @@ export const MovieProvider = ({ children }) => {
     setMoviesUpcoming([]);
     setPageUpcoming(1);
     fetchMovieUpcoming(1, false);
-  }, [activeSections.upcoming, upcomingQuery, adultContent]);
+  }, [activeSections.upcoming, upcomingQuery, contentFilter]);
 
   const loadMoreUpcoming = () => {
     if (loadingUpcoming || loadingMoreUpcoming || pageUpcoming >= totalPagesUpcoming) return;
@@ -931,12 +931,12 @@ export const MovieProvider = ({ children }) => {
   // yoksa aynı dizi döner, yani kartlar boşuna yeniden çizilmez. `/discover`
   // dışındaki uçlar (trending vb.) bu sayede ayarı önbellek kapsamı olmadan da
   // izliyor.
-  const visibleBests = useMemo(() => dropAdult(movieBests, adultContent), [movieBests, adultContent]);
-  const visibleTrends = useMemo(() => dropAdult(movieTrends, adultContent), [movieTrends, adultContent]);
-  const visibleNowPlaying = useMemo(() => dropAdult(moviesNowPlaying, adultContent), [moviesNowPlaying, adultContent]);
-  const visibleGenres = useMemo(() => dropAdult(moviesGenres, adultContent), [moviesGenres, adultContent]);
-  const visibleUpcoming = useMemo(() => dropAdult(moviesUpcoming, adultContent), [moviesUpcoming, adultContent]);
-  const visibleProvider = useMemo(() => dropAdult(moviesProvider, adultContent), [moviesProvider, adultContent]);
+  const visibleBests = useMemo(() => dropSensitive(movieBests, contentFilter), [movieBests, contentFilter]);
+  const visibleTrends = useMemo(() => dropSensitive(movieTrends, contentFilter), [movieTrends, contentFilter]);
+  const visibleNowPlaying = useMemo(() => dropSensitive(moviesNowPlaying, contentFilter), [moviesNowPlaying, contentFilter]);
+  const visibleGenres = useMemo(() => dropSensitive(moviesGenres, contentFilter), [moviesGenres, contentFilter]);
+  const visibleUpcoming = useMemo(() => dropSensitive(moviesUpcoming, contentFilter), [moviesUpcoming, contentFilter]);
+  const visibleProvider = useMemo(() => dropSensitive(moviesProvider, contentFilter), [moviesProvider, contentFilter]);
 
   const contextValue = useMemo(() => ({
     pageBest,
@@ -1054,6 +1054,7 @@ export const MovieProvider = ({ children }) => {
     // Değerdeki yükleyiciler (loadMore*, fetch*) `adultKey`i kapanışla yakalar;
     // ayar değişince bayat kapanış kalmasın diye açıkça bağımlılık.
     adultContent,
+    contentFilter,
   ]);
 
   const fieldStore = useFieldStore(contextValue);

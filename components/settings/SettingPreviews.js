@@ -18,6 +18,7 @@ import WeatherLayer from "../decor/WeatherLayer";
 
 import useAppActive from "../../hooks/useAppActive";
 import useReduceMotion from "../../hooks/useReduceMotion";
+import useScreenFocused from "../../hooks/useScreenFocused";
 import { useDecorSeed } from "../../services/decorSeed";
 import {
   AmbientBlobs,
@@ -41,6 +42,9 @@ import {
 export function SnowPreview({ opacity = 0.6 }) {
   const reduceMotion = useReduceMotion();
   const appActive = useAppActive();
+  // Kişiselleştirme'den daha derine geçilince bu ekran yığında bağlı kalıyor;
+  // odak yokken önizleme durmalı (eskiden arkada 60 fps çizmeye devam ediyordu).
+  const focused = useScreenFocused();
   const [size, setSize] = useState(null);
 
   // "Hareketi Azalt" açıkken hiç çizilmez: önizleme de bir animasyondur.
@@ -62,7 +66,7 @@ export function SnowPreview({ opacity = 0.6 }) {
           preview
           width={size.width}
           height={size.height}
-          playing={appActive}
+          playing={appActive && focused}
           // Tam ekranla aynı hızda akınca dar şeritte telaşlı görünüyor.
           speedScale={0.6}
         />

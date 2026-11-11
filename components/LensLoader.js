@@ -1,71 +1,72 @@
 // components/LensLoader.js
 //
 // Uygulamanın yükleme göstergesi: ActivityIndicator'ın yerine geçen Lens işareti.
-// İki daire (camgöbeği üstte, kırmızı altta) göz kırpar gibi ayrılır, birbirinin
-// çevresinde bir tur atar ve yeniden birleşip kesişimde gözü açar — açılış
-// animasyonunun (SplashLensIntro) tek nefeslik döngüsü. Hareket modeli saf:
-// utils/lensLoaderMotion.js.
+// İki karadelik (camgöbeği + kırmızı): uzaktan yavaşça yaklaşır, giderek hızlanır,
+// hızla iç içe geçer (gelgit gerilmesi + kütleçekim dalgası) ve öbür tarafta
+// yavaşlayarak uzaklaşır; bu sırada birbirinin çevresinde döner (yakınken hızlı).
+// Hareket modeli saf: utils/lensLoaderMotion.js.
 //
-// API ActivityIndicator ile aynı (`size` "small" | "large" | sayı, `color`,
-// `animating`, `hidesWhenStopped`, `style`, `testID`), böylece yer değiştirme tek
-// satırdır. İki ton:
+// API ActivityIndicator ile aynı (`size` "small" | "medium" | "large" | "screen" |
+// "fill" | sayı — kademeler ekranın kısa kenarıyla ölçeklenir, "fill" kabını ölçer;
+// `color`, `animating`, `hidesWhenStopped`, `style`, `testID`). DIŞ KAP da
+// ActivityIndicator gibi davranır: `style` dış kaba gider, kap içeriği ortalar ve
+// sütunda genişliğe yayılır. (Eski sürümde `style` sabit px kutusuna gidiyordu;
+// sütunda gösterge sola yapışıyor, `flex: 1` verilen durum kutularında kenarda
+// kalıyordu.)
+//
+// İki ton:
 //   - "brand" (varsayılan): marka renkleri; `color` yok sayılır. Ekran, bölüm,
-//     liste sonu, arama alanı gibi nötr zeminlerde.
-//   - "mono": tek renk (`color`), dolu renkli düğmelerin içinde (beyaz/onAccent
-//     yazılı düğmeler). Çizgi logo: daireler halka, göz dolu; bebek çizilmez.
+//     liste sonu, arama alanı gibi nötr zeminlerde. Boy verilmezse "medium".
+//   - "mono": tek renk (`color`), dolu renkli düğmelerin içinde. Halka + dolu
+//     çekirdek; hale yok. Boy verilmezse "small".
 //
-// KASMA BÜTÇESİ: 4–5 düz View + göz için tek SVG yolu; tüm hareket tek sürücüden
-// native interpolate ile (JS thread'i meşgulken de döner). Tablolar boya göre
-// modül düzeyinde önbelleklenir (bir listede onlarca gösterge olabilir).
-// Hareketi Azalt: işaret yerinde durur, yalnız saydamlık nefes alır.
-import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Easing, StyleSheet, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+// KASMA BÜTÇESİ: düz View'lar, SVG yok; tüm hareket tek sürücüden native
+// interpolate ile (JS thread'i meşgulken de döner). Tablolar boya göre modül
+// düzeyinde önbelleklenir (bir listede onlarca gösterge olabilir).
+// Hareketi Azalt: karadelikler yarı iç içe durur, yalnız saydamlık nefes alır.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, StyleSheet, View, useWindowDimensions } from "react-native";
 import useReduceMotion from "../hooks/useReduceMotion";
 import { i18nText } from "../utils/i18nText";
 import {
   BASE_ANGLE,
-  BOX_UNITS,
   BREATHE_MS,
   CYCLE_MS,
-  EYE_LENGTH,
-  EYE_WIDTH,
-  GLINT_MIN_SIZE,
-  LENS,
+  HALO_OPACITY,
   LENS_COLORS,
+  STILL_POS,
   angleAt,
   breatheAt,
-  discScaleAt,
-  eyeAt,
-  pupilAt,
+  fillSizeFor,
+  geomFor,
+  posAt,
   resolveLoaderSize,
   sampleLoop,
-  sepAt,
+  screenScaleFor,
+  tideAt,
+  waveAt,
 } from "../utils/lensLoaderMotion";
 
-const EPS = 0.0001; // sıfır ölçek yerine (tekil dönüşüm matrisi olmasın)
 const MONO_RING_MIN = 1.5;
-const MONO_RING_RATIO = 0.075;
+const MONO_RING_RATIO = 0.07;
+const WAVE_RING_RATIO = 0.035;
 
-const EYE_VIEWBOX = `${-EYE_LENGTH / 2} ${-EYE_WIDTH / 2} ${EYE_LENGTH} ${EYE_WIDTH}`;
-const EYE_PATH = `M0 ${-EYE_WIDTH / 2}A${LENS.r} ${LENS.r} 0 0 1 0 ${EYE_WIDTH / 2}A${LENS.r} ${LENS.r} 0 0 1 0 ${-EYE_WIDTH / 2}Z`;
-
-// Birimsiz tablolar bir kez; yalnız dairelerin ötelenmesi boya bağlı.
+// Birimsiz tablolar bir kez; yalnız ötelenme boya bağlı.
 const TABLES = {
   angle: sampleLoop(angleAt, { map: (v) => `${v}deg` }),
-  disc: sampleLoop(discScaleAt),
-  eyeAlong: sampleLoop((x) => Math.max(EPS, eyeAt(x)[0])),
-  eyeAcross: sampleLoop((x) => Math.max(EPS, eyeAt(x)[1])),
-  pupil: sampleLoop((x) => Math.max(EPS, pupilAt(x))),
-  breathe: sampleLoop(breatheAt, { steps: 48 }),
+  along: sampleLoop((x) => tideAt(x)[0]),
+  across: sampleLoop((x) => tideAt(x)[1]),
+  waveScale: sampleLoop((x) => waveAt(x)[0]),
+  waveOpacity: sampleLoop((x) => waveAt(x)[1]),
+  breathe: sampleLoop(breatheAt, { steps: 48, dense: 0 }),
 };
-const halfTables = new Map();
-function halfTable(size) {
-  let table = halfTables.get(size);
+const offsetTables = new Map();
+function offsetTable(px) {
+  let table = offsetTables.get(px);
   if (!table) {
-    const u = size / BOX_UNITS;
-    table = sampleLoop((x) => (sepAt(x) / 2) * u);
-    halfTables.set(size, table);
+    const { amp } = geomFor(px);
+    table = sampleLoop((x) => posAt(x) * amp * px);
+    offsetTables.set(px, table);
   }
   return table;
 }
@@ -74,7 +75,7 @@ const CLAMP = { extrapolate: "clamp" };
 const lerp = (driver, table) => driver.interpolate({ ...table, ...CLAMP });
 
 // Kutu merkezine göre konum: ölçüsüz, onLayout gerektirmez.
-const centered = (width, height) => ({
+const centered = (width, height = width) => ({
   position: "absolute",
   left: "50%",
   top: "50%",
@@ -83,9 +84,10 @@ const centered = (width, height) => ({
   width,
   height,
 });
+const disc = (radius) => ({ ...centered(2 * radius), borderRadius: radius });
 
 function LensLoader({
-  size = "small",
+  size,
   color,
   tone = "brand",
   animating = true,
@@ -95,8 +97,18 @@ function LensLoader({
   accessibilityLabel,
 }) {
   const reduceMotion = useReduceMotion();
-  const px = resolveLoaderSize(size);
   const mono = tone === "mono";
+  const window = useWindowDimensions();
+  const fill = size === "fill";
+  // "fill": dış kap kabını doldurur, kısa kenarı ölçülür; ölçülene kadar medium.
+  const [fillPx, setFillPx] = useState(null);
+  const onFillLayout = useCallback((e) => {
+    const { width, height } = e.nativeEvent.layout;
+    const next = fillSizeFor(width, height);
+    setFillPx((prev) => (prev === next ? prev : next));
+  }, []);
+  const scale = screenScaleFor(window?.width, window?.height);
+  const px = (fill && fillPx) || resolveLoaderSize(fill ? "medium" : size, tone, scale);
   const running = animating !== false;
   const driver = useRef(new Animated.Value(0)).current;
 
@@ -118,15 +130,15 @@ function LensLoader({
 
   const nodes = useMemo(() => {
     if (reduceMotion || !running) return null;
-    const half = lerp(driver, halfTable(px));
+    const offset = lerp(driver, offsetTable(px));
     return {
       rotate: lerp(driver, TABLES.angle),
-      half,
-      halfNeg: Animated.multiply(half, -1),
-      disc: lerp(driver, TABLES.disc),
-      eyeAlong: lerp(driver, TABLES.eyeAlong),
-      eyeAcross: lerp(driver, TABLES.eyeAcross),
-      pupil: lerp(driver, TABLES.pupil),
+      offset,
+      offsetNeg: Animated.multiply(offset, -1),
+      along: lerp(driver, TABLES.along),
+      across: lerp(driver, TABLES.across),
+      waveScale: lerp(driver, TABLES.waveScale),
+      waveOpacity: lerp(driver, TABLES.waveOpacity),
     };
   }, [driver, px, reduceMotion, running]);
 
@@ -143,89 +155,116 @@ function LensLoader({
     accessibilityState: { busy: running },
   };
 
+  const containerStyle = [styles.container, fill && styles.fill, style];
+  const layoutProps = fill ? { onLayout: onFillLayout } : null;
+
   if (!running && hidesWhenStopped) {
-    return <View testID={testID} style={[box, style]} />;
+    return (
+      <View testID={testID} {...layoutProps} style={containerStyle}>
+        <View style={box} />
+      </View>
+    );
   }
 
-  const u = px / BOX_UNITS;
-  const discSize = 2 * LENS.r * u;
-  const still = !nodes; // Hareketi Azalt ya da durmuş gösterge: işaret pozu
-  const staticHalf = (LENS.d / 2) * u;
-  const discTransform = (sign) =>
+  const GEOM = geomFor(px);
+  const still = !nodes; // Hareketi Azalt ya da durmuş gösterge: sabit poz
+  const stillOffset = STILL_POS * GEOM.amp * px;
+  const bodyTransform = (sign) =>
     still
-      ? [{ translateX: sign * staticHalf }]
-      : [{ translateX: sign > 0 ? nodes.half : nodes.halfNeg }, { scale: nodes.disc }];
-  // Mono: daireler halka (çizgi logo), göz dolu — renkli düğmede leke gibi durmaz.
-  const discStyle = (fill) => [
-    centered(discSize, discSize),
-    { borderRadius: discSize / 2 },
+      ? [{ translateX: sign * stillOffset }]
+      : [
+          { translateX: sign > 0 ? nodes.offset : nodes.offsetNeg },
+          { scaleX: nodes.along },
+          { scaleY: nodes.across },
+        ];
+
+  const monoColor = color || LENS_COLORS.paper;
+  const tint = (brandColor) => (mono ? monoColor : brandColor);
+  const showHalo = !mono && GEOM.halo > 0;
+  const ringStyle = (fill) =>
     mono
       ? { borderWidth: Math.max(MONO_RING_MIN, px * MONO_RING_RATIO), borderColor: fill }
-      : { backgroundColor: fill },
+      : { backgroundColor: fill };
+
+  // Katman sırası: haleler → halkalar → çekirdekler. Böylece iç içe geçerken iki
+  // olay ufku da görünür (biri ötekinin halkası altında kaybolmaz).
+  const bodies = [
+    { key: "red", sign: -1, color: LENS_COLORS.red },
+    { key: "cyan", sign: 1, color: LENS_COLORS.cyan },
   ];
-  const monoColor = color || LENS_COLORS.paper;
-  const pupilSize = 2 * LENS.pupil * u;
-  const glintSize = 2 * LENS.glint * u;
-  const glintOff = LENS.glintOff * u;
+  const coreRadius = GEOM.core * px * (mono ? 0.8 : 1);
+  const waveSize = 2 * GEOM.wave * px;
 
   return (
-    <Animated.View
-      testID={testID}
-      {...a11y}
-      pointerEvents="none"
-      needsOffscreenAlphaCompositing={!!breathe}
-      style={[box, breathe && { opacity: breathe }, style]}
-    >
+    <View testID={testID} {...a11y} {...layoutProps} pointerEvents="none" style={containerStyle}>
       <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { transform: [{ rotate: still ? `${BASE_ANGLE}deg` : nodes.rotate }] },
-        ]}
+        testID={testID ? `${testID}-box` : undefined}
+        needsOffscreenAlphaCompositing={!!breathe}
+        style={[box, breathe && { opacity: breathe }]}
       >
-        <Animated.View
-          testID={testID ? `${testID}-cyan` : undefined}
-          style={[...discStyle(mono ? monoColor : LENS_COLORS.cyan), { transform: discTransform(1) }]}
-        />
-        <Animated.View
-          testID={testID ? `${testID}-red` : undefined}
-          style={[...discStyle(mono ? monoColor : LENS_COLORS.red), { transform: discTransform(-1) }]}
-        />
-        <Animated.View
-          style={[
-            centered(EYE_LENGTH * u, EYE_WIDTH * u),
-            !still && { transform: [{ scaleX: nodes.eyeAlong }, { scaleY: nodes.eyeAcross }] },
-          ]}
-        >
-          <Svg width="100%" height="100%" viewBox={EYE_VIEWBOX}>
-            <Path d={EYE_PATH} fill={mono ? monoColor : LENS_COLORS.ink} />
-          </Svg>
-        </Animated.View>
-      </Animated.View>
-      {mono ? null : (
+        {still ? null : (
+          <Animated.View
+            testID={testID ? `${testID}-wave` : undefined}
+            style={[
+              centered(waveSize),
+              {
+                borderRadius: waveSize / 2,
+                borderWidth: Math.max(1, px * WAVE_RING_RATIO),
+                borderColor: tint(LENS_COLORS.cyan),
+                opacity: nodes.waveOpacity,
+                transform: [{ scale: nodes.waveScale }],
+              },
+            ]}
+          />
+        )}
         <Animated.View
           style={[
-            centered(pupilSize, pupilSize),
-            { borderRadius: pupilSize / 2, backgroundColor: LENS_COLORS.paper },
-            !still && { transform: [{ scale: nodes.pupil }] },
+            StyleSheet.absoluteFill,
+            { transform: [{ rotate: still ? `${BASE_ANGLE}deg` : nodes.rotate }] },
           ]}
         >
-          {px >= GLINT_MIN_SIZE ? (
-            <View
+          {showHalo
+            ? bodies.map((b) => (
+                <Animated.View
+                  key={`halo-${b.key}`}
+                  style={[
+                    disc(GEOM.halo * px),
+                    { backgroundColor: b.color, opacity: HALO_OPACITY },
+                    { transform: bodyTransform(b.sign) },
+                  ]}
+                />
+              ))
+            : null}
+          {bodies.map((b) => (
+            <Animated.View
+              key={`ring-${b.key}`}
+              testID={testID ? `${testID}-${b.key}` : undefined}
+              style={[disc(GEOM.ring * px), ringStyle(tint(b.color)), { transform: bodyTransform(b.sign) }]}
+            />
+          ))}
+          {bodies.map((b) => (
+            <Animated.View
+              key={`core-${b.key}`}
+              testID={testID ? `${testID}-${b.key}-core` : undefined}
               style={[
-                centered(glintSize, glintSize),
-                {
-                  marginLeft: glintOff - glintSize / 2,
-                  marginTop: -glintOff - glintSize / 2,
-                  borderRadius: glintSize / 2,
-                  backgroundColor: LENS_COLORS.ink,
-                },
+                disc(coreRadius),
+                { backgroundColor: mono ? monoColor : LENS_COLORS.ink },
+                { transform: bodyTransform(b.sign) },
               ]}
             />
-          ) : null}
+          ))}
         </Animated.View>
-      )}
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 }
+
+// ActivityIndicator'ın kabıyla aynı: içerik ortada.
+const styles = StyleSheet.create({
+  container: { alignItems: "center", justifyContent: "center" },
+  // "fill": kabın tamamını kaplar (kaplama / tam ekran kabı ölçülebilsin). Kutu
+  // ortada durur; kap içerikle büyümediği için ölçüm döngüsü olmaz.
+  fill: { flex: 1, alignSelf: "stretch" },
+});
 
 export default React.memo(LensLoader);

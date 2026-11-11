@@ -1,12 +1,13 @@
 // components/streak/StreakFlameSheet.js
 //
 // Seri rozetine dokununca açılan alt sayfa:
-//   • büyük canlı alev + seri sayısı + ay rengi
-//   • AY · HAFTA · GÜN sütunları — seri bu üçünün toplamı (47 = 1 ay 2 hafta 3 gün)
-//   • bugünün durumu: yandı / risk / telafi bekliyor (x/2) / kalkan koruyacak
-//   • sonraki hafta ve ay kademesine kalan gün
-//   • seri koruması: telafi hakkı (hazır / N gün sonra) ve kalkanlar (n/2)
-//   • 13 basamaklı ay merdiveni (yatay kaydırılır), rekor, "nasıl çalışır"
+//   • büyük canlı alev + başarılı hafta sayısı + renk · kıvılcım biçimi
+//   • HAFTA · BU HAFTA · KALKAN sütunları
+//   • bu haftanın ihtişamı (1..7: tek alev → yıldızlar)
+//   • durum: kazanıldı / risk (x/2) / telafi (x/4) / kalkan koruyacak / mola
+//   • sonraki renk kademesine kalan hafta, rekor
+//   • seri koruması: esnek hafta, kalkanlar (n/3), MOLA düğmesi, hatırlatıcı anahtarı
+//   • 13 basamaklı renk merdiveni (yatay kaydırılır), "nasıl çalışır"
 //
 // Merdivendeki küçük alevler DURGUN çizilir (animated=false): on üç alevin ayrı
 // saati sayfayı ağırlaştırırdı, hareket tek büyük alevde.
@@ -25,20 +26,26 @@ import GlassTouchable from "@components/common/GlassTouchable";
 import SheetScroll from "@components/common/SheetScroll";
 import { alpha } from "@theme/colors";
 import { intlLocaleOf } from "@utils/appLanguages";
+import SwitchToggle from "@components/SwitchToggle";
+import BetaBadge from "@components/common/BetaBadge";
+import { isBetaFeature } from "@utils/betaFeatures";
 import {
   DAYS_PER_WEEK,
   STREAK_MONTHS,
-  WEEKS_PER_MONTH,
+  WEEKS_PER_TIER,
   streakLook,
   streakFlameState,
 } from "@utils/streakFlame";
-import { getStreakFlameCopy, streakLevelText } from "@utils/streakFlameCopy";
+import { getStreakFlameCopy } from "@utils/streakFlameCopy";
 import StreakFlame from "./StreakFlame";
 
 const HERO_FLAME = 118;
+// Büyük alev %60 çözünürlükte çizilip büyütülür (piksel işi ~%36): shader ağır,
+// alev yumuşak — fark görünmez (bkz. SkiaStreakFlame `renderScale`).
+const HERO_RENDER_SCALE = 0.6;
 const LADDER_FLAME = 28;
 // Sayfa hazır olmayan bir durumla çizilirse (çıkış penceresi) ilk kademe.
-const FALLBACK_STATE = streakFlameState({ gunSerisi: 3, bugunAktif: true });
+const FALLBACK_STATE = streakFlameState({ alev: { seri: 1, buHaftaGun: 2, buHaftaBasarili: true } });
 const OK_COLOR = "#2FBF71";
 const WARN_COLOR = "#F5A524";
 
@@ -47,16 +54,23 @@ const STATUS_ICON = Object.freeze({
   risk: "hourglass",
   repair: "bandage",
   shield: "shield-checkmark",
+  paused: "pause-circle",
 });
 
-// Basamak alevleri yalnız paletle çizilir: efektsiz, tam boy.
-const LADDER_LOOKS = STREAK_MONTHS.map((palette) => ({ palette, effects: [], heat: 1, intensity: 0, growth: 1 }));
+// Basamak alevleri yalnız paletle çizilir: efektsiz, üç katman, tam boy.
+const LADDER_LOOKS = STREAK_MONTHS.map((palette) => ({ palette, layers: 3, effects: [], heat: 1, growth: 1 }));
 
-function Pips({ total, filled, color, track }) {
+function Pips({ total, filled, color, track, marks }) {
   return (
     <View style={styles.pips}>
       {Array.from({ length: total }, (_, i) => (
-        <View key={i} style={[styles.pip, { backgroundColor: i < filled ? color : track }]} />
+        <View
+          key={i}
+          style={[
+            styles.pip,
+            { backgroundColor: (marks ? marks[i] : i < filled) ? color : track },
+          ]}
+        />
       ))}
     </View>
   );
@@ -94,7 +108,18 @@ function ProtectionItem({ icon, title, value, valueColor, theme, accent }) {
   );
 }
 
-function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language, animated = true }) {
+function StreakFlameSheet({
+  visible,
+  onClose,
+  state: stateProp,
+  theme,
+  language,
+  animated = true,
+  onTakeBreak,
+  breakBusy = false,
+  reminderOn = true,
+  onToggleReminder,
+}) {
   const [infoOpen, setInfoOpen] = useState(false);
   const copy = getStreakFlameCopy(language);
   // BottomSheet kapanış animasyonu sırasında profil verisi eşik altına düşebilir.
@@ -102,15 +127,28 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
   const lastVisibleState = useRef(FALLBACK_STATE);
   if (stateProp?.visible) lastVisibleState.current = stateProp;
   const state = stateProp?.visible ? stateProp : lastVisibleState.current;
-  const { level, look, next, protection } = state;
+  const { level, look, next, protection, week } = state;
   const palette = look.palette;
   const locale = intlLocaleOf(language);
   const track = alpha(theme.text.muted, 0.18);
   const statusColor = state.status === "lit" ? OK_COLOR : state.status === "risk" ? WARN_COLOR : palette.text;
-  const statusText = state.status === "repair"
-    ? copy.status.repair(protection.repairHave, protection.repairNeed)
-    : copy.status[state.status];
-  const nextLook = next.nextPalette ? streakLook(next.monthAt) : null;
+  const repairing = state.status === "repair" || state.status === "shield";
+  const statusText = repairing
+    ? copy.status[state.status](protection.repairHave, protection.repairNeed)
+    : state.status === "risk"
+      ? copy.status.risk(week.days, week.need)
+      : state.status === "lit"
+        ? copy.status.lit(week.days)
+        : copy.status.paused;
+  const nextLook = next.nextPalette ? streakLook(next.tierAt, DAYS_PER_WEEK) : null;
+  const sparkName = copy.sparks[look.spark?.shape] || copy.sparks.ember;
+  // Mola: geçen hafta karar bekliyorsa geriye dönük, değilse bu hafta.
+  const breakLabel = protection.breakThisWeek
+    ? copy.breakActive
+    : !protection.breakAvailable
+      ? copy.breakUsed
+      : repairing ? copy.breakButtonLast : copy.breakButton;
+  const canBreak = Boolean(onTakeBreak) && protection.canBreak && !breakBusy;
 
   // Her açılışta ayrıntı metni kapalı başlar; böylece ana kademe özeti kompakt kalır.
   useEffect(() => {
@@ -134,13 +172,24 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
           {/* Kahraman: büyük alev + sayı. Hale/halkalar alev kutusunun dışına
               taştığı için kutu yüksekliği bunlara yer bırakacak kadar geniş. */}
           <View style={styles.hero}>
-            <StreakFlame look={look} size={HERO_FLAME} animated={animated && visible} dimmed={state.dimmed} />
+            <StreakFlame
+              look={look}
+              size={HERO_FLAME}
+              animated={animated && visible}
+              dimmed={state.dimmed}
+              renderScale={HERO_RENDER_SCALE}
+            />
+            {isBetaFeature("streak_flame") ? (
+              <View pointerEvents="none" style={styles.betaCorner}>
+                <BetaBadge />
+              </View>
+            ) : null}
           </View>
           <Text allowFontScaling={false} style={[styles.days, { color: palette.text }]}>
-            {state.days.toLocaleString(locale)}
+            {state.weeks.toLocaleString(locale)}
           </Text>
           <Text allowFontScaling={false} style={[styles.daysLabel, { color: theme.text.muted }]}>
-            {copy.dayStreak}
+            {copy.weekStreak}
           </Text>
           <View style={styles.summaryHead}>
             <View
@@ -151,7 +200,7 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
             >
               <AppIcon family="Ionicons" name="flame" size={13} color={palette.text} />
               <Text allowFontScaling={false} style={[styles.tierChipText, { color: palette.text }]}>
-                {copy.palettes[palette.id]} · {streakLevelText(copy, level)}
+                {copy.palettes[palette.id]} · {copy.sparkLabel(sparkName)}
               </Text>
             </View>
             <GlassTouchable
@@ -202,22 +251,47 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
                 <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.shieldTitle}: </Text>
                 {copy.shieldHint}
               </Text>
+              <Text allowFontScaling={false} style={[styles.infoDetail, { color: theme.text.muted }]}>
+                <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.breakTitle}: </Text>
+                {copy.breakHint}
+              </Text>
             </View>
           ) : null}
 
-          {/* AY · HAFTA · GÜN: seri bu üç kademenin toplamı. */}
+          {/* HAFTA · BU HAFTA · KALKAN */}
           <View style={[styles.levelRow, { borderColor: alpha(theme.text.muted, 0.16) }]}>
-            <LevelColumn label={copy.columns.month} value={level.month} theme={theme}>
-              <View style={[styles.monthDot, { backgroundColor: palette.glow }]} />
+            <LevelColumn label={copy.columns.weeks} value={state.weeks} theme={theme}>
+              <Pips total={WEEKS_PER_TIER} filled={level.weekInTier} color={palette.glow} track={track} />
             </LevelColumn>
             <View style={[styles.levelDivider, { backgroundColor: alpha(theme.text.muted, 0.16) }]} />
-            <LevelColumn label={copy.columns.week} value={level.week} theme={theme}>
-              <Pips total={WEEKS_PER_MONTH} filled={level.week} color={palette.glow} track={track} />
+            <LevelColumn label={copy.columns.thisWeek} value={`${week.days}/${DAYS_PER_WEEK}`} theme={theme}>
+              <Pips total={DAYS_PER_WEEK} marks={week.boxes} color={palette.glow} track={track} />
             </LevelColumn>
             <View style={[styles.levelDivider, { backgroundColor: alpha(theme.text.muted, 0.16) }]} />
-            <LevelColumn label={copy.columns.day} value={level.day} theme={theme}>
-              <Pips total={DAYS_PER_WEEK} filled={level.day} color={palette.glow} track={track} />
+            <LevelColumn label={copy.columns.shields} value={copy.shields(protection.shields, protection.shieldMax)} theme={theme}>
+              <Pips total={protection.shieldMax} filled={protection.shields} color={palette.glow} track={track} />
             </LevelColumn>
+          </View>
+
+          {/* Bu haftanın ihtişamı: farklı gün sayısı alevi büyütür (1 tek alev … 7 yıldızlar). */}
+          <View testID="streak-stage" style={[styles.stageRow, { borderColor: alpha(palette.glow, 0.22) }]}>
+            <Text allowFontScaling={false} style={[styles.stageTitle, { color: theme.text.muted }]}>
+              {copy.stageTitle}
+            </Text>
+            <View style={styles.stageSteps}>
+              {copy.stages.map((name, i) => (
+                <View
+                  key={name}
+                  style={[
+                    styles.stageStep,
+                    { backgroundColor: i < look.stage ? alpha(palette.glow, i === look.stage - 1 ? 0.9 : 0.45) : track },
+                  ]}
+                />
+              ))}
+            </View>
+            <Text allowFontScaling={false} style={[styles.stageName, { color: palette.text }]}>
+              {`${look.stage}/${DAYS_PER_WEEK} · ${copy.stages[look.stage - 1]}`}
+            </Text>
           </View>
 
           <View
@@ -233,35 +307,17 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
           </View>
 
           <View style={styles.progressBlock}>
-            {next.daysToWeek !== null ? (
-              <>
-                <Text allowFontScaling={false} style={[styles.progressLabel, { color: theme.text.secondary }]}>
-                  {copy.toWeek(next.daysToWeek)}
-                </Text>
-                <View style={[styles.track, { backgroundColor: track }]}>
-                  <View
-                    style={[
-                      styles.fill,
-                      {
-                        backgroundColor: palette.glow,
-                        width: `${Math.max(4, Math.round((level.day / DAYS_PER_WEEK) * 100))}%`,
-                      },
-                    ]}
-                  />
-                </View>
-              </>
-            ) : null}
             {nextLook ? (
               <>
                 <Text allowFontScaling={false} style={[styles.progressLabel, { color: theme.text.secondary }]}>
-                  {copy.toMonth(next.daysToMonth, copy.palettes[nextLook.palette.id])}
+                  {copy.toTier(next.weeksToTier, copy.palettes[nextLook.palette.id])}
                 </Text>
                 <View style={[styles.track, { backgroundColor: track }]}>
                   <LinearGradient
                     colors={[palette.glow, nextLook.palette.glow]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={[styles.fill, { width: `${Math.max(4, Math.round(state.monthProgress * 100))}%` }]}
+                    style={[styles.fill, { width: `${Math.max(4, Math.round(state.tierProgress * 100))}%` }]}
                   />
                 </View>
               </>
@@ -285,20 +341,66 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
             <ProtectionItem
               icon="bandage"
               title={copy.repairTitle}
-              value={protection.repairReady ? copy.repairReady : copy.repairWait(protection.repairIn)}
-              valueColor={protection.repairReady ? OK_COLOR : theme.text.muted}
+              value={repairing ? copy.repairActive(protection.repairHave, protection.repairNeed) : copy.repairIdle}
+              valueColor={repairing ? palette.text : OK_COLOR}
               accent={palette.text}
               theme={theme}
             />
             <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
             <ProtectionItem
               icon="shield-checkmark"
-              title={copy.shieldTitle}
-              value={copy.shields(protection.shields, protection.shieldMax)}
+              title={`${copy.shieldTitle} · ${copy.shields(protection.shields, protection.shieldMax)}`}
+              value={protection.shields >= protection.shieldMax ? copy.shieldsFull : copy.toShield(protection.weeksToShield)}
               valueColor={protection.shields > 0 ? palette.text : theme.text.muted}
               accent={palette.text}
               theme={theme}
             />
+            <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
+            <ProtectionItem
+              icon="pause-circle"
+              title={copy.breakTitle}
+              value={breakLabel}
+              valueColor={protection.breakThisWeek || canBreak ? palette.text : theme.text.muted}
+              accent={palette.text}
+              theme={theme}
+            />
+            {canBreak ? (
+              <GlassTouchable
+                testID="streak-break-button"
+                style={[styles.breakBtn, { borderColor: alpha(palette.glow, 0.5), backgroundColor: alpha(palette.glow, 0.12) }]}
+                onPress={onTakeBreak}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityHint={copy.breakHint}
+              >
+                <AppIcon family="Ionicons" name="pause" size={14} color={palette.text} />
+                <Text allowFontScaling={false} style={[styles.breakText, { color: palette.text }]}>
+                  {repairing ? copy.breakButtonLast : copy.breakButton}
+                </Text>
+              </GlassTouchable>
+            ) : null}
+            <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
+            <View style={styles.reminderRow}>
+              <View style={[styles.protIcon, { backgroundColor: alpha(palette.text, 0.14) }]}>
+                <AppIcon
+                  family="Ionicons"
+                  name={reminderOn ? "notifications" : "notifications-off"}
+                  size={14}
+                  color={palette.text}
+                />
+              </View>
+              <View style={styles.protBody}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[styles.protValue, { color: theme.text.primary }]}>
+                  {copy.reminderTitle}
+                </Text>
+                <Text allowFontScaling={false} numberOfLines={2} style={[styles.protTitle, { color: theme.text.muted }]}>
+                  {copy.reminderHint}
+                </Text>
+              </View>
+              {onToggleReminder ? (
+                <SwitchToggle testID="streak-reminder-toggle" value={reminderOn} onValueChange={onToggleReminder} size={34} />
+              ) : null}
+            </View>
           </View>
 
           <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text.secondary }]}>
@@ -310,9 +412,9 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
             style={styles.ladderScroll}
             contentContainerStyle={styles.ladder}
           >
-            {LADDER_LOOKS.map((item, month) => {
-              const reached = level.month >= month;
-              const current = month === Math.min(level.month, LADDER_LOOKS.length - 1);
+            {LADDER_LOOKS.map((item, tier) => {
+              const reached = state.weeks >= 1 && level.tier >= tier;
+              const current = tier === level.tier && !state.paused;
               return (
                 <View
                   key={item.palette.id}
@@ -336,7 +438,7 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
                       current && { color: item.palette.text },
                     ]}
                   >
-                    {month === 0 ? copy.ladderStart : copy.parts.month(month)}
+                    {copy.ladderStep(tier * WEEKS_PER_TIER + 1)}
                   </Text>
                 </View>
               );
@@ -373,6 +475,8 @@ const styles = StyleSheet.create({
   },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 4 },
   content: { paddingHorizontal: 20, paddingBottom: 6, alignItems: "center" },
+  // Haftalık seri hâlâ beta (utils/betaFeatures "streak_flame"): sağ üst köşe.
+  betaCorner: { position: "absolute", top: 4, right: 0, zIndex: 2 },
   hero: {
     height: HERO_FLAME + 60,
     alignSelf: "stretch",
@@ -434,7 +538,33 @@ const styles = StyleSheet.create({
   levelValue: { fontSize: 19, fontWeight: "900", fontVariant: ["tabular-nums"] },
   levelLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
   levelDivider: { width: 1, marginVertical: 4 },
-  monthDot: { width: 8, height: 8, borderRadius: 4, marginTop: 3 },
+  stageRow: {
+    alignSelf: "stretch",
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 5,
+  },
+  stageTitle: { fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  stageSteps: { flexDirection: "row", gap: 4 },
+  stageStep: { flex: 1, height: 6, borderRadius: 3 },
+  stageName: { fontSize: 12.5, fontWeight: "900" },
+  breakBtn: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 38,
+    marginTop: 4,
+    marginBottom: 2,
+    borderRadius: 11,
+    borderWidth: 1,
+  },
+  breakText: { fontSize: 13, fontWeight: "800" },
+  reminderRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 2, paddingVertical: 4 },
   pips: { flexDirection: "row", gap: 3, marginTop: 4 },
   pip: { width: 6, height: 6, borderRadius: 3 },
   status: {

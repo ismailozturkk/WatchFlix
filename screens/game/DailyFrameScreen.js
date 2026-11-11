@@ -623,7 +623,7 @@ function DailyFrameGame({ navigation }) {
       >
         {phase === "loading" ? (
           <View style={styles.center} accessibilityLabel={copy.loading}>
-            <LensLoader size="large" color={FRAME_ACCENT} />
+            <LensLoader size="screen" color={FRAME_ACCENT} />
             <Text style={[styles.note, { color: theme.text.secondary }]}>{copy.loading}</Text>
           </View>
         ) : null}

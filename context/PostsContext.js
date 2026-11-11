@@ -31,6 +31,7 @@ import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { POST_TYPES } from "../utils/postComposer";
 import useStartupGate from "../hooks/useStartupGate";
 import { useFocusEffect } from "@react-navigation/native";
+import { TabActiveContext } from "./TabActiveContext";
 import { getIsOnline } from "./ConnectivityContext";
 import {
   hidePost as hidePostApi,
@@ -668,7 +669,13 @@ export function PostsProvider({ children }) {
  */
 export function useLiveFeed({ withMarks = false } = {}) {
   const acquire = useContext(PostsContext)?.acquireLiveFeed;
+  // Kök sekmeler aynı rotada: Hub gizliyken talep bırakılsın (60 sn tolerans
+  // acquireLiveFeed içinde), yoksa başka sekmedeyken akış canlı kalır.
+  const tabActive = useContext(TabActiveContext);
   useFocusEffect(
-    useCallback(() => (acquire ? acquire({ withMarks }) : undefined), [acquire, withMarks]),
+    useCallback(
+      () => (acquire && tabActive ? acquire({ withMarks }) : undefined),
+      [acquire, withMarks, tabActive],
+    ),
   );
 }

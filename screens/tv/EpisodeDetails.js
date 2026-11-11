@@ -1,6 +1,7 @@
 import { tmdbLanguageOf } from "../../utils/appLanguages";
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import {
+  Animated,
   StyleSheet,
   View,
   Text,
@@ -154,6 +155,17 @@ export default function EpisodeDetails({ route, navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  // Üst görsel kaydırmaya bağlı: yavaş yükselir, kararır, söner; çekince esner
+  // (DetailHeroStage scrollY · components/common/heroScrollMotion.js — film/dizi,
+  // oyuncu ve profil kapağıyla ortak). Üstündeki etiketler içerikle normal kayar.
+  const heroScrollY = useRef(new Animated.Value(0)).current;
+  const onHeroScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: heroScrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [heroScrollY],
+  );
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
@@ -218,7 +230,9 @@ export default function EpisodeDetails({ route, navigation }) {
 
   return (
     <>
-    <ScrollView
+    <Animated.ScrollView
+      onScroll={onHeroScroll}
+      scrollEventThrottle={16}
       style={[styles.container, { backgroundColor: theme.primary }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -250,6 +264,7 @@ export default function EpisodeDetails({ route, navigation }) {
         topInset={insets.top}
         width={width}
         placeholderIcon="film-outline"
+        scrollY={heroScrollY}
       >
         {/* Sezon / Bölüm etiketi hero üzerinde */}
         <View
@@ -455,7 +470,7 @@ export default function EpisodeDetails({ route, navigation }) {
           </View>
         )}
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
     <BackButton variant="blur" />
     </>
   );

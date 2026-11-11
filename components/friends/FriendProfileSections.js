@@ -12,7 +12,7 @@
 //   • Sayaçlar tek parça şerit, istatistikler kendi renkli ikon karoları ve
 //     çubuklarıyla: her şey aynı yüzey/yarıçap ritminde.
 
-import React, { memo, useEffect, useMemo, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -29,6 +29,7 @@ import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
 import PillButton from "./PillButton";
 import GlassBox from "../common/GlassBox";
+import ProfileBannerBackdrop from "@components/profile/ProfileBannerBackdrop";
 
 const AVATAR_SIZE = 100;
 // UserAvatar squircle yarıçapı `round(size * 0.33)`; halka onun etrafında
@@ -53,8 +54,14 @@ const ListIcon = ({ name, iconLib, color, size = 16 }) => {
 // ── Arka plan gradyanı ───────────────────────────────────────────────────────
 // Ekranın en üstünden (durum çubuğu dahil) başlar; kaydırınca yarı hızda yukarı
 // kayıp söner. `scrollY` native sürücüyle bağlı: JS iş parçacığına yük bindirmez.
-export function ProfileBackdrop({ scrollY }) {
+// `banner` (utils/profileBanner.js) verilirse accent degradenin yerine sahne
+// görseli çizilir: kaydırınca yakınlaşıp çok yavaş kayar, çekince esner
+// (components/profile/ProfileBannerBackdrop — Profil sekmesiyle ortak).
+export function ProfileBackdrop({ scrollY, banner = null, width }) {
   const { theme } = useTheme();
+  if (banner) {
+    return <ProfileBannerBackdrop banner={banner} scrollY={scrollY} width={width} />;
+  }
   const motion = scrollY
     ? {
         opacity: scrollY.interpolate({
@@ -129,6 +136,78 @@ export function ProfileTopBar({ title, scrollY, onMore, moreLabel, leading = nul
   );
 }
 
+// ── Düzenleme alanı ──────────────────────────────────────────────────────────
+// Profil düzenleme modunda ad / kullanıcı adı / hakkında için cam alan: üstte
+// küçük etiket + sayaç, altta yazı. Odakta accent çerçeve; `tone` "error" ise
+// kırmızı, "success" ise yeşil çerçeve ve sağda durum simgesi.
+const FIELD_STATUS_ICON = { success: "checkmark-circle", error: "alert-circle", muted: "time-outline" };
+
+function ProfileEditField({ icon, label, value, max, prefix = null, tone = null, multiline = false, inputStyle, inputProps }) {
+  const { theme } = useTheme();
+  const [focused, setFocused] = useState(false);
+  const accent = theme.accent;
+  const red = theme.colors?.red ?? "#e5484d";
+  const green = theme.colors?.green ?? "#29b864";
+  const muted = theme.text?.muted ?? "#777";
+  const toneColor = tone === "error" ? red : tone === "success" ? green : null;
+  const length = String(value ?? "").length;
+  const nearMax = max && length >= max * 0.9;
+  return (
+    <GlassBox
+      role="field"
+      focused={focused}
+      accent={toneColor ?? accent}
+      style={[
+        styles.field,
+        {
+          backgroundColor: focused ? alpha(accent, 0.07) : theme.secondary,
+          borderColor: toneColor ?? (focused ? accent : theme.border),
+        },
+      ]}
+    >
+      <View style={styles.fieldHead}>
+        <Ionicons name={icon} size={13} color={focused ? accent : muted} />
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.fieldLabel, { color: focused ? accent : muted }]}>
+          {label}
+        </Text>
+        {tone && FIELD_STATUS_ICON[tone] ? (
+          <Ionicons name={FIELD_STATUS_ICON[tone]} size={15} color={toneColor ?? muted} />
+        ) : max ? (
+          <Text
+            allowFontScaling={false}
+            style={[styles.fieldCounter, { color: nearMax ? red : alpha(muted, focused ? 1 : 0.7) }]}
+          >
+            {length}/{max}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.fieldBody}>
+        {prefix ? (
+          <Text allowFontScaling={false} style={[styles.fieldPrefix, { color: focused ? accent : muted }]}>
+            {prefix}
+          </Text>
+        ) : null}
+        <TextInput
+          {...inputProps}
+          value={value}
+          maxLength={max}
+          multiline={multiline}
+          allowFontScaling={false}
+          placeholderTextColor={alpha(muted, 0.8)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={[
+            styles.fieldInput,
+            multiline && styles.fieldInputMultiline,
+            { color: theme.text?.primary ?? "#fff" },
+            inputStyle,
+          ]}
+        />
+      </View>
+    </GlassBox>
+  );
+}
+
 // ── Hero ─────────────────────────────────────────────────────────────────────
 export const ProfileHero = memo(function ProfileHero({
   avatarIndex,
@@ -143,8 +222,9 @@ export const ProfileHero = memo(function ProfileHero({
   socialLinks,
   memberSince,
   // Düzenleme modu (kendi profil önizlemesi): verilirse ad / kullanıcı adı / hakkında
-  // AYNI yazı stilinde yazılabilir olur, sosyal şerit düzenleme hâline geçer.
-  // { name, onChangeName, namePlaceholder, nameMax, username, onChangeUsername,
+  // etiketli cam alanlardan oluşan bir forma döner (ProfileEditField), sosyal şerit
+  // düzenleme hâline geçer.
+  // { name, onChangeName, namePlaceholder, nameLabel, nameMax, username, onChangeUsername,
   //   usernamePlaceholder, usernameLabel, usernameMax, usernameHint: {text, tone},
   //   bio, onChangeBio, bioPlaceholder, bioMax, socialDraft, socialInvalid,
   //   onChangeSocial, avatarHint }
@@ -152,7 +232,6 @@ export const ProfileHero = memo(function ProfileHero({
 }) {
   const { theme } = useTheme();
   const enter = useRef(new Animated.Value(0)).current;
-  const editLine = { borderBottomColor: alpha(theme.accent, 0.4) };
   const hintColor =
     editor?.usernameHint?.tone === "success"
       ? theme.colors?.green ?? "#29b864"
@@ -213,19 +292,64 @@ export const ProfileHero = memo(function ProfileHero({
       </View>
 
       {editor ? (
-        <TextInput
-          testID="profile-edit-name"
-          value={editor.name}
-          onChangeText={editor.onChangeName}
-          placeholder={editor.namePlaceholder}
-          placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
-          maxLength={editor.nameMax}
-          allowFontScaling={false}
-          fontRole="body"
-          returnKeyType="done"
-          accessibilityLabel={editor.namePlaceholder}
-          style={[styles.name, styles.nameInput, editLine, { color: theme.text?.primary ?? "#fff" }]}
-        />
+        // Düzenleme: ad / kullanıcı adı / hakkında tek form yığınında, cam alanlar.
+        <View style={styles.editStack}>
+          <ProfileEditField
+            icon="person-outline"
+            label={editor.nameLabel ?? editor.namePlaceholder}
+            value={editor.name}
+            max={editor.nameMax}
+            inputStyle={styles.fieldInputName}
+            inputProps={{
+              testID: "profile-edit-name",
+              onChangeText: editor.onChangeName,
+              placeholder: editor.namePlaceholder,
+              fontRole: "body",
+              returnKeyType: "done",
+              accessibilityLabel: editor.nameLabel ?? editor.namePlaceholder,
+            }}
+          />
+          <ProfileEditField
+            icon="at-outline"
+            label={editor.usernameLabel}
+            value={editor.username}
+            max={editor.usernameMax}
+            prefix="@"
+            tone={editor.usernameHint?.tone ?? null}
+            inputProps={{
+              testID: "profile-edit-username",
+              onChangeText: editor.onChangeUsername,
+              placeholder: editor.usernamePlaceholder,
+              autoCapitalize: "none",
+              autoCorrect: false,
+              autoComplete: "off",
+              accessibilityLabel: editor.usernameLabel,
+            }}
+          />
+          {editor.usernameHint ? (
+            <Text
+              testID="profile-edit-username-hint"
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={[styles.usernameHint, { color: hintColor }]}
+            >
+              {editor.usernameHint.text}
+            </Text>
+          ) : null}
+          <ProfileEditField
+            icon="chatbubble-ellipses-outline"
+            label={editor.bioLabel ?? editor.bioPlaceholder}
+            value={editor.bio}
+            max={editor.bioMax}
+            multiline
+            inputProps={{
+              testID: "profile-edit-bio",
+              onChangeText: editor.onChangeBio,
+              placeholder: editor.bioPlaceholder,
+              accessibilityLabel: editor.bioLabel ?? editor.bioPlaceholder,
+            }}
+          />
+        </View>
       ) : (
         <Text
           allowFontScaling={false}
@@ -239,41 +363,7 @@ export const ProfileHero = memo(function ProfileHero({
         </Text>
       )}
 
-      {editor ? (
-        <>
-          <View style={styles.identityRow}>
-            <View style={[styles.usernameEdit, editLine]}>
-              <Text allowFontScaling={false} style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}>
-                @
-              </Text>
-              <TextInput
-                testID="profile-edit-username"
-                value={editor.username}
-                onChangeText={editor.onChangeUsername}
-                placeholder={editor.usernamePlaceholder}
-                placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
-                maxLength={editor.usernameMax}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="off"
-                allowFontScaling={false}
-                accessibilityLabel={editor.usernameLabel}
-                style={[styles.username, styles.usernameInput, { color: theme.text?.secondary ?? "#aaa" }]}
-              />
-            </View>
-          </View>
-          {editor.usernameHint ? (
-            <Text
-              testID="profile-edit-username-hint"
-              allowFontScaling={false}
-              numberOfLines={2}
-              style={[styles.usernameHint, { color: hintColor }]}
-            >
-              {editor.usernameHint.text}
-            </Text>
-          ) : null}
-        </>
-      ) : username ? (
+      {!editor && username ? (
         <View style={styles.identityRow}>
           <Text
             allowFontScaling={false}
@@ -292,19 +382,7 @@ export const ProfileHero = memo(function ProfileHero({
         style={styles.badgesRow}
       />
 
-      {editor ? (
-        <TextInput
-          testID="profile-edit-bio"
-          value={editor.bio}
-          onChangeText={editor.onChangeBio}
-          placeholder={editor.bioPlaceholder}
-          placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
-          maxLength={editor.bioMax}
-          multiline
-          accessibilityLabel={editor.bioPlaceholder}
-          style={[styles.bio, styles.bioInput, editLine, { color: theme.text?.secondary ?? "#aaa" }]}
-        />
-      ) : bio ? (
+      {!editor && bio ? (
         <Text
           numberOfLines={3}
           style={[styles.bio, { color: theme.text?.secondary ?? "#aaa" }]}
@@ -543,40 +621,55 @@ export const WatchStatsCard = memo(function WatchStatsCard({
         </View>
       </View>
 
-      {/* (2) Dört sayaç tek şeritte */}
+      {/* (2) Yapım sayıları önde, ayrıntı sayıları altta */}
       <View style={[styles.statsDivider, divider]} />
-      <View style={styles.metricStrip}>
-        {metrics.map((item, index) => (
-          <React.Fragment key={item.key}>
-            {index > 0 ? <View style={[styles.metricDivider, divider]} /> : null}
+      <View style={styles.metricBlock}>
+        <View style={styles.metricFeatureRow}>
+          {metrics.slice(0, 2).map((item) => (
             <View
-              style={styles.metricCell}
+              key={item.key}
+              style={[styles.metricFeature, { backgroundColor: alpha(item.color, 0.1) }]}
               accessible
               accessibilityLabel={`${item.label}: ${item.value}`}
             >
+              <View style={styles.metricFeatureTop}>
+                <Text numberOfLines={1} style={[styles.metricFeatureLabel, { color: theme.text.secondary }]}>
+                  {item.label}
+                </Text>
+                <ListIcon name={item.icon} iconLib={item.iconLib} color={item.color} size={17} />
+              </View>
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
                 fontRole="numeric"
-                style={[styles.metricValue, { color: theme.text?.primary ?? "#fff" }]}
+                style={[styles.metricFeatureValue, { color: theme.text.primary }]}
               >
                 {item.value}
               </Text>
-              <View style={styles.metricLabelRow}>
-                <ListIcon name={item.icon} iconLib={item.iconLib} color={item.color} size={12} />
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={[styles.metricLabel, { color: theme.text?.muted ?? "#666" }]}
-                >
-                  {item.label}
-                </Text>
-              </View>
+              <View style={[styles.metricFeatureRule, { backgroundColor: item.color }]} />
             </View>
-          </React.Fragment>
-        ))}
+          ))}
+        </View>
+        <View style={[styles.metricDetailRow, { borderTopColor: alpha(theme.border, 0.8) }]}>
+          {metrics.slice(2).map((item) => (
+            <View key={item.key} style={styles.metricDetail} accessible accessibilityLabel={`${item.label}: ${item.value}`}>
+              <ListIcon name={item.icon} iconLib={item.iconLib} color={item.color} size={14} />
+              <Text numberOfLines={1} style={[styles.metricDetailLabel, { color: theme.text.secondary }]}>{item.label}</Text>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                fontRole="numeric"
+                style={[styles.metricDetailValue, { color: theme.text.primary }]}
+              >
+                {item.value}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* (3) En çok izlenen türler */}
@@ -775,29 +868,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  nameInput: {
-    alignSelf: "stretch",
-    marginHorizontal: 24,
-    paddingVertical: 2,
-    borderBottomWidth: StyleSheet.hairlineWidth * 2,
-  },
-  usernameEdit: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth * 2,
-    paddingBottom: 1,
-  },
-  usernameInput: { minWidth: 90, paddingVertical: 0, paddingHorizontal: 0, flexShrink: 0 },
-  usernameHint: { marginTop: 5, fontSize: 12, fontWeight: "700", textAlign: "center", paddingHorizontal: 24 },
-  bioInput: {
-    alignSelf: "stretch",
-    marginHorizontal: 24,
-    paddingVertical: 4,
-    minHeight: 40,
-    maxHeight: 110,
-    textAlignVertical: "top",
-    borderBottomWidth: StyleSheet.hairlineWidth * 2,
-  },
+  usernameHint: { marginTop: -4, fontSize: 12, fontWeight: "700", paddingHorizontal: 6 },
+  // Düzenleme formu (ProfileEditField).
+  editStack: { alignSelf: "stretch", gap: 10, marginTop: 18 },
+  field: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10 },
+  fieldHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  fieldLabel: { flex: 1, fontSize: 11, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" },
+  fieldCounter: { fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  fieldBody: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  fieldPrefix: { fontSize: 16, fontWeight: "700", marginRight: 2 },
+  fieldInput: { flex: 1, fontSize: 16, fontWeight: "600", paddingVertical: 2, paddingHorizontal: 0 },
+  fieldInputName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
+  fieldInputMultiline: { minHeight: 44, maxHeight: 120, lineHeight: 21, textAlignVertical: "top" },
   badgesRow: { justifyContent: "center", marginTop: 8, marginBottom: 0 },
   bio: {
     marginTop: 12,
@@ -899,13 +981,28 @@ const styles = StyleSheet.create({
   splitShare: { flexShrink: 0, fontSize: 12.5, fontWeight: "900" },
   statsDivider: { height: StyleSheet.hairlineWidth * 2, marginHorizontal: 16 },
 
-  // ── Sayaç şeridi (film / dizi / sezon / bölüm) ─────────────────────────────
-  metricStrip: { flexDirection: "row", alignItems: "stretch", paddingVertical: 12 },
-  metricCell: { flex: 1, minWidth: 0, alignItems: "center", gap: 3, paddingHorizontal: 6 },
-  metricDivider: { width: StyleSheet.hairlineWidth * 2, marginVertical: 4 },
-  metricValue: { fontSize: 20, fontWeight: "900", letterSpacing: -0.3 },
-  metricLabelRow: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" },
-  metricLabel: { fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
+  // ── Yapım sayıları ve ayrıntılar ──────────────────────────────────────────
+  metricBlock: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 5 },
+  metricFeatureRow: { flexDirection: "row", gap: 8 },
+  metricFeature: {
+    flex: 1,
+    minWidth: 0,
+    height: 88,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    paddingTop: 10,
+    paddingBottom: 8,
+    overflow: "hidden",
+    justifyContent: "space-between",
+  },
+  metricFeatureTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
+  metricFeatureLabel: { flex: 1, fontSize: 12, fontWeight: "750" },
+  metricFeatureValue: { fontSize: 29, fontWeight: "900", letterSpacing: -0.8 },
+  metricFeatureRule: { position: "absolute", bottom: 0, left: 13, width: 31, height: 2, borderRadius: 2 },
+  metricDetailRow: { flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, marginTop: 11, paddingTop: 5 },
+  metricDetail: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 8 },
+  metricDetailLabel: { flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: "700" },
+  metricDetailValue: { maxWidth: "40%", fontSize: 16, fontWeight: "850", textAlign: "right" },
 
   // ── Türler ─────────────────────────────────────────────────────────────────
   genresBlock: { padding: 16, paddingTop: 13 },

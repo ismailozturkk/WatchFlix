@@ -1,12 +1,12 @@
 // components/streak/StreakFlameBadge.js
 //
-// Profilde adın yanındaki seri rozeti: "12 🔥" — Snapchat'teki sayaç gibi önce
-// sayı, sonra alev. Art arda 3 günün altında HİÇ çizilmez (null döner).
+// Profilde adın yanındaki seri rozeti: "12 🔥" — sayı BAŞARILI HAFTA sayısıdır.
+// Seri yokken HİÇ çizilmez (null döner).
 //
-// Bugün henüz işaretleme yoksa alev solar ve yanında bir durum simgesi çıkar:
-// ⌛ risk (gün bitince kopar ya da kalkan korur), 🩹 telafi (dün kaçtı, bugün 2
-// içerikle kurtar), 🛡 kalkan (dün kaçtı, kalkan koruyacak). Telafi/kalkan
-// beklerken sayı KURTARILACAK seridir.
+// Bu hafta henüz kazanılmadıysa alev solar ve yanında bir durum simgesi çıkar:
+// ⌛ risk (bu hafta x/2 gün), 🩹 telafi (geçen hafta kaçtı, bu hafta 4 günle kurtar),
+// 🛡 kalkan (geçen hafta kaçtı, kalkan koruyacak), ⏸ mola (gri alev). Telafi/kalkan
+// beklerken sayı KURTARILACAK seridir. Alttaki ince çubuk bu haftanın ilerlemesidir.
 //
 // Dokununca ayrıntı sayfası (StreakFlameSheet) açılır. Sayfa açıkken rozetin
 // saati durur: aynı anda iki alev çizmeye gerek yok, rozet bulanık perdenin
@@ -27,12 +27,14 @@ import StreakFlame from "./StreakFlame";
 import StreakFlameSheet from "./StreakFlameSheet";
 import useStreakFlameMotion from "./useStreakFlameMotion";
 import useScreenFocused from "../../hooks/useScreenFocused";
+import useStreakActions from "../../hooks/useStreakActions";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Durum simgesi: risk ⌛ (bugün bir şey yok), telafi 🩹 (bugün 2 içerikle kurtar),
-// kalkan 🛡 (gün sonunda kalkan koruyacak). Yandıysa simge yok.
-const STATUS_ICON = Object.freeze({ risk: "hourglass", repair: "bandage", shield: "shield-checkmark" });
+// Durum simgesi: risk ⌛, telafi 🩹, kalkan 🛡, mola ⏸. Yandıysa simge yok.
+const STATUS_ICON = Object.freeze({
+  risk: "hourglass", repair: "bandage", shield: "shield-checkmark", paused: "pause-circle",
+});
 
 function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
   const state = useMemo(() => streakFlameState(seriler), [seriler]);
@@ -40,11 +42,12 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
   const focused = useScreenFocused();
   const motion = useStreakFlameMotion() && focused;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const actions = useStreakActions();
   const open = useCallback(() => setSheetOpen(true), []);
   const close = useCallback(() => setSheetOpen(false), []);
 
   const pop = useSharedValue(1);
-  // Kademe = ay × 5 + hafta (streakLevel.index): yeni hafta ya da ay kademesinde patlar.
+  // Kademe = başarılı hafta sayısı (streakLevel.index): her yeni haftada patlar.
   const levelIndex = state.visible ? state.level.index : -1;
   const lastLevel = useRef(levelIndex);
   useEffect(() => {
@@ -64,11 +67,11 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
   const copy = getStreakFlameCopy(language);
   const palette = state.look.palette;
   const quiet = state.dimmed;
-  const count = state.days.toLocaleString(intlLocaleOf(language));
+  const count = state.weeks.toLocaleString(intlLocaleOf(language));
   const statusIcon = STATUS_ICON[state.status];
-  const milestoneRatio = state.next.daysToWeek === null
-    ? state.monthProgress
-    : state.level.day / 7;
+  // Bu haftanın ilerlemesi: kazanılana kadar x/2, sonra ihtişam x/7.
+  const milestoneRatio = state.week.won ? state.week.days / 7 : state.week.days / state.week.need;
+  const repairing = state.status === "repair" || state.status === "shield";
 
   return (
     <>
@@ -76,7 +79,7 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
         <AnimatedPressable
           testID="profile-streak-flame"
           accessibilityRole="button"
-          accessibilityLabel={copy.a11y[state.status](state.days)}
+          accessibilityLabel={copy.a11y[state.status](state.weeks)}
           accessibilityState={{ expanded: sheetOpen }}
           hitSlop={8}
           onPress={open}
@@ -110,10 +113,14 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
               color={state.status === "risk" ? theme.text.muted : palette.text}
             />
           ) : null}
-          {/* Telafi ilerlemesi: ilk içerik de rozette görünür bir değişiklik yapsın. */}
-          {state.status === "repair" ? (
+          {/* Telafi (x/4) ya da bu haftanın (x/2) ilerlemesi: ilk işaretleme de rozette görünür. */}
+          {repairing ? (
             <Text allowFontScaling={false} style={[styles.progress, { color: palette.text }]}>
               {`${Math.min(state.protection.repairHave, state.protection.repairNeed)}/${state.protection.repairNeed}`}
+            </Text>
+          ) : state.status === "risk" ? (
+            <Text allowFontScaling={false} style={[styles.progress, { color: theme.text.muted }]}>
+              {`${Math.min(state.week.days, state.week.need)}/${state.week.need}`}
             </Text>
           ) : null}
           <Animated.View testID="streak-milestone-progress" pointerEvents="none" style={styles.milestoneTrack}>
@@ -136,6 +143,10 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
         theme={theme}
         language={language}
         animated={motion}
+        onTakeBreak={actions.takeBreak}
+        breakBusy={actions.breakBusy}
+        reminderOn={actions.reminderOn}
+        onToggleReminder={actions.toggleReminder}
       />
     </>
   );

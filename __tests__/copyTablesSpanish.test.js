@@ -38,6 +38,7 @@ const { POLL_COPY } = require("../utils/dailyPollCopy");
 const { TOP100_COPY } = require("../utils/top100Copy");
 const { WATCH_CHALLENGES_COPY } = require("../utils/watchChallengesCopy");
 const { TIER_LIST_COPY } = require("../utils/tierListCopy");
+const { SENSITIVE_CONTENT_COPY } = require("../screens/tabs/settings/sensitiveContentCopy");
 const { QUICK_COPY } = require("../utils/quickGamesCopy");
 const { FRAME_COPY } = require("../utils/dailyFrameCopy");
 const { LEAGUE_COPY } = require("../utils/leagueCopy");
@@ -51,6 +52,7 @@ const { UPCOMING_FILTERS_COPY } = require("../utils/upcomingFiltersCopy");
 const { POSTER_CHOICES_COPY } = require("../utils/posterChoicesCopy");
 const { BADGE_SHOWCASE_COPY } = require("../utils/badgeShowcaseCopy");
 const { STREAK_FLAME_COPY } = require("../utils/streakFlameCopy");
+const { ACTIVITY_FILTER_COPY } = require("../utils/activityFilterCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -143,6 +145,7 @@ const TABLOLAR = {
   "Seelogd Top 100 (top100Copy)": () => TOP100_COPY,
   "Meydan okumalar (watchChallengesCopy)": () => WATCH_CHALLENGES_COPY,
   "Tier list (tierListCopy)": () => TIER_LIST_COPY,
+  "Hassas içerikler (sensitiveContentCopy)": () => SENSITIVE_CONTENT_COPY,
   "Hızlı oyunlar (quickGamesCopy)": () => QUICK_COPY,
   "Günün Karesi (dailyFrameCopy)": () => FRAME_COPY,
   "Haftalık Lig (leagueCopy)": () => LEAGUE_COPY,
@@ -156,6 +159,7 @@ const TABLOLAR = {
   "Özel afişler (posterChoicesCopy)": () => POSTER_CHOICES_COPY,
   "Rozet vitrini ve arama (badgeShowcaseCopy)": () => BADGE_SHOWCASE_COPY,
   "Günlük seri alevi (streakFlameCopy)": () => STREAK_FLAME_COPY,
+  "Etkinliklerim arama ve süzgeç (activityFilterCopy)": () => ACTIVITY_FILTER_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

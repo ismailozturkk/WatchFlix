@@ -324,7 +324,7 @@ export default function EditProfileScreen({ navigation }) {
   if (loading && !profile) {
     return (
       <View style={[styles.root, styles.center, { backgroundColor: theme.primary }]}>
-        <LensLoader size="large" color={theme.accent} />
+        <LensLoader size="screen" color={theme.accent} />
       </View>
     );
   }

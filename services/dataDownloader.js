@@ -30,8 +30,14 @@ import { prefetchImages } from "./imagePrefetch";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
 import { setCachedValue } from "../utils/apiCache";
-import { adultContentAllowed } from "../utils/ageGate";
-import { adultScoped } from "../utils/homeContentSettings";
+import { contentScoped } from "../utils/homeContentSettings";
+import { SENSITIVE_CATEGORIES, hiddenSensitiveCategories } from "../utils/sensitiveContent";
+
+// Ekranların okuduğu kovayla aynı: izin verilen hassas kategorilerin imzası.
+const currentContentFilter = () => {
+  const hidden = hiddenSensitiveCategories();
+  return SENSITIVE_CATEGORIES.filter((c) => !hidden.includes(c)).join(",");
+};
 import { cacheKeys } from "../utils/cacheKeys";
 import {
   getAutoDataCacheEnabled,
@@ -346,9 +352,9 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
 
         for (const sort of ["vote_count.desc", "popularity.desc"]) {
           // `/discover` tabanlı listeler yetişkin izniyle kapsamlanır: ekranlar
-          // aynı anahtarı okuyor (bkz. utils/homeContentSettings.js adultScoped).
+          // aynı anahtarı okuyor (bkz. utils/homeContentSettings.js contentScoped).
           count += await cachePagedTmdb(
-            adultScoped(`movie_bests_${shortLang}_${sort}_page_1`, adultContentAllowed()),
+            contentScoped(`movie_bests_${shortLang}_${sort}_page_1`, currentContentFilter()),
             "discover/movie",
             {
               include_null_first_air_dates: "false",
@@ -414,7 +420,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           (data) => data.genres || [],
         );
         count += await cachePagedTmdb(
-          adultScoped(`movie_genres_content_${tmdbLanguage}_p1_g`, adultContentAllowed()),
+          contentScoped(`movie_genres_content_${tmdbLanguage}_p1_g`, currentContentFilter()),
           "discover/movie",
           { language: tmdbLanguage, page: 1 },
           posterPaths,
@@ -446,7 +452,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
 
         for (const sort of ["vote_count", "popularity"]) {
           count += await cachePagedTmdb(
-            adultScoped(`tv_bests_${shortLang}_discover_${sort}_page_1`, adultContentAllowed()),
+            contentScoped(`tv_bests_${shortLang}_discover_${sort}_page_1`, currentContentFilter()),
             "discover/tv",
             {
               include_null_first_air_dates: "false",
@@ -484,7 +490,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
           (data) => data.genres || [],
         );
         count += await cachePagedTmdb(
-          adultScoped(`tv_genres_content_${tmdbLanguage}_p1_g`, adultContentAllowed()),
+          contentScoped(`tv_genres_content_${tmdbLanguage}_p1_g`, currentContentFilter()),
           "discover/tv",
           { language: tmdbLanguage, page: 1 },
           posterPaths,

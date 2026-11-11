@@ -554,7 +554,7 @@ export default function SharedListScreen({ route, navigation }) {
           { backgroundColor: theme.primary },
         ]}
       >
-        <LensLoader size="large" color={ACCENT} />
+        <LensLoader size="screen" color={ACCENT} />
       </SafeAreaView>
     );
   }

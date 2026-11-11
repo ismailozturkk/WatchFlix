@@ -99,6 +99,9 @@ export const BACKUP_GROUPS = Object.freeze([
     keys: [
       "language",
       "adultContent",
+      "sensitiveDrugs",
+      "sensitiveGore",
+      "sensitiveWar",
       "showOngoingTvShows",
       "streamingProviderIds",
       "onboardingGenreKeys",

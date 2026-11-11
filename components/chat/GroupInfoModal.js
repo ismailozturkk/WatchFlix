@@ -838,7 +838,7 @@ export default function GroupInfoModal({
               />
               {savingAvatar && (
                 <View style={styles.avatarSavingOverlay}>
-                  <LensLoader color={groupData?.color || ACCENT} />
+                  <LensLoader size="fill" color={groupData?.color || ACCENT} />
                 </View>
               )}
             </View>

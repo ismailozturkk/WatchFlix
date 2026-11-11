@@ -14,6 +14,7 @@ import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import { TAB_BAR_SCROLL_UNSET, advanceTabBarCollapse } from "../../utils/tabBarCollapse";
 import { nativeTabBarScaleAvailable } from "../../services/tabBarScale";
 import useAppActive from "../../hooks/useAppActive";
+import { TabActiveContext } from "../../context/TabActiveContext";
 import NativeTabBarScale from "./NativeTabBarScale";
 import TabBar from "./TabBar";
 
@@ -48,6 +49,12 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   const [state, dispatch] = useReducer(tabStateReducer, route?.params?.initialTab, createTabState);
   const [rendererFailed, setRendererFailed] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Dondurma bir kare GECİKİR: sekme değişince önce eski sekmeye
+  // TabActiveContext=false gider (animasyon saatleri, döngüler, canlı akış
+  // effect'lerle kapanır), ardından dondurulur. Aynı render'da dondurulsaydı
+  // donmuş alt ağaç bu güncellemeyi hiç işlemez, UI thread saatleri dönmeye
+  // devam ederdi.
+  const [settledTab, setSettledTab] = useState(state.activeTab);
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const appActive = useAppActive();
@@ -92,6 +99,17 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
     lastScrollY.value = TAB_BAR_SCROLL_UNSET;
     tabBarCollapse.value = reduceMotion ? 0 : withTiming(0, { duration: 200 });
   }, [state.activeTab, reduceMotion]);
+
+  useEffect(() => {
+    if (settledTab === state.activeTab) return undefined;
+    const settle = () => setSettledTab(state.activeTab);
+    if (typeof requestAnimationFrame !== "function") {
+      const id = setTimeout(settle, 16);
+      return () => clearTimeout(id);
+    }
+    const id = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(id);
+  }, [state.activeTab, settledTab]);
 
   // Sekme kullanımı: açılışta ilk sekme dahil her geçişte bir kez. Sekme düzeni
   // kararları (hangi sekme ne kadar açılıyor) bununla ölçülür.
@@ -183,8 +201,10 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   const fallbackScenes = (
     <ScreenContainer style={styles.fill} hasTwoStates>
       {tabs.map((tab) => state.mountedTabs.has(tab.name) ? (
-        <Screen key={tab.name} activityState={state.activeTab === tab.name ? 2 : 0} freezeOnBlur shouldFreeze={state.activeTab !== tab.name} style={styles.scene}>
-          {screens[tab.name]}
+        <Screen key={tab.name} activityState={state.activeTab === tab.name ? 2 : 0} freezeOnBlur shouldFreeze={state.activeTab !== tab.name && settledTab !== tab.name} style={styles.scene}>
+          <TabActiveContext.Provider value={state.activeTab === tab.name}>
+            {screens[tab.name]}
+          </TabActiveContext.Provider>
         </Screen>
       ) : null)}
     </ScreenContainer>
@@ -208,7 +228,11 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
                       tabBarItemTestID={`tab-${tab.name}`} specialEffects={NO_RESELECT_EFFECTS}
                       nativeContainerStyle={{ backgroundColor: theme.primary }}
                       ios={{ icon: { type: "sfSymbol", name: tab.sf }, selectedIcon: { type: "sfSymbol", name: tab.selectedSf }, standardAppearance: appearance, scrollEdgeAppearance: appearance, overrideScrollViewContentInsetAdjustmentBehavior: false }}>
-                      {state.mountedTabs.has(tab.name) ? screens[tab.name] : <View style={styles.loading}><LensLoader color={theme.accent} /></View>}
+                      {state.mountedTabs.has(tab.name) ? (
+                        <TabActiveContext.Provider value={state.activeTab === tab.name}>
+                          {screens[tab.name]}
+                        </TabActiveContext.Provider>
+                      ) : <View style={styles.loading}><LensLoader size="screen" color={theme.accent} /></View>}
                     </Tabs.Screen>
                   ))}
                   {/* Yapay zeka: SON öğe (iOS 26'da sistemin ayrık yuvarlak cam düğmesi).

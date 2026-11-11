@@ -443,7 +443,7 @@ const DiscoverSection = memo(
         <View style={styles.discoverWrapper}>
           {chips}
           <View style={styles.discoverLoadingBox}>
-            <LensLoader size="small" color={theme.text?.muted ?? "#666"} />
+            <LensLoader size="medium" color={theme.text?.muted ?? "#666"} />
           </View>
         </View>
       );

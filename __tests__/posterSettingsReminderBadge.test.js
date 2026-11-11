@@ -20,6 +20,7 @@ jest.mock("react-native", () => {
   const React = require("react");
   return {
     View: "View",
+    ScrollView: "ScrollView",
     Text: "Text",
     TouchableOpacity: ({ children, ...rest }) => React.createElement("TouchableOpacity", rest, children),
     StyleSheet: { create: (styles) => styles, flatten: (style) => style, hairlineWidth: 1 },
@@ -205,7 +206,8 @@ describe("Poster görünümü — alan seçici ve beş kademeli köşe", () => {
   test("varsayılan alan Listeler: beş köşe seçeneği, seçili olan 'Normal'; basınca liste köşesi yazılır", () => {
     const tree = render();
     const labels = radios(tree).map((n) => n.props.accessibilityLabel);
-    expect(labels.slice(0, 5)).toEqual(CORNERS);
+    expect(labels.slice(0, 2)).toEqual(["3'lü", "4'lü"]);
+    expect(labels.slice(2, 7)).toEqual(CORNERS);
     expect(radio(tree, "Normal").props.accessibilityState).toEqual({ selected: true });
 
     act(() => radio(tree, "Yumuşak").props.onPress());

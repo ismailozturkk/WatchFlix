@@ -24,6 +24,11 @@
 
 import axios from "axios";
 import { adultContentAllowed } from "./ageGate";
+import {
+  discoverExclusionParams,
+  dropSensitiveItems,
+  hiddenSensitiveCategories,
+} from "./sensitiveContent";
 
 let installed = false;
 
@@ -47,11 +52,36 @@ export function installTmdbAdultGuard() {
     const url = config?.url;
     if (!isTmdb(url) || !supportsIncludeAdult(url)) return config;
 
+    // Hassas içerik kategorileri (uyuşturucu, kan/vahşet, savaş): /discover
+    // uçlarında TMDB'nin kendi etiketleriyle sunucuda dışlanır (bkz.
+    // utils/sensitiveContent.js). URL'e gömülü değer varsa onunla birleşir.
+    const urlParams = {};
+    const queryIndex = url.indexOf("?");
+    if (queryIndex >= 0) {
+      for (const [k, v] of new URLSearchParams(url.slice(queryIndex + 1))) {
+        if (k === "without_keywords" || k === "without_genres") urlParams[k] = v;
+      }
+    }
+    const exclusions = discoverExclusionParams(
+      url,
+      { ...urlParams, ...(config.params || {}) },
+      hiddenSensitiveCategories(),
+    );
+    if (exclusions) {
+      let nextUrl = url;
+      for (const k of Object.keys(urlParams)) {
+        nextUrl = nextUrl.replace(new RegExp(`([?&])${k}=[^&]*&?`), "$1").replace(/[?&]$/, "");
+      }
+      config.url = nextUrl;
+      config.params = { ...(config.params || {}), ...exclusions };
+    }
+
     const flag = adultAllowed();
+    const currentUrl = config.url;
     // Parametre URL'in içine gömülmüşse orada güncellenir; params'a da
     // eklenirse sorguda iki include_adult olurdu.
-    if (/[?&]include_adult=/i.test(url)) {
-      config.url = url.replace(
+    if (/[?&]include_adult=/i.test(currentUrl)) {
+      config.url = currentUrl.replace(
         /([?&])include_adult=[^&]*/i,
         `$1include_adult=${flag}`,
       );
@@ -62,13 +92,15 @@ export function installTmdbAdultGuard() {
   });
 
   axios.interceptors.response.use((response) => {
-    if (adultAllowed()) return response;
+    const hidden = hiddenSensitiveCategories();
+    if (hidden.length === 0) return response;
     const data = response?.data;
     if (!isTmdb(response?.config?.url) || !Array.isArray(data?.results)) {
       return response;
     }
-    const temiz = data.results.filter((item) => item?.adult !== true);
-    if (temiz.length === data.results.length) return response;
+    // Yetişkin bayrağı + hassas kategoriler (tür ve özet eşleşmesi).
+    const temiz = dropSensitiveItems(data.results, hidden);
+    if (temiz === data.results) return response;
     // Yeni nesne: önbellekte duran ham cevaba dokunulmuyor.
     response.data = { ...data, results: temiz };
     return response;

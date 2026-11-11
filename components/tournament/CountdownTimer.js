@@ -18,6 +18,7 @@ import { now } from "@services/tournamentEngine";
 import { pickByLanguage } from "@utils/appLanguages";
 import { RollingDigit } from "../animated/RollingNumber";
 import { countdownDims, SEP_FONT_RATIO } from "@components/tournament/countdownLayout";
+import useLoopActive from "../../hooks/useLoopActive";
 
 const DUR = 420;
 
@@ -88,10 +89,16 @@ export default function CountdownTimer({
   const { width: screenW } = useWindowDimensions();
   const [rowW, setRowW] = useState(0); // yalnız fill kipinde ölçülür
   const [, force] = useState(0);
+  // Saniye saati yalnız ekran görünür + uygulama öndeyken (gizli sekmede /
+  // arka planda boşuna render yok). Geri dönünce kalan süre now()'dan
+  // hesaplandığı için doğru değer anında çizilir.
+  const active = useLoopActive();
   useEffect(() => {
+    if (!active) return undefined;
+    force((x) => (x + 1) % 1e6);
     const id = setInterval(() => force((x) => (x + 1) % 1e6), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [active]);
 
   const remaining = Math.max(0, (deadlineMs || 0) - now());
   const tot = Math.floor(remaining / 1000);

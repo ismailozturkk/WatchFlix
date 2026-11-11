@@ -238,7 +238,7 @@ function Inbox({ uid, navigation }) {
           <Text style={{ color: theme.text.primary }}>{copy.retry}</Text>
         </GlassPressable>
       </View>}
-      {loading ? <LensLoader testID="notifications-loading" style={styles.loading} color={accent} /> : (
+      {loading ? <LensLoader size="screen" testID="notifications-loading" style={styles.loading} color={accent} /> : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}

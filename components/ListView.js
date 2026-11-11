@@ -396,7 +396,7 @@ const ListView = ({
             />
           ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar. */
           isLoading && !getIsActive("watchedMovies") ? (
-            <LensLoader size={iconSize} />
+            <LensLoader size={compact ? 22 : 26} />
           ) : (
             <ListActionIcon
               active={!!getIsActive("watchedMovies")}

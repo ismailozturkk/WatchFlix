@@ -369,7 +369,7 @@ const ListViewTv = ({
             theme={theme}
           >
             {isLoading && !isWatchedActive ? (
-              <LensLoader size={iconSize} />
+              <LensLoader size={compact ? 22 : 26} />
             ) : (
               // `pulseKey`: dizi 4 durumlu (izlenmedi / kısmen / tamamen …).
               // Kısmen → tamamen geçişinde ikon "eye" olarak AYNI kalır, yalnız

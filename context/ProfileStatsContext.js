@@ -21,8 +21,8 @@ import {
   countMovieWatchStats,
   countTvWatchStats,
   flattenMovieWatchEntries,
-  flattenTvEpisodeWatchEntries,
-  materializeTvWatchState,
+  cachedTvEpisodeEntries,
+  cachedTvHistoryState,
   mostRewatched,
 } from "../utils/watchHistory";
 
@@ -323,19 +323,18 @@ export const ProfileStatsProvider = ({ children }) => {
     [listItems],
   );
 
+  // Dizi başına hazırlanmış durum nesne kimliğiyle önbellekte: tek bölüm
+  // değişince yalnız o dizi yeniden hazırlanır (yol haritası Y14).
   const tvHistoryStates = useMemo(
-    () => (listItemsTv || []).map((show) => ({
-      show,
-      ...materializeTvWatchState(show),
-    })),
+    () => (listItemsTv || []).map(cachedTvHistoryState),
     [listItemsTv],
   );
 
   // Bölüm listesi hem dizi sayaçlarının hem StatisticsSection/Wrapped'in girdisi.
-  // (Eskiden dizi istatistik effect'i içinde İKİNCİ kez flatten ediliyordu.)
+  // Hazırlanmış durumdan türetilir (eskiden her dizi İKİNCİ kez hazırlanıyordu).
   const flatEpisodesTv = useMemo(
-    () => flattenTvEpisodeWatchEntries(listItemsTv),
-    [listItemsTv],
+    () => tvHistoryStates.flatMap(cachedTvEpisodeEntries),
+    [tvHistoryStates],
   );
 
   // ── Film istatistikleri ─────────────────────────────────────────────────

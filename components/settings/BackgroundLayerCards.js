@@ -22,10 +22,13 @@ import GlassTouchable from "../common/GlassTouchable";
 import { DensitySegment } from "./AtmosphereControls";
 import { usePremiumGate } from "../../hooks/usePremiumGate";
 import { useLanguage } from "../../context/LanguageContext";
+import { useNavigation } from "@react-navigation/native";
 import {
   useAmbientBackgroundSettings,
+  useDecorScopeSettings,
   useIconBackgroundSettings,
 } from "../../context/AppSettingsContext";
+import { isDecorCustomized } from "../../utils/decorScopes";
 import { useEffectPreset } from "../../services/effectSettings";
 import { reshuffleDecorSeed } from "../../services/decorSeed";
 import * as Haptics from "../../services/hapticsService";
@@ -463,6 +466,50 @@ export function RegenerateBackgroundCard({ colors }) {
               <Text allowFontScaling={false} style={[s.badgeText, { color: colors.accentStrong }]}>
                 {i18nText("autoI18n.dekor_yeniden_dugme", "Yenile")}
               </Text>
+            </View>
+          }
+        />
+      </GlassTouchable>
+    </GlassBox>
+  );
+}
+
+/**
+ * "Ekran bazında ayarla": atmosfer, ikon deseni ve ambiyansın HANGİ ekran
+ * gruplarında görüneceği (DecorScopesScreen). Eskiden Kişiselleştirme'de ayrı
+ * bir satırdı; ayarladığı katmanların yanında, Atmosfer ekranında duruyor.
+ */
+export function DecorScopesCard({ colors }) {
+  const navigation = useNavigation();
+  const { decorHidden } = useDecorScopeSettings();
+  return (
+    <GlassBox role="card" style={cardStyle(colors)}>
+      <GlassTouchable
+        glass={false}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("DecorScopesScreen")}
+        accessibilityRole="button"
+      >
+        <LayerHeader
+          colors={colors}
+          icon={{ name: "layers-outline" }}
+          iconBg={colors.iconBlue}
+          iconColor={colors.blue}
+          title={i18nText("autoI18n.dekor_kapsam_satir_baslik", "Ekran bazında ayarla")}
+          subtitle={i18nText(
+            "autoI18n.dekor_kapsam_satir_alt",
+            "Kar, ikon ve ambiyans hangi ekranlarda görünsün",
+          )}
+          right={
+            <View style={s.right}>
+              <View style={[s.badge, { backgroundColor: colors.accentDim }]}>
+                <Text allowFontScaling={false} style={[s.badgeText, { color: colors.accentStrong }]}>
+                  {isDecorCustomized(decorHidden)
+                    ? i18nText("autoI18n.dekor_kapsam_ozel", "Özel")
+                    : i18nText("autoI18n.dekor_kapsam_her_yerde", "Her yerde")}
+                </Text>
+              </View>
+              <AppIcon name="chevron-forward" size={14} color={colors.muted} />
             </View>
           }
         />

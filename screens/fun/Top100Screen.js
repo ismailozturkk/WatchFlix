@@ -465,7 +465,7 @@ export default function Top100Screen({ navigation }) {
 
   const empty = busy ? (
     <View style={styles.state}>
-      <LensLoader color={theme.accent} />
+      <LensLoader size="screen" color={theme.accent} />
       <Text style={[styles.stateText, { color: theme.text.muted }]}>{searching ? copy.searching : copy.loading}</Text>
     </View>
   ) : failed ? (

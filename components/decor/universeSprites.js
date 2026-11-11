@@ -449,35 +449,106 @@ function Flask() {
 }
 
 // ── Game of Thrones ─────────────────────────────────────────────────────────
-const DRAGON_BODY =
-  "M12 58 C24 52 38 50 52 52 C60 53 66 50 72 46 C76 43 80 42 84 43 L93 46 C95 48 93 50 89 50 L84 51 C80 52 76 54 72 58 C64 64 52 66 40 64 C30 63 22 64 12 70 C8 72 4 70 6 66 C8 62 10 60 12 58 Z";
-function Dragon({ near, far }) {
+// Buz ejderhası, yandan, burun sağda ve hafif aşağı (ağız ~(90,52): ateş
+// emitter'ı ox D*0.4, oy 8 ile buradan çıkar). İki kare: kanat yukarı / aşağı.
+// Katman sırası: uzak kanat → arka bacak/kuyruk ucu → dikenler/boynuz → ağız
+// içi (parlayan) → gövde → karın/gırtlak plakaları → ayrıntı → yakın kanat.
+const DRG_BODY = "M60 45 C63 41 66 36 70 33 C72.5 31.4 75.5 31 78 31.6 C80.6 32.2 82.6 33.8 84.4 35.8 L95 45.4 C96 46.6 95.4 48.2 93.8 48.2 L84.6 44.6 " +
+  "L91.4 53.4 C91.6 55 90 56 88.6 55.4 C85 53.6 81 51 78.4 48.8 C76 47.2 73 47 70.6 48.6 " +
+  "C67.6 53 62.6 58.6 55 60.6 C48 62.4 40 62.2 34 60.4 C27 58.8 20 58.6 14.4 61.4 C11 63.2 9.8 66 10.8 68.6 " +
+  "C9 66.8 8.4 63.6 10 60.6 C13 55.6 20 52.6 28 51.6 C35 50.8 41 47.4 47 45.8 C51 44.8 56 45.4 60 45 Z";
+const DRG_BELLY = "M70.6 48.6 C67.6 53 62.6 58.6 55 60.6 C48 62.4 40 62.2 34 60.4 C40 59.4 48 58.8 55 56.6 C61.6 54.4 66.6 51.4 70.6 48.6 Z";
+const DRG_THROAT = "M88.6 55.4 C85 53.6 81 51 78.4 48.8 C76 47.2 73 47 70.6 48.6 C73 48.4 75.4 49.4 77.6 51.2 C81 53.8 84.6 55.2 88.6 55.4 Z";
+const DRG_BELLY_LINES = "M63 54.6 L64.4 57.2 M57.4 57.2 L58.4 60 M51.8 58.8 L52.4 61.6 M46 59.6 L46.4 62.2 M40.6 59.8 L40.6 62.2 M74.4 48.6 L73.6 50.6 M78.6 50.6 L77.4 52.8 M82.6 52.8 L81.6 54.6";
+const DRG_RIM = "M10 60.6 C13 55.6 20 52.6 28 51.6 C35 50.8 41 47.4 47 45.8 C51 44.8 56 45.4 60 45 C63 41 66 36 70 33 C72.5 31.4 75.5 31 78 31.6 C80.6 32.2 82.6 33.8 84.4 35.8 L95 45.4";
+const DRG_SPINES = "M18 54.4 L19.4 50.6 L21.6 53.4 Z M25 52.2 L27 48.2 L29 51.6 Z M32 50.8 L34.4 46.2 L36 49.8 Z M39 48.6 L41.6 43.8 L43 47.4 Z " +
+  "M46 46 L48.6 41.4 L50 45.2 Z M53 45.2 L55.6 40.6 L57 44.8 Z M61.4 43.4 L62.4 38.4 L64.4 40.8 Z M65.8 37.6 L66.8 32.6 L68.8 35 Z";
+const DRG_HORNS = "M78.6 32.4 C74 28.4 69 26.6 62 27 C67.6 28.4 72 30.8 75.6 34.4 Z " +
+  "M81.4 33.4 C79.6 28.6 76.6 25.4 71.6 23.2 C75 26.8 77.4 30.2 78.6 34.6 Z";
+const DRG_FRILL = "M80.6 50.2 L75 53.6 L78.6 48.8 Z M84.2 52.4 L80 57 L82.6 51.6 Z";
+const DRG_TEETH = "M86.8 45.46 L86.71 47.6 L87.92 45.9 Z M88.64 46.18 L88.55 48.1 L89.76 46.62 Z M90.48 46.9 L90.3 49.4 L91.6 47.34 Z M92.14 47.58 L92.05 49.2 L93.26 48.02 Z " +
+  "M87.32 48.13 L88.7 47.9 L88 48.99 Z M88.68 49.89 L90.1 49.6 L89.36 50.75 Z M90.04 51.65 L91.3 51.4 L90.72 52.51 Z";
+const DRG_MOUTH = "M84.6 44.6 L93.8 48.2 L91.4 53.4 Z";
+const DRG_HIND =
+  "M33 56 C30 60 30.6 64.6 34.4 66.6 C36 68 35.4 70 33.4 71 L29.6 72.2 L33.6 72.6 L31.2 75.4 L35.4 73.4 L35.6 76.2 L37.6 71.6 " +
+  "C39.4 68.6 39 65.6 37.4 63.4 C39.4 61.6 40.6 59.6 40.4 57.4 Z";
+const DRG_FORE =
+  "M62 54.6 C60.4 58.4 61 61.6 63.6 63.4 L61.4 66 L64.4 65.2 L63.6 68.4 L66 65.2 L67.6 67.4 L67.2 63.4 C65.6 61.4 65.6 58.6 67 55.6 Z";
+const DRG_SPADE = "M11.2 67.6 L4 70.4 L8.6 71.6 L6.6 77 L13 70 Z";
+const DRG_EYE = [83.2, 38.8];
+const DRG_BROW = "M79.6 37 C81.6 35.8 84 36 86.4 37.6";
+const DRG_SCALES = "M38 54.6 q1.6 1.2 3.2 0 M44 53.4 q1.6 1.2 3.2 0 M50 52.6 q1.6 1.2 3.2 0 M41 57.4 q1.6 1.2 3.2 0 M47 56.6 q1.6 1.2 3.2 0 M24 56.4 q1.4 1 2.8 0 M30 55.6 q1.4 1 2.8 0 M64 46.4 q1.4 1 2.8 0 M67 41.6 q1.4 1 2.8 0";
+
+function Dragon({ far, near }) {
   return (
     <>
-      <Path path={far} color="#16243d" />
-      <Path path={DRAGON_BODY}>
-        <LinearGradient start={vec(50, 44)} end={vec(50, 68)} colors={["#3d5578", "#1c2b45"]} />
+      <Path path={far.skin} color="#1c2f50" />
+      <Path path={far.skin} style="stroke" strokeWidth={0.7} strokeJoin="round" color="#3a5a88" />
+      <Path path={far.bones} style="stroke" strokeWidth={1.1} strokeCap="round" color="#35557f" />
+      <Path path={DRG_HIND} color="#1a2a46" />
+      <Path path={DRG_SPADE} color="#22375a" />
+      <Path path={DRG_SPINES} color="#9dbfe4" />
+      <Path path={DRG_HORNS} color="#c9dcef" />
+      <Path path={DRG_MOUTH}>
+        <RadialGradient c={vec(91, 49.6)} r={6} colors={["#bff4ff", "#3fa6e8", "#0a1830"]} positions={[0, 0.45, 1]} />
       </Path>
-      <Path path="M40 63 C52 64 62 62 70 57" style="stroke" strokeWidth={3} strokeCap="round" color="#7fa6cf" />
-      <Path path="M30 54 L32 50 L35 54 M42 52 L44 48 L47 52 M54 52 L56 48 L59 51" style="stroke" strokeWidth={1.4} strokeJoin="round" color="#bfd8f0" />
-      <Path path="M84 43 L80 36 M87 44 L87 36" style="stroke" strokeWidth={2} strokeCap="round" color="#bfd8f0" />
-      <Circle cx={88.5} cy={45.6} r={2.6} color="rgba(91,224,255,0.35)" />
-      <Circle cx={88.5} cy={45.6} r={1.4} color="#7cf0ff" />
-      <Path path="M40 63 L37 71 M52 64 L52 72" style="stroke" strokeWidth={2.6} strokeCap="round" color="#1c2b45" />
-      <Path path={near}>
-        <LinearGradient start={vec(40, 6)} end={vec(56, 90)} colors={["#2a4570", "#0f1c36"]} />
+      <Path path={DRG_BODY}>
+        <LinearGradient start={vec(0, 30)} end={vec(0, 64)} colors={["#6d8db8", "#34507a", "#14223a"]} positions={[0, 0.45, 1]} />
       </Path>
-      <Path path={near} style="stroke" strokeWidth={1.2} strokeJoin="round" color="#6fa2d8" />
+      <Path path={`${DRG_BELLY} ${DRG_THROAT}`}>
+        <LinearGradient start={vec(0, 48)} end={vec(0, 62)} colors={["#a9c6e6", "#5f7fa8"]} />
+      </Path>
+      <Path path={DRG_BELLY_LINES} style="stroke" strokeWidth={0.8} strokeCap="round" color="#46658f" />
+      <Path path={DRG_RIM} style="stroke" strokeWidth={1} strokeCap="round" color="rgba(188,216,244,0.7)" />
+      <Path path={DRG_SCALES} style="stroke" strokeWidth={0.6} strokeCap="round" color="rgba(134,168,210,0.3)" />
+      <Path path={DRG_TEETH} color="#eef6ff" />
+      <Path path={DRG_BROW} style="stroke" strokeWidth={1.1} strokeCap="round" color="#d6e8fa" />
+      <Circle cx={93.2} cy={46.2} r={0.7} color="#0c1628" />
+      <Path path={DRG_FRILL} color="#7f9fc8" />
+      <Path path={DRG_FORE} color="#22375a" />
+      <Circle cx={DRG_EYE[0]} cy={DRG_EYE[1]} r={5}>
+        <RadialGradient c={vec(DRG_EYE[0], DRG_EYE[1])} r={5} colors={["rgba(159,246,255,0.9)", "rgba(91,224,255,0)"]} />
+      </Circle>
+      <Circle cx={DRG_EYE[0]} cy={DRG_EYE[1]} r={1.5} color="#d8fbff" />
+      <Path path={near.skin}>
+        <RadialGradient c={vec(near.glow[0], near.glow[1])} r={34} colors={["#4f75a8", "#26406a", "#101d36"]} positions={[0, 0.6, 1]} />
+      </Path>
+      <Path path={near.fingers} style="stroke" strokeWidth={1.3} strokeCap="round" color="#7aa3d4" />
+      <Path path={near.arm} style="stroke" strokeWidth={2.6} strokeCap="round" strokeJoin="round" color="#93b8e2" />
+      <Path path={near.skin} style="stroke" strokeWidth={0.8} strokeJoin="round" color="rgba(111,162,216,0.8)" />
+      <Path path={near.claw} color="#d8e8f8" />
     </>
   );
 }
 const DRAGON_OPEN = {
-  near: "M44 52 C40 36 32 20 20 6 C32 10 46 14 58 22 C62 30 62 40 58 52 Z M44 52 L20 6 M50 51 L40 12 M55 51 L58 22",
-  far: "M54 50 C58 36 66 22 80 14 C76 26 72 38 64 50 Z",
+  far: {
+    skin: "M60 46 C61.6 36 64 26 68.6 16.6 C75 13 81 10.6 89 8.6 Q84 15.4 84.4 21.6 Q78.4 26 76 33.6 Q72.4 38.6 66 47 Z",
+    bones: "M60 46 L68.6 16.6 M68.6 16.6 L89 8.6 M68.6 16.6 L84.4 21.6 M68.6 16.6 L76 33.6",
+  },
+  near: {
+    skin:
+      "M55 47 C50.6 41 47.4 35.6 46.4 30 C49.6 22.4 53.6 14.6 58.6 8.6 C46 5 30 3.4 13.6 4.4 Q21.6 13.4 15.4 21.8 " +
+      "Q25.6 26.4 25.4 35.6 Q32 40.6 37.4 50.4 C43.6 48.6 49.6 47.4 55 47 Z",
+    arm: "M55 47 C50.6 41 47.4 35.6 46.4 30 C49.6 22.4 53.6 14.6 58.6 8.6",
+    fingers: "M58.6 8.6 C46 5 30 3.4 13.6 4.4 M58.6 8.6 C44 12 28 17 15.4 21.8 M58.6 8.6 C48 18 36 27 25.4 35.6",
+    claw: "M58.6 8.6 L61.6 5 L60 9.4 Z",
+    glow: [40, 18],
+  },
 };
 const DRAGON_CLOSED = {
-  near: "M44 56 C40 70 30 82 16 92 C30 90 44 86 54 80 C58 72 58 64 56 56 Z M44 56 L16 92 M50 57 L36 88 M55 57 L54 80",
-  far: "M56 56 C62 68 70 78 84 84 C78 74 72 64 66 56 Z",
+  far: {
+    skin: "M62 53 C63.6 62 65.6 71 68 79 C74 84.6 80 87.4 88 90 Q82.4 83.6 82.6 77.4 Q76.6 73.4 74.6 66.6 Q70.6 60.6 67 53.6 Z",
+    bones: "M62 53 L68 79 M68 79 L88 90 M68 79 L82.6 77.4 M68 79 L74.6 66.6",
+  },
+  near: {
+    skin:
+      "M55.6 48 C50.6 52.6 46.6 57.6 44.6 62.4 C46.6 70.6 50 78.6 54.6 86.6 C42 91 28 94 13 95 Q19.6 87.4 17 80.4 " +
+      "Q25.6 77 25.4 68.6 Q31 63 34.6 58.6 C41.6 54.6 48.6 50.6 55.6 48 Z",
+    arm: "M55.6 48 C50.6 52.6 46.6 57.6 44.6 62.4 C46.6 70.6 50 78.6 54.6 86.6",
+    fingers: "M54.6 86.6 C42 91 28 94 13 95 M54.6 86.6 C42 85 28 82.6 17 80.4 M54.6 86.6 C46 80 34 74 25.4 68.6",
+    claw: "M54.6 86.6 L58.4 89 L54 89.6 Z",
+    glow: [38, 76],
+  },
 };
 
 const RAVEN_BODY = "M30 53 C40 47 56 47 66 49 L76 46 L85 48.5 L76 51 C70 56 56 58 44 57 C38 57 32 58 22 63 L17 60 Z";

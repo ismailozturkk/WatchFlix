@@ -22,6 +22,8 @@
 // başlangıçta seçilen türler, dil) ekranın kendi `sections` / efekt
 // bağımlılıklarında zaten karşılanıyor; ek bir şey gerekmiyor.
 
+import { dropSensitiveItems, hiddenFromFilterKey } from "./sensitiveContent";
+
 export const HOME_SETTING_EFFECT = Object.freeze({
   DATA: "data",
   RENDER: "render",
@@ -81,6 +83,28 @@ export const dropAdult = (list, allowed) => {
   if (allowed || !Array.isArray(list)) return list;
   return list.some(isAdultItem) ? list.filter((item) => !isAdultItem(item)) : list;
 };
+
+/**
+ * Hassas içerik imzasıyla (utils/sensitiveContent.js → contentFilterKeyOf)
+ * önbellek kapsamı. Hepsi gizli (varsayılan) → anahtar ESKİ biçiminde kalır;
+ * yalnız yetişkin açık → eski "~a" kovası; başka bir bileşim → kendi kovası.
+ *
+ * @param {string} key
+ * @param {string} filterKey "" | "adult" | "adult,war" …
+ */
+export const contentScoped = (key, filterKey) => {
+  if (!filterKey) return key;
+  if (filterKey === "adult") return `${key}${ADULT_SCOPE_SUFFIX}`;
+  return `${key}~${filterKey.replace(/,/g, ".")}`;
+};
+
+/**
+ * Ekrandaki/önbellekteki listeden gizli hassas kategorileri eler. Ağ cevabı
+ * zaten süzülüyor (utils/tmdbAdultGuard.js); bu, ayar değişince ağa gitmeden
+ * mevcut listeyi anında temizlemek için. Kimlik korunur.
+ */
+export const dropSensitive = (list, filterKey) =>
+  dropSensitiveItems(list, hiddenFromFilterKey(filterKey));
 
 /** Platform kimliklerinin sıralı, tekil, geçerli listesi. */
 export const normalizeProviderIds = (ids) =>

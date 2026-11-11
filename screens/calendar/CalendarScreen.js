@@ -683,7 +683,7 @@ export default function CalendarScreen({ navigation }) {
       >
         {isLoadingEvents && (
           <View style={styles.loadingOverlay} pointerEvents="none">
-            <LensLoader color={theme.accent} />
+            <LensLoader size="fill" color={theme.accent} />
           </View>
         )}
         <Calendar

@@ -699,7 +699,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
                 {/* Görsel yüklenene kadar iskelet (Part 12.2) */}
                 {sceneImageUrl && !sceneImageReady && !imageLoadFailed ? (
                   <View style={[styles.sceneSkeleton, { backgroundColor: theme.secondary }]}>
-                    <LensLoader color={theme.accent} />
+                    <LensLoader size="fill" color={theme.accent} />
                   </View>
                 ) : null}
 

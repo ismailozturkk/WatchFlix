@@ -127,7 +127,7 @@ export default function FilmClubDiscussionScreen({ navigation, route }) {
     return (
       <GameScreenShell navigation={navigation} title={copy.discussion} scroll={false}>
         <View style={styles.center}>
-          <LensLoader color={CLUB_ACCENT} />
+          <LensLoader size="screen" color={CLUB_ACCENT} />
         </View>
       </GameScreenShell>
     );

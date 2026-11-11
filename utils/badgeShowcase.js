@@ -1,7 +1,7 @@
 // utils/badgeShowcase.js
 //
 // Kullanıcının profilinde (ve arkadaş profilinde) sergilemek üzere seçtiği
-// en fazla 4 rozetin ("Vitrin Rozetleri") saf doğrulama, normalizasyon,
+// en fazla 6 rozetin ("Vitrin Rozetleri") saf doğrulama, normalizasyon,
 // seçme/çıkarma ve çözümleme katmanı.
 //
 // SAF MODÜL: React Native ve Firebase importu içermez.
@@ -21,7 +21,7 @@ import {
 } from "../components/badges/seasonSeals";
 import { kartBul } from "../components/badges/badgeInsights";
 
-export const MAX_SHOWCASE_BADGES = 4;
+export const MAX_SHOWCASE_BADGES = 6;
 export const SHOWCASE_ID_REGEX = /^[a-zA-Z0-9_]{2,48}$/;
 
 // Aile başına toplam kademe sayısı (katalogdan bir kez hesaplanır).
@@ -52,7 +52,7 @@ export function isValidShowcaseBadgeId(id) {
 }
 
 /**
- * Ham girdiyi (string[] ya da {id}[]) en fazla 4 geçerli ve tekrarsız rozet id'sine
+ * Ham girdiyi (string[] ya da {id}[]) en fazla 6 geçerli ve tekrarsız rozet id'sine
  * indirger. Aynı kademeli aileden iki farklı kademe verilmişse ilk yuvanın konumunu
  * koruyarak yüksek kademeli olanı tutar.
  */

@@ -668,6 +668,18 @@ describe("Users/{uid}/private", () => {
     );
   });
 
+  // private/streak (haftalık seri, 11 Kas): damga sunucu saati, son gün ileri tarihli olamaz.
+  test("seri belgesi: sunucu damgasi + gecerli son gun ile yazilir, baskasi okuyamaz", async () => {
+    const ref = doc(alice, "Users", ALICE, "private", "streak");
+    const veri = (ek) => ({ gunler: ["2026-11-10"], alev: {}, sonGunMs: Date.now() - 86400000, guncellendi: serverTimestamp(), ...ek });
+    await assertSucceeds(setDoc(ref, veri()));
+    await assertSucceeds(getDoc(ref));
+    await assertFails(getDoc(doc(bob, "Users", ALICE, "private", "streak")));
+    await assertFails(setDoc(ref, veri({ guncellendi: new Date(0) })));
+    await assertFails(setDoc(ref, veri({ sonGunMs: Date.now() + 3 * 86400000 })));
+    await assertFails(setDoc(ref, veri({ gunler: Array(401).fill("2026-01-01") })));
+  });
+
   test("oturumsuz kullanici okuyamaz", async () => {
     await seed((db) =>
       setDoc(doc(db, "Users", ALICE, "private", "push"), { expoPushToken: TOKEN }),
@@ -1199,6 +1211,44 @@ describe("dort favori siniri", () => {
       setDoc(doc(db, "Users", ALICE), profil({ fourFavorites: { movies: liste(2) } })),
     );
     await assertSucceeds(getDoc(doc(bob, "Users", ALICE)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profil kapağı (banner): yalnız TMDB görsel yolu (utils/profileBanner.js)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("profil kapagi", () => {
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    friendsCount: 0,
+    ...extra,
+  });
+  const kapak = (extra = {}) => ({ id: 27205, type: "movie", title: "Inception", path: "/abc_D-1.jpg", ...extra });
+
+  test("gecerli kapak yazilir ve null ile kaldirilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertSucceeds(updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak() }));
+    await assertSucceeds(updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak({ type: "tv" }) }));
+    await assertSucceeds(updateDoc(doc(alice, "Users", ALICE), { profileBanner: null }));
+  });
+
+  test("tam adres, bilinmeyen tur ve fazla alan reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak({ path: "https://evil.example/p.jpg" }) }),
+    );
+    await assertFails(updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak({ type: "person" }) }));
+    await assertFails(updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak({ id: "1" }) }));
+    await assertFails(updateDoc(doc(alice, "Users", ALICE), { profileBanner: kapak({ extra: 1 }) }));
+    await assertFails(updateDoc(doc(alice, "Users", ALICE), { profileBanner: "x" }));
+  });
+
+  test("baskasinin kapagini yazamaz", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(updateDoc(doc(bob, "Users", ALICE), { profileBanner: kapak() }));
   });
 });
 

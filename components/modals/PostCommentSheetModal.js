@@ -65,6 +65,7 @@ import { toast } from "@components/AppToast";
 import { alpha } from "../../theme/colors";
 import {
   subscribeToPostComments,
+  fetchOlderPostComments,
   addComment,
   updateComment,
   deleteComment,
@@ -292,6 +293,12 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const isPostAuthorMe = post?.authorId === user?.uid;
 
   const [comments, setComments] = useState([]);
+  // Canlı pencerenin dışındaki (daha eski) yorumlar: tek seferlik sayfalar +
+  // pencereden taşanlar. Artan sırada.
+  const [olderComments, setOlderComments] = useState([]);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const olderCursorRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [replyVisibility, setReplyVisibility] = useState({});
@@ -379,12 +386,46 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   useEffect(() => {
     if (!visible || !postId) return;
     setLoading(true);
-    const unsub = subscribeToPostComments(postId, (loaded) => {
+    setOlderComments([]);
+    setHasOlder(false);
+    olderCursorRef.current = null;
+    let first = true;
+    const unsub = subscribeToPostComments(postId, (loaded, meta) => {
       setComments(loaded);
+      if (first) {
+        first = false;
+        olderCursorRef.current = meta?.oldestDoc || null;
+        setHasOlder(Boolean(meta?.full));
+      }
+      if (meta?.shifted?.length) {
+        setOlderComments((prev) => {
+          const known = new Set(prev.map((c) => c.id));
+          const add = meta.shifted.filter((c) => !known.has(c.id));
+          return add.length ? [...prev, ...add] : prev;
+        });
+      }
       setLoading(false);
     });
     return () => unsub();
   }, [visible, postId]);
+
+  const loadOlderComments = useCallback(async () => {
+    if (!postId || !hasOlder || loadingOlder || !olderCursorRef.current) return;
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderPostComments(postId, olderCursorRef.current);
+      olderCursorRef.current = page.cursor;
+      setHasOlder(page.hasMore);
+      setOlderComments((prev) => {
+        const known = new Set(prev.map((c) => c.id));
+        return [...page.items.filter((c) => !known.has(c.id)), ...prev];
+      });
+    } catch (e) {
+      if (__DEV__) console.warn("older post comments:", e?.message);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [postId, hasOlder, loadingOlder]);
 
   // Modal kapanınca giriş alanını ve açık yanıtları sıfırla.
   useEffect(() => {
@@ -416,7 +457,11 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   // ── Gruplama: üst yorumlar + parentId'ye göre yanıtlar ──
   const topLevel = [];
   const repliesByParent = {};
-  for (const c of comments) {
+  const liveIds = new Set(comments.map((c) => c.id));
+  const allComments = olderComments.length
+    ? [...olderComments.filter((c) => !liveIds.has(c.id)), ...comments]
+    : comments;
+  for (const c of allComments) {
     if (c.parentId) {
       (repliesByParent[c.parentId] = repliesByParent[c.parentId] || []).push(c);
     } else {
@@ -493,6 +538,8 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       if (!postId) return;
       try {
         await deleteComment(postId, item.id, user?.uid);
+        // Canlı pencere dışındaki kopya dinlenmiyor: elle düş.
+        setOlderComments((prev) => prev.filter((c) => c.id !== item.id));
         // Silinen düzenleniyorsa giriş alanını temizle
         setInput((p) => (p.editId === item.id ? EMPTY_INPUT : p));
       } catch (e) {
@@ -777,6 +824,9 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
               keyExtractor={(c) => c.id}
               renderItem={renderItem}
               ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
+              onEndReached={loadOlderComments}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={loadingOlder ? <View style={styles.olderLoader}><LensLoader color={theme.text.muted} /></View> : null}
               contentContainerStyle={styles.listContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -1002,6 +1052,7 @@ const getStyles = (theme) =>
     commentArea: { flexGrow: 1, flexShrink: 1, backgroundColor: theme.primary },
     list: { flexGrow: 1, flexShrink: 1 },
     listContent: { padding: 15, paddingBottom: 140, gap: 10 },
+    olderLoader: { alignItems: "center", paddingVertical: 12 },
     feedSeparator: {
       height: StyleSheet.hairlineWidth,
       marginHorizontal: -15,

@@ -350,6 +350,7 @@ describe("aktiflik damgasi (gercek isaretleme ani)", () => {
     expect(l.aktiflik).toEqual({
       gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0,
       gunluk: {}, koruma: { yamalar: {}, kalkan: 0, kalkanAy: 0, islenen: null },
+      alev: null, saatDilimi: null, sayimTuru: 1, // eski defter: ilk ölçüm sayım türünü göç ettirir
     });
   });
 

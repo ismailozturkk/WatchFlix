@@ -113,6 +113,11 @@ const settingsKeys = {
     validate: oneOf("real", "free", "premium", "unlimited"),
   },
   adultContent: { key: "adultContent", type: TYPES.boolean, default: false },
+  // Hassas içerik kategorileri (bkz. utils/sensitiveContent.js). true = GÖSTER.
+  // Varsayılan kapalı: yeni ve mevcut kullanıcılarda bu içerikler gizli başlar.
+  sensitiveDrugs: { key: "sensitiveDrugs", type: TYPES.boolean, default: false },
+  sensitiveGore: { key: "sensitiveGore", type: TYPES.boolean, default: false },
+  sensitiveWar: { key: "sensitiveWar", type: TYPES.boolean, default: false },
   showOngoingTvShows: { key: "showOngoingTvShows", type: TYPES.boolean, default: true },
   showIconBackground: { key: "showIconBackground", type: TYPES.boolean, default: false },
   // Ambiyans arka planı: bulanık, rengârenk, yavaşça süzülen ışık lekeleri.
@@ -626,15 +631,25 @@ const dataKeys = {
     scope: "user",
     keepOnLogout: true,
   },
-  // Günlük seri alevinin en son kutlanan durumu: { seviye, yama }. `seviye` =
-  // utils/streakFlame.js streakLevel().index (ay × 5 + hafta; -1 = alev yok), `yama` =
-  // en son duyurulan telafi/kalkan günü. Kademe yükselince ya da seri kurtarılınca bir
+  // Haftalık seri alevinin en son kutlanan durumu: { v: 2, seviye, yama }. `seviye` =
+  // utils/streakFlame.js streakLevel().index (başarılı hafta; -1 = alev yok), `yama` =
+  // en son duyurulan telafi/kalkan haftasının ilk günü. Kademe yükselince ya da seri kurtarılınca bir
   // kez kutlanır; seri sönünce seviye düşer, alev yeniden yanınca yine kutlanır
   // (hooks/useStreakCelebration.js).
   streakFlameSeen: {
     key: "watch_progress:streak_flame_seen:",
     type: TYPES.json,
     default: null,
+    scope: "user",
+    keepOnLogout: true,
+  },
+  // Haftalık seri hatırlatıcısı (alevin ayrıntı sayfasındaki anahtar): hafta kaybedilmek
+  // üzereyken yerel bildirim (hooks/useStreakReminder.js). Varsayılan AÇIK; OS bildirim
+  // izni yoksa hiçbir şey zamanlanmaz.
+  streakReminder: {
+    key: "watch_progress:streak_reminder:",
+    type: TYPES.boolean,
+    default: true,
     scope: "user",
     keepOnLogout: true,
   },

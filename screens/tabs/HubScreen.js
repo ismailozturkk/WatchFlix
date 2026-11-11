@@ -16,7 +16,7 @@
 // dili); kartların ortak kabuğu components/hub/HubCard.js.
 // (Wrapped / yıllık arşiv Kütüphane sekmesine taşındı: screens/tabs/LibraryScreen.js)
 
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import useScreenSections from "../../hooks/useSectionVisibility";
@@ -82,6 +82,33 @@ export default function HubScreen({ navigation }) {
   // (utils/sectionVisibility.js "hub"). Selamlama başlığı her zaman görünür.
   const { isVisible: show, allHidden } = useScreenSections("hub");
 
+  // Kademeli kurulum (yol haritası Y17): ilk ekranı dolduran kartlar hemen;
+  // aşağıdakiler (Bingo, anket, Top 100, meydan okumalar, tier list, oyunlar)
+  // kullanıcı kaydırmaya başlayınca ya da içerik ekranı doldurmuyorsa kurulur.
+  // Hub'ı hiç kaydırmadan çıkan kullanıcı için o kartların sorguları/animasyonları
+  // hiç başlamaz. Kurulduktan sonra bir daha sökülmez.
+  const [deepMounted, setDeepMounted] = useState(false);
+  const viewportHRef = useRef(0);
+  const handleScroll = useCallback(
+    (event) => {
+      onTabBarScroll(event);
+      if (!deepMounted && (event?.nativeEvent?.contentOffset?.y || 0) > DEEP_MOUNT_SCROLL) {
+        setDeepMounted(true);
+      }
+    },
+    [onTabBarScroll, deepMounted],
+  );
+  const handleLayout = useCallback((event) => {
+    viewportHRef.current = event?.nativeEvent?.layout?.height || 0;
+  }, []);
+  const handleContentSize = useCallback(
+    (_w, h) => {
+      if (deepMounted || !viewportHRef.current) return;
+      if (h <= viewportHRef.current + DEEP_MOUNT_SCROLL) setDeepMounted(true);
+    },
+    [deepMounted],
+  );
+
   // language dependency'de olmalı; yoksa dil değişince selamlama eski dilde kalır.
   const greeting = useMemo(() => {
     const name = user?.displayName?.split(" ")[0] || "";
@@ -100,7 +127,9 @@ export default function HubScreen({ navigation }) {
             { paddingTop: insets.top + SCROLL_TOP, paddingBottom: contentBottom },
           ]}
           showsVerticalScrollIndicator={false}
-          onScroll={onTabBarScroll}
+          onScroll={handleScroll}
+          onLayout={handleLayout}
+          onContentSizeChange={handleContentSize}
           scrollEventThrottle={16}
         >
         {/* Başlık */}
@@ -160,42 +189,42 @@ export default function HubScreen({ navigation }) {
         )}
 
         {/* Sinema Bingosu (haftalık kart) */}
-        {show("bingo") && (
+        {deepMounted && show("bingo") && (
           <HubSection id="bingo" title="BINGO" theme={theme}>
             <BingoWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Günün Sorusu (iki seçenekli günlük anket) */}
-        {show("poll") && (
+        {deepMounted && show("poll") && (
           <HubSection id="poll" title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
             <DailyPollWidget />
           </HubSection>
         )}
 
         {/* Seelogd Top 100 (film + dizi topluluk sıralaması; oy, liste kaydı, sohbete gönder) */}
-        {show("top100") && (
+        {deepMounted && show("top100") && (
           <HubSection id="top100" title="SEELOGD TOP 100" theme={theme}>
             <Top100Widget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Meydan okumalar (52 haftada 52 film, her on yıldan bir film, yönetmen filmografisi…) */}
-        {show("challenges") && (
+        {deepMounted && show("challenges") && (
           <HubSection id="challenges" title={getWatchChallengesCopy(language).sectionTitle} theme={theme}>
             <ChallengesWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Tier list (film / dizi kademeli sıralama; görsel ve sohbet paylaşımı) */}
-        {show("tierlist") && (
+        {deepMounted && show("tierlist") && (
           <HubSection id="tierlist" title={getTierListCopy(language).sectionTitle} theme={theme}>
             <TierListWidget navigation={navigation} />
           </HubSection>
         )}
 
         {/* Oyunlar */}
-        {show("games") && <ProfileGamesModule navigation={navigation} />}
+        {deepMounted && show("games") && <ProfileGamesModule navigation={navigation} />}
 
         {allHidden && <SectionsHiddenNotice navigation={navigation} screen="hub" />}
         </MarkedScrollView>
@@ -205,6 +234,8 @@ export default function HubScreen({ navigation }) {
 }
 
 const SCROLL_TOP = 10;
+// Bu kadar kaydırınca alt kartlar kurulur (dp).
+const DEEP_MOUNT_SCROLL = 120;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -102,7 +102,7 @@ export default function OpenSourceLicensesScreen() {
     return (
       <SettingsSubScreen title={title}>
         <View style={s.loading}>
-          <LensLoader size="small" color={C.accent} />
+          <LensLoader size="screen" color={C.accent} />
         </View>
       </SettingsSubScreen>
     );

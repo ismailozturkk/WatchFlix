@@ -283,7 +283,7 @@ export default function WidgetSettingsScreen() {
     return (
       <SettingsSubScreen title={title}>
         <View style={styles.loading}>
-          <LensLoader color={C.accent} />
+          <LensLoader size="screen" color={C.accent} />
         </View>
       </SettingsSubScreen>
     );

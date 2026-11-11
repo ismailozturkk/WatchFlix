@@ -47,6 +47,10 @@ import usePosterUri from "../../hooks/usePosterUri";
 import { usePosterResolver } from "../../context/PosterChoicesContext";
 import useBackdropUri from "../../hooks/useBackdropUri";
 
+
+// Bölüm grafiği: aynı anda en fazla bu kadar sezon isteği (TMDB + dış puan).
+const SEASON_CONCURRENCY = 4;
+
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
 
@@ -323,25 +327,46 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       // Dizi puanı ile sezonlar birbirinden bağımsız: art arda değil birlikte
       // beklenir. Her sezonun TMDB isteği ile IMDb bölüm puanı da paralel
       // (eskiden önce TMDB, SONRA OMDb bekleniyordu — sezon başına iki kat gecikme).
-      const titleRatingsPromise = fetchTitleRatings(imdbId);
-      const seasonPromises = validSeasons.map(async (season) => {
+      const titleRatingsPromise = fetchTitleRatings(imdbId).catch(() => null);
+      // Yol haritası Y13: en fazla SEASON_CONCURRENCY sezon aynı anda (30 sezonlu
+      // dizide 60+ eşzamanlı istek yerine). Bir sezon düşerse tüm görünüm
+      // hataya gitmez: o sezon boş bölümlerle çizilir, gerisi korunur.
+      const loadSeason = async (season) => {
         const [tmdbRes, seasonRatings] = await Promise.all([
           request(
             `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
             { language: tmdbLanguage },
           ),
-          fetchSeasonRatings(imdbId, season.season_number),
+          fetchSeasonRatings(imdbId, season.season_number).catch(() => null),
         ]);
         return {
           ...tmdbRes.data,
           episodes: mergeEpisodeRatings(tmdbRes.data.episodes, seasonRatings?.episodes),
         };
-      });
-
-      const [titleRatings, seasonsData] = await Promise.all([
-        titleRatingsPromise,
-        Promise.all(seasonPromises),
-      ]);
+      };
+      const seasonsData = new Array(validSeasons.length);
+      let failed = 0;
+      let next = 0;
+      const worker = async () => {
+        while (next < validSeasons.length && !isStale()) {
+          const index = next++;
+          const season = validSeasons[index];
+          try {
+            seasonsData[index] = await loadSeason(season);
+          } catch (err) {
+            if (axios.isCancel?.(err)) throw err;
+            failed += 1;
+            seasonsData[index] = { ...season, episodes: [] };
+          }
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(SEASON_CONCURRENCY, validSeasons.length) }, worker),
+      );
+      if (validSeasons.length > 0 && failed === validSeasons.length) {
+        throw new Error("seasons_unavailable");
+      }
+      const titleRatings = await titleRatingsPromise;
       if (isStale()) return;
 
       const imdbMainInfo = pickMainRating(titleRatings, show);

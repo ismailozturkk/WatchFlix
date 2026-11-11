@@ -46,6 +46,7 @@ import { AmbientLayer } from "@components/AmbientBackground";
 import { IconPattern } from "@components/IconBacground";
 import {
   AmbientLayerCard,
+  DecorScopesCard,
   IconLayerCard,
   RegenerateBackgroundCard,
 } from "@components/settings/BackgroundLayerCards";
@@ -79,6 +80,7 @@ import SwitchToggle from "@components/SwitchToggle";
 import { alpha } from "@theme/colors";
 import GlassBox from "../../../components/common/GlassBox";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassPressable from "../../../components/common/GlassPressable";
 import AtmosphereGenreInfoSheet from "@components/settings/AtmosphereGenreInfoSheet";
 import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 import { DECOR_DENSITIES } from "@utils/decorLayout";
@@ -351,7 +353,7 @@ function PhonePreview({
             ) : null}
           </View>
           <View style={pp.tools}>
-            <Pressable
+            <GlassPressable
               onPress={onToggleContent}
               hitSlop={6}
               accessibilityRole="button"
@@ -363,8 +365,8 @@ function PhonePreview({
               style={pp.toolBtn}
             >
               <AppIcon name={showContent ? "eye-outline" : "eye-off-outline"} size={16} color="#ffffff" />
-            </Pressable>
-            <Pressable
+            </GlassPressable>
+            <GlassPressable
               onPress={onToggleExpand}
               hitSlop={6}
               accessibilityRole="button"
@@ -376,7 +378,7 @@ function PhonePreview({
               style={pp.toolBtn}
             >
               <AppIcon name={expanded ? "contract-outline" : "expand-outline"} size={16} color="#ffffff" />
-            </Pressable>
+            </GlassPressable>
           </View>
           <View style={[pp.island, { width: innerW * 0.3, height: islandH }]} />
           {/* Durum: adanın altında küçük hap (gerçek boyutta, ölçeklenmez). */}
@@ -825,6 +827,13 @@ export default function AtmosphereScreen() {
         <AmbientLayerCard colors={C} />
         <IconLayerCard colors={C} />
         <RegenerateBackgroundCard colors={C} />
+
+        {/* Hangi ekranlarda görünsün: atmosfer + iki katmanın ekran grubu süzgeci
+            (DecorScopesScreen). Eskiden Kişiselleştirme'de ayrı satırdı. */}
+        <Text allowFontScaling={false} style={[st.sectionLabel, { color: C.muted }]}>
+          {i18nText("autoI18n.atmosfer_nerede_baslik", "Nerede görünsün")}
+        </Text>
+        <DecorScopesCard colors={C} />
       </ScrollView>
       <Modal
         visible={fullscreen}

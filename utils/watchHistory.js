@@ -54,7 +54,7 @@ export function movieWatchEvents(item) {
 
 export const materializeMovieWatchEvents = (item) => movieWatchEvents(item);
 
-const episodeKey = (seasonNumber, episodeNumber) =>
+export const episodeKey = (seasonNumber, episodeNumber) =>
   `${Number(seasonNumber)}:${Number(episodeNumber)}`;
 
 const eventSort = (a, b) =>
@@ -190,33 +190,64 @@ export function flattenMovieWatchEntries(items = []) {
   })));
 }
 
+/** Tek dizinin bölüm izleme kayıtları; `state` verilirse yeniden hazırlanmaz. */
+export function tvShowEpisodeWatchEntries(show, state = materializeTvWatchState(show)) {
+  return state.seasons.flatMap((season) =>
+    (season.episodes || []).flatMap((episode) =>
+      (episode.watchEvents || []).map((event) => ({
+        showId: show.id,
+        showName: show.name,
+        showImage: show.imagePath,
+        genres: show.genres,
+        seasonNumber: season.seasonNumber,
+        seasonPosterPath: season.seasonPosterPath,
+        episodeNumber: episode.episodeNumber,
+        episodeName: episode.episodeName,
+        episodeWatchTime: event.watchedAt,
+        episodeMinutes: episode.episodeMinutes,
+        episodeRatings: episode.episodeRatings,
+        id: `${show.id}_${season.seasonNumber}_${episode.episodeNumber}_${event.id}`,
+        historyId: `${show.id}_${season.seasonNumber}_${episode.episodeNumber}_${event.id}`,
+        watchEvent: event,
+        watchEventId: event.id,
+        addedShowDate: show.addedShowDate,
+        addedSeasonDate: season.addedSeasonDate,
+      })),
+    ),
+  );
+}
+
 export function flattenTvEpisodeWatchEntries(shows = []) {
-  return shows.flatMap((show) => {
-    const state = materializeTvWatchState(show);
-    return state.seasons.flatMap((season) =>
-      (season.episodes || []).flatMap((episode) =>
-        (episode.watchEvents || []).map((event) => ({
-          showId: show.id,
-          showName: show.name,
-          showImage: show.imagePath,
-          genres: show.genres,
-          seasonNumber: season.seasonNumber,
-          seasonPosterPath: season.seasonPosterPath,
-          episodeNumber: episode.episodeNumber,
-          episodeName: episode.episodeName,
-          episodeWatchTime: event.watchedAt,
-          episodeMinutes: episode.episodeMinutes,
-          episodeRatings: episode.episodeRatings,
-          id: `${show.id}_${season.seasonNumber}_${episode.episodeNumber}_${event.id}`,
-          historyId: `${show.id}_${season.seasonNumber}_${episode.episodeNumber}_${event.id}`,
-          watchEvent: event,
-          watchEventId: event.id,
-          addedShowDate: show.addedShowDate,
-          addedSeasonDate: season.addedSeasonDate,
-        })),
-      ),
-    );
-  });
+  return shows.flatMap((show) => tvShowEpisodeWatchEntries(show));
+}
+
+// ── Dizi bazında hazırlama önbelleği ────────────────────────────────────────
+// Profil istatistikleri kökte çalışır; tek bölüm işaretlenince dizi dizisinin
+// kimliği değişir ama değişmeyen dizi NESNELERİ aynı kalabilir. Hazırlanmış
+// durum ve bölüm kayıtları nesne kimliğine göre saklanır (WeakMap: dizi
+// listeden çıkınca kendiliğinden bırakılır). Yol haritası Y14.
+const tvStateByShow = new WeakMap();
+const tvEntriesByShow = new WeakMap();
+
+export function cachedTvHistoryState(show) {
+  if (!show || typeof show !== "object") return { show, ...materializeTvWatchState(show || {}) };
+  let entry = tvStateByShow.get(show);
+  if (!entry) {
+    entry = { show, ...materializeTvWatchState(show) };
+    tvStateByShow.set(show, entry);
+  }
+  return entry;
+}
+
+export function cachedTvEpisodeEntries(historyState) {
+  const show = historyState?.show;
+  if (!show || typeof show !== "object") return tvShowEpisodeWatchEntries(show || {}, historyState);
+  let entries = tvEntriesByShow.get(show);
+  if (!entries) {
+    entries = tvShowEpisodeWatchEntries(show, historyState);
+    tvEntriesByShow.set(show, entries);
+  }
+  return entries;
 }
 
 // ── Profil sayaçları ────────────────────────────────────────────────────────

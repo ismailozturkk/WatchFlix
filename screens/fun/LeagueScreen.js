@@ -191,7 +191,7 @@ export default function LeagueScreen({ navigation }) {
   if (!user && status === "loading") {
     content = (
       <View style={styles.state}>
-        <LensLoader color={theme.accent} />
+        <LensLoader size="screen" color={theme.accent} />
         <Text style={[styles.stateText, { color: theme.text.muted }]}>{copy.loading}</Text>
       </View>
     );

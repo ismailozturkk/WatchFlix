@@ -478,7 +478,7 @@ export function SeeAllGrid({
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footer}>
-                <LensLoader size="small" color={theme.accent} />
+                <LensLoader size="medium" color={theme.accent} />
               </View>
             ) : null
           }

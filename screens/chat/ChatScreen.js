@@ -1853,9 +1853,15 @@ export default function ChatScreen({ route, navigation }) {
     return isGroup ? next : applyReceipts(next, { myUid: currentUser.uid, friendReadAt });
   }, [chatData.messages, chatData.loaded, currentUser.uid, isGroup, friendReadAt]);
 
+  // Güncel mesaj dizisi ref'te: scrollToMessage → jumpToMessage zinciri mesaj
+  // dizisine bağlı olunca her yeni mesajda `onJumpToMessage` değişiyor ve
+  // memo'lu TÜM balonlar yeniden çiziliyordu (yol haritası Y8).
+  const latestMessagesRef = useRef(memoizedMessages);
+  latestMessagesRef.current = memoizedMessages;
+
   const scrollToMessage = useCallback(
     (messageId) => {
-      const index = memoizedMessages.findIndex((message) => message.id === messageId);
+      const index = latestMessagesRef.current.findIndex((message) => message.id === messageId);
       if (index < 0) return false;
       scrollRetryRef.current = 0;
       flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
@@ -1865,7 +1871,7 @@ export default function ChatScreen({ route, navigation }) {
       setPinnedModalVisible(false);
       return true;
     },
-    [memoizedMessages],
+    [],
   );
 
   // Hedef mesaj listede yoksa eski sayfalar, bulunana ya da tavana (6×50)

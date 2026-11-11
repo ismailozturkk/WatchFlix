@@ -100,6 +100,8 @@ const EXCLUDED_BACKDROP = {
   "components/AICineCards.js": "AI yanıt kartı",
   "components/chat/SharedAiMessage.js": "sohbet anlık görüntüsü (gönderenin AI kartındaki banner)",
   "components/modals/ImageGalleryModal.js": "galeri TÜM arka planları listeler (seçici burada)",
+  "components/profile/ProfileBannerBackdrop.js": "profil kapağı: kullanıcının SEÇTİĞİ sahne, izleyenin özel arka planı ezmemeli",
+  "components/profile/ProfileBannerPickerSheet.js": "kapak seçici TÜM sahneleri listeler",
   "components/wrapped/WrappedShareCard.js": "Wrapped (sonraki faz)",
   "screens/story/StoryShareScreen.js": "paylaşım kartı (sonraki faz)",
   "screens/tv/EpisodeDetails.js": "bölüm görseli (still), yapım arka planı değil",

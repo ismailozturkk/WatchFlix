@@ -16,6 +16,7 @@ import { previewHaptic } from "../services/hapticsService";
 import { usePremiumPlanSnapshot } from "../services/premiumState";
 import { getFeatureLimit } from "../utils/premiumFeatures";
 import { cozumlenmisDil } from "../translations";
+import { SENSITIVE_STORAGE_KEYS, contentFilterKeyOf } from "../utils/sensitiveContent";
 import {
   normalizeDataTypes,
   setAutoDataCacheEnabled,
@@ -236,6 +237,21 @@ export const AppSettingsProvider = ({ children }) => {
   // Ayarın ETKİN değeri. Kayıtlı bayrak açık kalmış olabilir (aynı cihazda daha
   // önce yetişkin bir hesap kullanılmışsa); yaş kısıtı onu daima ezer.
   const adultContent = storedAdultContent && !ageRestricted;
+  // Hassas içerik kategorileri (uyuşturucu, kan/vahşet, savaş) — bkz.
+  // utils/sensitiveContent.js. true = göster; varsayılan gizli.
+  const storedDrugs = useStored(Keys.sensitiveDrugs);
+  const storedGore = useStored(Keys.sensitiveGore);
+  const storedWar = useStored(Keys.sensitiveWar);
+  const sensitiveContent = useMemo(
+    () => ({
+      adult: adultContent === true,
+      drugs: storedDrugs === true && !ageRestricted,
+      gore: storedGore === true && !ageRestricted,
+      war: storedWar === true && !ageRestricted,
+    }),
+    [adultContent, storedDrugs, storedGore, storedWar, ageRestricted],
+  );
+  const contentFilter = contentFilterKeyOf(sensitiveContent);
   const [showOngoingTvShows, setShowOngoingTvShows] = useState(() =>
     get(Keys.showOngoingTvShows),
   );
@@ -432,6 +448,21 @@ export const AppSettingsProvider = ({ children }) => {
       persist(Keys.adultContent, newVal, "Content kaydedilemedi");
     },
     [ageRestricted],
+  );
+
+  // Tek kategori aç/kapat. "adult" eski anahtara yazar (geri uyum).
+  const changeSensitiveContent = useCallback(
+    (category, newVal) => {
+      if (category === "adult") {
+        chaneAdultContent(newVal);
+        return;
+      }
+      if (newVal && ageRestricted) return;
+      const storageKey = SENSITIVE_STORAGE_KEYS[category];
+      if (!storageKey) return;
+      persist(Keys[storageKey], newVal === true, "Hassas içerik ayarı kaydedilemedi");
+    },
+    [ageRestricted, chaneAdultContent],
   );
 
   const changeShowOngoingTvShows = useCallback((newVal) => {
@@ -791,11 +822,15 @@ export const AppSettingsProvider = ({ children }) => {
     () => ({
       adultContent,
       chaneAdultContent,
+      // { adult, drugs, gore, war } ETKİN değerler + imzası ("" = hepsi gizli).
+      sensitiveContent,
+      contentFilter,
+      changeSensitiveContent,
       // Ayarlar ekranı satırı bu bayrakla gizliyor: 18 altı kullanıcı
       // kapatılmış bir anahtarı görüp neden açamadığını merak etmesin.
       ageRestricted,
     }),
-    [adultContent, chaneAdultContent, ageRestricted],
+    [adultContent, chaneAdultContent, sensitiveContent, contentFilter, changeSensitiveContent, ageRestricted],
   );
 
   const ongoingTvShowsValue = useMemo(

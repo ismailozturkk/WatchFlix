@@ -10,7 +10,8 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const DIRS = ["components", "screens", "context", "hooks", "utils", "services"];
-const TARGET = /navigate\(\s*["']UsageDebugScreen["']/g;
+// Geliştirici Laboratuvarı (Ayarlar > DEV) da aynı kurala bağlı.
+const TARGET = /navigate\(\s*["'](UsageDebugScreen|DevLabScreen)["']/g;
 const LOOKBACK = 500;
 
 function walk(dir, out = []) {

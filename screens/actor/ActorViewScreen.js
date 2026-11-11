@@ -40,10 +40,9 @@ import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassPressable from "../../components/common/GlassPressable";
 import DetailHeroStage, { computeDetailHeroMetrics } from "../../components/detail/DetailHeroStage";
 import NewConversationSheet from "../../components/chat/NewConversationSheet";
-import AIChatScreen from "../chat/AIChatScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
-import { buildPersonAiRequest, buildPersonChatMedia } from "../../utils/personDetailActions";
+import { buildPersonChatMedia } from "../../utils/personDetailActions";
 import usePosterUri from "../../hooks/usePosterUri";
 
 
@@ -270,15 +269,19 @@ const InfoPill = ({ icon, label, theme }) =>
 // ─── Hero yuvarlak eylem düğmesi ──────────────────────────────────────────────
 // "Takip et" / "Avatarım yap" haplarıyla AYNI cam dil ve yükseklik; yalnız simge
 // (dört düğme dar ekranda da tek satıra sığsın). Etiket erişilebilirlikte okunur.
-const HeroIconButton = ({ icon, label, onPress }) => (
+// Simge + kısa yazı (ör. "Gönder"); `label` ekran okuyucu için uzun ad.
+const HeroPillButton = ({ icon, text, label, onPress }) => (
   <GlassPressable
     onPress={onPress}
     hitSlop={8}
     accessibilityRole="button"
-    accessibilityLabel={label}
-    style={({ pressed }) => [styles.heroIconBtn, pressed && styles.heroIconBtnPressed]}
+    accessibilityLabel={label || text}
+    style={({ pressed }) => [styles.heroPillBtn, pressed && styles.heroIconBtnPressed]}
   >
-    <Ionicons name={icon} size={16} color="#FFFFFF" />
+    <Ionicons name={icon} size={15} color="#FFFFFF" />
+    <Text allowFontScaling={false} style={styles.heroPillText}>
+      {text}
+    </Text>
   </GlassPressable>
 );
 
@@ -355,19 +358,9 @@ const ActorViewScreen = ({ route, navigation }) => {
     bottomBandHeight: HERO_BAND_HEIGHT,
   }).stageHeight;
 
-  // Yapay Zeka: film/dizi detayındaki gibi panel açılır açılmaz kişi sorusunu gönderir.
-  // Panel ilk dokunuşta bağlanır (çoğu ziyarette hiç açılmaz; ağır bileşen boşuna kurulmasın).
-  const [aiMounted, setAiMounted] = useState(false);
-  const [aiVisible, setAiVisible] = useState(false);
+  // (11 Kas) Yapay Zeka düğmesi bu sayfadan kaldırıldı — kullanıcı isteği.
   const [sendVisible, setSendVisible] = useState(false);
-  const aiRequest = useMemo(() => buildPersonAiRequest(actor), [actor, language]);
   const chatMedia = useMemo(() => buildPersonChatMedia(actor), [actor]);
-
-  const openAi = () => {
-    if (!aiRequest.prompt) return;
-    setAiMounted(true);
-    setAiVisible(true);
-  };
 
   // Sohbete gönder: film/dizi detayındaki "Gönder" ile aynı yol — seçilen sohbet
   // `initialMedia` ile açılır, ChatScreen kişi kartını kendisi gönderir.
@@ -517,6 +510,9 @@ const ActorViewScreen = ({ route, navigation }) => {
           bottomFadeHeight={HERO_FADE_HEIGHT}
           placeholderIcon="person"
           placeholderSize={80}
+          // Film/dizi detayı ve profil kapağıyla ortak: kaydırınca yavaş yükselip
+          // kararır, çekince esner (ad + haplar içerikle normal kayar).
+          scrollY={scrollY}
         >
           {/* Alt bilgi (alt bulanık şeridin üstünde) */}
           <View style={styles.heroBottom}>
@@ -543,16 +539,10 @@ const ActorViewScreen = ({ route, navigation }) => {
               <FollowPersonButton person={actor} />
               {/* Kişinin fotoğrafını profil avatarı yap (onaylı; fotoğrafsızsa çizilmez). */}
               <PersonAvatarButton person={actor} />
-              {aiRequest.prompt ? (
-                <HeroIconButton
-                  icon="sparkles"
-                  label={i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
-                  onPress={openAi}
-                />
-              ) : null}
               {chatMedia ? (
-                <HeroIconButton
+                <HeroPillButton
                   icon="paper-plane"
+                  text={i18nText("autoI18n.gonder", "Gönder")}
                   label={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
                   onPress={() => setSendVisible(true)}
                 />
@@ -744,14 +734,6 @@ const ActorViewScreen = ({ route, navigation }) => {
         />
       </SafeAreaView>
 
-      {aiMounted ? (
-        <AIChatScreen
-          visible={aiVisible}
-          onClose={() => setAiVisible(false)}
-          initialPrompt={aiRequest.prompt}
-          initialDisplay={aiRequest.display}
-        />
-      ) : null}
       <NewConversationSheet
         visible={sendVisible}
         onClose={() => setSendVisible(false)}
@@ -839,17 +821,20 @@ const styles = StyleSheet.create({
   popText: { color: "#f5c518", fontSize: 12, fontWeight: "700" },
   heroActions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 12 },
   // Yükseklik haplarla aynı (8 + 16 + 8 dolgu + 2 çerçeve ≈ 34).
-  heroIconBtn: {
-    width: 34,
+  heroPillBtn: {
     height: 34,
     borderRadius: 17,
     borderWidth: 1,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    gap: 6,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.18)",
     borderColor: "rgba(255,255,255,0.35)",
   },
   heroIconBtnPressed: { opacity: 0.8 },
+  heroPillText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
 
   // ── Info pills ────────────────────────────────────────────────────────────
   pillsRow: {

@@ -19,6 +19,7 @@ import {
   Text,
   StyleSheet,
   Animated,
+  Easing,
   FlatList,
   TouchableOpacity,
   Modal,
@@ -28,6 +29,7 @@ import {
 import LensLoader from "../../../components/LensLoader";
 import { Image } from "expo-image";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
+import { usePreventRemove } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -104,6 +106,10 @@ import { resolveProfileAccess, resolveProfileViewer } from "../../../utils/profi
 import useOwnProfileEditor, { BIO_MAX, NAME_MAX, USERNAME_MAX } from "../../../hooks/useOwnProfileEditor";
 import ProfileAvatarPickerModal from "../../../components/profile/ProfileAvatarPickerModal";
 import ShowcaseBadgePickerSheet from "../../../components/badges/ShowcaseBadgePickerSheet";
+import ProfileBannerPickerSheet from "../../../components/profile/ProfileBannerPickerSheet";
+import { profileBannerSpacer } from "../../../components/profile/ProfileBannerBackdrop";
+import { readProfileBanner } from "../../../utils/profileBanner";
+import { getProfileBannerCopy } from "../../../utils/profileBannerCopy";
 import { removeShowcaseBadge } from "../../../utils/badgeShowcase";
 import { useWatchProgressContext } from "../../../context/WatchProgressContext";
 
@@ -119,6 +125,15 @@ const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"]
 // Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
 // kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
 const FULLSCREEN_LIST_THRESHOLD = 12;
+// Kapak bölgesinin (hero üstündeki boşluk) yüksekliği: görüntüleme / düzenleme.
+// Görüntülemede boşluk kapak boyundan hesaplanır (profileBannerSpacer); düzenlemede
+// en az bu kadar ve görüntülemeden EDIT_EXTRA fazla açılır.
+const BANNER_ZONE_VIEW_MIN = 84;
+const BANNER_ZONE_EDIT = 176;
+const BANNER_ZONE_EDIT_EXTRA = 56;
+const BANNER_ZONE_EDIT_EMPTY = 112;
+// Üst çubuğun boyu (ProfileTopBar minHeight 52): içerik bunun altından başlar.
+const TOP_BAR_HEIGHT = 52;
 
 // Subcollection (yeni format) öncelikli, root-doc array'inde (eski format)
 // olup subcollection'da olmayanlar eklenir — ProfileStatsContext ile aynı mantık.
@@ -325,7 +340,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Liste sayfası pencere kenarına çizilir: şerit varken de gerçek üst boşluk.
   const windowInsets = useWindowSafeAreaInsets();
@@ -401,19 +416,29 @@ export default function FriendProfileScreen({ route, navigation }) {
   const draft = editing ? editor.draft : null;
   const [avatarSheet, setAvatarSheet] = useState(false);
   const [badgeSheet, setBadgeSheet] = useState(false);
+  const [bannerSheet, setBannerSheet] = useState(false);
   const [discardVisible, setDiscardVisible] = useState(false);
   // Kaydedilmemiş değişiklikle ekrandan çıkılırken (geri / kaydırma) onay sorulur;
   // onaylanınca bekletilen gezinme eylemi burada.
   const pendingLeaveRef = useRef(null);
   const ownKartlar = useWatchProgressContext()?.kartlar;
+  // native-stack'te düz `beforeRemove` + preventDefault desteklenmiyor: kaydırarak
+  // geri dönüşte ekran yerelde kalkıp JS durumunda kalıyordu ("removed natively
+  // but didn't get removed from JS state"). usePreventRemove kaydırma hareketini
+  // ve yerel geri menüsünü de kapatır; geri düğmesi/donanım geri onaya düşer.
+  const preventLeave = editing && editor.dirty;
+  usePreventRemove(preventLeave, ({ data }) => {
+    pendingLeaveRef.current = data?.action ?? null;
+    setDiscardVisible(true);
+  });
+  // Onaylanan çıkış, engel KALKTIKTAN sonra gönderilir (usePreventRemove engeli
+  // efektte günceller; aynı karede dispatch yine engellenirdi).
+  const [leaveAction, setLeaveAction] = useState(null);
   useEffect(() => {
-    if (!editing || !editor.dirty || !navigation?.addListener) return undefined;
-    return navigation.addListener("beforeRemove", (event) => {
-      event.preventDefault();
-      pendingLeaveRef.current = event.data?.action ?? null;
-      setDiscardVisible(true);
-    });
-  }, [editing, editor.dirty, navigation]);
+    if (!leaveAction || preventLeave) return;
+    setLeaveAction(null);
+    navigation.dispatch(leaveAction);
+  }, [leaveAction, preventLeave, navigation]);
   const requestCancelEdit = useCallback(() => {
     if (editor.dirty) {
       pendingLeaveRef.current = null;
@@ -427,9 +452,8 @@ export default function FriendProfileScreen({ route, navigation }) {
     const action = pendingLeaveRef.current;
     pendingLeaveRef.current = null;
     editor.cancel();
-    // Dinleyici mod kapanınca söküldüğü için eylem bir sonraki karede engelsiz geçer.
-    if (action) setTimeout(() => navigation.dispatch(action), 0);
-  }, [editor, navigation]);
+    if (action) setLeaveAction(action);
+  }, [editor]);
   const startEdit = useCallback(() => {
     if (editor.start()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }, [editor]);
@@ -869,7 +893,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   // zaten dinlenen belgeden gelir. Görünürlüğü profilin kendisiyle aynı
   // (canViewProfile): gizli profilde favoriler de gizli.
   const profileFavorites = useMemo(() => readProfileFavorites(profile), [profile]);
-  // Kullanıcının vitrine seçtiği en fazla 4 rozet (Users/{uid}.showcaseBadges).
+  // Kullanıcının vitrine seçtiği en fazla 6 rozet (Users/{uid}.showcaseBadges).
   const [selectedShowcaseBadge, setSelectedShowcaseBadge] = useState(null);
   const draftShowcase = draft?.showcase ?? null;
   const profileShowcaseBadges = useMemo(() => {
@@ -978,12 +1002,50 @@ export default function FriendProfileScreen({ route, navigation }) {
   ]);
 
   // ── Yükleniyor / bulunamadı ───────────────────────────────────────────────
+  // ── Kapak bölgesi yüksekliği ──────────────────────────────────────────────
+  // Düzenleme açılınca içerik aşağı kayar, kapak görseli daha çok görünür;
+  // kapanınca yumuşakça geri gelir. Yalnız düzenleme GEÇİŞİ canlandırılır —
+  // profil yüklenince / kapak değişince yükseklik doğrudan oturur (zıplama yok).
+  const zoneHasBanner = !!(draft ? draft.banner : readProfileBanner(profile));
+  // İçerik SafeAreaView içinde: güvenli alan + üst çubuğun altından başlar.
+  const zoneView = profileBannerSpacer({
+    width: windowWidth,
+    topInset: insets.top,
+    contentTop: insets.top + TOP_BAR_HEIGHT,
+    min: BANNER_ZONE_VIEW_MIN,
+  });
+  const zoneTarget = editing
+    ? zoneHasBanner
+      ? Math.max(BANNER_ZONE_EDIT, zoneView + BANNER_ZONE_EDIT_EXTRA)
+      : BANNER_ZONE_EDIT_EMPTY
+    : zoneHasBanner
+      ? zoneView
+      : 0;
+  const bannerZone = useRef(new Animated.Value(zoneTarget)).current;
+  const zoneEditingRef = useRef(editing);
+  useEffect(() => {
+    const toggled = zoneEditingRef.current !== editing;
+    zoneEditingRef.current = editing;
+    if (!toggled) {
+      bannerZone.setValue(zoneTarget);
+      return undefined;
+    }
+    const anim = Animated.timing(bannerZone, {
+      toValue: zoneTarget,
+      duration: 380,
+      easing: Easing.bezier(0.22, 1, 0.36, 1),
+      useNativeDriver: false, // yükseklik: yerleşim özelliği
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [bannerZone, editing, zoneTarget]);
+
   if (profileLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
         <ProfileTopBar title={friendName || i18nText("profile", "Profil")} />
         <View style={styles.centerContent}>
-          <LensLoader size="large" color={theme.accent} />
+          <LensLoader size="screen" color={theme.accent} />
         </View>
       </SafeAreaView>
     );
@@ -1006,11 +1068,14 @@ export default function FriendProfileScreen({ route, navigation }) {
   const movieShare = stats?.totalMinutes ? Math.round((stats.movieMinutes / stats.totalMinutes) * 100) : 0;
   const tvShare = stats?.totalMinutes ? 100 - movieShare : 0;
   const genreColors = [orange, blue, green, theme.accent ?? "#8847ff", "#e4ae39"];
+  // Profil kapağı: düzenlemede taslak, değilse kayıtlı alan (herkese görünür — avatar gibi).
+  const profileBanner = draft ? draft.banner || null : readProfileBanner(profile);
+  const bannerCopy = getProfileBannerCopy(language);
 
   return (
     <PosterChoicesScope choices={friendPosterChoices}>
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ProfileBackdrop scrollY={scrollY} />
+      <ProfileBackdrop scrollY={scrollY} banner={profileBanner} width={windowWidth} />
       <ScreenDecor scope="profile" iconOpacity={0.3} />
       <ProfileTopBar
         title={displayName || profile.username || friendName}
@@ -1095,21 +1160,47 @@ export default function FriendProfileScreen({ route, navigation }) {
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
       >
-        {/* ── Önizleme: kendi profilin, bir arkadaşın gözünden ────────────── */}
-        {/* Düzenleme modunda yönlendirme şeridi; salt önizlemede gizlilik üst çubukta. */}
-        {previewAsFriend && editing ? (
-            <ProfilePreviewBanner
-              icon="pencil"
-              title={i18nText("autoI18n.profil_duzenleme_modu_baslik", "Düzenleme modu")}
-              subtitle={i18nText(
-                "autoI18n.profil_duzenleme_modu_aciklama",
-                "Değiştirmek istediğin yere dokun. ✓ ile kaydedince arkadaşların böyle görecek.",
-              )}
-              actionLabel={i18nText("autoI18n.hesap", "Hesap")}
-              actionIcon="person-circle-outline"
-              onAction={() => navigation.navigate("EditProfileScreen")}
-            />
-        ) : null}
+        {/* ── Kapak (banner): sahne görünsün diye hero biraz aşağıda başlar ── */}
+        <Animated.View
+          style={[styles.bannerZone, { height: bannerZone }]}
+          accessible={!editing && !!profileBanner}
+          accessibilityLabel={profileBanner ? bannerCopy.bannerLabel(profileBanner.title) : undefined}
+        >
+          {editing ? (
+            <View style={styles.bannerEditRow}>
+              <GlassPillButton
+                label={profileBanner ? bannerCopy.change : bannerCopy.add}
+                icon="image-outline"
+                iconSize={16}
+                height={38}
+                paddingHorizontal={14}
+                gap={6}
+                fontSize={13}
+                fallbackRadius={19}
+                color={theme.text?.primary ?? "#fff"}
+                fallbackStyle={{ backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 }}
+                accessibilityLabel={profileBanner ? bannerCopy.change : bannerCopy.add}
+                onPress={() => setBannerSheet(true)}
+              />
+              {profileBanner ? (
+                <GlassPillButton
+                  label={bannerCopy.remove}
+                  icon="trash-outline"
+                  iconSize={15}
+                  height={38}
+                  paddingHorizontal={14}
+                  gap={6}
+                  fontSize={13}
+                  fallbackRadius={19}
+                  color={theme.colors?.red ?? "#e5484d"}
+                  fallbackStyle={{ backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 }}
+                  accessibilityLabel={bannerCopy.remove}
+                  onPress={() => editor.setBanner(null)}
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </Animated.View>
 
         {/* ── Hero: avatar, ad, durum, rozetler, bio ───────────────────────── */}
         <ProfileHero
@@ -1139,6 +1230,8 @@ export default function FriendProfileScreen({ route, navigation }) {
                   name: draft.displayName,
                   onChangeName: editor.setDisplayName,
                   namePlaceholder: i18nText("autoI18n.adin", "Adın"),
+                  nameLabel: i18nText("autoI18n.isim", "İsim"),
+                  bioLabel: i18nText("autoI18n.hakkinda", "Hakkında"),
                   nameMax: NAME_MAX,
                   username: draft.username,
                   onChangeUsername: editor.setUsername,
@@ -1158,6 +1251,22 @@ export default function FriendProfileScreen({ route, navigation }) {
               : null
           }
         />
+
+        {/* ── Düzenleme modu şeridi: hero'nun ALTINDA — üstte kapak (banner) ──── */}
+        {/* görselinin üstüne binmesin. Salt önizlemede gizlilik üst çubukta. */}
+        {previewAsFriend && editing ? (
+            <ProfilePreviewBanner
+              icon="pencil"
+              title={i18nText("autoI18n.profil_duzenleme_modu_baslik", "Düzenleme modu")}
+              subtitle={i18nText(
+                "autoI18n.profil_duzenleme_modu_aciklama",
+                "Değiştirmek istediğin yere dokun. ✓ ile kaydedince arkadaşların böyle görecek.",
+              )}
+              actionLabel={i18nText("autoI18n.hesap", "Hesap")}
+              actionIcon="person-circle-outline"
+              onAction={() => navigation.navigate("EditProfileScreen")}
+            />
+        ) : null}
 
         {/* ── Eylemler: etiketli, tam genişlik ─────────────────────────────── */}
         {!isSelf && (
@@ -1212,13 +1321,12 @@ export default function FriendProfileScreen({ route, navigation }) {
           />
         )}
 
-        {/* ── Vitrin rozetleri: en fazla 4 rozet (varsa) ──────────────────── */}
+        {/* ── Vitrin rozetleri: en fazla 6 rozet (varsa) ──────────────────── */}
         {/* Düzenleme modunda boş da olsa çizilir: dört yuva, boşlarda "+". */}
         {(editing || (canViewProfile && profileShowcaseBadges.length > 0)) && (
           <>
             <SectionHeader
               title={getBadgeShowcaseCopy(language).profileTitle}
-              trailing={<CountChip value={profileShowcaseBadges.length} icon="ribbon-outline" />}
             />
             <FriendBadgeShowcase
               badges={profileShowcaseBadges}
@@ -1264,7 +1372,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             <SectionHeader title={i18nText("autoI18n.izleme_istatistikleri", "İzleme İstatistikleri")} />
 
             {stats === null ? (
-              <LensLoader size="small" color={theme.accent} style={{ marginVertical: 24 }} />
+              <LensLoader size="medium" color={theme.accent} style={{ marginVertical: 24 }} />
             ) : (
               <>
                 <WatchStatsCard
@@ -1352,7 +1460,7 @@ export default function FriendProfileScreen({ route, navigation }) {
 
             {/* ── Paylaşılan Listeler ─────────────────────────────────────── */}
             {allLists === null ? (
-              <LensLoader size="small" color={theme.accent} style={{ marginTop: 30 }} />
+              <LensLoader size="medium" color={theme.accent} style={{ marginTop: 30 }} />
             ) : visibleLists.length === 0 ? (
               <ProfileNoticeCard
                 icon="albums-outline"
@@ -1580,6 +1688,13 @@ export default function FriendProfileScreen({ route, navigation }) {
             }}
             onClose={() => setAvatarSheet(false)}
           />
+          <ProfileBannerPickerSheet
+            visible={bannerSheet && editing}
+            current={draft?.banner || null}
+            favorites={draft?.favorites || profileFavorites}
+            onSelect={editor.setBanner}
+            onClose={() => setBannerSheet(false)}
+          />
           <ShowcaseBadgePickerSheet
             visible={badgeSheet && editing}
             value={draft?.showcase}
@@ -1753,6 +1868,15 @@ export default function FriendProfileScreen({ route, navigation }) {
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   previewActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Kapak bölgesi: düğmeler alt kenarda; büyürken alttan açılır (taşan kırpılır).
+  bannerZone: { overflow: "hidden", justifyContent: "flex-end" },
+  bannerEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+  },
   // Düzenleme modu: gizli liste soluk, köşede göz işareti.
   railCardHidden: { opacity: 0.45 },
   railVisibilityDot: {

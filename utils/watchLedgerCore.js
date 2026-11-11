@@ -84,8 +84,16 @@ export const bosLedger = () => ({
 // seriKorumasiniIlerlet verir; burada yalnız biçimi korunur.
 export const GUNLUK_TUT = 10;
 export const bosKoruma = () => ({ yamalar: {}, kalkan: 0, kalkanAy: 0, islenen: null });
+// `alev`: HAFTALIK seri alevinin koruma durumu (utils/streakWeekly.js alevOku biçimi;
+// burada yalnız nesne mi diye bakılır, ayrıntılı doğrulama kullanılırken yapılır).
+// `saatDilimi`: { dakika, degisti } — seri gününün "ev saat dilimi" (watchActivity
+// saatDilimiGuncelle). `sayimTuru`: `sonSayim`ın neyi saydığı; 2 = izleme OLAYLARI
+// (tekrar izleme dahil). Eski (1/yok) sayımla yeni sayım karşılaştırılmaz: göçte ilk
+// ölçüm sayılır, sahte "bugün 30 içerik eklendi" damgası oluşmaz.
+export const SAYIM_TURU = 2;
 export const bosAktiflik = () => ({
   gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0, gunluk: {}, koruma: bosKoruma(),
+  alev: null, saatDilimi: null, sayimTuru: SAYIM_TURU,
 });
 
 const dizi = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
@@ -176,8 +184,20 @@ export function normalizeLedger(raw) {
       rekorHafta: tamsayi(raw.aktiflik?.rekorHafta, 0),
       gunluk: gunlukOku(raw.aktiflik?.gunluk),
       koruma: korumaOku(raw.aktiflik?.koruma),
+      alev: nesneMi(raw.aktiflik?.alev) ? raw.aktiflik.alev : null,
+      saatDilimi: dilimOku(raw.aktiflik?.saatDilimi),
+      // Alan yoksa ESKİ defter (benzersiz içerik sayımı): 1.
+      sayimTuru: Number.isFinite(Number(raw.aktiflik?.sayimTuru)) ? Math.floor(Number(raw.aktiflik.sayimTuru)) : 1,
     },
   };
+}
+
+function dilimOku(v) {
+  if (!nesneMi(v)) return null;
+  const dakika = Math.round(Number(v.dakika));
+  if (!Number.isFinite(dakika) || dakika < -720 || dakika > 840) return null;
+  const degisti = Number(v.degisti);
+  return { dakika, degisti: Number.isFinite(degisti) ? degisti : 0 };
 }
 
 export const tohumlandiMi = (ledger) => !!normalizeLedger(ledger).baseline;

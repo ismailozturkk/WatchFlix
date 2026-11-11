@@ -9,10 +9,9 @@ import { useEffect, useMemo, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
-import {
-  materializeTvWatchState,
-  tvWatchEvents,
-} from "../utils/watchHistory";
+import { episodeKey, materializeTvWatchState } from "../utils/watchHistory";
+
+const NO_EVENTS = Object.freeze([]);
 
 export function useWatchedShow(showId) {
   const { user } = useAuth();
@@ -69,6 +68,28 @@ export function useWatchedShow(showId) {
       totalMinutes += eps.reduce((a, e) => a + (e.episodeMinutes || 0), 0);
     });
 
+    // Sezon/bölüm → izleme olayları indeksi, ilk ihtiyaçta BİR KEZ kurulur.
+    // Eskiden her bölüm satırı tvWatchEvents ile dizinin TÜM geçmişini yeniden
+    // hazırlıyordu (yol haritası Y5; 1.000 bölümde ~87 ms → ~0,5 ms). Sıra,
+    // historyState.watchEvents'in sırasıdır (tvWatchEvents'in filtresiyle aynı).
+    let index = null;
+    const eventIndex = () => {
+      if (index) return index;
+      const bySeason = new Map();
+      const byEpisode = new Map();
+      const push = (map, key, event) => {
+        const list = map.get(key);
+        if (list) list.push(event);
+        else map.set(key, [event]);
+      };
+      for (const event of historyState.watchEvents) {
+        for (const sn of new Set(event.seasonNumbers || [])) push(bySeason, Number(sn), event);
+        for (const key of new Set(event.episodeKeys || [])) push(byEpisode, key, event);
+      }
+      index = { bySeason, byEpisode };
+      return index;
+    };
+
     const aggregates = {
       watchedSeasonCount: Object.keys(seasonsMap).length,
       watchedEpisodeCount,
@@ -86,9 +107,9 @@ export function useWatchedShow(showId) {
       seasonWatchedCount: (seasonNumber) => seasonsMap[seasonNumber]?.count || 0,
       showWatchEvents: () => historyState.watchEvents,
       seasonWatchEvents: (seasonNumber) =>
-        tvWatchEvents(materializedDoc, { seasonNumber }),
+        eventIndex().bySeason.get(Number(seasonNumber)) || NO_EVENTS,
       episodeWatchEvents: (seasonNumber, episodeNumber) =>
-        tvWatchEvents(materializedDoc, { seasonNumber, episodeNumber }),
+        eventIndex().byEpisode.get(episodeKey(Number(seasonNumber), episodeNumber)) || NO_EVENTS,
     };
   }, [showDoc, loading, showId]);
 }

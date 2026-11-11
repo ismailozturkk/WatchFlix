@@ -33,7 +33,7 @@ import {
 } from "../utils/discoveryPersonalization";
 import { sameListIdentity } from "../utils/sameData";
 import { localizeGenreList } from "../utils/genreDisplay";
-import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { contentScoped, dropSensitive } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import {
   WORLD_TOUR_DEFAULT,
@@ -189,7 +189,7 @@ export default function DiscoveryMediaRail({
   // Yetişkin izni: `/discover` sonucunu değiştirir. Önbellek anahtarı kapsamlanır ve
   // `load` bu değere bağlıdır — ayar değişince ray yeniden yüklenir
   // (bkz. utils/homeContentSettings.js).
-  const { adultContent } = useHomeDataSettings();
+  const { contentFilter } = useHomeDataSettings();
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -381,9 +381,9 @@ export default function DiscoveryMediaRail({
           : preset === "worldTour"
             ? worldLanguage
             : "all";
-      const cacheKey = adultScoped(
+      const cacheKey = contentScoped(
         `discovery_v2_${mediaType}_${preset}_${language}_${filterKey}_${requestedPage}`,
-        adultContent,
+        contentFilter,
       );
       try {
         const cached = await getCachedValue(cacheKey, TTL.TREND);
@@ -418,7 +418,7 @@ export default function DiscoveryMediaRail({
         // başka bir ayardaysa bile kayıt kendi kapsamında doğru kalır.
         if (!cached) setCachedValue(cacheKey, data);
         if (!isCurrent()) return;
-        const results = dropAdult(data.results || [], adultContent).filter(
+        const results = dropSensitive(data.results || [], contentFilter).filter(
           (item) => item.poster_path,
         );
         setItems((current) => {
@@ -447,7 +447,7 @@ export default function DiscoveryMediaRail({
     },
     [
       API_KEY,
-      adultContent,
+      contentFilter,
       buildParams,
       resolvedGenreIds,
       language,

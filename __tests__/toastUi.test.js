@@ -28,6 +28,7 @@ jest.mock("react-native", () => {
   return {
     View: "View",
     Text: "Text",
+    ActivityIndicator: "ActivityIndicator",
     Pressable: ({ style, children, ...rest }) =>
       React.createElement("Pressable", { ...rest, style: resolve(style, { pressed: false }) }, children),
     StyleSheet: {
@@ -240,11 +241,14 @@ describe("StatusCard", () => {
     expect(texts(card(baseToast({ count: 1 })))).not.toContain("×1");
   });
 
-  it("türe göre doğru glif: premium yıldız + kıvılcım, yükleniyor dönen halka", () => {
+  it("türe göre doğru glif: premium yıldız + kıvılcım, yükleniyor Lens göstergesi", () => {
     const premium = card(baseToast({ kind: "premium", title: "Premium aktif" }));
     expect(premium.root.findAllByType("Path").length).toBeGreaterThan(0);
     const loading = card(baseToast({ kind: "loading", title: "Yükleniyor", totalMs: null, resumeFrom: null }));
-    expect(loading.root.findAllByType("Circle").length).toBe(2); // zemin halkası + yay
+    // Ortak yükleme göstergesi (LensLoader; jest.setup'ta ActivityIndicator'a eşli), orb üstünde mono.
+    const spinners = loading.root.findAllByType("ActivityIndicator");
+    expect(spinners).toHaveLength(1);
+    expect(spinners[0].props).toMatchObject({ tone: "mono", color: "#FFFFFF" });
   });
 });
 

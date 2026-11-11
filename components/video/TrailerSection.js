@@ -202,7 +202,7 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
               />
               <View style={styles.playerOverlayDim} />
               {playerState === "loading" ? (
-                <LensLoader size="large" color="#fff" />
+                <LensLoader size="fill" color="#fff" />
               ) : (
                 <View style={styles.playerErrorBox}>
                   <Ionicons name="cloud-offline-outline" size={30} color="#fff" />
@@ -517,7 +517,7 @@ export default function TrailerSection({
         />
       ) : loading ? (
         <View style={styles.stateBox}>
-          <LensLoader size="small" color={theme.accent} />
+          <LensLoader size="medium" color={theme.accent} />
         </View>
       ) : videos.length === 0 ? (
         <View style={styles.stateBox}>

@@ -70,7 +70,7 @@ export default function PaginatedRail({
               alignItems: "center",
             }}
           >
-            <LensLoader size="small" color={theme.accent} />
+            <LensLoader size="medium" color={theme.accent} />
           </View>
         ) : null
       }

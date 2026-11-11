@@ -37,12 +37,18 @@ const QUALITY_MULTIPLIERS = {
  */
 export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good') => {
   if (qualityLevel === 'original') return 'original';
-  if (!expectedWidth || expectedWidth <= 0) return 'original';
+  // Bilinçli tam boy isteği (galeri yakınlaştırma / indirme): genişlik yerine "original".
+  if (expectedWidth === 'original') return 'original';
+
+  const availableSizes = TMDB_SIZES[type] || TMDB_SIZES.poster;
+  const largest = availableSizes[availableSizes.length - 1];
+  const largestSize = type === 'profile' && largest === 632 ? 'h632' : `w${largest}`;
+  // Genişlik bilinmiyorsa en büyük CDN türevi (eskiden "original": ekranda
+  // hiçbir kartın ihtiyaç duymadığı 2–6 MB'lık dosya iniyordu).
+  if (!Number.isFinite(expectedWidth) || expectedWidth <= 0) return largestSize;
 
   const multiplier = QUALITY_MULTIPLIERS[qualityLevel] || QUALITY_MULTIPLIERS.good;
   const targetPixels = expectedWidth * multiplier;
-
-  const availableSizes = TMDB_SIZES[type] || TMDB_SIZES.poster;
 
   // Find the smallest size that is greater than or equal to targetPixels
   // If no size is large enough, fallback to the largest available specific size.
@@ -56,10 +62,10 @@ export const getOptimalTmdbSize = (type, expectedWidth, qualityLevel = 'good') =
     }
   }
 
-  // If the target pixel requirement exceeds all specific sizes, return original or the largest size?
-  // Let's return original to be safe, or the largest 'wXXX'. 
-  // Returning original guarantees highest quality when requested size is massive.
-  return 'original';
+  // Hedef en büyük türevi aşıyor. Yalnız "high" (kullanıcının açık "en yüksek
+  // kalite" tercihi) orijinale çıkar; normal akışta (good: DPR 3'te still 300 /
+  // backdrop 1000 bile) en büyük türevde kalınır (yol haritası Y7).
+  return qualityLevel === 'high' ? 'original' : largestSize;
 };
 
 /**

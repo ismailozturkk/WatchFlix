@@ -47,6 +47,9 @@ export function installAxiosDataCache() {
       const config = error?.config || {};
       if (!isGet(config)) return Promise.reject(error);
       if (error?.response) return Promise.reject(error);
+      // Bilinçli iptal (ekrandan çıkıldı) bağlantı hatası değildir: eski cache'i
+      // "başarılı yeni cevap" gibi döndürme.
+      if (axios.isCancel?.(error) || error?.code === "ERR_CANCELED") return Promise.reject(error);
 
       const cached = cacheStore.getJSON(NS, cacheKey(config));
       if (cached === null) return Promise.reject(error);
