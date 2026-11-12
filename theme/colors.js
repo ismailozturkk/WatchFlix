@@ -8,14 +8,18 @@
 
  *  - PALETTE   : Tüm ham renk değerleri tek yerde (değer tekrarı yok)
 
- *  - themes    : { gray, dark, light, blue, green } — tüm temalar
+ *  - themes    : tüm yerleşik temalar — her biri `expandTheme` ile v2 token
+ *                şemasına genişletilmiş (bkz. theme/themeTokens.js)
+ *  - THEME_FAMILIES : 3 aile × 5 ton (bkz. theme/toneModel.js)
 
  *  - Yardımcı  : getThemeColors, alpha (opacity helper)
 
  * ────────────────────────────────────────────────────────────────────────────*/
 
 import { clamp, hexToHsl, hslToHex, toHex } from "../utils/colorUtils";
-import { DEFAULT_TONE, deriveToneTokens, isTone } from "../utils/themeStudio";
+import { deriveToneTokens } from "../utils/themeStudio";
+import { DEFAULT_TONE, TONES, isTone } from "./toneModel";
+import { expandTheme, toRgba } from "./themeTokens";
 
 // ─── Temel renk sabitleri (raw) ───────────────────────────────────────────────
 
@@ -144,31 +148,10 @@ const PALETTE = {
  */
 
 export function alpha(hex, a = 1) {
-  if (typeof hex !== "string") return `rgba(0, 0, 0, ${a})`;
-
-  // Bazı tema token'ları (ör. gray temasının border/tab değerleri) zaten
-  // "rgba(...)" — hex parse etmeye kalkınca "rgba(NaN, NaN, NaN, a)" üretip
-  // stili geçersiz kılıyordu. rgb bileşenlerini koruyup opaklığı değiştir.
-  const rgbaMatch = hex.match(
-    /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)/,
-  );
-  if (rgbaMatch) {
-    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${a})`;
-  }
-
-  const clean = hex.replace("#", "");
-
-  const r = parseInt(clean.substring(0, 2), 16);
-
-  const g = parseInt(clean.substring(2, 4), 16);
-
-  const b = parseInt(clean.substring(4, 6), 16);
-
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
-    return `rgba(0, 0, 0, ${a})`;
-  }
-
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
+  // "#rgb", "#rrggbb", "#rrggbbaa", "rgb()" ve "rgba()" hepsi desteklenir; bazı
+  // tema token'ları (ör. gray temasının border/tab değerleri) zaten rgba.
+  // (Eskiden "#fff" gibi kısa hex parse edilemiyor ve SİYAH dönüyordu.)
+  return toRgba(hex, a);
 }
 
 // ─── Not renk paleti (tüm temalar paylaşır) ───────────────────────────────────
@@ -331,25 +314,27 @@ export const BLUE_THEME_NOTES_COLORS = Object.freeze({
 });
 
 export function getSemanticColorsForTheme(themeKey, surfaceHex) {
-  if (themeKey === "light") {
+  if (themeKey === "light" || themeKey === "silver") {
     return { colors: LIGHT_THEME_COLORS, notesColor: LIGHT_THEME_NOTES_COLORS };
   }
-  if (themeKey === "green") {
+  if (themeKey === "green" || themeKey === "greenBright") {
     return { colors: GREEN_THEME_COLORS, notesColor: GREEN_THEME_NOTES_COLORS };
   }
-  if (themeKey === "sky") {
+  if (themeKey === "sky" || themeKey === "blueBright") {
     return { colors: SKY_THEME_COLORS, notesColor: SKY_THEME_NOTES_COLORS };
   }
-  if (themeKey === "blue" || themeKey === "blueDeep") {
+  if (themeKey === "blue" || themeKey === "blueDeep" || themeKey === "blueDusk") {
     return { colors: BLUE_THEME_COLORS, notesColor: BLUE_THEME_NOTES_COLORS };
   }
   if (
     themeKey === "gray" ||
     themeKey === "dark" ||
+    themeKey === "dusk" ||
     themeKey === "purple" ||
     themeKey === "amber" ||
     themeKey === "greenMid" ||
-    themeKey === "greenDeep"
+    themeKey === "greenDeep" ||
+    themeKey === "greenDusk"
   ) {
     return { colors: DARK_THEME_COLORS, notesColor: DARK_THEME_NOTES_COLORS };
   }
@@ -370,8 +355,58 @@ export function getSemanticColorsForTheme(themeKey, surfaceHex) {
 
 // ─── Temalar ──────────────────────────────────────────────────────────────────
 
-export const themes = {
-  /* ── Koyu Gri ─────────────────────────────────────────────────── */
+// Ham (elle yazılmış) temalar. Uygulamaya `themes` (genişletilmiş) üzerinden açılır.
+// Ton merdiveni (zemin L*): çok açık ~97 · açık ~76 · orta ~27 · koyu ~11 · AMOLED 0.
+// Açık→orta arasındaki fark en büyüğüdür: yazı rengi orada siyahtan beyaza döner,
+// orta ton da vurgu + beyaz düğme yazısı okunur kalsın diye L* ~30'u geçemez.
+const RAW_THEMES = {
+  /* ── Gümüş (Varsayılan ailenin "açık" tonu) ──────────────────────
+     Çok açık ile orta arasındaki basamak: açık gri zemin, bir tık açık kartlar.  */
+  silver: {
+    primary: "#B7BCC4",
+    secondary: "#C2C8D1",
+    secondaryt: alpha("#C2C8D1", 0.5),
+    between: "#A8AEB8",
+    border: "#9299A5",
+    tab: "#C2C8D1",
+    ai: alpha("#C2C8D1", 0.4),
+    text: {
+      primary: "#1E2024",
+      secondary: "#353941",
+      between: "#454B54",
+      muted: "#555C68",
+    },
+    accent: "#0B5CE0",
+    bold: "#084AB4",
+    shadow: alpha("#0F172A", 0.16),
+    colors: LIGHT_THEME_COLORS,
+    notesColor: LIGHT_THEME_NOTES_COLORS,
+  },
+
+  /* ── Alacakaranlık (Varsayılan ailenin "orta" tonu) ──────────────
+     Açık ile koyu arasındaki basamak: orta-koyu arduvaz gri; yazı açık.  */
+  dusk: {
+    primary: "#3B3F48",
+    secondary: "#474C57",
+    secondaryt: alpha("#474C57", 0.5),
+    between: "#434751",
+    border: "#60646C",
+    tab: "#40454F",
+    ai: alpha("#40454F", 0.4),
+    text: {
+      primary: "#FCFCFD",
+      secondary: "#DBDDE1",
+      between: "#BEC2CA",
+      muted: "#A1A6AF",
+    },
+    accent: "#5593F7",
+    bold: "#2474F5",
+    shadow: alpha(PALETTE.black, 0.45),
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
+  },
+
+  /* ── Koyu Gri (Varsayılan ailenin "koyu" tonu; kayıtlı ad "gray") ── */
   gray: {
     primary: "#1D1F23",
     secondary: "#2A2D33",
@@ -393,7 +428,7 @@ export const themes = {
     notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Siyah (AMOLED) ────────────────────────────────────────────── */
+  /* ── Siyah (Varsayılan ailenin AMOLED tonu) ──────────────────── */
   dark: {
     primary: PALETTE.black,
     secondary: "#15171C",
@@ -415,7 +450,7 @@ export const themes = {
     notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Açık (Light) ──────────────────────────────────────────────── */
+  /* ── Açık (Varsayılan ailenin "çok açık" tonu; kayıtlı ad "light") ── */
   light: {
     primary: "#F1F5F9",
     secondary: "#FFFFFF",
@@ -428,7 +463,8 @@ export const themes = {
       primary: "#0F172A",
       secondary: "#334155",
       between: "#64748B",
-      muted: "#94A3B8",
+      // #94A3B8 zemine karşı 2.34:1'di (soluk metin okunmuyordu); 3.3:1'e çekildi.
+      muted: "#7B889D",
     },
     accent: "#2563EB",
     bold: "#1D4ED8",
@@ -436,32 +472,30 @@ export const themes = {
     colors: LIGHT_THEME_COLORS,
     notesColor: LIGHT_THEME_NOTES_COLORS,
   },
-
-  /* ── Açık Mavi (Sky / Ice Blue) ───────────────────────────────────
-     #81D4FA / #4FC3F7 tabanlı ferah pastel mavi zemin + berrak buz mavisi
-     kartlar + derin okyanus safir accent. */
+  /* ── Açık Mavi (mavi ailesinin "açık" tonu) ──────────────────────
+     Çok açık ile orta arasında: buz mavisi zemin, bir tık açık kartlar, safir vurgu.  */
   sky: {
-    primary: "#B6DCF0",
-    secondary: "#DDF2FC",
-    secondaryt: alpha("#DDF2FC", 0.5),
-    between: "#A5D4EC",
-    border: "#8EC4E0",
-    tab: "#DDF2FC",
-    ai: alpha("#DDF2FC", 0.4),
+    primary: "#AABCDF",
+    secondary: "#BBCAE8",
+    secondaryt: alpha("#BBCAE8", 0.5),
+    between: "#97ADD8",
+    border: "#7A95CD",
+    tab: "#BBCAE8",
+    ai: alpha("#BBCAE8", 0.4),
     text: {
-      primary: "#0A2540",
-      secondary: "#183B5E",
-      between: "#2D557B",
-      muted: "#486E94",
+      primary: "#0F1D33",
+      secondary: "#24344E",
+      between: "#374863",
+      muted: "#4E5D78",
     },
-    accent: "#026AA7",
-    bold: "#024C7B",
+    accent: "#0557E6",
+    bold: "#0446B9",
     shadow: alpha("#032B44", 0.18),
     colors: SKY_THEME_COLORS,
     notesColor: SKY_THEME_NOTES_COLORS,
   },
 
-  /* ── Lacivert ───────────────────────────────────────────────────── */
+  /* ── Lacivert (mavi ailesinin "koyu" tonu; uygulama varsayılanı) ── */
   blue: {
     primary: PALETTE.navy500,
     secondary: PALETTE.navy400,
@@ -482,33 +516,33 @@ export const themes = {
     colors: BLUE_THEME_COLORS,
     notesColor: BLUE_THEME_NOTES_COLORS,
   },
-
-  /* ── Açık Yeşil (Teal / Sage) ──────────────────────────────────── */
+  /* ── Açık Yeşil (yeşil ailesinin "açık" tonu) ────────────────────
+     Çok açık ile orta arasında: adaçayı zemin, bir tık açık kartlar, çam vurgu.  */
   green: {
-    primary: "#B9CEC7",
-    secondary: "#D8E7E1",
-    secondaryt: alpha("#D8E7E1", 0.5),
-    between: "#A9C0B8",
-    border: "#93AFA6",
-    tab: "#D8E7E1",
-    ai: alpha("#D8E7E1", 0.4),
+    primary: "#9CC2B9",
+    secondary: "#AACDC5",
+    secondaryt: alpha("#AACDC5", 0.5),
+    between: "#8BB6AC",
+    border: "#71A498",
+    tab: "#AACDC5",
+    ai: alpha("#AACDC5", 0.4),
     text: {
       primary: "#122E2B",
-      secondary: "#24504B",
-      between: "#3E6862",
-      muted: "#527570",
+      secondary: "#24443F",
+      between: "#34524D",
+      muted: "#475F5B",
     },
-    accent: "#0B5F57",
-    bold: "#0A4A44",
+    accent: "#156A5C",
+    bold: "#0D443B",
     shadow: alpha("#0B221F", 0.22),
     colors: GREEN_THEME_COLORS,
     notesColor: GREEN_THEME_NOTES_COLORS,
   },
 
-  /* ── Koyu Lacivert (mavi ailesinin koyu tonu) ──────────────────────
+  /* ── Gece Laciverti (mavi ailesinin AMOLED tonu; kayıtlı ad "blueDeep")
      Lacivert temanın bir kademe derini: neredeyse siyah gece mavisi. */
   blueDeep: {
-    primary: "#050A13",
+    primary: PALETTE.black,
     secondary: "#0B1425",
     secondaryt: alpha("#0B1425", 0.5),
     between: "#08101E",
@@ -528,7 +562,95 @@ export const themes = {
     notesColor: BLUE_THEME_NOTES_COLORS,
   },
 
-  /* ── Orta Yeşil (yeşil ailesinin orta tonu) ───────────────────────
+  /* ── Buz Mavisi (mavi ailesinin "çok açık" tonu) ─────────────────── */
+  blueBright: {
+    primary: "#F3F8FC",
+    secondary: "#FFFFFF",
+    secondaryt: alpha("#FFFFFF", 0.5),
+    between: "#E8F1F9",
+    border: "#CFE0EF",
+    tab: "#FFFFFF",
+    ai: alpha("#FFFFFF", 0.4),
+    text: {
+      primary: "#0A2540",
+      secondary: "#1F4266",
+      between: "#3E6487",
+      muted: "#5A7A99",
+    },
+    accent: "#1366C9",
+    bold: "#0D4F9E",
+    shadow: alpha("#0A2540", 0.08),
+    colors: SKY_THEME_COLORS,
+    notesColor: SKY_THEME_NOTES_COLORS,
+  },
+  /* ── Alacakaranlık Mavi (mavi ailesinin "orta" tonu) ─────────────
+     Açık ile lacivert arasında: gece mavisi zemin; yazı açık.  */
+  blueDusk: {
+    primary: "#293F6B",
+    secondary: "#304A7E",
+    secondaryt: alpha("#304A7E", 0.5),
+    between: "#2D4576",
+    border: "#415F9B",
+    tab: "#2B4373",
+    ai: alpha("#2B4373", 0.4),
+    text: {
+      primary: "#F9FAFA",
+      secondary: "#D8DADF",
+      between: "#BCC0C8",
+      muted: "#A1A6AF",
+    },
+    accent: "#5291FF",
+    bold: "#1F71FF",
+    shadow: alpha(PALETTE.black, 0.45),
+    colors: BLUE_THEME_COLORS,
+    notesColor: BLUE_THEME_NOTES_COLORS,
+  },
+
+  /* ── Nane (yeşil ailesinin "çok açık" tonu) ─────────────────────── */
+  greenBright: {
+    primary: "#F2F8F6",
+    secondary: "#FFFFFF",
+    secondaryt: alpha("#FFFFFF", 0.5),
+    between: "#E6F1ED",
+    border: "#CBE0D8",
+    tab: "#FFFFFF",
+    ai: alpha("#FFFFFF", 0.4),
+    text: {
+      primary: "#0E2A26",
+      secondary: "#24504A",
+      between: "#3D6862",
+      muted: "#557872",
+    },
+    accent: "#0B6F63",
+    bold: "#095A50",
+    shadow: alpha("#0B221F", 0.08),
+    colors: GREEN_THEME_COLORS,
+    notesColor: GREEN_THEME_NOTES_COLORS,
+  },
+  /* ── Alacakaranlık Yeşil (yeşil ailesinin "orta" tonu) ───────────
+     Açık ile koyu yeşil arasında: orman yeşili zemin; yazı açık.  */
+  greenDusk: {
+    primary: "#25463F",
+    secondary: "#2D534B",
+    secondaryt: alpha("#2D534B", 0.5),
+    between: "#2A5048",
+    border: "#417167",
+    tab: "#284D45",
+    ai: alpha("#284D45", 0.4),
+    text: {
+      primary: "#FFFFFF",
+      secondary: "#E0E6E5",
+      between: "#BECAC8",
+      muted: "#A1AFAC",
+    },
+    accent: "#21A690",
+    bold: "#187B6B",
+    shadow: alpha(PALETTE.black, 0.45),
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
+  },
+
+  /* ── Koyu Yeşil (yeşil ailesinin "koyu" tonu; kayıtlı ad "greenMid")
      Gri temanın yeşil karşılığı: koyu ama siyah olmayan çam yeşili yüzey. */
   greenMid: {
     primary: "#13211F",
@@ -551,9 +673,9 @@ export const themes = {
     notesColor: DARK_THEME_NOTES_COLORS,
   },
 
-  /* ── Koyu Yeşil (yeşil ailesinin koyu tonu) ───────────────────────── */
+  /* ── Gece Yeşili (yeşil ailesinin AMOLED tonu; kayıtlı ad "greenDeep") */
   greenDeep: {
-    primary: "#040A09",
+    primary: PALETTE.black,
     secondary: "#0B1614",
     secondaryt: alpha("#0B1614", 0.5),
     between: "#08110F",
@@ -618,6 +740,15 @@ export const themes = {
   },
 };
 
+/**
+ * Uygulamanın kullandığı yerleşik temalar: her biri v2 token şemasına
+ * genişletilmiş (surface/textScale/accentScale/borders/state/status/elevation…).
+ * Nesneler modül yüklenirken BİR KEZ üretilir; kimlikleri sabittir.
+ */
+export const themes = Object.freeze(
+  Object.fromEntries(Object.entries(RAW_THEMES).map(([key, raw]) => [key, expandTheme(raw)])),
+);
+
 // ─── Yardımcı fonksiyonlar ────────────────────────────────────────────────────
 
 /**
@@ -642,13 +773,15 @@ export const getThemeColors = (themeName) => themes[themeName] ?? themes.gray;
 
 export const THEME_NAMES = Object.keys(themes);
 
-// ─── Tema aileleri (açık · orta · koyu) ───────────────────────────────────────
+// ─── Tema aileleri (çok açık · açık · orta · koyu · AMOLED) ───────────────────
 
 /**
- * Ayarlar > Tema ekranındaki ana seçenekler. Her aile TEK renk karakterinin üç
- * tonudur; kullanıcı aileyi seçer, altındaki üç küçük düğmeyle tonu belirler.
- *   light → açık zemin, mid → koyu ama siyah olmayan zemin, dark → en koyu zemin.
- * `tones` değerleri `themes` anahtarlarıdır (eski kayıtlı seçimler değişmeden çalışır).
+ * Ayarlar > Tema ekranındaki ana seçenekler. Her aile TEK renk karakterinin beş
+ * tonudur (bkz. theme/toneModel.js); kullanıcı aileyi seçer, altındaki ton
+ * düğmeleriyle tonu belirler. `tones` değerleri `themes` anahtarlarıdır.
+ * Eski kayıtlı seçimler (light, gray, dark, sky, blue, blueDeep, green, greenMid,
+ * greenDeep) değişmeden çalışır: Varsayılan ailede saf siyah "dark" teması artık
+ * AMOLED tonudur; yeni "koyu" ton grafittir.
  */
 export const THEME_FAMILIES = Object.freeze([
   {
@@ -656,21 +789,21 @@ export const THEME_FAMILIES = Object.freeze([
     icon: "contrast",
     labelKey: "themeFamilyDefault",
     fallback: "Varsayılan",
-    tones: Object.freeze({ light: "light", mid: "gray", dark: "dark" }),
+    tones: Object.freeze({ bright: "light", light: "silver", mid: "dusk", dark: "gray", amoled: "dark" }),
   },
   {
     id: "blue",
     icon: "water",
     labelKey: "themeFamilyBlue",
     fallback: "Mavi",
-    tones: Object.freeze({ light: "sky", mid: "blue", dark: "blueDeep" }),
+    tones: Object.freeze({ bright: "blueBright", light: "sky", mid: "blueDusk", dark: "blue", amoled: "blueDeep" }),
   },
   {
     id: "green",
     icon: "leaf",
     labelKey: "themeFamilyGreen",
     fallback: "Yeşil",
-    tones: Object.freeze({ light: "green", mid: "greenMid", dark: "greenDeep" }),
+    tones: Object.freeze({ bright: "greenBright", light: "green", mid: "greenDusk", dark: "greenMid", amoled: "greenDeep" }),
   },
 ]);
 
@@ -689,7 +822,7 @@ export const LEGACY_PRESET_THEME_KEYS = Object.freeze(["purple", "amber"]);
 /** Hazır tema anahtarından { family, tone } (ailesi yoksa null). */
 export function familyOfTheme(themeKey) {
   for (const family of THEME_FAMILIES) {
-    for (const tone of ["light", "mid", "dark"]) {
+    for (const tone of TONES) {
       if (family.tones[tone] === themeKey) return { family, tone };
     }
   }
@@ -805,12 +938,13 @@ export function resolveThemeTokens(tokens) {
   return resolved;
 }
 
-// ─── Özel tema: üç ton ────────────────────────────────────────────────────────
+// ─── Özel tema: beş ton ───────────────────────────────────────────────────────
 
 /**
- * Seçili tema anahtarı: "custom:<id>" (orta ton, eski kayıtlarla aynı) veya
- * "custom:<id>:light|mid|dark". Özel tema değilse null.
- * @returns {{id: string|null, tone: "light"|"mid"|"dark"}|null}
+ * Seçili tema anahtarı: "custom:<id>" (varsayılan ton = "koyu"; eski kayıtların
+ * "orta"sı ile aynı basamak) veya "custom:<id>:bright|light|mid|dark|amoled".
+ * Özel tema değilse null.
+ * @returns {{id: string|null, tone: "bright"|"light"|"mid"|"dark"|"amoled"}|null}
  */
 export function parseCustomSelection(selection) {
   if (typeof selection !== "string" || !selection.startsWith("custom")) return null;
@@ -820,28 +954,110 @@ export function parseCustomSelection(selection) {
   return { id, tone };
 }
 
-/** Özel tema + ton → seçim anahtarı (orta ton eski biçimle yazılır). */
+/** Özel tema + ton → seçim anahtarı (varsayılan ton eksiz yazılır). */
 export const customSelectionKey = (id, tone = DEFAULT_TONE) =>
   tone && tone !== DEFAULT_TONE && isTone(tone) ? `custom:${id}:${tone}` : `custom:${id}`;
+
+// ─── Ton merdiveni göçü (12 Kas) ──────────────────────────────────────────────
+//
+// Özel tema kayıtlarının hangi merdivenle yazıldığı. 2 = eşit basamaklı merdiven
+// (çok açık ~97 · açık ~76 · orta ~27 · koyu ~11 · AMOLED 0). Bayrak taşımayan
+// kayıt ESKİ merdivendendir (19 Eki üç ton: açık ~94 · orta ~13 · koyu ~4).
+export const TONE_LADDER = 2;
+
+// Eski merdivendeki ton adının yeni basamağı. Eski "açık" beyaza yakındı (→ çok
+// açık), eski "orta" gri/lacivert yoğunluğundaydı (→ koyu), eski "koyu" siyaha
+// yakındı (→ AMOLED). Yeni "açık" ve "orta" basamakları eski kayıtta yoktur.
+export const LEGACY_TONE_TO_LADDER = Object.freeze({
+  bright: "bright",
+  light: "bright",
+  mid: "dark",
+  dark: "amoled",
+  amoled: "amoled",
+});
+
+const isPlainObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+
+/** Kayıt eski merdivenden mi (göç gerekir mi)? */
+export const isLegacyCustomEntry = (entry) => isPlainObject(entry) && entry.ladder !== TONE_LADDER;
+
+const ladderCache = new WeakMap();
+
+/**
+ * Eski merdivenli kaydı yenisine çevirir (saf; aynı girdi için aynı nesne).
+ * Görünen tema DEĞİŞMEZ: eski "orta" = yeni "koyu" = `tokens`. Eski "açık" çok
+ * açık basamağına geçer; eski "koyu" (L~4) atılır — AMOLED saf siyah olarak
+ * türetilir. Yeni "açık"/"orta" basamakları kayıtta yoksa türetilir.
+ */
+export function migrateCustomEntry(entry) {
+  if (!isLegacyCustomEntry(entry)) return entry;
+  const cached = ladderCache.get(entry);
+  if (cached) return cached;
+  const old = isPlainObject(entry.tones) ? entry.tones : {};
+  const main = isPlainObject(old.mid) ? old.mid : entry.tokens;
+  const tones = {};
+  const bright = isPlainObject(old.bright) ? old.bright : old.light;
+  if (isPlainObject(bright)) tones.bright = bright;
+  if (isPlainObject(main)) tones[DEFAULT_TONE] = main;
+  if (isPlainObject(old.amoled)) tones.amoled = old.amoled;
+  const out = { ...entry, ladder: TONE_LADDER, tokens: isPlainObject(main) ? main : {} };
+  if (Object.keys(tones).length) out.tones = tones;
+  else delete out.tones;
+  ladderCache.set(entry, out);
+  return out;
+}
+
+/**
+ * Eski merdivenli bir kayda bakan seçim anahtarını yeni basamağa çevirir
+ * (ör. "custom:x:dark" → "custom:x:amoled"). Kayıt yeniyse ya da seçim o kayda
+ * ait değilse olduğu gibi döner.
+ */
+export function migrateCustomSelection(selection, entry) {
+  const parsed = parseCustomSelection(selection);
+  if (!parsed?.id || !isLegacyCustomEntry(entry) || entry.id !== parsed.id) return selection;
+  const raw = selection.split(":")[2];
+  const oldTone = isTone(raw) ? raw : "mid"; // eksiz anahtar eskiden "orta" idi
+  return customSelectionKey(parsed.id, LEGACY_TONE_TO_LADDER[oldTone]);
+}
+
+/**
+ * Kayıtlı seçim + özel tema listesi → yeni merdiven. `changed` true ise ikisi
+ * de depoya geri yazılmalı. Açılışta, yedek dönüşünde ve paylaşımda kullanılır.
+ */
+export function migrateThemeLadder(selectedTheme, customThemes) {
+  const list = Array.isArray(customThemes) ? customThemes : [];
+  if (!list.some(isLegacyCustomEntry)) return { selectedTheme, customThemes, changed: false };
+  const parsed = parseCustomSelection(selectedTheme);
+  const owner = parsed?.id ? list.find((entry) => entry?.id === parsed.id) : null;
+  return {
+    selectedTheme: owner ? migrateCustomSelection(selectedTheme, owner) : selectedTheme,
+    customThemes: list.map(migrateCustomEntry),
+    changed: true,
+  };
+}
 
 const toneCache = new WeakMap();
 
 /**
- * Kayıtlı bir özel temanın bir tonu için token seti. Üç ton kayıtlıysa (yeni
- * temalar) olduğu gibi; eski tek tonlu temalarda orta ton `tokens`, açık/koyu ton
- * ondan türetilir (orta ton DEĞİŞMEZ → seçili tema aynı görünür).
+ * Kayıtlı bir özel temanın bir tonu için token seti. Ton kayıtlıysa olduğu gibi;
+ * kayıtta yoksa varsayılan tondan ("koyu" = `tokens`) türetilir. Eski merdivenli
+ * kayıt önce `migrateCustomEntry` ile çevrilir (varsayılan ton DEĞİŞMEZ).
  */
-export function customToneTokens(entry, tone = DEFAULT_TONE) {
+export function customToneTokens(rawEntry, tone = DEFAULT_TONE) {
+  const entry = migrateCustomEntry(rawEntry);
   const t = isTone(tone) ? tone : DEFAULT_TONE;
   const stored = entry?.tones?.[t];
-  if (stored && typeof stored === "object") return stored;
+  if (isPlainObject(stored)) return stored;
   if (t === DEFAULT_TONE || !entry) return entry?.tokens || {};
   let perEntry = toneCache.get(entry);
   if (!perEntry) {
     perEntry = {};
     toneCache.set(entry, perEntry);
   }
-  if (!perEntry[t]) perEntry[t] = deriveToneTokens(resolveThemeTokens(entry.tokens), t);
+  if (!perEntry[t]) {
+    const main = entry?.tones?.[DEFAULT_TONE] || entry.tokens;
+    perEntry[t] = deriveToneTokens(resolveThemeTokens(main), t, DEFAULT_TONE);
+  }
   return perEntry[t];
 }
 
@@ -858,7 +1074,7 @@ export const buildCustomThemeFromEntry = (entry, tone = DEFAULT_TONE) =>
 export function buildCustomTheme(tokens) {
   const t = resolveThemeTokens(tokens);
   const semantic = getSemanticColorsForTheme("custom", t.primary);
-  return {
+  return expandTheme({
     primary: t.primary,
     secondary: t.secondary,
     secondaryt: alpha(t.secondary, 0.5),
@@ -877,7 +1093,7 @@ export function buildCustomTheme(tokens) {
     shadow: alpha(PALETTE.black, 0.7),
     colors: semantic.colors,
     notesColor: semantic.notesColor,
-  };
+  });
 }
 
 /**

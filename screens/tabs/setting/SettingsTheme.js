@@ -1,13 +1,14 @@
 // Ayarlar → Görünüm: tema seçici.
 //
 // Tasarım dili:
-//   • Yatay kaydırılan KOMPAKT kartlar (136 x 133 dp). "Tema Oluştur" kartı
+//   • Yatay kaydırılan KOMPAKT kartlar (160 dp genişlik). "Tema Oluştur" kartı
 //     listenin BAŞINDA; ardından (varsa) eski hazır tema, aileler (Varsayılan,
 //     Mavi, Yeşil) ve kayıtlı özel temalar gelir.
 //   • Kart üç katmandır: üstte temanın gerçek renkleriyle mini uygulama önizlemesi
-//     (başlık çubuğu, vurgu bannerı, poster rayı), ortada ad, altta üç BÜYÜK ton
-//     düğmesi (açık · orta · koyu). Düğme tonun gerçek zemin rengidir; seçili
-//     olanda vurgu halkası + tikli nokta durur. Düğme 36 dp (+ hitSlop).
+//     (başlık çubuğu, vurgu bannerı, poster rayı), ortada ad, altta beş ton
+//     düğmesi (çok açık · açık · orta · koyu · AMOLED; theme/toneModel.js). Düğme
+//     tonun gerçek zemin rengidir; seçili olanda vurgu halkası + tikli nokta
+//     durur. Düğme 26 dp + dikey hitSlop (beş düğme kart genişliğine sığar).
 //   • Karta basmak aileyi hatırlanan tonuyla seçer; bir düğmeye basmak tonu belirler.
 //   • Seçili kart vurgu halkası ve önizleme köşesinde tik rozeti taşır; basınca
 //     yaylı küçülme, seçimde haptic tık. Liste açılışta seçili karta kayar;
@@ -33,29 +34,31 @@ import {
   parseCustomSelection,
   themes,
 } from "../../../theme/colors";
+import { DEFAULT_TONE, TONES, toneLabelMap } from "../../../theme/toneModel";
 import { i18nText } from "../../../utils/i18nText";
 import { pickByLanguage } from "../../../utils/appLanguages";
 import { usePremiumGate } from "../../../hooks/usePremiumGate";
 
-// Ton sırası: soldan sağa açık → orta → koyu.
-const TONE_ORDER = ["light", "mid", "dark"];
-const TONE_LABEL_KEYS = {
-  light: "themeToneLight",
-  mid: "themeToneMid",
-  dark: "themeToneDark",
-};
-const TONE_FALLBACKS = { light: "Açık", mid: "Orta", dark: "Koyu" };
+// Ton sırası: soldan sağa çok açık → AMOLED (theme/toneModel.js TONES).
+
+// Ailelerin ton paletleri: yerleşik temalar sabit olduğu için modül düzeyinde bir kez.
+const FAMILY_PALETTES = Object.fromEntries(
+  THEME_FAMILIES.map((family) => [
+    family.id,
+    Object.fromEntries(TONES.map((tone) => [tone, themes[family.tones[tone]]])),
+  ]),
+);
 
 // Gece Moru / Kızıl Sinema artık listede yok (Tema Stüdyosu > Hazır temalar).
 // Daha önce seçmiş olanlar için yalnız SEÇİLİYKEN tek kart olarak görünürler.
 const LEGACY_LABEL_KEYS = { purple: "purpleTheme", amber: "amberTheme" };
 
-const CARD_W = 136;
+const CARD_W = 160;
 const CREATE_W = 108;
 const GAP = 10;
 const PAD_X = 12;
 const PREVIEW_H = 44;
-const TONE_BTN = 36;
+const TONE_BTN = 26;
 const BORDER = 1.5;
 const CARD_PAD = 8;
 const TITLE_H = 18;
@@ -98,7 +101,7 @@ const Preview = ({ p }) => (
 const ToneButton = ({ palette, active, selected, ringColor, label, onPress }) => (
   <Pressable
     onPress={onPress}
-    hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
+    hitSlop={{ top: 8, bottom: 8, left: 1, right: 1 }}
     accessibilityRole="button"
     accessibilityLabel={label}
     accessibilityState={{ selected }}
@@ -114,7 +117,7 @@ const ToneButton = ({ palette, active, selected, ringColor, label, onPress }) =>
   >
     {selected ? (
       <View style={[styles.toneCheck, { backgroundColor: palette.accent }]}>
-        <Ionicons name="checkmark" size={11} color="#fff" />
+        <Ionicons name="checkmark" size={10} color={palette.onAccent || "#FFFFFF"} />
       </View>
     ) : (
       <View style={[styles.toneDot, { backgroundColor: palette.accent }]} />
@@ -147,7 +150,7 @@ const PressCard = ({ onPress, label, selected, children, style }) => {
 };
 
 /* ── Tema kartı ─────────────────────────────────────────────────────────── */
-// `tones` verilirse kart üç tonludur (aile / özel tema); yoksa tek tema (eski
+// `tones` verilirse kart çok tonludur (aile / özel tema); yoksa tek tema (eski
 // hazır tema, yalnız seçiliyken görünür). `locked`: Premium'a özel (plan Free'ye
 // düşmüş kullanıcının özel teması) — soluk çizilir, köşede elmas durur.
 const ThemeCard = ({
@@ -155,7 +158,7 @@ const ThemeCard = ({
   selected,
   tones,
   palette,
-  displayTone = "mid",
+  displayTone = DEFAULT_TONE,
   toneLabels,
   onPress,
   onTone,
@@ -210,7 +213,7 @@ const ThemeCard = ({
 
       {tones ? (
         <View style={styles.toneRow}>
-          {TONE_ORDER.map((tone) => (
+          {TONES.map((tone) => (
             <ToneButton
               key={tone}
               palette={tones[tone]}
@@ -294,34 +297,23 @@ export default function SettingsTheme() {
   };
 
   // Aile başına hatırlanan ton: karta (düğmeye değil) basınca aile, kullanıcının
-  // son baktığı tonla açılır; hiç bakılmadıysa orta ton.
+  // son baktığı tonla açılır; hiç bakılmadıysa varsayılan (koyu) ton.
   const [rememberedTones, setRememberedTones] = useState({});
 
-  const toneLabels = useMemo(
-    () => ({
-      light: t[TONE_LABEL_KEYS.light] || TONE_FALLBACKS.light,
-      mid: t[TONE_LABEL_KEYS.mid] || TONE_FALLBACKS.mid,
-      dark: t[TONE_LABEL_KEYS.dark] || TONE_FALLBACKS.dark,
-    }),
-    [t],
-  );
+  const toneLabels = useMemo(() => toneLabelMap(t), [t]);
   const familyLabel = (family) => t[family.labelKey] || family.fallback;
 
   const appliedFamily = familyOfTheme(appliedTheme);
   const appliedCustom = parseCustomSelection(appliedTheme);
   const legacyApplied = LEGACY_PRESET_THEME_KEYS.includes(appliedTheme) ? appliedTheme : null;
 
-  // Özel temaların üç tonu (kayıtlı üç ton ya da orta tondan türetilen açık/koyu).
+  // Özel temaların tonları (kayıtlı ton ya da varsayılan tondan türetilen).
   const customPalettes = useMemo(
     () =>
       Object.fromEntries(
         customThemes.map((ct) => [
           ct.id,
-          {
-            light: buildCustomThemeFromEntry(ct, "light"),
-            mid: buildCustomThemeFromEntry(ct, "mid"),
-            dark: buildCustomThemeFromEntry(ct, "dark"),
-          },
+          Object.fromEntries(TONES.map((tone) => [tone, buildCustomThemeFromEntry(ct, tone)])),
         ]),
       ),
     [customThemes],
@@ -405,7 +397,7 @@ export default function SettingsTheme() {
           <CreateCard
             theme={theme}
             label={i18nText("autoI18n.ct_olustur", "Tema Oluştur")}
-            sub={i18nText("autoI18n.ct_olustur_alt", "Kendi renklerin, üç tonuyla")}
+            sub={i18nText("autoI18n.ct_olustur_alt", "Kendi renklerin, beş tonuyla")}
             onPress={() => openEditor()}
             locked={customLocked}
           />
@@ -421,20 +413,16 @@ export default function SettingsTheme() {
             />
           ) : null}
 
-          {/* Renk aileleri: her biri açık · orta · koyu */}
+          {/* Renk aileleri: her biri beş tonlu */}
           {THEME_FAMILIES.map((family) => {
             const selected = appliedFamily?.family.id === family.id;
-            const displayTone = selected ? appliedFamily.tone : rememberedTones[family.id] || "mid";
+            const displayTone = selected ? appliedFamily.tone : rememberedTones[family.id] || DEFAULT_TONE;
             return (
               <ThemeCard
                 key={family.id}
                 label={familyLabel(family)}
                 selected={selected}
-                tones={{
-                  light: themes[family.tones.light],
-                  mid: themes[family.tones.mid],
-                  dark: themes[family.tones.dark],
-                }}
+                tones={FAMILY_PALETTES[family.id]}
                 displayTone={displayTone}
                 toneLabels={toneLabels}
                 onPress={() => selectTone(family.id, displayTone, family.tones[displayTone])}
@@ -444,11 +432,11 @@ export default function SettingsTheme() {
             );
           })}
 
-          {/* Kaydedilmiş özel temalar — her biri üç tonlu, seçilebilir + düzenlenebilir */}
+          {/* Kaydedilmiş özel temalar — her biri beş tonlu, seçilebilir + düzenlenebilir */}
           {customThemes.map((ct) => {
             const memoryId = `custom:${ct.id}`;
             const selected = appliedCustom?.id === ct.id;
-            const displayTone = selected ? appliedCustom.tone : rememberedTones[memoryId] || "mid";
+            const displayTone = selected ? appliedCustom.tone : rememberedTones[memoryId] || DEFAULT_TONE;
             return (
               <ThemeCard
                 key={ct.id}
@@ -497,7 +485,8 @@ export default function SettingsTheme() {
             es: "Tus temas personalizados están guardados y vuelven con Premium. Por ahora se usa el tema predeterminado.",
             pt: "Seus temas personalizados estão salvos e voltam com o Premium. Por enquanto, o tema padrão está em uso.",
             de: "Deine eigenen Designs sind gespeichert und kehren mit Premium zurück. Vorerst wird das Standarddesign verwendet.",
-          })}
+
+  it: "I tuoi temi personalizzati vengono salvati e restituiti con Premium. Per ora è in uso il tema predefinito."})}
         </Text>
       ) : null}
     </View>
@@ -572,15 +561,15 @@ const styles = StyleSheet.create({
   toneBtn: {
     width: TONE_BTN,
     height: TONE_BTN,
-    borderRadius: 12,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
-  toneDot: { width: 10, height: 10, borderRadius: 5 },
+  toneDot: { width: 8, height: 8, borderRadius: 4 },
   toneCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },

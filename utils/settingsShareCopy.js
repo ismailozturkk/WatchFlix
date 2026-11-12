@@ -10,6 +10,7 @@
 import { copyLanguage } from "./appLanguages";
 import { FONT_PRESETS, TEXT_ROLES } from "./typographyRoles";
 import { familyOfTheme, LEGACY_PRESET_THEME_KEYS, parseCustomSelection } from "../theme/colors";
+import { DEFAULT_TONE, isTone, toneLabel as toneLabelFor } from "../theme/toneModel";
 import { countHiddenSections } from "./sectionVisibility";
 import { sharedFontRolesOf, sharedThemeOf } from "./settingsShare";
 
@@ -314,16 +315,88 @@ export const SETTINGS_SHARE_COPY = {
     badges: (n) => (n > 0 ? `${n} Poster-Abzeichen` : "Poster-Abzeichen aus"),
     hidden: (n) => (n > 0 ? `${n} Bereich${n === 1 ? "" : "e"} ausgeblendet` : "Alle Bereiche sichtbar"),
   },
-};
+
+  it: {
+  kicker: "Impostazioni aspetto",
+  from: name => `Condiviso da ${name}`,
+  groups: n => `${n} gruppo di impostazioni${n === 1 ? "" : "s"}`,
+  sections: {
+    theme: "Tema",
+    fonts: "Caratteri",
+    effects: "Effetti",
+    posters: "Poster e angoli",
+    lists: "Layout elenco",
+    home: "Sezioni home"
+  },
+  descriptions: {
+    theme: "Colori e toni",
+    fonts: "Caratteri di intestazione, corpo e numeri",
+    effects: "Sfondo neve, ambiente e icone",
+    posters: "Arrotondamento angoli, dimensioni e layout del poster",
+    lists: "Colonne, griglia e badge poster",
+    home: "Binari nascosti e visibili"
+  },
+  reviewAndApply: "Rivedi e applica",
+  outgoingNote: "Il tuo amico può scegliere cosa applicare",
+  applyToMe: "Candidati a me",
+  outgoingChangedNote: "Le tue impostazioni sono cambiate: puoi tornare a questo aspetto",
+  applyTitle: "Applica impostazioni",
+  applySubtitle: "Scegli cosa vuoi applicare",
+  sameAsYours: "Già lo stesso",
+  premium: "Premium",
+  selectAll: "Seleziona tutto",
+  selectNone: "Cancella selezione",
+  applySelected: n => n > 0 ? `Applica selezionato (${n})` : "Scegli un'impostazione",
+  applyNote: "Puoi annullare dalla notifica visualizzata dopo l'applicazione.",
+  cancel: "Annulla",
+  applied: n => `${n} gruppo di impostazioni${n === 1 ? "" : "s"} applicato`,
+  appliedPartial: (n, failed) => `${n} applicato, ${failed} non può essere applicato`,
+  applyFailed: "Impossibile applicare le impostazioni",
+  undone: "Le tue impostazioni precedenti sono tornate",
+  nothingNew: "Disponi già di tutte queste impostazioni",
+  shareRowTitle: "Condividi il mio look",
+  shareRowSub: "Invia il tema, i caratteri e il layout a un amico",
+  shareTitle: "Condividi il tuo look",
+  shareSubtitle: "Scegli le impostazioni che desideri inviare",
+  sendToChat: "Invia alla chat",
+  previewLabel: "Anteprima",
+  includedLabel: "Cosa condividere",
+  themeNotIncluded: "Il tema non verrà inviato",
+  sendSelected: n => n > 0 ? `Invia alla chat (${n})` : "Scegli un'impostazione",
+  shareNote: "Il tuo amico può sceglierli e applicarli separatamente.",
+  customTheme: "Tema personalizzato",
+  roles: {
+    heading: "Intestazione",
+    body: "Corpo",
+    numeric: "Numeri"
+  },
+  effects: {
+    snow: "Neve",
+    ambient: "Ambiente",
+    icon: "Icon background"
+  },
+  effectsOff: "Tutti gli effetti disattivati",
+  radius: {
+    sharp: "Angoli vivi",
+    subtle: "Angoli sottili",
+    normal: "Angoli normali",
+    soft: "Angoli morbidi",
+    round: "Angoli arrotondati"
+  },
+  allRounded: "Tutte le carte arrotondate",
+  smallPosters: "Poster piccoli",
+  xsmallPosters: "Poster più piccoli",
+  columns: (lists, seeAll) => `Elenchi ${lists} colonne · Visualizza tutte le ${seeAll} colonne`,
+  badges: n => n > 0 ? `${n} badge poster${n === 1 ? "" : "s"}` : "Distintivi poster disattivati",
+  hidden: n => n > 0 ? `${n} sezione${n === 1 ? "" : "s"} nascosta` : "Tutte le sezioni visibili"
+}};
 
 export const getSettingsShareCopy = (language) =>
   SETTINGS_SHARE_COPY[copyLanguage(language, Object.keys(SETTINGS_SHARE_COPY))];
 
-const TONE_LABEL_KEYS = { light: "themeToneLight", mid: "themeToneMid", dark: "themeToneDark" };
-const TONE_FALLBACKS = { light: "Açık", mid: "Orta", dark: "Koyu" };
 const LEGACY_LABEL_KEYS = { purple: "purpleTheme", amber: "amberTheme" };
 
-const toneLabel = (tone, t) => t?.[TONE_LABEL_KEYS[tone]] || TONE_FALLBACKS[tone] || "";
+const toneLabel = (tone, t) => (isTone(tone) ? toneLabelFor(t, tone) : "");
 
 /** Paylaşılan temanın adı ve tonu ("Mavi · Koyu", "Okyanus · Açık", "Gece Moru"). */
 export function themeLabel(share, { language, t } = {}) {
@@ -331,7 +404,7 @@ export function themeLabel(share, { language, t } = {}) {
   if (!shared) return "";
   const copy = getSettingsShareCopy(language);
   if (shared.entry) {
-    const tone = parseCustomSelection(shared.selection)?.tone || "mid";
+    const tone = parseCustomSelection(shared.selection)?.tone || DEFAULT_TONE;
     return [shared.entry.name || copy.customTheme, toneLabel(tone, t)].filter(Boolean).join(" · ");
   }
   const family = familyOfTheme(shared.builtin);

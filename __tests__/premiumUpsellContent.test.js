@@ -350,8 +350,8 @@ describe("plan sütunu değeri: figür + birim (splitTierValue)", () => {
       sub: "cards/day",
       figure: true,
     });
-    // ACCESS değeri de "N birim" biçimindeyse aynı ayrım (9 hazır tema).
-    expect(split("custom_themes", FREE)).toEqual({ main: "9", sub: "hazır tema", figure: true });
+    // ACCESS değeri de "N birim" biçimindeyse aynı ayrım (15 hazır tema).
+    expect(split("custom_themes", FREE)).toEqual({ main: "15", sub: "hazır tema", figure: true });
   });
 
   test("AI kotası günlük/aylık diye ayrılır (nokta satır sonunda kalmaz)", () => {

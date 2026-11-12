@@ -11,6 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { MOODS } from "@utils/themeStudio";
 import { alpha } from "../../theme/colors";
+import { TONES } from "../../theme/toneModel";
 import { moodLabel } from "./themeStudioCopy";
 import { SectionHeader, inkOn } from "./ThemeStudioKit";
 
@@ -111,9 +112,9 @@ const CandidateCard = memo(function CandidateCard({
           {applied ? (
             <Text style={[styles.candidateApplied, { color: theme.accent }]}>{appliedText}</Text>
           ) : (
-            // Üç tonun zeminleri: aday tek renk değil, açık · orta · koyu bir set.
+            // Tonların zeminleri: aday tek renk değil, çok açıktan AMOLED'e bir set.
             <View style={styles.toneDots}>
-              {["light", "mid", "dark"].map((key) => (
+              {TONES.map((key) => (
                 <View
                   key={key}
                   style={[
@@ -342,6 +343,6 @@ const styles = StyleSheet.create({
   candidateLabel: { flexShrink: 1, fontSize: 12, fontWeight: "800" },
   candidateApplied: { fontSize: 10, fontWeight: "900", marginLeft: "auto" },
 
-  toneDots: { flexDirection: "row", gap: 4, marginLeft: "auto" },
-  toneDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1 },
+  toneDots: { flexDirection: "row", gap: 3, marginLeft: "auto" },
+  toneDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1 },
 });

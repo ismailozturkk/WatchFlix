@@ -19,6 +19,7 @@ import { Keys } from "../services/storage/registry";
 const CUSTOM = {
   id: "ct_ocean",
   name: "Okyanus",
+  ladder: 2, // yeni (eşit basamaklı) ton merdiveni; eski kayıt göçü ayrı testte
   tokens: { primary: "#0b1320", secondary: "#14223a", accent: "#3aa0ff", textPrimary: "#ffffff" },
   tones: { light: { primary: "#eef4fb", accent: "#1f7ae0" } },
   base: "#0b1320",
@@ -185,5 +186,22 @@ describe("Zaten aynı", () => {
     expect(sectionMatchesCurrent(share, "theme", { read: reader(FULL), customThemes: [CUSTOM] })).toBe(true);
     expect(sectionMatchesCurrent(share, "theme", { read: reader(FULL), customThemes: [mine] })).toBe(false);
     expect(sectionMatchesCurrent(share, "theme", { read: reader({ theme: "blue" }), customThemes: [CUSTOM] })).toBe(false);
+  });
+});
+
+describe("ton merdiveni göçü (eski sürümden paylaşım)", () => {
+  test("eski kayıt yeni basamaklara çevrilir, seçili tonu da: :dark → :amoled", () => {
+    const { sanitizeSettingsShare: clean } = require("../utils/settingsShare");
+    const legacy = {
+      id: "ct_old",
+      name: "Eski",
+      tokens: { primary: "#141C33", secondary: "#23324B", accent: "#4C8DFF", textPrimary: "#EFF5FA" },
+      tones: { light: { primary: "#EEF4FB", accent: "#1F7AE0" }, dark: { primary: "#050A13", accent: "#4C8DFF" } },
+    };
+    const share = clean({ type: "settings", sections: { theme: { theme: "custom:ct_old:dark", custom: legacy } } });
+    expect(share.sections.theme.theme).toBe("custom:ct_old:amoled");
+    expect(share.sections.theme.custom.ladder).toBe(2);
+    expect(share.sections.theme.custom.tones.bright.primary).toBe("#EEF4FB");
+    expect(share.sections.theme.custom.tones.dark.primary).toBe("#141C33");
   });
 });

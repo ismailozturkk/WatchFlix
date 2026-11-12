@@ -240,7 +240,7 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Günün Karesi (günlük film tahmini; 30 Eki) | — (kartı ve sohbet kartını görmek açık) | ✓ | ✓ | Oyunlar kartı `ProfileGamesModule` (`frameLocked`), `DailyFrameScreen` (`usePremiumScreenGuard`), `SharedFrameMessage` ("Oyna") |
 | Film Zinciri (günlük + serbest + sohbetten meydan okuma; 30 Eki) | — (sohbet kartını görmek açık) | ✓ | ✓ | ray kartı `ProfileGamesModule` (`chainLocked`), `FilmChainScreen` (`usePremiumScreenGuard`), `SharedChainMessage` ("Zinciri kur") |
 | Film Kulübü kurmak (grup başına; 30 Eki) | — (katılmak, oy, izledim/puan, tartışma açık) | ✓ | ✓ | `FilmClubScreen` ("Kulübü kur" → `usePremiumGate("film_club").check`); sunucu: `firestore.rules` groups `club` dalı (`isPaidPlan`) |
-| Özel tema oluşturma | 9 hazır tema (3 aile × açık·orta·koyu) | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
+| Özel tema oluşturma | 15 hazır tema (3 aile × çok açık·açık·orta·koyu·AMOLED) | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
 | Yazı tipi kataloğu | 7 font | 56 font | 56 font | `FontSettingsSection`, `typographySettings` |
 | Uygulama simgesi | Varsayılan | ✓ | ✓ | `AppIconSection` |
 | Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |

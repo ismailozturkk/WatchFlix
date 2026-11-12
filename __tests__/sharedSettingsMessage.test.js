@@ -27,6 +27,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("expo-image", () => ({ Image: "Image" }));
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "Gradient" }));
+jest.mock("react-native-svg", () => ({ __esModule: true, default: "Svg", Circle: "Circle" }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
 jest.mock("../utils/i18nText", () => ({
   // Eski davranışı taklit eder: cihaz diliyle büyük harf, Türkçe yüzde.
@@ -211,7 +212,8 @@ test("gelen balon: küçük tema önizlemesi, yalnız bölüm ikonları ve İnce
   const all = texts(root);
   expect(all).toContain("GÖRÜNÜM AYARLARI");
   expect(all).toContain("Paylaşan: Ada");
-  expect(all).toContain("Okyanus · Orta"); // önizlemenin başlığı
+  // Eksiz özel seçim = varsayılan ton (koyu; eski kayıtların "orta"sı ile aynı basamak).
+  expect(all).toContain("Okyanus · Koyu"); // önizlemenin başlığı
   expect(root.findAll((node) => node.props.testID === "settings-theme-mock-compact")).toHaveLength(1);
   for (const id of ["fonts", "posters", "lists"]) {
     const icon = root.findAll((node) => node.props.testID === `shared-settings-icon-${id}`);

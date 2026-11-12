@@ -1,16 +1,17 @@
-// Özel tema stüdyosu — ÜÇ TONLU temalar.
+// Özel tema stüdyosu — BEŞ TONLU temalar.
 //
-// Bir özel tema artık tek renk ailesinin üç tonudur: açık · orta · koyu. Hepsi
-// aynı "ana renkten" ve aynı vurgudan türetilir; her ton ayrıca tek başına
-// ayarlanabilir. Ayar ekranında temanın altında üç ton düğmesi çıkar.
+// Bir özel tema tek renk ailesinin beş tonudur: çok açık · açık · orta · koyu ·
+// AMOLED (theme/toneModel.js). Hepsi aynı "ana renkten" ve aynı vurgudan
+// türetilir; her ton ayrıca tek başına ayarlanabilir. Ayar ekranında temanın
+// altında beş ton düğmesi çıkar.
 //
 // Tek ekranda dört sekme; üstte HER ZAMAN canlı önizleme (+ ton anahtarı):
-//   • Kur       — ana renk + vurgu, üç tonun zemini ayrı ayrı, hazır renkler,
+//   • Kur       — ana renk + vurgu, her tonun zemini ayrı ayrı, hazır renkler,
 //                 uyumlu vurgu önerileri, kontrast/yüzey stili.
-//   • Keşfet    — ruh haline göre ALTI rastgele ÜÇ TONLU aday; ana renk/vurgu
+//   • Keşfet    — ruh haline göre ALTI rastgele BEŞ TONLU aday; ana renk/vurgu
 //                 kilitlenebilir; beğenilen adaya dokunulur (geri alınabilir).
 //   • Hazır     — Varsayılan/Mavi/Yeşil + Gece Moru, Kızıl Sinema ve yeni setler;
-//                 üç tonuyla yüklenir, sonra istenen ayarlanır.
+//                 beş tonuyla yüklenir, sonra istenen ayarlanır.
 //   • İnce ayar — önizlenen tonun 11 token'ını tek tek ayarla.
 // Her değişiklik bir geçmiş adımıdır (geri al / yinele). Okunabilirlik özeti
 // önizlemenin altında (önizlenen ton için); sorun varsa tek dokunuşla düzeltilir.
@@ -71,6 +72,7 @@ import {
   BASE_PRESETS,
   CONTRAST_LEVELS,
   SURFACE_MODES,
+  DEFAULT_TONE,
   TONES,
   analyzeContrast,
   describeTheme,
@@ -195,11 +197,7 @@ export default function CustomThemeScreen({ navigation, route }) {
   const [candidates, setCandidates] = useState(() => generateCandidates(CANDIDATE_COUNT));
 
   const resolvedTones = useMemo(
-    () => ({
-      light: resolveThemeTokens(bundle.tones.light),
-      mid: resolveThemeTokens(bundle.tones.mid),
-      dark: resolveThemeTokens(bundle.tones.dark),
-    }),
+    () => Object.fromEntries(TONES.map((t) => [t, resolveThemeTokens(bundle.tones[t])])),
     [bundle.tones],
   );
   const resolved = resolvedTones[tone];
@@ -226,7 +224,7 @@ export default function CustomThemeScreen({ navigation, route }) {
   }, [tab, tabFade, reduceMotion]);
 
   /* ── İsim ── */
-  const described = useMemo(() => describeTheme(resolvedTones.mid), [resolvedTones.mid]);
+  const described = useMemo(() => describeTheme(resolvedTones[DEFAULT_TONE]), [resolvedTones]);
   const suggestion = useMemo(() => {
     const mood = origin && origin.json === bundleJson ? origin.moodId : null;
     const base = suggestedBundleName(copy, { moodId: mood, family: described.family });
@@ -290,7 +288,7 @@ export default function CustomThemeScreen({ navigation, route }) {
     setTone(next);
   };
 
-  // Vurgu: üç tona birden. Önizlenen tonda seçilen renk AYNEN (yetmiyorsa
+  // Vurgu: tüm tonlara birden. Önizlenen tonda seçilen renk AYNEN (yetmiyorsa
   // okunabilirlik uyarısı verir, "Düzelt" ile oturtulur); diğer tonlar kendi
   // zeminine oturtulur.
   const applyAccent = (hex) => {
@@ -310,7 +308,7 @@ export default function CustomThemeScreen({ navigation, route }) {
     setOrigin(null);
   };
 
-  // Ana renk: üç ton da bu tondan/doygunluktan yeniden kurulur.
+  // Ana renk: beş ton da bu tondan/doygunluktan yeniden kurulur.
   const applyBase = (hex, { announce = true } = {}) => {
     tick();
     const base = toHex(hex);
@@ -637,10 +635,11 @@ export default function CustomThemeScreen({ navigation, route }) {
 
       <View style={styles.block}>
         <SectionHeader icon="contrast-outline" title={copy.toneSectionTitle} sub={copy.toneSectionSub} theme={theme} />
-        <View style={styles.tileRow}>
+        <View style={[styles.tileRow, styles.tileRowTones]}>
           {TONES.map((key) => (
             <ToneTile
               key={key}
+              compact
               label={toneLabel(copy, key)}
               tokens={resolvedTones[key]}
               active={tone === key}
@@ -915,6 +914,8 @@ const styles = StyleSheet.create({
   stack: { gap: 16 },
   block: { gap: 9 },
   tileRow: { flexDirection: "row", gap: 10 },
+  // Beş ton kutusu tek satırda: aralık daralır.
+  tileRowTones: { gap: 6 },
   hint: { fontSize: 11, fontWeight: "650", lineHeight: 15, marginLeft: 2 },
   ghostRow: { flexDirection: "row", gap: 10 },
 

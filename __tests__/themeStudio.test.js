@@ -12,6 +12,7 @@ const {
   HARMONIES,
   MOODS,
   SURFACE_MODES,
+  DEFAULT_TONE,
   TONES,
   analyzeContrast,
   baseFromTokens,
@@ -29,6 +30,7 @@ const {
   hueFamily,
   suggestAccents,
   toneBackground,
+  toneOfTokens,
   uniqueName,
 } = require("../utils/themeStudio");
 const { contrastRatio, hexToHsl, isLightSurface, normalizeHex } = require("../utils/colorUtils");
@@ -239,12 +241,15 @@ describe("üç ton (açık · orta · koyu)", () => {
         const set = generateToneSet(base, accent);
         expect(Object.keys(set).sort()).toEqual([...TONES].sort());
         const lum = (hex) => hexToHsl(hex).l;
-        // koyu < orta < açık (zemin açıklığı sırası)
-        if (!(lum(set.dark.primary) < lum(set.mid.primary) && lum(set.mid.primary) < lum(set.light.primary))) {
-          sorunlar.push(`${base}/${accent} sıra`);
+        // AMOLED < koyu < orta < açık < çok açık (zemin açıklığı sırası)
+        const sira = ["amoled", "dark", "mid", "light", "bright"].map((t) => lum(set[t].primary));
+        if (!sira.every((v, i) => i === 0 || v > sira[i - 1])) sorunlar.push(`${base}/${accent} sıra`);
+        for (const t of ["bright", "light"]) {
+          if (!isLightSurface(set[t].primary)) sorunlar.push(`${base}/${accent} ${t} koyu`);
         }
-        if (!isLightSurface(set.light.primary)) sorunlar.push(`${base}/${accent} açık ton koyu`);
-        if (isLightSurface(set.dark.primary)) sorunlar.push(`${base}/${accent} koyu ton açık`);
+        for (const t of ["mid", "dark", "amoled"]) {
+          if (isLightSurface(set[t].primary)) sorunlar.push(`${base}/${accent} ${t} açık`);
+        }
         for (const tone of TONES) {
           const k = set[tone];
           expect(Object.keys(k).sort()).toEqual([...TOKEN_KEYS].sort());
@@ -267,9 +272,10 @@ describe("üç ton (açık · orta · koyu)", () => {
     }
   });
 
-  test("kilitli vurgu orta tonda AYNEN kalır", () => {
+  test("kilitli vurgu varsayılan (koyu) tonda AYNEN kalır", () => {
     const set = generateToneSet("#10151F", "#F97316", { exactMidAccent: true });
-    expect(set.mid.accent).toBe("#F97316");
+    expect(set[DEFAULT_TONE].accent).toBe("#F97316");
+    expect(contrastRatio(set.mid.accent, set.mid.primary)).toBeGreaterThanOrEqual(3);
     // diğer tonlar kendi zeminine oturur
     expect(contrastRatio(set.light.accent, set.light.primary)).toBeGreaterThanOrEqual(3);
     expect(contrastRatio(set.dark.accent, set.dark.primary)).toBeGreaterThanOrEqual(3);
@@ -281,14 +287,25 @@ describe("üç ton (açık · orta · koyu)", () => {
     expect(analyzeContrast(tok).passes).toBe(true);
   });
 
-  test("eski tek tonlu temada orta ton DEĞİŞMEZ, açık/koyu türetilir", () => {
+  test("eski tek tonlu tema kendi basamağına (koyu) oturur ve DEĞİŞMEZ; diğerleri türetilir", () => {
     const eski = generateTokensFromSeeds("#16131E", "#8B5CF6");
+    expect(toneOfTokens(eski)).toBe("dark");
     const set = deriveToneSet(eski);
-    expect(set.mid).toEqual(eski);
+    expect(set.dark).toEqual(eski);
     expect(isLightSurface(set.light.primary)).toBe(true);
-    expect(isLightSurface(set.dark.primary)).toBe(false);
-    expect(deriveToneTokens(eski, "mid")).toBe(eski);
-    expect(deriveToneTokens(eski, "dark")).toEqual(set.dark);
+    expect(isLightSurface(set.mid.primary)).toBe(false);
+    expect(deriveToneTokens(eski, "dark")).toBe(eski);
+    expect(deriveToneTokens(eski, "mid")).toEqual(set.mid);
+    // açıkça verilen basamak, zemin açıklığından bulunanı ezer
+    expect(deriveToneSet(eski, { at: "mid" }).mid).toEqual(eski);
+  });
+
+  test("toneOfTokens: zemin açıklığına en yakın basamak", () => {
+    expect(toneOfTokens({ primary: "#000000" })).toBe("amoled");
+    expect(toneOfTokens({ primary: "#1D1F23" })).toBe("dark");
+    expect(toneOfTokens({ primary: "#3B3F48" })).toBe("mid");
+    expect(toneOfTokens({ primary: "#B7BCC4" })).toBe("light");
+    expect(toneOfTokens({ primary: "#F1F5F9" })).toBe("bright");
   });
 
   test("baseFromTokens → toneBackground geri dönüşümü orta tonun tonunu korur", () => {
@@ -322,7 +339,7 @@ describe("generateRandomTheme", () => {
         const t = generateRandomTheme({ rng: seeded(i * 31 + mood.id.length), moodId: mood.id });
         if (t.moodId !== mood.id) sorunlar.push(`${mood.id}#${i} mood`);
         if (JSON.stringify(Object.keys(t.tones).sort()) !== JSON.stringify([...TONES].sort())) sorunlar.push(`${mood.id}#${i} tonlar`);
-        if (t.tokens !== t.tones.mid) sorunlar.push(`${mood.id}#${i} kısa yol`);
+        if (t.tokens !== t.tones[DEFAULT_TONE]) sorunlar.push(`${mood.id}#${i} kısa yol`);
         for (const tone of TONES) {
           const k = t.tones[tone];
           if (!analyzeContrast(k).passes) sorunlar.push(`${mood.id}#${i}/${tone} rapor`);
@@ -370,12 +387,12 @@ describe("generateRandomTheme", () => {
     expect(t.base).toBe("#0B0D12");
   });
 
-  test("kilitli vurgu orta tonda AYNEN korunur, ana renk değişir", () => {
+  test("kilitli vurgu varsayılan tonda AYNEN korunur, ana renk değişir", () => {
     const seen = new Set();
     for (let i = 0; i < 12; i += 1) {
       const t = generateRandomTheme({ rng: seeded(i + 50), lock: { accent: "#F97316" } });
       expect(t.accent).toBe("#F97316");
-      expect(t.tones.mid.accent).toBe("#F97316");
+      expect(t.tones[DEFAULT_TONE].accent).toBe("#F97316");
       seen.add(t.base);
     }
     expect(seen.size).toBeGreaterThan(4);
@@ -425,10 +442,11 @@ describe("generateRandomTheme", () => {
     }
   });
 
-  test("AMOLED ruh halinde koyu ton neredeyse saf siyah", () => {
+  test("AMOLED ruh hali: AMOLED tonu saf siyah, koyu ton merdivenin koyu ucunda", () => {
     for (let i = 0; i < 20; i += 1) {
       const t = generateRandomTheme({ rng: seeded(i + 300), moodId: "amoled" });
-      expect(hexToHsl(t.tones.dark.primary).l).toBeLessThanOrEqual(3);
+      expect(hexToHsl(t.tones.amoled.primary).l).toBe(0);
+      expect(hexToHsl(t.tones.dark.primary).l).toBeLessThanOrEqual(10);
     }
   });
 
@@ -489,7 +507,7 @@ describe("generateCandidates", () => {
   test("ana renk VE vurgu kilitliyse adaylar stil kombinasyonlarıyla ayrışır", () => {
     const list = generateCandidates(6, { rng: seeded(2), lock: { base: "#3B6FD4", accent: "#F97316" } });
     expect(list).toHaveLength(6);
-    expect(list.every((c) => c.base === "#3B6FD4" && c.tones.mid.accent === "#F97316")).toBe(true);
+    expect(list.every((c) => c.base === "#3B6FD4" && c.tones[DEFAULT_TONE].accent === "#F97316")).toBe(true);
     expect(new Set(list.map((c) => c.key)).size).toBe(6);
   });
 

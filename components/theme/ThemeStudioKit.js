@@ -256,7 +256,12 @@ export const Segmented = memo(function Segmented({ options, value, onChange, the
             onPress={() => onChange(opt.key)}
             style={[styles.segBtn, dense && styles.segBtnDense, active && { backgroundColor: theme.accent }]}
           >
-            <Text style={[styles.segText, dense && styles.segTextDense, { color: active ? "#FFFFFF" : theme.text.secondary }]} numberOfLines={1}>
+            <Text
+              style={[styles.segText, dense && styles.segTextDense, { color: active ? theme.onAccent || "#FFFFFF" : theme.text.secondary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
               {opt.label}
             </Text>
           </GlassPressable>

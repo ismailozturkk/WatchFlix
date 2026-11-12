@@ -27,8 +27,10 @@ import {
   THEME_NAMES,
   buildCustomThemeFromEntry,
   getThemeColors,
+  migrateCustomSelection,
   parseCustomSelection,
 } from "../theme/colors";
+import { DEFAULT_TONE } from "../theme/toneModel";
 import { DEFAULT_FONT_ROLES, TEXT_ROLES, normalizeFontRoles } from "./typographyRoles";
 import { canUseFontPreset, getFeatureLimit } from "./premiumFeatures";
 
@@ -114,7 +116,9 @@ function sanitizeSection(id, raw) {
   const customId = customIdOf(values.theme);
   if (!customId) return { theme: values.theme };
   const custom = cleanCustomTheme(raw.custom, customId);
-  return custom ? { theme: values.theme, custom } : null;
+  // Eski sürümden gelen paylaşım: tema yeni merdivene çevrildi (cleanCustomTheme),
+  // seçimin ton eki de yeni basamağa çevrilir ("custom:x:dark" → ":amoled").
+  return custom ? { theme: migrateCustomSelection(values.theme, raw.custom), custom } : null;
 }
 
 /**
@@ -184,7 +188,7 @@ export function sharedThemeOf(share) {
     selection: section.theme,
     builtin: custom ? null : section.theme,
     entry: custom ? section.custom || null : null,
-    tone: custom?.tone || "mid",
+    tone: custom?.tone || DEFAULT_TONE,
   };
 }
 

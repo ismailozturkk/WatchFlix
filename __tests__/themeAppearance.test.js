@@ -4,7 +4,11 @@ const { getListAccent, getSharedListAccent } = require('../utils/listAppearance'
 
 describe('theme appearance', () => {
   test.each(Object.keys(themes))('%s uses the correct status bar appearance', (name) => {
-    expect(isLightSurface(themes[name].primary)).toBe(['light', 'sky', 'green'].includes(name));
+    expect(isLightSurface(themes[name].primary)).toBe(
+      ['light', 'silver', 'blueBright', 'sky', 'greenBright', 'green'].includes(name),
+    );
+    // v2 şeması kutupluluğu aynı kuraldan türetir (status bar / scheme tutarlı).
+    expect(themes[name].isDark).toBe(!isLightSurface(themes[name].primary));
   });
 
   test.each(['#FFFFFF', '#000000', '#888888', '#A9C0B8', 'rgb(220,230,240)'])(

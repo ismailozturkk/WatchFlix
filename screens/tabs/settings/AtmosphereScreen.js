@@ -53,6 +53,7 @@ import {
 import {
   ChipRow,
   DENSITY_LABELS,
+  QuickWeatherStrip,
   SPECIAL_DAY_ICONS,
   SPECIAL_DAY_LABELS,
   WEATHER_ICONS,
@@ -77,7 +78,14 @@ import { copyLanguage } from "@utils/appLanguages";
 import { GENRE_LABELS } from "@utils/genreDisplay";
 import { GENRE_MIX_MAX, SPECIAL_DAYS, genreEffectsFor, resolvePlan } from "@utils/weatherParticles";
 import SwitchToggle from "@components/SwitchToggle";
-import { alpha } from "@theme/colors";
+import {
+  alpha,
+  buildCustomThemeFromEntry,
+  familyOfTheme,
+  parseCustomSelection,
+  themes,
+} from "@theme/colors";
+import { TONES, toneLabelMap } from "@theme/toneModel";
 import GlassBox from "../../../components/common/GlassBox";
 import GlassTouchable from "../../../components/common/GlassTouchable";
 import GlassPressable from "../../../components/common/GlassPressable";
@@ -137,10 +145,17 @@ const GENRE_ICONS = {
   documentary: { name: "videocam-outline" },
 };
 
-const LANGS = ["tr", "en", "es", "pt", "de"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it"];
 const BEZEL = 7;
 // Kapalıyken atmosferin önizlemedeki sönüklüğü.
 const DIM_OPACITY = 0.28;
+// Ton sırası theme/toneModel.js'ten (çok açık → AMOLED).
+const TONE_ORDER = TONES;
+// Önizleme araçlarının (ton düğmeleri + 2 eylem) tek satıra sığdığı en dar
+// telefon iç genişliği: 5×24 + 4×3 (tonlar) + 6 + 2×28 + 6 (eylemler) + 16 kenar.
+const TOOLS_ROW_MIN_W = TONES.length * 24 + (TONES.length - 1) * 3 + 6 + 2 * 28 + 6 + 16;
+// Tam ekrandaki hızlı seçim şeridinin yüksekliği (üst boşluk + ad + simgeler).
+const QUICK_STRIP_H = 76;
 
 // ── Telefon önizlemesi ─────────────────────────────────────────────────────
 
@@ -267,6 +282,10 @@ function PhonePreview({
   onToggleContent,
   expanded = false,
   onToggleExpand,
+  toneOptions,
+  previewTone,
+  onPreviewTone,
+  toneLabels,
 }) {
   // Cihaz ekranı (pencere değil: klavye/çoklu pencere boyutu oynatmasın).
   const [screen] = useState(() => Dimensions.get("screen"));
@@ -317,8 +336,30 @@ function PhonePreview({
       accessibilityHint={a11y.hint}
     >
       <Animated.View
-        style={[pp.frame, { width: frameW, height: frameHeight, borderRadius: radius, transform: [{ scale: press }] }]}
+        style={[
+          pp.frame,
+          {
+            width: frameW,
+            height: frameHeight,
+            borderRadius: radius,
+            backgroundColor: theme.secondary,
+            shadowColor: theme.accent,
+            transform: [{ scale: press }],
+          },
+        ]}
       >
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            alpha(theme.accent, 0.42),
+            theme.secondary,
+            theme.between,
+            alpha(theme.accent, 0.24),
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
+        />
         <View
           style={[
             pp.screen,
@@ -352,33 +393,57 @@ function PhonePreview({
               <MockScreen theme={theme} width={screen.width} height={screen.height} topInset={14} />
             ) : null}
           </View>
-          <View style={pp.tools}>
-            <GlassPressable
-              onPress={onToggleContent}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={
-                showContent
-                  ? i18nText("autoI18n.atmosfer_icerik_gizle", "İçeriği gizle")
-                  : i18nText("autoI18n.atmosfer_icerik_goster", "İçeriği göster")
-              }
-              style={pp.toolBtn}
-            >
-              <AppIcon name={showContent ? "eye-outline" : "eye-off-outline"} size={16} color="#ffffff" />
-            </GlassPressable>
-            <GlassPressable
-              onPress={onToggleExpand}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={
-                expanded
-                  ? i18nText("autoI18n.atmosfer_kucult", "Küçült")
-                  : i18nText("autoI18n.atmosfer_tam_ekran", "Tam ekran")
-              }
-              style={pp.toolBtn}
-            >
-              <AppIcon name={expanded ? "contract-outline" : "expand-outline"} size={16} color="#ffffff" />
-            </GlassPressable>
+          <View style={[pp.tools, innerW < TOOLS_ROW_MIN_W && pp.toolsCompact]}>
+            {toneOptions ? (
+              <View style={[pp.toneRow, { maxWidth: innerW - 16 }]}>
+                {TONE_ORDER.map((tone) => {
+                  const palette = toneOptions[tone];
+                  const active = previewTone === tone;
+                  return (
+                    <GlassPressable
+                      key={tone}
+                      glass={false}
+                      onPress={() => onPreviewTone(tone)}
+                      hitSlop={2}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: active }}
+                      accessibilityLabel={toneLabels[tone]}
+                      style={[pp.toneBtn, active && pp.toneBtnActive]}
+                    >
+                      <View style={[pp.toneSwatch, { backgroundColor: palette.primary, borderColor: palette.border }]} />
+                    </GlassPressable>
+                  );
+                })}
+              </View>
+            ) : null}
+            <View style={pp.actionRow}>
+              <GlassPressable
+                onPress={onToggleContent}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showContent
+                    ? i18nText("autoI18n.atmosfer_icerik_gizle", "İçeriği gizle")
+                    : i18nText("autoI18n.atmosfer_icerik_goster", "İçeriği göster")
+                }
+                style={pp.toolBtn}
+              >
+                <AppIcon name={showContent ? "eye-outline" : "eye-off-outline"} size={16} color="#ffffff" />
+              </GlassPressable>
+              <GlassPressable
+                onPress={onToggleExpand}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  expanded
+                    ? i18nText("autoI18n.atmosfer_kucult", "Küçült")
+                    : i18nText("autoI18n.atmosfer_tam_ekran", "Tam ekran")
+                }
+                style={pp.toolBtn}
+              >
+                <AppIcon name={expanded ? "contract-outline" : "expand-outline"} size={16} color="#ffffff" />
+              </GlassPressable>
+            </View>
           </View>
           <View style={[pp.island, { width: innerW * 0.3, height: islandH }]} />
           {/* Durum: adanın altında küçük hap (gerçek boyutta, ölçeklenmez). */}
@@ -405,6 +470,10 @@ function PhonePreview({
             </View>
           </Animated.View>
         </View>
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, pp.frameEdge, { borderRadius: radius, borderColor: alpha(theme.accent, 0.55) }]}
+        />
       </Animated.View>
     </Pressable>
   );
@@ -615,9 +684,34 @@ function CardHeader({ colors, icon, title, subtitle, badge, right }) {
 
 export default function AtmosphereScreen() {
   const { t, language } = useLanguage();
-  const { theme } = useTheme();
+  const { theme, appliedTheme, customThemes } = useTheme();
   const C = buildUiColors(theme);
-  const { height: windowH } = useWindowDimensions();
+  const toneVariants = useMemo(() => {
+    const preset = familyOfTheme(appliedTheme);
+    if (preset) {
+      return {
+        active: preset.tone,
+        options: Object.fromEntries(TONE_ORDER.map((tone) => [tone, themes[preset.family.tones[tone]]])),
+      };
+    }
+    const custom = parseCustomSelection(appliedTheme);
+    if (!custom) return null;
+    const entry = customThemes.find((item) => item.id === custom.id) || (!custom.id && customThemes[0]);
+    if (!entry) return null;
+    return {
+      active: custom.tone,
+      options: Object.fromEntries(TONE_ORDER.map((tone) => [tone, buildCustomThemeFromEntry(entry, tone)])),
+    };
+  }, [appliedTheme, customThemes]);
+  const [toneTrial, setToneTrial] = useState(null);
+  const previewTone = toneTrial?.themeKey === appliedTheme ? toneTrial.tone : toneVariants?.active;
+  const previewTheme = toneVariants?.options[previewTone] || theme;
+  const toneLabels = toneLabelMap(t);
+  const tryTone = useCallback((tone) => {
+    Haptics.selectionAsync();
+    setToneTrial({ themeKey: appliedTheme, tone });
+  }, [appliedTheme]);
+  const { height: windowH, width: windowW } = useWindowDimensions();
   const isFocused = useIsFocused();
   const appActive = useAppActive();
   const reduceMotion = useReduceMotion();
@@ -685,7 +779,17 @@ export default function AtmosphereScreen() {
     Haptics.selectionAsync();
     setFullscreen((v) => !v);
   }, []);
-  const fullHeight = Math.round(Math.max(frameHeight, windowH - 110));
+  // Tam ekranda telefonun altında hızlı seçim şeridi (ad + simge sırası) için yer.
+  const fullHeight = Math.round(Math.max(frameHeight, windowH - 110 - QUICK_STRIP_H));
+  // Şeritten seçim: önizlemede denenen tür/özel gün seçilen efekti örtmesin.
+  const quickPick = useCallback(
+    (c) => {
+      setSampleDay(null);
+      setSampleGenres([]);
+      changeChoice(c);
+    },
+    [changeChoice],
+  );
 
   const statusText = reduceMotion
     ? i18nText("autoI18n.atmosfer_onizleme_hareket", "Hareketi Azalt açık · önizleme duraklatıldı")
@@ -714,7 +818,7 @@ export default function AtmosphereScreen() {
       <View style={st.previewArea}>
         <SideDensity value={density} onChange={changeDensity} colors={C} count={particleCount} />
         <PhonePreview
-          theme={theme}
+          theme={previewTheme}
           frameHeight={frameHeight}
           playing={playing && !fullscreen}
           genres={previewGenres}
@@ -735,6 +839,10 @@ export default function AtmosphereScreen() {
           onToggleContent={toggleContent}
           expanded={false}
           onToggleExpand={toggleFullscreen}
+          toneOptions={toneVariants?.options}
+          previewTone={previewTone}
+          onPreviewTone={tryTone}
+          toneLabels={toneLabels}
         />
         <SideGenreSwitch value={byGenre} onChange={changeByGenre} colors={C} onInfo={() => setInfoOpen(true)} />
       </View>
@@ -845,7 +953,7 @@ export default function AtmosphereScreen() {
         <View style={st.fullBackdrop}>
           {fullscreen ? (
             <PhonePreview
-              theme={theme}
+              theme={previewTheme}
               frameHeight={fullHeight}
               playing={playing}
               genres={previewGenres}
@@ -865,7 +973,22 @@ export default function AtmosphereScreen() {
               onToggleContent={toggleContent}
               expanded
               onToggleExpand={toggleFullscreen}
+              toneOptions={toneVariants?.options}
+              previewTone={previewTone}
+              onPreviewTone={tryTone}
+              toneLabels={toneLabels}
             />
+          ) : null}
+          {fullscreen ? (
+            <View style={st.quickStrip}>
+              <QuickWeatherStrip
+                value={choice}
+                effect={effect}
+                onChange={quickPick}
+                accent={previewTheme.accent}
+                width={windowW}
+              />
+            </View>
           ) : null}
         </View>
       </Modal>
@@ -876,14 +999,14 @@ export default function AtmosphereScreen() {
 
 const pp = StyleSheet.create({
   frame: {
-    backgroundColor: "#0b0b10",
     padding: BEZEL,
     shadowColor: "#000",
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.25,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 10,
   },
+  frameEdge: { borderWidth: 1 },
   screen: { overflow: "hidden" },
   statusWrap: { position: "absolute", left: 6, right: 6, alignItems: "center" },
   status: {
@@ -905,7 +1028,13 @@ const pp = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tools: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", gap: 6 },
+  tools: { position: "absolute", right: 8, bottom: 8, flexDirection: "row", alignItems: "flex-end", gap: 6 },
+  toolsCompact: { flexDirection: "column", alignItems: "flex-end", gap: 4 },
+  toneRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 3 },
+  actionRow: { flexDirection: "row", gap: 6 },
+  toneBtn: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)" },
+  toneBtnActive: { borderWidth: 1, borderColor: "#ffffff" },
+  toneSwatch: { width: 14, height: 14, borderRadius: 7, borderWidth: 1 },
   toolBtn: {
     width: 28,
     height: 28,
@@ -972,6 +1101,7 @@ const ms = StyleSheet.create({
 const st = StyleSheet.create({
   flex: { flex: 1 },
   fullBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.88)", alignItems: "center", justifyContent: "center" },
+  quickStrip: { alignSelf: "stretch", height: QUICK_STRIP_H, justifyContent: "flex-end" },
   previewArea: { flexDirection: "row", alignItems: "center", paddingTop: 4, paddingBottom: 14, gap: 12 },
   controls: { paddingBottom: 110, gap: 12 },
   card: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },

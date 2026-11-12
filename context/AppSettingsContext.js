@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import Toast from "@components/AppToast";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
+import { TONE_LADDER, migrateThemeLadder } from "../theme/colors";
 import { i18nText } from "../utils/i18nText";
 import { Keys, get, set, useStored } from "../services/storage";
 import { previewHaptic } from "../services/hapticsService";
@@ -207,6 +208,19 @@ const persist = (key, value, errorText) => {
 
 // Hata metinleri kaydetme ANINDA çözülür (modül yüklenirken dondurulursa dil değişince eski dilde kalır).
 const TEMA_HATASI = () => i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ");
+// Ton merdiveni göçü (12 Kas): eski merdivenli özel tema kayıtları ve onlara bakan
+// seçim anahtarı ("custom:x:dark" → "custom:x:amoled" gibi) açılışta bir kez
+// çevrilir. Görünen tema değişmez; sonuç depoya geri yazılır (idempotent).
+function readThemeState() {
+  const storedTheme = get(Keys.theme);
+  const migrated = migrateThemeLadder(storedTheme, get(Keys.customThemes));
+  if (migrated.changed) {
+    persist(Keys.customThemes, migrated.customThemes, TEMA_HATASI);
+    if (migrated.selectedTheme !== storedTheme) persist(Keys.theme, migrated.selectedTheme, TEMA_HATASI);
+  }
+  return migrated;
+}
+
 const IKON_HATASI = () => i18nText(
   "autoI18n.ikon_arka_plan_ayari_kaydedilemedi",
   "İkon arka plan ayarı kaydedilemedi: ",
@@ -242,8 +256,9 @@ export const AppSettingsProvider = ({ children }) => {
   // İkisi ayrışırsa LanguageContext bu değeri i18n'e geri yazar ve cihaz dili
   // anında Türkçe'ye ezilirdi — bu yüzden tek kaynak.
   const [selectedLanguage, setSelectedLanguage] = useState(cozumlenmisDil);
-  const [selectedTheme, setSelectedTheme] = useState(() => get(Keys.theme));
-  const [customThemes, setCustomThemes] = useState(() => get(Keys.customThemes));
+  const [initialThemeState] = useState(readThemeState);
+  const [selectedTheme, setSelectedTheme] = useState(initialThemeState.selectedTheme);
+  const [customThemes, setCustomThemes] = useState(initialThemeState.customThemes);
   const [storedAdultContent, setAdultContent] = useState(() => get(Keys.adultContent));
   // Oturumdaki hesap 18 altı mı? Kaynağı Users/{uid}.birthDate; UserProfileContext
   // türetip depoya yazıyor (bkz. utils/ageGate.js). Bağlam üzerinden değil DEPO
@@ -423,8 +438,11 @@ export const AppSettingsProvider = ({ children }) => {
       id,
       name: (themeInput?.name || "").trim() || i18nText("autoI18n.ozel_tema", "Özel Tema"),
       tokens: themeInput?.tokens || {},
-      // Üç tonlu temalar: açık/orta/koyu setleri + "ana renk" tohumu. Eski, tek
-      // tonlu kayıtlarda bu alanlar yoktur (açık/koyu ton orta tondan türetilir).
+      // Stüdyo daima yeni (eşit basamaklı) merdivenle kaydeder; bayrak, kaydın
+      // göçten geçmemesi içindir (bkz. theme/colors.js → migrateCustomEntry).
+      ladder: TONE_LADDER,
+      // Beş tonlu temalar: ton setleri + "ana renk" tohumu. Eski, tek tonlu
+      // kayıtlarda bu alanlar yoktur (eksik tonlar varsayılan tondan türetilir).
       ...(themeInput?.tones ? { tones: themeInput.tones } : {}),
       ...(themeInput?.base ? { base: themeInput.base } : {}),
     };

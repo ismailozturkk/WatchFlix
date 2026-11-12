@@ -300,7 +300,7 @@ describe("metinler", () => {
     expect(formatFeatureValue("ai_messages", FREE, "tr")).toBe("3/gün · 30/ay");
     expect(formatFeatureValue("identity_badge", FREE, "tr")).toBe("—");
     expect(formatFeatureValue("identity_badge", MAX, "tr")).toBe("Efsanevi rozet");
-    expect(formatFeatureValue("custom_themes", FREE, "tr")).toBe("9 hazır tema");
+    expect(formatFeatureValue("custom_themes", FREE, "tr")).toBe("15 hazır tema");
     expect(formatFeatureValue("font_catalog", PREMIUM, "en")).toBe("56 fonts");
   });
 

@@ -27,7 +27,13 @@ import AppIcon from "@components/AppIcon";
 import ConfirmSheet from "@components/common/ConfirmSheet";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import { alpha, buildCustomTheme, themes } from "../../../theme/colors";
+import {
+  FAMILY_THEME_KEYS,
+  LEGACY_PRESET_THEME_KEYS,
+  alpha,
+  buildCustomTheme,
+  themes,
+} from "../../../theme/colors";
 import { isLightSurface, toHex } from "../../../utils/colorUtils";
 import { i18nText } from "@utils/i18nText";
 import { toast } from "@components/AppToast";
@@ -73,19 +79,33 @@ const WIDGET_ICONS = {
   stats: "stats-chart-outline",
 };
 
-const BUILTIN_THEMES = [
-  { id: "gray", labelKey: "grayTheme", fallback: "Gri" },
-  { id: "dark", labelKey: "darkTheme", fallback: "AMOLED" },
-  { id: "light", labelKey: "lightTheme", fallback: "Açık" },
-  { id: "sky", labelKey: "skyTheme", fallback: "Açık Mavi" },
-  { id: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
-  { id: "green", labelKey: "greenTheme", fallback: "Yeşil" },
-  { id: "blueDeep", labelKey: "blueDeepTheme", fallback: "Koyu Mavi" },
-  { id: "greenMid", labelKey: "greenMidTheme", fallback: "Orta Yeşil" },
-  { id: "greenDeep", labelKey: "greenDeepTheme", fallback: "Koyu Yeşil" },
-  { id: "purple", labelKey: "purpleTheme", fallback: "Gece Moru" },
-  { id: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
-];
+// Yerleşik temalar AİLELERDEN türetilir (aile sırası, her ailede çok açık →
+// AMOLED) + eski hazır temalar: yeni bir ton/tema eklenince liste kendiliğinden
+// büyür. Çeviri anahtarı `<tema>Theme` (translations/*.json).
+const THEME_FALLBACK_NAMES = {
+  light: "Açık",
+  silver: "Gümüş",
+  dusk: "Alacakaranlık",
+  gray: "Gri",
+  dark: "AMOLED",
+  blueBright: "Buz Mavisi",
+  sky: "Açık Mavi",
+  blueDusk: "Alacakaranlık Mavi",
+  blue: "Lacivert",
+  blueDeep: "Gece Laciverti",
+  greenBright: "Nane",
+  green: "Yeşil",
+  greenDusk: "Alacakaranlık Yeşil",
+  greenMid: "Koyu Yeşil",
+  greenDeep: "Gece Yeşili",
+  purple: "Gece Moru",
+  amber: "Kızıl Sinema",
+};
+const BUILTIN_THEMES = [...FAMILY_THEME_KEYS, ...LEGACY_PRESET_THEME_KEYS].map((id) => ({
+  id,
+  labelKey: `${id}Theme`,
+  fallback: THEME_FALLBACK_NAMES[id] || id,
+}));
 
 const widgetLabel = (id) =>
   id === "reminders"

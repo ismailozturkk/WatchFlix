@@ -21,6 +21,7 @@ import {
   toHex,
 } from "./colorUtils";
 import { randomInt } from "./randomPick";
+import { DEFAULT_TONE, TONES, TONE_POLARITY, isTone } from "../theme/toneModel";
 
 /* ───────────────────────── Rastgelelik ───────────────────────── */
 
@@ -59,7 +60,7 @@ export const BACKGROUND_PRESETS = [
   "#000000", "#F6F7FB", "#FAF6EE", "#EDF5F0", "#F4EEF9", "#E9EEF5",
 ];
 
-// Tek dokunuşla ANA RENK (üç tonun hepsi bu ton + doygunluktan türetilir).
+// Tek dokunuşla ANA RENK (beş tonun hepsi bu ton + doygunluktan türetilir).
 // Orta açıklıkta, doygun renkler: asıl zemin her tonda açıklığı yeniden kurulur.
 export const BASE_PRESETS = [
   "#3B6FD4", "#5B5BD6", "#8B5CF6", "#C026D3", "#E11D48", "#EA580C",
@@ -74,7 +75,8 @@ export const SURFACE_MODES = ["neutral", "tinted"];
 // Metin kademelerinin zeminlere karşı ULAŞMASI gereken en düşük kontrast.
 // Başlangıç açıklığı yeterliyse dokunulmaz; değilse zeminden uzağa itilir.
 const TEXT_TARGETS = {
-  soft: { primary: 6, secondary: 4.8, between: 3.8, muted: 3 },
+  // Ana metin her kipte >= 7:1 (AAA): orta-açık "açık" tonda bile metin net kalır.
+  soft: { primary: 7, secondary: 4.8, between: 3.8, muted: 3 },
   balanced: { primary: 8, secondary: 6, between: 4.6, muted: 3.4 },
   high: { primary: 12, secondary: 8.5, between: 6.5, muted: 4.6 },
 };
@@ -133,6 +135,12 @@ export function generateTokensFromSeeds(bgHex, accentHex, opts = {}) {
   const primary = toHex(bgHex);
   const accent = toHex(accentHex);
   const bg = hexToHsl(primary);
+  // Saf siyah (AMOLED) zeminin tonu/doygunluğu yoktur; verilen `tint` kartlara
+  // ve metne renk karakterini taşır (zemin yine saf siyah kalır).
+  if (opts.tint && bg.l <= 2) {
+    bg.h = Number(opts.tint.h) || 0;
+    bg.s = clamp(Number(opts.tint.s) || 0, 0, 100);
+  }
   const dark = !isLightSurface(primary);
   const steps = SURFACE_STEPS[contrast];
   const T = (h, s, l) => hslToHex(h, clamp(s, 0, 100), clamp(l, 0, 100));
@@ -151,7 +159,9 @@ export function generateTokensFromSeeds(bgHex, accentHex, opts = {}) {
     tab = T(bg.h, surfS, bg.l + steps.tab);
     border = T(bg.h, Math.max(surfS - 4, 0), bg.l + steps.border);
   } else {
-    secondary = T(bg.h, Math.min(surfS + 4, 100), Math.min(bg.l + steps.secondary - 1, 98));
+    // Çok açık zeminde (L >= 96) kartlar saf beyaza çıkabilir; aksi halde kart
+    // zeminden KOYU kalıp "çukur" gibi görünürdü.
+    secondary = T(bg.h, Math.min(surfS + 4, 100), Math.min(bg.l + steps.secondary - 1, bg.l >= 96 ? 100 : 98));
     between = T(bg.h, surfS, bg.l - (steps.between + 2));
     tab = secondary;
     border = T(bg.h, surfS, bg.l - (steps.border - 1));
@@ -249,25 +259,32 @@ export function suggestAccents(bgHex, accentHex) {
   }));
 }
 
-/* ───────────────────────── Üç ton (açık · orta · koyu) ───────────────────────── */
+/* ───────────────────────── Beş ton (çok açık · açık · orta · koyu · AMOLED) ───────────────────────── */
 
-// Bir özel tema artık TEK renk ailesinin üç tonudur: açık, orta, koyu. Hepsi aynı
-// ana renkten (ton + doygunluk) ve aynı vurgudan türetilir; her ton ayrıca tek
-// başına ayarlanabilir. "orta" ton, gri tema gibi koyu-ama-siyah-olmayan yüzeydir.
-export const TONES = ["light", "mid", "dark"];
-export const DEFAULT_TONE = "mid";
-export const isTone = (value) => TONES.includes(value);
+// Bir özel tema TEK renk ailesinin beş tonudur (bkz. theme/toneModel.js). Hepsi
+// aynı ana renkten (ton + doygunluk) ve aynı vurgudan türetilir; her ton ayrıca
+// tek başına ayarlanabilir. Merdiven (zemin L*): ~97 · ~76 · ~27 · ~11 · 0; varsayılan
+// ton "koyu"dur (eski kayıtların "orta"sı), kullanıcının kilitlediği vurgu orada aynen kalır.
+export { TONES, DEFAULT_TONE, isTone, LEGACY_TONES } from "../theme/toneModel";
 
-// Zemin açıklığı (L) ve ana rengin doygunluğunun ton başına payı.
+// Zemin açıklığı (L) ve ana rengin doygunluğunun ton başına payı. AMOLED zemini
+// saf siyahtır (doygunluk anlamsız); kartlar ana rengin tonunu `tint` ile taşır.
+// HSL açıklığı; algısal karşılığı yaklaşık L* 97 · 76 · 27 · 12 · 0.
 const TONE_BG = {
-  light: { l: 94, sMul: 0.75, sMax: 55 },
-  mid: { l: 13, sMul: 0.9, sMax: 46 },
-  dark: { l: 4, sMul: 0.8, sMax: 56 },
+  bright: { l: 97, sMul: 0.5, sMax: 40 },
+  light: { l: 74, sMul: 0.6, sMax: 42 },
+  mid: { l: 25, sMul: 0.85, sMax: 46 },
+  dark: { l: 12, sMul: 0.9, sMax: 46 },
+  amoled: { l: 0, sMul: 0, sMax: 0 },
 };
 
-// Vurgunun ton başına izin verilen açıklık bandı (mid ton kullanıcının seçtiği
-// vurguyu olduğu gibi korur; yalnız zemine oturtulur).
-const TONE_ACCENT_L = { light: [32, 46], dark: [52, 68] };
+// AMOLED kartlarının taşıdığı renk tonu (koyu tonun doygunluk payı).
+const AMOLED_TINT = { sMul: 0.8, sMax: 56 };
+
+// Vurgunun ton başına izin verilen açıklık bandı. Varsayılan ton ("koyu")
+// kullanıcının seçtiği vurguyu olduğu gibi korur; yalnız zemine oturtulur.
+// "açık" ton orta-açık zemindir: vurgu, zemine 3:1 için belirgin koyu olmalı.
+const TONE_ACCENT_L = { bright: [30, 44], light: [24, 38], mid: [52, 64], amoled: [54, 70] };
 
 /** Ana renkten bir tonun zemin rengi. `lightness` verilirse tonun varsayılan açıklığını ezer. */
 export function toneBackground(baseHex, tone, lightness) {
@@ -278,10 +295,19 @@ export function toneBackground(baseHex, tone, lightness) {
   return hslToHex(base.h, s, l);
 }
 
+/** AMOLED tonunun kart/metin rengi tohumu: zemin siyah, ton ana renkten. */
+export function toneTint(baseHex) {
+  const base = hexToHsl(toHex(baseHex));
+  return { h: base.h, s: clamp(base.s * AMOLED_TINT.sMul, 0, AMOLED_TINT.sMax) };
+}
+
+/** Bir ton için üretim seçenekleri (AMOLED'e ana renk tonu eklenir). */
+const toneOpts = (tone, baseHex, opts) => (tone === "amoled" ? { ...opts, tint: toneTint(baseHex) } : opts);
+
 /** Vurguyu bir tonun zeminine oturtur: ton/doygunluk korunur, açıklık banda çekilir. */
 export function toneAccent(accentHex, tone, bgHex) {
   const accent = toHex(accentHex);
-  const band = TONE_ACCENT_L[tone];
+  const band = tone === DEFAULT_TONE ? null : TONE_ACCENT_L[tone];
   if (!band) return fitAccent(accent, bgHex);
   const { h, s, l } = hexToHsl(accent);
   return fitAccent(hslToHex(h, clamp(s, 45, 96), clamp(l, band[0], band[1])), bgHex);
@@ -304,28 +330,68 @@ export function harmonizeTokens(tokens) {
     if (next === accent) break;
     accent = next;
   }
-  if (accent === toHex(tokens.accent)) return tokens;
-  return { ...tokens, accent, bold: shiftLightness(accent, dark ? -10 : -9) };
+  // Koyu ve doygun bir kartta "beyaz yazı taşıyan" vurgu bandı ile "kartta
+  // seçilen" vurgu bandı çakışmayabilir (ör. pastel orta ton + yüksek kontrast).
+  // O zaman vurguyu değil KARTI koyulaştır: açık metnin kontrastı yalnız artar.
+  let card = secondary;
+  if (dark && contrastRatio(accent, card) < 2.8) {
+    const { h, s, l } = hexToHsl(card);
+    for (let nl = l - 1; nl >= 0; nl -= 1) {
+      const candidate = hslToHex(h, s, nl);
+      if (contrastRatio(accent, candidate) >= 2.8 || nl <= hexToHsl(primary).l) {
+        card = candidate;
+        break;
+      }
+    }
+  }
+  if (accent === toHex(tokens.accent) && card === secondary) return tokens;
+  const out = { ...tokens, accent, bold: accent === toHex(tokens.accent) ? tokens.bold : shiftLightness(accent, dark ? -10 : -9) };
+  if (card !== secondary) {
+    out.secondary = card;
+    if (toHex(tokens.tab) === secondary) out.tab = card;
+  }
+  return out;
 }
 
 /**
- * Ana renk + vurgudan üç tonluk set. `opts`: contrast/surfaces/boldDrift (bkz.
- * generateTokensFromSeeds), `toneL` ({light, mid, dark} → zemin açıklığı) ve
- * `exactMidAccent` (orta tonun vurgusu zemine oturtulmadan olduğu gibi kalır).
+ * Ana renk + vurgudan beş tonluk set. `opts`: contrast/surfaces/boldDrift (bkz.
+ * generateTokensFromSeeds), `toneL` ({ton: zemin açıklığı}) ve `exactMidAccent`
+ * (VARSAYILAN tonun vurgusu zemine oturtulmadan olduğu gibi kalır; ad tarihsel).
  *
- * @returns {{light: object, mid: object, dark: object}} her biri 11 token
+ * @returns {Record<"bright"|"light"|"mid"|"dark"|"amoled", object>} her biri 11 token
  */
 export function generateToneSet(baseHex, accentHex, opts = {}) {
   const out = {};
   for (const tone of TONES) {
-    const bg = toneBackground(baseHex, tone, opts.toneL?.[tone]);
-    // exactMidAccent: kullanıcının KİLİTLEDİĞİ vurgu orta tonda aynen kalır.
-    const exact = opts.exactMidAccent && tone === "mid";
-    const accent = exact ? toHex(accentHex) : toneAccent(accentHex, tone, bg);
-    const tokens = generateTokensFromSeeds(bg, accent, opts);
-    out[tone] = exact ? tokens : harmonizeTokens(tokens);
+    // exactMidAccent: kullanıcının KİLİTLEDİĞİ vurgu varsayılan tonda aynen kalır.
+    const exact = opts.exactMidAccent && tone === DEFAULT_TONE;
+    const start = Number.isFinite(opts.toneL?.[tone]) ? opts.toneL[tone] : TONE_BG[tone].l;
+    // Doygun ana renklerde aynı HSL açıklığı algısal olarak daha parlak düşer;
+    // orta-ara tonlarda (açık / orta) vurgu + beyaz düğme yazısı + metin bandı
+    // daralır. Okunurluk sağlanana dek zemin, kutbuna doğru birer puan kayar.
+    const lightSide = TONE_POLARITY[tone] === "light";
+    let tokens;
+    for (let step = 0; step <= 14; step += 1) {
+      const l = clamp(start + (lightSide ? step : -step), 0, 100);
+      const bg = toneBackground(baseHex, tone, l);
+      const accent = exact ? toHex(accentHex) : toneAccent(accentHex, tone, bg);
+      const raw = generateTokensFromSeeds(bg, accent, toneOpts(tone, baseHex, opts));
+      tokens = exact ? raw : harmonizeTokens(raw);
+      if (exact || tone === "amoled" || toneReadable(tokens)) break;
+    }
+    out[tone] = tokens;
   }
   return out;
+}
+
+// Bir ton setinin kabul eşiği: metin raporu geçer, vurgu zeminde >= 3 ve kartta >= 2.5.
+function toneReadable(tokens) {
+  return (
+    analyzeContrast(tokens).passes &&
+    contrastRatio(tokens.accent, tokens.primary) >= 3 &&
+    contrastRatio(tokens.accent, tokens.secondary) >= 2.5 &&
+    contrastRatio(tokens.textPrimary, tokens.primary) >= 7
+  );
 }
 
 /**
@@ -337,56 +403,81 @@ export function generateToneFromBackground(bgHex, accentHex, tone, opts = {}) {
   return harmonizeTokens(generateTokensFromSeeds(bg, toneAccent(accentHex, tone, bg), opts));
 }
 
+/**
+ * Bir token setinin merdivendeki yeri: zemin açıklığına en yakın ton. Saf siyah
+ * zemin AMOLED'dir. Hazır/eski temalar türetilirken DOĞRU basamağa oturur.
+ */
+export function toneOfTokens(tokens) {
+  const l = hexToHsl(toHex(tokens?.primary || "#000000")).l;
+  if (l <= 1) return "amoled";
+  let best = DEFAULT_TONE;
+  for (const tone of TONES) {
+    if (tone === "amoled") continue;
+    if (Math.abs(TONE_BG[tone].l - l) < Math.abs(TONE_BG[best].l - l)) best = tone;
+  }
+  return best;
+}
+
 /** "Ana renk" kutusunda gösterilecek tohum: zemin tonu + doygunluğu, orta açıklık. */
 export function baseFromTokens(tokens) {
-  const bg = hexToHsl(toHex(tokens.primary));
-  const s = clamp(bg.s / TONE_BG.mid.sMul, 0, 100);
+  const tone = toneOfTokens(tokens);
+  // AMOLED zemin renksizdir: ton/doygunluk kartlardan okunur.
+  const src = tone === "amoled" ? tokens.secondary || tokens.primary : tokens.primary;
+  const bg = hexToHsl(toHex(src));
+  const mul = tone === "amoled" ? AMOLED_TINT.sMul : TONE_BG[tone].sMul;
+  const s = clamp(bg.s / mul, 0, 100);
   return hslToHex(bg.h, s, 46);
 }
 
 /**
- * Tek bir (çözülmüş) token setinden, onu "orta" ton sayarak açık ve koyu tonları
- * türetir. Eski, tek tonlu özel temaların açık/koyu tonu böyle ortaya çıkar;
- * orta ton DEĞİŞMEZ (seçili tema aynı görünmeye devam eder).
+ * Tek bir (çözülmüş) token setinden diğer dört tonu türetir. Set, zemin
+ * açıklığına göre merdivendeki KENDİ basamağına oturur (ör. eski "orta" L~13 →
+ * "koyu") ve orada DEĞİŞMEZ (seçili tema aynı görünmeye devam eder).
  */
 export function deriveToneSet(tokens, opts = {}) {
+  const { at, ...rest } = opts;
+  const slot = isTone(at) ? at : toneOfTokens(tokens);
   const base = baseFromTokens(tokens);
   const accent = toHex(tokens.accent);
-  const set = generateToneSet(base, accent, { contrast: "balanced", surfaces: "tinted", ...opts });
-  return { light: set.light, mid: tokens, dark: set.dark };
+  const set = generateToneSet(base, accent, { contrast: "balanced", surfaces: "tinted", ...rest });
+  return { ...set, [slot]: tokens };
 }
 
-/** Bir ton için token seti: kayıtlı tones[tone] > orta ton > türetilen. */
-export function deriveToneTokens(tokens, tone) {
-  if (tone === "mid" || !isTone(tone)) return tokens;
-  return deriveToneSet(tokens)[tone];
+/**
+ * Bir ton için token seti: setin kendi basamağı (`at`; yoksa zemin açıklığından
+ * bulunur) olduğu gibi, diğerleri ondan türetilir.
+ */
+export function deriveToneTokens(tokens, tone, at) {
+  const slot = isTone(at) ? at : toneOfTokens(tokens);
+  if (!isTone(tone) || tone === slot) return tokens;
+  return deriveToneSet(tokens, { at: slot })[tone];
 }
 
 /* ───────────────────────── Ruh halleri + rastgele ───────────────────────── */
 
-// Her ruh hali bir "ana renk" karakteridir (ton + doygunluk) ve üç tonun hepsine
+// Her ruh hali bir "ana renk" karakteridir (ton + doygunluk) ve beş tonun hepsine
 // yansır. hue/baseS/accS/accL: [min, max]; hue 360'ı aşabilir (sarılır).
 //   toneL  — ton başına zemin açıklığı aralığı (yoksa varsayılan aralık)
 //   lead   — keşif kartında öne çıkan ton
 //   surfaces — "neutral" ise yüzeyler renksiz tutulur (AMOLED gibi)
 export const MOODS = [
-  { id: "midnight", icon: "moon", lead: "mid", hue: [212, 268], baseS: [30, 52], accS: [72, 92], accL: [58, 68], harmonies: ["complementary", "analogousR", "split", "mono"] },
-  { id: "amoled", icon: "contrast", lead: "dark", hue: [0, 360], baseS: [0, 12], accS: [82, 100], accL: [56, 66], harmonies: ["complementary", "triadic", "split", "analogousR", "mono"], toneL: { dark: [0, 1.5], mid: [6, 9] }, surfaces: "neutral" },
-  { id: "forest", icon: "leaf", lead: "mid", hue: [135, 168], baseS: [24, 44], accS: [62, 86], accL: [56, 66], harmonies: ["complementary", "split", "triadic", "analogousL"] },
-  { id: "sunset", icon: "flame", lead: "mid", hue: [335, 380], baseS: [30, 52], accS: [82, 98], accL: [58, 66], harmonies: ["analogousR", "analogousL", "mono"] },
-  { id: "ocean", icon: "water", lead: "mid", hue: [176, 208], baseS: [34, 56], accS: [74, 94], accL: [58, 66], harmonies: ["complementary", "split", "analogousR"] },
-  { id: "mocha", icon: "cafe", lead: "mid", hue: [16, 36], baseS: [18, 34], accS: [60, 82], accL: [58, 68], harmonies: ["mono", "analogousR", "complementary"] },
-  { id: "neon", icon: "flash", lead: "dark", hue: [256, 292], baseS: [48, 72], accS: [96, 100], accL: [56, 62], harmonies: ["complementary", "triadic", "split"], toneL: { dark: [1, 3.5], mid: [8, 12] } },
-  { id: "pastel", icon: "flower", lead: "light", hue: [0, 360], baseS: [40, 66], accS: [52, 72], accL: [48, 58], harmonies: ["triadic", "analogousR", "complementary", "split"], toneL: { light: [95, 97.5], mid: [14, 19], dark: [5, 8] } },
-  { id: "paper", icon: "newspaper", lead: "light", hue: [28, 56], baseS: [20, 38], accS: [62, 84], accL: [40, 54], harmonies: ["complementary", "mono", "split"], toneL: { light: [92, 96] } },
-  { id: "slate", icon: "cloudy-night", lead: "mid", hue: [200, 228], baseS: [8, 18], accS: [60, 85], accL: [56, 66], harmonies: ["complementary", "split", "analogousR", "mono"], toneL: { mid: [14, 19] } },
-  { id: "sand", icon: "sunny", lead: "light", hue: [32, 50], baseS: [14, 28], accS: [56, 78], accL: [44, 58], harmonies: ["analogousL", "complementary", "split"], toneL: { light: [92, 96] } },
-  { id: "lavender", icon: "color-filter", lead: "mid", hue: [252, 292], baseS: [24, 40], accS: [58, 82], accL: [58, 68], harmonies: ["analogousL", "split", "complementary", "mono"] },
-  { id: "mint", icon: "snow", lead: "light", hue: [146, 178], baseS: [24, 42], accS: [58, 82], accL: [44, 58], harmonies: ["complementary", "analogousR", "split"], toneL: { light: [93, 96.5] } },
-  { id: "rose", icon: "rose", lead: "mid", hue: [326, 352], baseS: [28, 46], accS: [66, 90], accL: [58, 68], harmonies: ["analogousL", "complementary", "mono", "split"] },
-  { id: "cobalt", icon: "diamond", lead: "dark", hue: [216, 234], baseS: [58, 78], accS: [78, 96], accL: [58, 68], harmonies: ["complementary", "split", "triadic"], toneL: { dark: [3, 5.5] } },
-  { id: "ember", icon: "bonfire", lead: "dark", hue: [4, 24], baseS: [34, 52], accS: [78, 96], accL: [56, 66], harmonies: ["analogousR", "mono", "split"] },
-  { id: "aurora", icon: "sparkles", lead: "mid", hue: [168, 204], baseS: [30, 48], accS: [74, 94], accL: [58, 68], harmonies: ["triadic", "split", "complementary"] },
+  { id: "midnight", icon: "moon", lead: "dark", hue: [212, 268], baseS: [30, 52], accS: [72, 92], accL: [58, 68], harmonies: ["complementary", "analogousR", "split", "mono"] },
+  { id: "amoled", icon: "contrast", lead: "amoled", hue: [0, 360], baseS: [0, 12], accS: [82, 100], accL: [56, 66], harmonies: ["complementary", "triadic", "split", "analogousR", "mono"], toneL: { dark: [7, 10], mid: [20, 23] }, surfaces: "neutral" },
+  { id: "forest", icon: "leaf", lead: "dark", hue: [135, 168], baseS: [24, 44], accS: [62, 86], accL: [56, 66], harmonies: ["complementary", "split", "triadic", "analogousL"] },
+  { id: "sunset", icon: "flame", lead: "dark", hue: [335, 380], baseS: [30, 52], accS: [82, 98], accL: [58, 66], harmonies: ["analogousR", "analogousL", "mono"] },
+  { id: "ocean", icon: "water", lead: "dark", hue: [176, 208], baseS: [34, 56], accS: [74, 94], accL: [58, 66], harmonies: ["complementary", "split", "analogousR"] },
+  { id: "mocha", icon: "cafe", lead: "dark", hue: [16, 36], baseS: [18, 34], accS: [60, 82], accL: [58, 68], harmonies: ["mono", "analogousR", "complementary"] },
+  { id: "neon", icon: "flash", lead: "amoled", hue: [256, 292], baseS: [48, 72], accS: [96, 100], accL: [56, 62], harmonies: ["complementary", "triadic", "split"], toneL: { dark: [9, 12], mid: [22, 25] } },
+  { id: "pastel", icon: "flower", lead: "bright", hue: [0, 360], baseS: [40, 66], accS: [52, 72], accL: [48, 58], harmonies: ["triadic", "analogousR", "complementary", "split"], toneL: { bright: [95, 97.5], light: [76, 80], dark: [13, 17] } },
+  { id: "paper", icon: "newspaper", lead: "bright", hue: [28, 56], baseS: [20, 38], accS: [62, 84], accL: [40, 54], harmonies: ["complementary", "mono", "split"], toneL: { bright: [95, 98] } },
+  { id: "slate", icon: "cloudy-night", lead: "dark", hue: [200, 228], baseS: [8, 18], accS: [60, 85], accL: [56, 66], harmonies: ["complementary", "split", "analogousR", "mono"], toneL: { dark: [13, 17], mid: [26, 29] } },
+  { id: "sand", icon: "sunny", lead: "bright", hue: [32, 50], baseS: [14, 28], accS: [56, 78], accL: [44, 58], harmonies: ["analogousL", "complementary", "split"], toneL: { bright: [95, 98] } },
+  { id: "lavender", icon: "color-filter", lead: "dark", hue: [252, 292], baseS: [24, 40], accS: [58, 82], accL: [58, 68], harmonies: ["analogousL", "split", "complementary", "mono"] },
+  { id: "mint", icon: "snow", lead: "bright", hue: [146, 178], baseS: [24, 42], accS: [58, 82], accL: [44, 58], harmonies: ["complementary", "analogousR", "split"], toneL: { bright: [95, 98] } },
+  { id: "rose", icon: "rose", lead: "dark", hue: [326, 352], baseS: [28, 46], accS: [66, 90], accL: [58, 68], harmonies: ["analogousL", "complementary", "mono", "split"] },
+  { id: "cobalt", icon: "diamond", lead: "amoled", hue: [216, 234], baseS: [58, 78], accS: [78, 96], accL: [58, 68], harmonies: ["complementary", "split", "triadic"], toneL: { dark: [9, 12] } },
+  { id: "ember", icon: "bonfire", lead: "amoled", hue: [4, 24], baseS: [34, 52], accS: [78, 96], accL: [56, 66], harmonies: ["analogousR", "mono", "split"] },
+  { id: "aurora", icon: "sparkles", lead: "dark", hue: [168, 204], baseS: [30, 48], accS: [74, 94], accL: [58, 68], harmonies: ["triadic", "split", "complementary"] },
 ];
 
 export const MOOD_IDS = MOODS.map((m) => m.id);
@@ -404,7 +495,7 @@ function steerAccentHue(hue) {
 }
 
 // Ton başına varsayılan zemin açıklığı aralığı (ruh hali ezmezse).
-const DEFAULT_TONE_L = { light: [91, 96], mid: [10, 16], dark: [2, 6] };
+const DEFAULT_TONE_L = { bright: [96, 98.5], light: [71, 77], mid: [23, 27], dark: [10, 14], amoled: [0, 0] };
 
 // Vurgu "enerjisi": soluk / normal / canlı. Aynı ruh halinden farklı karakterde
 // adaylar çıkması için ölçek çarpanı.
@@ -457,7 +548,7 @@ export function describeTheme(tokens) {
 function settleTones(tones, { keepMidAccent = false } = {}) {
   const out = {};
   for (const tone of TONES) {
-    const keep = keepMidAccent && tone === "mid";
+    const keep = keepMidAccent && tone === DEFAULT_TONE;
     let tokens = tones[tone];
     if (!analyzeContrast(tokens).passes) {
       const patch = fixReadability(tokens);
@@ -473,7 +564,7 @@ function settleTones(tones, { keepMidAccent = false } = {}) {
 }
 
 /**
- * Tek bir rastgele tema adayı: ana renk + vurgu → üç ton.
+ * Tek bir rastgele tema adayı: ana renk + vurgu → beş ton.
  *
  * Çeşitlilik ve uyum kaynakları:
  *  • 17 ruh hali (ton/doygunluk/açıklık karakteri), ruh halinin uyum kuralları;
@@ -550,8 +641,8 @@ export function generateRandomTheme(opts = {}) {
     generateToneSet(base, accent, { contrast, surfaces, toneL, boldDrift, exactMidAccent: keepAccent }),
     { keepMidAccent: keepAccent },
   );
-  // Gösterilen/kilitlenen vurgu, orta tonda GERÇEKTEN kullanılan değerdir.
-  const shownAccent = tones.mid.accent;
+  // Gösterilen/kilitlenen vurgu, varsayılan tonda GERÇEKTEN kullanılan değerdir.
+  const shownAccent = tones[DEFAULT_TONE].accent;
   const accHsl = hexToHsl(shownAccent);
 
   return {
@@ -565,8 +656,8 @@ export function generateRandomTheme(opts = {}) {
     surfaces,
     family: hueFamily(accHsl.h, accHsl.s),
     tones,
-    // Eski çağıranlar (ve orta ton gösterimi) için kısa yol.
-    tokens: tones.mid,
+    // Eski çağıranlar (ve varsayılan ton gösterimi) için kısa yol.
+    tokens: tones[DEFAULT_TONE],
   };
 }
 
@@ -587,7 +678,7 @@ const tooSimilar = (a, b) => {
   const bb = hexToHsl(b.base);
   const sameBase = hueDistance(ba.h, bb.h) < 26 && Math.abs(ba.s - bb.s) < 20;
   const sameAccent = hueDistance(hexToHsl(a.accent).h, hexToHsl(b.accent).h) < 38;
-  return (sameBase && sameAccent) || (sameAccent && rgbDistance(a.tones.mid.primary, b.tones.mid.primary) < 14);
+  return (sameBase && sameAccent) || (sameAccent && rgbDistance(a.tones[DEFAULT_TONE].primary, b.tones[DEFAULT_TONE].primary) < 14);
 };
 
 /**

@@ -18,6 +18,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import {
   addGroupMember,
+  deleteGroup,
   removeGroupMember,
   setGroupAdminRole,
   setGroupAdminsOnlyMessages,
@@ -42,6 +43,7 @@ import LeaveSheet from "@components/modals/createPost/LeaveSheet";
 import UserAvatar from "@components/common/UserAvatar";
 import GlassTouchable from "../common/GlassTouchable";
 import SwitchToggle from "@components/SwitchToggle";
+import HoldToConfirmButton from "@components/common/HoldToConfirmButton";
 
 const ACCENT = "#6C63FF";
 const DANGER = "#FF6B6B";
@@ -54,6 +56,7 @@ export default function GroupInfoModal({
   currentUid,
   onOpenProfile,
   onOpenClub,
+  onDeleted,
 }) {
   const { theme } = useTheme();
   const { profile } = useUserProfile();
@@ -64,6 +67,7 @@ export default function GroupInfoModal({
   const [busyUid, setBusyUid] = useState(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [savingSendPolicy, setSavingSendPolicy] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState(false);
   // Üye çıkar / yönetici yap onayı: { title, message, actions } | null.
   // `appAlert` KULLANMA: bu sayfa açıkken o, köke bağlı ikinci bir native Modal
   // ister; iOS sunamaz, uyarı hiç görünmez ve AppAlertHost takılı kalır →
@@ -345,6 +349,39 @@ export default function GroupInfoModal({
     },
     [savingSendPolicy, canManage, groupId],
   );
+
+  // Grubu kalıcı sil: YALNIZ kurucu (kural da yalnız createdBy'a izin verir).
+  // Onay = düğmeyi basılı tutmak; ayrıca bir uyarı penceresi açılmaz.
+  const removeGroup = useCallback(async () => {
+    if (deletingGroup || !isCreator) return;
+    if (!getIsOnline()) {
+      toast.warning(
+        i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
+        i18nText(
+          "autoI18n.kutuphane_cevrimdisi",
+          "İnternet bağlantısı yok. Bağlanınca tekrar dene.",
+        ),
+      );
+      return;
+    }
+    setDeletingGroup(true);
+    try {
+      await waitForGroupMemberAction(() => deleteGroup(groupId, currentUid));
+      toast.success(
+        i18nText("autoI18n.grup_silindi", "Grup silindi"),
+        i18nText("autoI18n.grup_silindi_aciklama", "Grup ve tüm mesajları herkes için silindi"),
+      );
+      onDeleted?.();
+    } catch (error) {
+      console.error("deleteGroup:", error);
+      toast.error(
+        i18nText("autoI18n.hata", "Hata"),
+        i18nText("autoI18n.grup_silinemedi", "Grup silinemedi"),
+      );
+    } finally {
+      setDeletingGroup(false);
+    }
+  }, [deletingGroup, isCreator, groupId, currentUid, onDeleted]);
 
   const confirmAdminRole = useCallback(
     (member, shouldBeAdmin) => {
@@ -871,14 +908,49 @@ export default function GroupInfoModal({
                   >
                     {section.title}
                   </Text>
-                  <View style={styles.sectionCount}>
-                    <Text style={styles.sectionCountText}>{section.data.length}</Text>
+                  <View style={[styles.sectionCount, theme.borders && { backgroundColor: theme.borders.subtle }]}>
+                    <Text style={[styles.sectionCountText, theme.text?.muted && { color: theme.text.muted }]}>
+                      {section.data.length}
+                    </Text>
                   </View>
                 </View>
               )}
               stickySectionHeadersEnabled={false}
               style={styles.list}
               contentContainerStyle={!members.length ? styles.emptyList : undefined}
+              ListFooterComponent={
+                isCreator ? (
+                  <View style={styles.dangerZone} testID="group-delete-zone">
+                    <HoldToConfirmButton
+                      testID="group-delete-button"
+                      label={i18nText("autoI18n.grubu_sil", "Grubu sil")}
+                      holdingLabel={i18nText("autoI18n.silmek_icin_basili_tut", "Silmek için basılı tut…")}
+                      hint={i18nText(
+                        "autoI18n.grubu_sil_ipucu",
+                        "Basılı tut: grup ve tüm mesajlar herkes için kalıcı olarak silinir",
+                      )}
+                      color={DANGER}
+                      busy={deletingGroup}
+                      onConfirm={removeGroup}
+                      onShortPress={() =>
+                        toast.info(
+                          i18nText("autoI18n.silmek_icin_basili_tut_baslik", "Silmek için basılı tut"),
+                          i18nText(
+                            "autoI18n.grubu_sil_ipucu",
+                            "Basılı tut: grup ve tüm mesajlar herkes için kalıcı olarak silinir",
+                          ),
+                        )
+                      }
+                    />
+                    <Text style={[styles.dangerNote, { color: theme.text?.muted || "#888" }]}>
+                      {i18nText(
+                        "autoI18n.grubu_sil_not",
+                        "Yalnız kurucu silebilir. Grup, mesajlar ve Film Kulübü turları tüm üyeler için kalıcı olarak silinir.",
+                      )}
+                    </Text>
+                  </View>
+                ) : null
+              }
               ListEmptyComponent={
                 <View style={styles.empty}>
                   <Ionicons name="people-outline" size={34} color={theme.text?.muted || "#555"} />
@@ -980,6 +1052,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   list: { minHeight: 250 },
+  dangerZone: {
+    marginTop: 18,
+    marginBottom: 6,
+    gap: 8,
+  },
+  dangerNote: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    paddingHorizontal: 8,
+  },
   clubRow: {
     flexDirection: "row",
     alignItems: "center",

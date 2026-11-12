@@ -32,12 +32,13 @@ test("uygulamanın her dili için tablo var ve hepsi aynı anahtar/işlev şekli
 
 test("tema adı alıcının dilinde; özel tema kendi adıyla ve tonuyla", () => {
   const builtin = buildSettingsShare({ read: reader({ theme: "greenDeep" }), sections: ["theme"] });
-  expect(themeLabel(builtin, { language: "tr", t })).toBe("Yeşil · Koyu");
+  // greenDeep, 12 Kas eşit basamaklı merdivende Yeşil ailesinin AMOLED basamağı.
+  expect(themeLabel(builtin, { language: "tr", t })).toBe("Yeşil · AMOLED");
   const legacy = buildSettingsShare({ read: reader({ theme: "purple" }), sections: ["theme"] });
   expect(themeLabel(legacy, { language: "tr", t })).toBe("Gece Moru");
   const custom = buildSettingsShare({
     read: reader({ theme: "custom:ct_x:light" }),
-    customThemes: [{ id: "ct_x", name: "Gün Batımı", tokens: { primary: "#221100" } }],
+    customThemes: [{ id: "ct_x", name: "Gün Batımı", ladder: 2, tokens: { primary: "#221100" } }],
     sections: ["theme"],
   });
   expect(themeLabel(custom, { language: "tr", t })).toBe("Gün Batımı · Açık");

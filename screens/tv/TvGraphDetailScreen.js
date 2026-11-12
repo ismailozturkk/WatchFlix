@@ -5,9 +5,9 @@ import {
   View,
   Image,
   Animated,
-  InteractionManager,
   useWindowDimensions,
 } from "react-native";
+import { runAfterInteractions } from "../../utils/afterInteractions";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import BackButton from "../../components/BackButton";
@@ -454,7 +454,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       gridChangeHandleRef.current.cancel();
     }
     setGridMode(mode);
-    gridChangeHandleRef.current = InteractionManager.runAfterInteractions(() => {
+    gridChangeHandleRef.current = runAfterInteractions(() => {
       setRenderGridMode(mode);
       gridChangeHandleRef.current = null;
     });
@@ -489,8 +489,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
         <TopBar />
         <View style={styles.errorBody}>
-          <Text style={styles.errorTitle}>{t.mistake}</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
+          <Text style={[styles.errorTitle, { color: theme.text.primary }]}>{t.mistake}</Text>
+          <Text style={[styles.errorMessage, { color: theme.text.muted }]}>{error}</Text>
           <GlassTouchable style={styles.retryButton} onPress={fetchAllSeasons}>
             <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
           </GlassTouchable>

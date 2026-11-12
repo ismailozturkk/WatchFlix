@@ -18,7 +18,15 @@
 // kimlikler yok sayılır; özel temalar token token temizlenir.
 
 import { Keys } from "../services/storage/registry";
-import { THEME_NAMES, CUSTOM_THEME_TOKENS } from "../theme/colors";
+import {
+  THEME_NAMES,
+  CUSTOM_THEME_TOKENS,
+  TONE_LADDER,
+  migrateCustomEntry,
+  migrateCustomSelection,
+  parseCustomSelection,
+} from "../theme/colors";
+import { TONES, TONE_PATTERN } from "../theme/toneModel";
 import { normalizeHex } from "./colorUtils";
 import { normalizeDecorScopes } from "./decorScopes";
 import { normalizeSectionVisibility } from "./sectionVisibility";
@@ -179,8 +187,11 @@ function jsonSafe(value, depth = 0) {
   return false;
 }
 
+// "custom:<id>" ya da "custom:<id>:<ton>" (ton listesi theme/toneModel.js'ten).
+const CUSTOM_SELECTION_RE = new RegExp(`^custom:[A-Za-z0-9_-]{1,64}(:(${TONE_PATTERN}))?$`);
+
 const isThemeId = (v) =>
-  typeof v === "string" && (THEME_NAMES.includes(v) || /^custom:[A-Za-z0-9_-]{1,64}(:(light|mid|dark))?$/.test(v));
+  typeof v === "string" && (THEME_NAMES.includes(v) || CUSTOM_SELECTION_RE.test(v));
 
 const isPositiveIntList = (v) =>
   Array.isArray(v) && v.length <= 60 && v.every((n) => Number.isInteger(n) && n > 0);
@@ -278,19 +289,22 @@ function sanitizeTokens(rawTokens) {
   return Object.keys(tokens).length ? tokens : null;
 }
 
-function sanitizeTheme(raw) {
-  if (!isPlain(raw)) return null;
+function sanitizeTheme(input) {
+  if (!isPlain(input)) return null;
+  // Eski merdivenli kayıt (bayraksız) önce yeni basamaklara çevrilir; çıktı
+  // daima yeni merdivendendir (`ladder` bayrağıyla).
+  const raw = migrateCustomEntry(input);
   const id = typeof raw.id === "string" ? raw.id.trim() : "";
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
   const tokens = sanitizeTokens(raw.tokens);
   if (!tokens) return null;
   const name = typeof raw.name === "string" ? raw.name.trim().slice(0, MAX_THEME_NAME) : "";
-  const out = { id, name, tokens };
-  // Üç tonlu temalar: açık/orta/koyu setleri ve "ana renk" tohumu korunur.
-  // Geçersiz bir ton atılır (o ton, orta tondan yeniden türetilir).
+  const out = { id, name, ladder: TONE_LADDER, tokens };
+  // Çok tonlu temalar: ton setleri (çok açık … AMOLED) ve "ana renk" tohumu
+  // korunur. Geçersiz ya da eksik bir ton atılır (o ton orta tondan türetilir).
   if (isPlain(raw.tones)) {
     const tones = {};
-    for (const tone of ["light", "mid", "dark"]) {
+    for (const tone of TONES) {
       const clean = sanitizeTokens(raw.tones[tone]);
       if (clean) tones[tone] = clean;
     }
@@ -486,10 +500,15 @@ export function planImport(backup, options = {}) {
   }
 
   // Seçili tema, var olmayan bir özel temayı gösteriyorsa varsayılana dön (yoksa
-  // ThemeContext boş referansla açılışta yanlış temaya düşer).
+  // ThemeContext boş referansla açılışta yanlış temaya düşer). Kimlik ton ekinden
+  // ayrılarak okunur ("custom:x:dark" → "x"); eski merdivenli yedekteki seçim de
+  // yeni basamağa çevrilir (temalar sanitizeTheme içinde çevrildi).
   const themeWrite = writes.find((w) => w.id === "theme");
   if (themeWrite && typeof themeWrite.value === "string" && themeWrite.value.startsWith("custom:")) {
-    const wanted = themeWrite.value.slice("custom:".length);
+    const wanted = parseCustomSelection(themeWrite.value)?.id;
+    const incoming = Array.isArray(source.customThemes) ? source.customThemes : [];
+    const rawOwner = incoming.find((theme) => isPlain(theme) && theme.id === wanted);
+    if (rawOwner) themeWrite.value = migrateCustomSelection(themeWrite.value, rawOwner);
     if (!finalThemes.some((theme) => theme.id === wanted)) {
       themeWrite.value = null;
       warnings.push("theme-missing");

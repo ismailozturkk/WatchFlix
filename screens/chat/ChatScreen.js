@@ -79,6 +79,7 @@ import {
   useContentSettings,
   useHapticsSettings,
   useImageQualitySettings,
+  useSnowSettings,
 } from "@context/AppSettingsContext";
 import * as Haptics from "@services/hapticsService";
 import { useLanguage } from "@context/LanguageContext";
@@ -200,7 +201,9 @@ const LATEST_MESSAGE_BUTTON_THRESHOLD = 420;
 const messageKeyExtractor = (item) => item.clientId || item.id;
 const AMBIENT_ONLY = ["ambient"];
 const ICON_ONLY = ["icon"];
-const AMBIENT_FRAME_HEIGHT = Dimensions.get("screen").height;
+const ATMOSPHERE_ONLY = ["snow"];
+const ATMOSPHERE_AND_AMBIENT = ["ambient", "snow"];
+const DECOR_FRAME_HEIGHT = Dimensions.get("screen").height;
 
 // ─── Tarih yardımcıları (mesaj gruplama + gün ayracı) ───────────────────────
 const tsToDate = (ts) => {
@@ -546,8 +549,11 @@ export default function ChatScreen({ route, navigation }) {
   // Ambiyans bu sohbette görünüyor mu (genel anahtar VE "Ekran bazında > Sohbet
   // içi")? Başlık yalnız o zaman yarı saydam olur; kapalıyken eskisi gibi opak.
   const { showAmbientBackground } = useAmbientBackgroundSettings();
+  const { showSnow } = useSnowSettings();
   const ambientScopeVisible = useDecorVisibility("conversation", AMBIENT_ONLY).ambient;
+  const atmosphereScopeVisible = useDecorVisibility("conversation", ATMOSPHERE_ONLY).snow;
   const ambientVisible = showAmbientBackground && ambientScopeVisible;
+  const atmosphereVisible = showSnow && atmosphereScopeVisible;
 
   // Yalnız Android 12+ (BlurTargetView): hedefin opak arka planı kökteki ambiyansı
   // örter, bu yüzden hedefin içine AYNI desenin ekranla hizalı bir kopyası konur.
@@ -950,6 +956,34 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [isGroup, friendsLoading, friendNow, navigation]);
 
+  // Grup silindi (kurucu "Grubu sil"i basılı tuttu): belge bir kez yüklendikten
+  // sonra yok olursa sohbet kapanır. Kurucunun kendisi zaten GroupInfoModal'dan
+  // "Grup silindi" bildirimi aldığı için ona ikinci bildirim gösterilmez.
+  // Okuma kuralı dinleyiciyi keserse (grup silindi / gruptan çıkarıldın)
+  // belge "yok" yerine permission-denied gelir; ikisi de sohbeti kapatır.
+  const lastGroupRef = useRef(null);
+  const [groupAccessLost, setGroupAccessLost] = useState(false);
+  useEffect(() => {
+    if (!isGroup) return;
+    if (groupData && !groupAccessLost) {
+      lastGroupRef.current = groupData;
+      return;
+    }
+    const previous = lastGroupRef.current;
+    if (!previous) return;
+    lastGroupRef.current = null;
+    setGroupInfoVisible(false);
+    if (previous.createdBy !== currentUser?.uid) {
+      toast.show({
+        type: "info",
+        text1: groupAccessLost
+          ? i18nText("autoI18n.gruba_erisim_kalmadi", "Bu gruba artık erişimin yok")
+          : i18nText("autoI18n.grup_kurucu_tarafindan_silindi", "Grup kurucu tarafından silindi"),
+      });
+    }
+    navigation.goBack();
+  }, [isGroup, groupData, groupAccessLost, currentUser?.uid, navigation]);
+
   // Gelen mesaj titreşimi için görülen en yeni mesaj zamanı (ms).
   const newestSeenAtRef = useRef(0);
 
@@ -1022,7 +1056,13 @@ export default function ChatScreen({ route, navigation }) {
     let unsubFriendProfile = () => {};
     let unsubGroup = () => {};
     if (isGroup) {
-      unsubGroup = subscribeGroup(groupId, (g) => setGroupData(g));
+      unsubGroup = subscribeGroup(
+        groupId,
+        (g) => setGroupData(g),
+        (err) => {
+          if (err?.code === "permission-denied") setGroupAccessLost(true);
+        },
+      );
     } else {
       unsubFriendProfile = onSnapshot(
         doc(db, "Users", friendUid),
@@ -2522,11 +2562,10 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
-      {/* Ambiyans arka planı: kökün ilk çocuğu = en altta, TAM EKRAN (durum
-          çubuğundan alt kenara). Başlık ve mesaj alanı bunun üstünde durur;
-          mesaj hedefi saydam olduğundan (iOS/eski Android) lekeler içeriden de
-          görünür. Android 12+'ta hedefin içinde hizalı kopyası var (aşağıda). */}
-      <ScreenDecor scope="conversation" effects={AMBIENT_ONLY} />
+      {/* Arka plan: iOS ve eski Android'de ambiyans + atmosfer tek katmanda.
+          Android 12+ opak blur hedefi mesaj alanını örttüğü için atmosfer
+          aşağıdaki hedef içinde çizilir; kökteki ambiyans başlığa da uzanır. */}
+      <ScreenDecor scope="conversation" effects={COMPOSER_TARGET_IS_NATIVE ? AMBIENT_ONLY : ATMOSPHERE_AND_AMBIENT} />
 
       {/* ── HEADER ── */}
       <ChatHeader
@@ -2583,19 +2622,19 @@ export default function ChatScreen({ route, navigation }) {
             backgroundColor={COMPOSER_TARGET_IS_NATIVE ? theme.primary : "transparent"}
             style={{ flex: 1 }}
           >
-          {/* Android 12+: opak hedef kökteki ambiyansı örter ve blur yalnız hedefin
-              içini kaydeder. Bu yüzden AYNI deseni (ortak saat + ortak lekeler)
+          {/* Android 12+: opak hedef kökteki dekoru örter ve blur yalnız hedefin
+              içini kaydeder. Bu yüzden AYNI deseni ve atmosferi
               ekranla hizalı çizen bir kopya burada durur: ambiyansın koordinatı
               ekranın sol-üstüne göre, mesaj alanı ise başlığın altından başlıyor
               → çerçeve `-messageViewportTop` kadar yukarı kayar, klip mesaj alanı
               kadar. Böylece kökteki ambiyansla dikişsiz birleşir (üst üste binmez). */}
-          {COMPOSER_TARGET_IS_NATIVE && ambientVisible ? (
-            <View style={styles.ambientClip} pointerEvents="none">
+          {COMPOSER_TARGET_IS_NATIVE && (ambientVisible || atmosphereVisible) ? (
+            <View style={styles.decorClip} pointerEvents="none">
               <View
-                style={[styles.ambientFrame, { top: -messageViewportTop }]}
+                style={[styles.decorFrame, { top: -messageViewportTop }]}
                 pointerEvents="none"
               >
-                <ScreenDecor scope="conversation" effects={AMBIENT_ONLY} />
+                <ScreenDecor scope="conversation" effects={ATMOSPHERE_AND_AMBIENT} />
               </View>
             </View>
           ) : null}
@@ -2603,7 +2642,7 @@ export default function ChatScreen({ route, navigation }) {
               Android'de blur bu görünümü fotoğrafladığı için desen buraya girmeli
               (dışına konursa opak katman onu görünmez kılar ve blur'a hiç yansımaz).
               Birebir VE grup sohbeti aynı ekran (isGroup); grup "conversation":
-              Ekran bazında > Sohbet içi. Kar yok — grup tablosu desteklemiyor. */}
+              Ekran bazında > Sohbet içi. */}
           <View style={styles.iconBgWrapper} pointerEvents="none">
             <ScreenDecor scope="conversation" iconOpacity={0.5} effects={ICON_ONLY} />
           </View>
@@ -2790,7 +2829,7 @@ export default function ChatScreen({ route, navigation }) {
                 <View style={styles.editingBanner}>
                   <View style={styles.editingAccent} />
                   <MaterialIcons name="edit" size={13} color={EDIT_COLOR} />
-                  <Text style={styles.editingText} numberOfLines={1}>
+                  <Text style={[styles.editingText, { color: theme.text.secondary }]} numberOfLines={1}>
                     {i18nText("autoI18n.duzenlendi_2", "Düzenlendi:") + " " + editingMessage.text}
                   </Text>
                   <TouchableOpacity
@@ -2803,7 +2842,7 @@ export default function ChatScreen({ route, navigation }) {
                     <Ionicons
                       name="close-circle"
                       size={18}
-                      color="rgba(255,255,255,0.35)"
+                      color={theme.text.faint || theme.text.muted}
                     />
                   </TouchableOpacity>
                 </View>
@@ -3923,6 +3962,7 @@ export default function ChatScreen({ route, navigation }) {
             groupId={groupId}
             groupData={groupData}
             currentUid={currentUser.uid}
+            onDeleted={() => setGroupInfoVisible(false)}
             onOpenProfile={(uid, name) => {
               setGroupInfoVisible(false);
               navigation.navigate("FriendProfileScreen", { friendUid: uid, friendName: name });
@@ -4112,17 +4152,17 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  // ── Ambiyans (Android 12+ hedef içi kopya) ─────────────
-  ambientClip: {
+  // ── Android 12+ blur hedefi içinde hizalı dekor ────────
+  decorClip: {
     ...StyleSheet.absoluteFillObject,
     overflow: "hidden",
     zIndex: 0,
   },
-  ambientFrame: {
+  decorFrame: {
     position: "absolute",
     left: 0,
     right: 0,
-    height: AMBIENT_FRAME_HEIGHT,
+    height: DECOR_FRAME_HEIGHT,
   },
 
   // ── IconBg wrapper ─────────────────────────────────────

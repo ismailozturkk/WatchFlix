@@ -486,8 +486,8 @@ const SectionTitle = memo(({ label, theme, count }) => (
       {label}
     </Text>
     {count != null && (
-      <View style={styles.sectionCount}>
-        <Text style={styles.sectionCountText}>{count}</Text>
+      <View style={[styles.sectionCount, theme.borders && { backgroundColor: theme.borders.subtle }]}>
+        <Text style={[styles.sectionCountText, theme.text?.muted && { color: theme.text.muted }]}>{count}</Text>
       </View>
     )}
   </View>
