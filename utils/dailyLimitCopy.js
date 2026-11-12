@@ -57,8 +57,18 @@ const de = {
   hour: "Std.",
   minute: "Min.",
 };
+const it = {
+  full: "{day} è pieno: è possibile registrare al massimo 24 ore al giorno. {remaining} rimasti, hai provato ad aggiungere {requested}. Scegli un altro giorno.",
+  fullNone: "Le 24 ore per {day} sono esaurite. Scegli un altro giorno.",
+  span: "This title ({requested}) does not fit even in {days} days back from the date you picked. Pick a later date or mark episodes one by one.",
+  spreadTitle: "Distribuito su più giorni",
+  spreadBody: "Un giorno dura al massimo 24 ore, quindi gli episodi sono stati distribuiti su {days} giorni, da {start} a {end}.",
+  hour: "h",
+  minute: "min"
+};
 
-export const DAILY_LIMIT_COPY = Object.freeze({ tr, en, es, pt, de });
+export const DAILY_LIMIT_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 export const getDailyLimitCopy = (language) =>
   DAILY_LIMIT_COPY[copyLanguage(language, Object.keys(DAILY_LIMIT_COPY))];

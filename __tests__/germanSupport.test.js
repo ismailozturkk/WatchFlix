@@ -186,7 +186,7 @@ describe("Almanca: rozet kataloğu", () => {
 describe("Almanca: dil listeleri olan kaynak dosyaları", () => {
   it("sunucu bildirim dili listesi de'yi içeriyor ve metinleri var", () => {
     const sunucu = oku("functions/index.js");
-    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de"\]/);
+    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it"\]/);
     expect(sunucu).toMatch(/\n {2}de: \{\n {4}someone: "Jemand"/);
     expect(sunucu).toMatch(/\n {2}de: \{\n {4}single: \(p\) =>/);
   });
@@ -223,7 +223,7 @@ describe("Almanca: içe aktarma akışı ve düzeltilen denetim bulguları", () 
   it("içe aktarma metinleri 5 dilde ve hata kodları çözülüyor", () => {
     const { getImportCopy, importErrorText, IMPORT_COPY } = require("../components/import/importCopy");
     const { ImportError } = require("../services/import/importErrors");
-    expect(Object.keys(IMPORT_COPY).sort()).toEqual(["de", "en", "es", "pt", "tr"]);
+    expect(Object.keys(IMPORT_COPY).sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
     const de = getImportCopy("de");
     expect(importErrorText(new ImportError("noBundle"), de)).toBe(de.errors.noBundle);
     expect(importErrorText(new Error("ham"), de)).toBe(de.unexpected);

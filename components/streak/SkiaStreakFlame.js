@@ -2,8 +2,8 @@
 //
 // Seri alevinin Skia çizimi: tek bir runtime shader (utils/streakFlameShader.js
 // FLAME_SKSL) tuvali boyar. Alev gövdesi, sıcaklık rampası, kıvılcımlar, hale, taç,
-// yıldızlar ve gökkuşağı hepsi aynı geçişte, GPU'da çizilir; React'e kare başına
-// yük binmez. Kararlar (kademe, ihtişam, mola) utils/streakFlame.js streakLook().
+// ve yıldızlar hepsi aynı geçişte, GPU'da çizilir; React'e kare başına
+// yük binmez. Kararlar (kademe, ihtişam) utils/streakFlame.js streakLook().
 //
 // YERLEŞİM: bileşen eski SVG alevle aynı kutuyu kaplar (size × 0,78 genişlik);
 // tuval bu kutudan büyüktür ve ortalanmış durur, efektler kutunun dışına taşar
@@ -61,7 +61,6 @@ const FRAME_MS = 1000 / 60 - 2;
 function SkiaStreakFlame({ look, size = 24, animated = true, dimmed = false, renderScale = 1, style, testID }) {
   const width = Math.round(size * FLAME_ASPECT);
   const height = Math.round(size);
-  const paused = Boolean(look?.paused);
   const canvas = flameCanvasBox(width, height);
   const rs = renderScale > 0 && renderScale < 1 ? renderScale : 1;
   // pixelRatio = rs: shader koordinatları küçük tuvale göre (res/box), ayrıntı
@@ -75,8 +74,8 @@ function SkiaStreakFlame({ look, size = 24, animated = true, dimmed = false, ren
   const lastFrame = useSharedValue(0);
   const speed = useSharedValue(1);
   useEffect(() => {
-    speed.value = flameTimeScale({ paused, dimmed });
-  }, [paused, dimmed, speed]);
+    speed.value = flameTimeScale({ dimmed });
+  }, [dimmed, speed]);
 
   const frame = useFrameCallback((info) => {
     "worklet";
@@ -103,7 +102,7 @@ function SkiaStreakFlame({ look, size = 24, animated = true, dimmed = false, ren
 
   if (!EFFECT) return null;
   return (
-    <View testID={testID} pointerEvents="none" style={[{ width, height, opacity: dimmed && !paused ? 0.8 : 1 }, style]}>
+    <View testID={testID} pointerEvents="none" style={[{ width, height, opacity: dimmed ? 0.8 : 1 }, style]}>
       <Canvas
         pointerEvents="none"
         style={{

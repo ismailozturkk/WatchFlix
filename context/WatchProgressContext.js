@@ -22,6 +22,7 @@ import useWatchProgress from "@hooks/useWatchProgress";
 import useBadgeCelebration from "@hooks/useBadgeCelebration";
 import useStreakCelebration from "@hooks/useStreakCelebration";
 import useStreakReminder from "@hooks/useStreakReminder";
+import usePublicStreakSync from "@hooks/usePublicStreakSync";
 
 const WatchProgressContext = createContext(null);
 
@@ -35,6 +36,7 @@ export function WatchProgressProvider({ children }) {
   useStreakCelebration(deger);
   // Hafta kaybedilmek üzereyken isteğe bağlı yerel bildirim (alev sayfasındaki anahtar).
   useStreakReminder(deger);
+  usePublicStreakSync(deger?.seriler);
   return (
     <WatchProgressContext.Provider value={deger}>
       {children}

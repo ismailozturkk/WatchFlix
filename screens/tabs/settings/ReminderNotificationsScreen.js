@@ -63,7 +63,8 @@ export default function ReminderNotificationsScreen() {
     de: `Deine ${streamingGate.limit} neuesten Titel werden verfolgt${
       streamingBelowPremium ? ` · ${premiumStreamingLimit} mit Premium` : ""
     }`,
-  });
+
+  it: `I tuoi ${streamingGate.limit} ultimi titoli vengono monitorati${streamingBelowPremium ? ` · ${premiumStreamingLimit} con Premium` : ""}`});
   const { notificationSettings, changeNotificationSettings } =
     useNotificationSettings();
   const { reminderPreviewLimit, changeReminderPreviewLimit } =

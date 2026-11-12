@@ -7,12 +7,12 @@
  * görüneceğine karar veriyor. JS çalışmazsa iki blok da görünür kalır —
  * yasal metin her koşulda okunabilir olmalı.
  *
- * Site 5 dil bilir (site-lang.js: tr · en · es · pt · de) ama HUKUKİ METİN yalnız
- * Türkçe ve İngilizce. es/pt/de seçiliyse İngilizce blok gösterilir; sayfanın
- * çerçevesi (başlık, içindekiler, alt bilgi) seçilen dilde, üstte de o dilde bir
- * not çıkar ("metin tr/en; çelişkide Türkçe esas"). Hukuki metni çevirmek hukuki
- * inceleme ister; çevrilirse ilgili dil için <section data-lang-block="xx"> ekle,
- * BLOCK_LANGS'e yaz ve CHROME.<dil>.note'u sil.
+ * Site 12 dil bilir (site-lang.js: tr · en · es · pt · de · it · fr · ja · zh · hi · id · ko)
+ * ama HUKUKİ METİN yalnız Türkçe ve İngilizce. Diğer diller seçiliyse İngilizce
+ * blok gösterilir; sayfanın çerçevesi (başlık, içindekiler, alt bilgi) seçilen
+ * dilde, üstte de o dilde bir not çıkar ("metin tr/en; çelişkide Türkçe esas").
+ * Hukuki metni çevirmek hukuki inceleme ister; çevrilirse ilgili dil için
+ * <section data-lang-block="xx"> ekle, BLOCK_LANGS'e yaz ve CHROME.<dil>.note'u sil.
  *
  * Dil seçimi landing (index.html) ile aynı localStorage anahtarını paylaşır
  * ("wf_lang"). Uygulama içindeki bağlantılar `?lang=` ekler: telefonun dili
@@ -39,6 +39,34 @@
     de: {
       home: "Startseite", privacy: "Datenschutzerklärung", terms: "Nutzungsbedingungen", "delete": "Konto löschen", toc: "Inhalt", menu: "Sprache",
       note: "Dieser Rechtstext gibt es nur auf Türkisch und Englisch. Wir zeigen dir die englische Fassung; bei Abweichungen gilt der türkische Text.",
+    },
+    it: {
+      home: "Home", privacy: "Informativa sulla privacy", terms: "Termini di utilizzo", "delete": "Elimina account", toc: "Indice", menu: "Lingua",
+      note: "Questo testo legale è disponibile solo in turco e in inglese. Ti mostriamo la versione in inglese; in caso di divergenze tra le versioni, prevale il testo in turco.",
+    },
+    fr: {
+      home: "Accueil", privacy: "Politique de confidentialité", terms: "Conditions d’utilisation", "delete": "Supprimer le compte", toc: "Sommaire", menu: "Langue",
+      note: "Ce texte juridique est uniquement disponible en turc et en anglais. Nous vous affichons la version anglaise ; en cas de divergence entre les versions, le texte turc prévaut.",
+    },
+    ja: {
+      home: "ホーム", privacy: "プライバシーポリシー", terms: "利用規約", "delete": "アカウント削除", toc: "目次", menu: "言語",
+      note: "この法的文書はトルコ語と英語でのみ提供されています。以下に英語版を表示しています。言語間に相違がある場合は、トルコ語版が優先されます。",
+    },
+    zh: {
+      home: "首页", privacy: "隐私政策", terms: "使用条款", "delete": "删除账户", toc: "目录", menu: "语言",
+      note: "本法律文本仅提供土耳其语和英语版本。当前为您显示英语版本；如各版本之间存在差异，以土耳其语文本为准。",
+    },
+    hi: {
+      home: "होम", privacy: "गोपनीयता नीति", terms: "उपयोग की शर्तें", "delete": "खाता हटाएँ", toc: "विषय-सूची", menu: "भाषा",
+      note: "यह कानूनी पाठ केवल तुर्की और अंग्रेज़ी में उपलब्ध है। हम आपको अंग्रेज़ी संस्करण दिखा रहे हैं; यदि संस्करणों में कोई अंतर होता है, तो तुर्की पाठ मान्य होगा।",
+    },
+    id: {
+      home: "Beranda", privacy: "Kebijakan Privasi", terms: "Ketentuan Penggunaan", "delete": "Hapus Akun", toc: "Daftar Isi", menu: "Bahasa",
+      note: "Teks hukum ini hanya tersedia dalam bahasa Turki dan Inggris. Kami menampilkan versi bahasa Inggris; jika terdapat perbedaan antarversi, teks bahasa Turki yang berlaku.",
+    },
+    ko: {
+      home: "홈", privacy: "개인정보 처리방침", terms: "이용약관", "delete": "계정 삭제", toc: "목차", menu: "언어",
+      note: "이 법률 문서는 튀르키예어와 영어로만 제공됩니다. 아래에 영어 버전을 표시하며, 버전 간 차이가 있을 경우 튀르키예어 원문이 우선합니다.",
     },
   };
 

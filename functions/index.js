@@ -907,6 +907,29 @@ exports.applyBetaAccess = onSchedule(
   },
 );
 
+/**
+ * Grup silinince (kurucu "Grubu sil"i basılı tuttu — services/groupsService.js
+ * deleteGroup; ya da hesap silmede son üye gitti) geride kalanları süpürür:
+ *   • groups/{gid} altındaki bütün alt koleksiyonlar (messages, pins,
+ *     clubRounds…) — belge silinse de alt ağaç Firestore'da yaşamaya devam eder,
+ *   • her üyenin Users/{uid}/groupInbox/{gid} okunmamış sayacı (başkasının
+ *     sayacını istemci silemez; kalırsa Mesajlar rozeti hayalet sayı gösterir).
+ */
+exports.cleanupGroupOnDelete = onDocumentDeleted(
+  { ...CAPACITY.trigger, document: "groups/{groupId}" },
+  async (event) => {
+    const groupId = event.params.groupId;
+    const members = event.data?.get("members");
+    const memberIds = Array.isArray(members) ? members.filter((m) => typeof m === "string" && m) : [];
+    await db.recursiveDelete(db.doc(`groups/${groupId}`));
+    if (memberIds.length) {
+      const batch = db.batch();
+      memberIds.forEach((uid) => batch.delete(db.doc(`Users/${uid}/groupInbox/${groupId}`)));
+      await batch.commit();
+    }
+  },
+);
+
 /** Hesap silinince davet verisi de silinir (kod, davet hesabı, davet kayıtları). */
 exports.cleanupReferralOnUserDeleted = onDocumentDeleted(
   { ...CAPACITY.trigger, document: "Users/{uid}" },
@@ -1603,6 +1626,24 @@ const STRINGS = {
     mention: "💬 hat dich erwähnt",
     mention_text: "💬 hat dich erwähnt: {text}",
   },
+  it: {
+    someone: "Qualcuno",
+    notification: "Notifica",
+    messageFallback: "ti ha inviato un messaggio",
+    cineswipe_invite: "🎬 ti ha invitato in una stanza CineSwipe",
+    cineswipe_result: "🎬 I risultati di CineSwipe sono pronti",
+    cineswipe_result_detail: "🎬 I risultati di CineSwipe sono pronti · {n} affinità in comune",
+    game_challenge: "⚔️ ti ha sfidato a un duello giornaliero",
+    friend_request: "👤 ti ha inviato una richiesta di amicizia",
+    friend_accepted: "🤝 ha accettato la tua richiesta di amicizia",
+    post_like: "❤️ ha messo Mi piace al tuo post",
+    post_comment: "💬 ha commentato il tuo post",
+    post_comment_text: "💬 ha commentato: {text}",
+    comment_reply: "💬 ha risposto al tuo commento",
+    comment_reply_text: "💬 ha risposto: {text}",
+    mention: "💬 ti ha menzionato",
+    mention_text: "💬 ti ha menzionato: {text}",
+  },
 };
 
 // Push dili: istemci Users/{uid}.notificationLanguage'a uygulama dilini yazar
@@ -1610,7 +1651,7 @@ const STRINGS = {
 // (alan yokken varsayılan her zaman Türkçeydi). Alan var ama bu listede yoksa
 // (ileride eklenecek bir dil, bu deploy'dan önce) → İNGİLİZCE: yabancı kullanıcıya
 // Türkçe push gitmesin. YENİ DİL: STRINGS + STREAM_STRINGS'e giriş + bu liste.
-const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt", "de"];
+const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt", "de", "it"];
 function pickNotificationLang(value) {
   if (!value) return "tr";
   return NOTIFICATION_LANGUAGES.includes(value) ? value : "en";
@@ -2325,6 +2366,11 @@ const STREAM_STRINGS = {
     single: (p) => `📺 Jetzt verfügbar bei ${p}`,
     multi: (ps) => `📺 Jetzt verfügbar bei: ${ps}`,
     fallbackTitle: "Deine Merkliste",
+  },
+  it: {
+    single: (p) => `📺 Ora disponibile su ${p}`,
+    multi: (ps) => `📺 Ora disponibile su: ${ps}`,
+    fallbackTitle: "La tua lista Da vedere",
   },
 };
 

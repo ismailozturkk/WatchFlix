@@ -25,7 +25,7 @@ import {
   seriKorumasiniIlerlet,
 } from "./watchActivity";
 import { SAYIM_TURU } from "./watchLedgerCore";
-import { alevBirlestir, alevIlerlet, alevOku, alevRekorYukselt, molaVer } from "./streakWeekly";
+import { alevBirlestir, alevIlerlet, alevOku, alevRekorYukselt } from "./streakWeekly";
 import { seriDurumu } from "./streakState";
 import { streakBridge } from "./streakBridge";
 import { Keys, get, remove, set } from "../services/storage";
@@ -50,25 +50,9 @@ export function subscribeLedgerReset(listener) {
   return () => resetListeners.delete(listener);
 }
 
-// Defter mutabakat DIŞINDA değişince (mola verildi) canlı kanca yeniden okur.
-const changeListeners = new Set();
-/** `listener(uid, ledger)`. Aboneliği bırakan fonksiyon döner. */
-export function subscribeLedgerChange(listener) {
-  changeListeners.add(listener);
-  return () => changeListeners.delete(listener);
-}
-function degisimiDuyur(uid, ledger) {
-  changeListeners.forEach((listener) => {
-    try {
-      listener(uid, ledger);
-    } catch {
-      // bir dinleyicinin hatası diğerlerini durdurmasın
-    }
-  });
-}
 
 // ── BULUT EŞİTLEMESİ ─────────────────────────────────────────────────────────
-// Haftalık seri (gün listesi, alev koruması: kalkan/telafi/mola, rekorlar, ev saat
+// Haftalık seri (gün listesi, alev koruması: kalkan/telafi, rekorlar, ev saat
 // dilimi) Users/{uid}/private/streak belgesine yazılır (yalnız sahibi okur;
 // services/streakRuntime.js). Yeniden kurulumda / yeni cihazda seri geri gelir, iki
 // cihaz aynı seriyi görür.
@@ -177,30 +161,6 @@ function alevIslet(ledger, gun, simdi) {
     seriler: alev === islem.alev ? durum : seriDurumu({ ...a, alev }, simdi),
     degisti,
   };
-}
-
-/**
- * Bu haftaya (ya da karar bekleyen geçen haftaya) MOLA verir. Ayda bir.
- * @returns {Promise<{ ok:boolean, hedef?:"bu"|"gecen", sebep?:string, seriler?:object }>}
- */
-export async function molaVerDefter(uid) {
-  if (!uid) return { ok: false, sebep: "uid" };
-  const donem = epoch;
-  await streakBridge.hazir();
-  const simdi = streakBridge.simdi();
-  const mevcut = await buluttanCek(uid, await loadLedger(uid));
-  if (!mevcut.baseline) return { ok: false, sebep: "seri" };
-  const z = zamanaHazirla(mevcut, simdi, streakBridge.dogrulandi());
-  const a = z.ledger.aktiflik;
-  const ilk = alevIlerlet({ gunler: a.gunler, alev: a.alev }, z.gun).alev;
-  const r = molaVer({ gunler: a.gunler, alev: ilk, gunluk: a.gunluk }, z.gun);
-  if (!r.ok) return { ok: false, sebep: r.sebep };
-  const islenmis = alevIslet({ ...z.ledger, aktiflik: { ...a, alev: r.alev } }, z.gun, simdi);
-  if (donem !== epoch) return { ok: false, sebep: "sifirlandi" };
-  await saveLedger(uid, islenmis.ledger);
-  bulutaGonder(uid, islenmis.ledger);
-  degisimiDuyur(uid, islenmis.ledger);
-  return { ok: true, hedef: r.hedef, seriler: islenmis.seriler };
 }
 
 /**
@@ -316,7 +276,7 @@ export async function reconcileLedger(uid, {
   const korunmus = korumaDegisti
     ? { ...a.ledger, aktiflik: { ...a.ledger.aktiflik, koruma: islem.koruma } }
     : a.ledger;
-  // Haftalık alev (profildeki 🔥): mola / telafi / kalkan kararları.
+  // Haftalık alev (profildeki 🔥): telafi / kalkan kararları.
   const alevli = alevIslet(korunmus, seriGunu, simdi);
   const seriler = alevli.seriler;
   const r = rekorYukselt(alevli.ledger, seriler);

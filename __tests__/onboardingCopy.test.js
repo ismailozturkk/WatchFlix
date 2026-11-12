@@ -36,7 +36,8 @@ describe("onboarding metinleri", () => {
     expect(ONBOARDING_COPY.en.language).toBe("Español");
     expect(ONBOARDING_COPY.es.language).toBe("Português");
     expect(ONBOARDING_COPY.pt.language).toBe("Deutsch");
-    expect(ONBOARDING_COPY.de.language).toBe("Türkçe");
+    expect(ONBOARDING_COPY.de.language).toBe("Italiano");
+    expect(ONBOARDING_COPY.it.language).toBe("Türkçe");
   });
 
   it("vurgulanan kelime başlığın içinde geçiyor (yoksa vurgu sessizce kaybolur)", () => {

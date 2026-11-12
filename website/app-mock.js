@@ -17,7 +17,10 @@
   var MOCK = root.MOCK_I18N || {};
   var HOME = root.HOME_I18N || {};
   var lang = "en";
-  var LOCALES = { tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE" };
+  var LOCALES = {
+    tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE",
+    it: "it-IT", fr: "fr-FR", ja: "ja-JP", zh: "zh-CN", hi: "hi-IN", id: "id-ID", ko: "ko-KR",
+  };
 
   /* ── Metin ve biçim ─────────────────────────────────────────────────── */
   function t(key, vars) {
@@ -409,7 +412,7 @@
       '<div class="am-lab">' + t("mGrpAppearance") + "</div>" + themeCard(st) +
       '<div class="am-card stacked">' + row("palette", t("mRowPersonal"), null, { tone: "violet" }) + row("image", t("mRowPoster"), null, { tone: "orange" }) + row("apps", t("mRowWidgets"), null, { tone: "teal" }) + row("phone", t("mRowHaptics"), null, { right: toggle(true) }) + "</div>" +
       '<div class="am-lab">' + t("mGrpLang") + "</div>" +
-      '<div class="am-card">' + row("globe", t("mLanguage"), "Türkçe · English · Español · Português · Deutsch") + row("tv", t("mRowSubs"), null, { tone: "orange" }) + row("lock", t("mRowAdult"), null, { tone: "red", right: toggle(false) }) + "</div>" +
+      '<div class="am-card">' + row("globe", t("mLanguage"), "Türkçe · English · Español · Português · Deutsch · Italiano · Français · 日本語 · 中文 · हिन्दी · Bahasa Indonesia · 한국어") + row("tv", t("mRowSubs"), null, { tone: "orange" }) + row("lock", t("mRowAdult"), null, { tone: "red", right: toggle(false) }) + "</div>" +
       '<div class="am-lab">' + t("mGrpNotif") + "</div>" +
       '<div class="am-card">' + row("bell", t("mRowReminders"), null, { tone: "orange" }) + row("chat", t("mRowSocialNotif"), null, { tone: "green" }) + "</div>" +
       '<div class="am-lab">' + t("mGrpData") + "</div>" +

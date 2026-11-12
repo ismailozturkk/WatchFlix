@@ -112,6 +112,9 @@ import { readProfileBanner } from "../../../utils/profileBanner";
 import { getProfileBannerCopy } from "../../../utils/profileBannerCopy";
 import { removeShowcaseBadge } from "../../../utils/badgeShowcase";
 import { useWatchProgressContext } from "../../../context/WatchProgressContext";
+import { profileAvatarProgress } from "../../../utils/profileAvatarProgress";
+import { publicStreakFromSeriler, readPublicStreak } from "../../../utils/publicStreak";
+import StreakFlameBadge from "../../../components/streak/StreakFlameBadge";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -421,7 +424,8 @@ export default function FriendProfileScreen({ route, navigation }) {
   // Kaydedilmemiş değişiklikle ekrandan çıkılırken (geri / kaydırma) onay sorulur;
   // onaylanınca bekletilen gezinme eylemi burada.
   const pendingLeaveRef = useRef(null);
-  const ownKartlar = useWatchProgressContext()?.kartlar;
+  const ownWatchProgress = useWatchProgressContext();
+  const ownKartlar = ownWatchProgress?.kartlar;
   // native-stack'te düz `beforeRemove` + preventDefault desteklenmiyor: kaydırarak
   // geri dönüşte ekran yerelde kalkıp JS durumunda kalıyordu ("removed natively
   // but didn't get removed from JS state"). usePreventRemove kaydırma hareketini
@@ -665,6 +669,13 @@ export default function FriendProfileScreen({ route, navigation }) {
       topGenres,
     };
   }, [canViewLists, allLists, subMovies, subShows, language]);
+  const avatarProgress = useMemo(
+    () => stats ? profileAvatarProgress(stats.totalMinutes) : null,
+    [stats?.totalMinutes, Boolean(stats), language],
+  );
+  const visibleStreak = isSelf
+    ? readPublicStreak(publicStreakFromSeriler(ownWatchProgress?.seriler))
+    : readPublicStreak(profile?.publicStreak);
 
   // ── Görünür listeler: listVisible haritası + sabit liste sıralaması ──────
   // Dört öntanımlı liste VE özel listeler artık kendi alt koleksiyonlarında
@@ -1214,6 +1225,16 @@ export default function FriendProfileScreen({ route, navigation }) {
           name={displayName || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")}
           username={profile.username}
           badges={identityBadges}
+          avatarProgress={avatarProgress}
+          streak={canViewProfile && visibleStreak ? (
+            <StreakFlameBadge
+              seriler={visibleStreak}
+              theme={theme}
+              language={language}
+              variant="hero"
+              readOnly
+            />
+          ) : null}
           language={language}
           bio={canViewProfile ? profile.bio : null}
           socialLinks={canViewSocialLinks ? (visibleSocialLinks?.uid === friendUid ? (visibleSocialLinks.links ?? profile.socialLinks) : profile.socialLinks) : null}

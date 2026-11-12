@@ -48,9 +48,9 @@ import { showBadgeCelebration } from "../../../hooks/useBadgeCelebration";
 import { showStreakCelebration } from "../../../hooks/useStreakCelebration";
 import { DEV_BADGE_CELEBRATIONS as BADGE_CELEBRATIONS } from "../../../utils/devLabSamples";
 
-const STREAK_PRESETS = [0, 1, 2, 4, 5, 8, 9, 13, 17, 26, 49, 52, 53];
+const STREAK_PRESETS = [0, 1, 2, 4, 5, 8, 9, 12, 13, 15, 16, 20];
 const STREAK_STEPS = [-4, -1, 1, 4];
-const STATUS_LABELS = { lit: "Yanıyor", risk: "Risk ⌛", repair: "Telafi 🩹", shield: "Kalkan 🛡", paused: "Mola ⏸" };
+const STATUS_LABELS = { lit: "Yanıyor", risk: "Risk ⌛", repair: "Telafi 🩹", shield: "Kalkan 🛡" };
 const SPLASH_HOLD_MS = 2600;
 
 function Chip({ label, active, onPress, C, testID }) {
@@ -110,16 +110,15 @@ function FlamePreviewLab({ C }) {
   const stageSize = Math.round(inner / 3 / 1.35);
   const shapeSize = Math.round(inner / 2 / 1.35);
   const weeks = Math.max(1, sim.weeks);
-  const paused = sim.status === "paused";
   const dimmed = sim.status === "risk" || sim.status === "repair" || sim.status === "shield";
   const days = Math.max(1, sim.weekDays);
-  const look = useMemo(() => streakLook(weeks, days, { paused }), [weeks, days, paused]);
-  const stages = useMemo(() => [1, 2, 3, 4, 5, 6, 7].map((d) => streakLook(weeks, d, { paused })), [weeks, paused]);
-  // Kıvılcım biçimi haftaya bağlı: bu renk kademesinin 4 haftası (her biri 4. günde).
-  const shapes = useMemo(() => {
-    const first = Math.floor((weeks - 1) / 4) * 4 + 1;
-    return [0, 1, 2, 3].map((i) => ({ week: first + i, look: streakLook(first + i, 4, { paused }) }));
-  }, [weeks, paused]);
+  const look = useMemo(() => streakLook(weeks, days), [weeks, days]);
+  const stages = useMemo(() => [1, 2, 3, 4, 5, 6, 7].map((d) => streakLook(weeks, d)), [weeks]);
+  // Kıvılcım biçimi 4 haftada bir: dört bölümün ilk haftaları (her biri 4. günde).
+  const shapes = useMemo(
+    () => [1, 5, 9, 13].map((week) => ({ week, look: streakLook(week, 4) })),
+    [],
+  );
 
   useEffect(() => {
     if (!playing) return undefined;
@@ -161,7 +160,7 @@ function FlamePreviewLab({ C }) {
         </View>
       </GlassTouchable>
       <Text allowFontScaling={false} style={[styles.streakMeta, { color: C.muted }]}>
-        {`${weeks}. hafta · renk ${look.palette.id} · kıvılcım ${SHAPE_NAMES[look.spark.shape]} ×${look.spark.count} · ihtişam ${look.stage}/7 (${STAGE_NAMES[look.stage - 1]})${paused ? " · mola" : ""}`}
+        {`${weeks}. hafta · renk ${look.palette.id} · kıvılcım ${SHAPE_NAMES[look.spark.shape]} ×${look.spark.count} · ihtişam ${look.stage}/7 (${STAGE_NAMES[look.stage - 1]})`}
       </Text>
 
       <Text allowFontScaling={false} style={[styles.subTitle, { color: C.text }]}>İhtişam kademeleri (bu haftanın günü)</Text>
@@ -174,7 +173,7 @@ function FlamePreviewLab({ C }) {
         ))}
       </View>
 
-      <Text allowFontScaling={false} style={[styles.subTitle, { color: C.text }]}>Kıvılcım biçimi (her hafta değişir)</Text>
+      <Text allowFontScaling={false} style={[styles.subTitle, { color: C.text }]}>Kıvılcım biçimi (4 haftada bir değişir)</Text>
       <View style={[styles.flameStrip, { backgroundColor: stageBg }]}>
         {shapes.map(({ week, look: item }) => (
           <View key={week} style={[styles.flameCell, { width: "48%", paddingTop: shapeSize * 0.45 }]}>
@@ -183,7 +182,7 @@ function FlamePreviewLab({ C }) {
           </View>
         ))}
       </View>
-      <Hint C={C}>{`Biçimler: ${SPARK_SHAPES.map((k) => SHAPE_NAMES[k]).join(" → ")}. Renk 4 haftada bir değişir, 52. haftadan sonra gökkuşağı halkası.`}</Hint>
+      <Hint C={C}>{`Biçimler: ${SPARK_SHAPES.map((k) => SHAPE_NAMES[k]).join(" → ")}. Renk her hafta değişir: 16. haftada Efsane.`}</Hint>
       <Hint C={C}>Çizici seçimi profildeki alevi de değiştirir (yalnız bu oturum). Büyük aleve dokun: tam ekran.</Hint>
       {full ? (
         <FlameFullscreen
@@ -192,7 +191,6 @@ function FlamePreviewLab({ C }) {
           dimmed={dimmed}
           weeks={weeks}
           days={days}
-          paused={paused}
           onClose={() => setFull(false)}
         />
       ) : null}
@@ -202,7 +200,7 @@ function FlamePreviewLab({ C }) {
 
 // Tam ekran alev: koyu zemin, ekranın büyük kısmını kaplayan alev; gün ve hafta
 // buradan da değiştirilir (simülatörle aynı durum).
-function FlameFullscreen({ C, look, dimmed, weeks, days, paused, onClose }) {
+function FlameFullscreen({ C, look, dimmed, weeks, days, onClose }) {
   const win = useWindowDimensions();
   const size = Math.round(Math.min(win.width / 1.3, win.height * 0.4));
   return (
@@ -213,7 +211,7 @@ function FlameFullscreen({ C, look, dimmed, weeks, days, paused, onClose }) {
         </View>
         <View style={styles.fullControls}>
           <Text allowFontScaling={false} style={[styles.streakMeta, styles.fullMeta]}>
-            {`${weeks}. hafta · ${look.palette.id} · ${SHAPE_NAMES[look.spark.shape]} · ihtişam ${look.stage}/7 (${STAGE_NAMES[look.stage - 1]})${paused ? " · mola" : ""}`}
+            {`${weeks}. hafta · ${look.palette.id} · ${SHAPE_NAMES[look.spark.shape]} · ihtişam ${look.stage}/7 (${STAGE_NAMES[look.stage - 1]})`}
           </Text>
           <View style={[styles.wrap, styles.fullRow]}>
             {[1, 2, 3, 4, 5, 6, 7].map((n) => (
@@ -224,7 +222,6 @@ function FlameFullscreen({ C, look, dimmed, weeks, days, paused, onClose }) {
             {STREAK_STEPS.map((d) => (
               <Chip key={d} C={C} label={`${d > 0 ? "+" : ""}${d} hf`} onPress={() => setDevStreak((p) => ({ weeks: Math.max(1, p.weeks + d) }))} />
             ))}
-            <Chip C={C} label={paused ? "Molayı bitir" : "Mola"} active={paused} onPress={() => setDevStreak({ status: paused ? "lit" : "paused" })} />
             <Chip C={C} label="Kapat ✕" onPress={onClose} />
           </View>
         </View>

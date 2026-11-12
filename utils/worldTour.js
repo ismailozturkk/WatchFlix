@@ -11,24 +11,24 @@
 // güvenilir değil), bu yüzden raf bir dil seçtirir, hepsini karıştırmaz. Ana liste dili (İngilizce) bilerek
 // çiplerde YOK: ana akış zaten onunla dolu.
 //
-// DİL: tr/en/es/pt/de; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
+// DİL: tr/en/es/pt/de/it; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
 //
-// YENİ DİL ÇİPİ: aşağıdaki listeye bir giriş ekle (kod, bayrak, beş dilde ad). __tests__/worldTour.test.js
+// YENİ DİL ÇİPİ: aşağıdaki listeye bir giriş ekle (kod, bayrak, altı dilde ad). __tests__/worldTour.test.js
 // her girişin tüm dillerde dolu olduğunu ve kodların tekrar etmediğini doğrular.
 import { pickByLanguage } from "./appLanguages";
 
-const tri = (tr, en, es, pt, de) => ({ tr, en, es: es ?? en, pt: pt ?? en, de: de ?? en });
+const tri = (tr, en, es, pt, de, it) => ({ tr, en, es: es ?? en, pt: pt ?? en, de: de ?? en, it: it ?? en });
 
 /** Çip sırası = ekrandaki sıra. İlk giriş varsayılandır. */
 export const WORLD_TOUR_LANGUAGES = Object.freeze([
-  { code: "ko", flag: "🇰🇷", name: tri("Korece", "Korean", "Coreano", "Coreano", "Koreanisch") },
-  { code: "ja", flag: "🇯🇵", name: tri("Japonca", "Japanese", "Japonés", "Japonês", "Japanisch") },
-  { code: "tr", flag: "🇹🇷", name: tri("Türkçe", "Turkish", "Turco", "Turco", "Türkisch") },
-  { code: "fr", flag: "🇫🇷", name: tri("Fransızca", "French", "Francés", "Francês", "Französisch") },
-  { code: "es", flag: "🇪🇸", name: tri("İspanyolca", "Spanish", "Español", "Espanhol", "Spanisch") },
-  { code: "hi", flag: "🇮🇳", name: tri("Hintçe", "Hindi", "Hindi", "Hindi", "Hindi") },
-  { code: "it", flag: "🇮🇹", name: tri("İtalyanca", "Italian", "Italiano", "Italiano", "Italienisch") },
-  { code: "de", flag: "🇩🇪", name: tri("Almanca", "German", "Alemán", "Alemão", "Deutsch") },
+  { code: "ko", flag: "🇰🇷", name: tri("Korece", "Korean", "Coreano", "Coreano", "Koreanisch", "Coreano") },
+  { code: "ja", flag: "🇯🇵", name: tri("Japonca", "Japanese", "Japonés", "Japonês", "Japanisch", "Giapponese") },
+  { code: "tr", flag: "🇹🇷", name: tri("Türkçe", "Turkish", "Turco", "Turco", "Türkisch", "Turco") },
+  { code: "fr", flag: "🇫🇷", name: tri("Fransızca", "French", "Francés", "Francês", "Französisch", "Francese") },
+  { code: "es", flag: "🇪🇸", name: tri("İspanyolca", "Spanish", "Español", "Espanhol", "Spanisch", "Spagnolo") },
+  { code: "hi", flag: "🇮🇳", name: tri("Hintçe", "Hindi", "Hindi", "Hindi", "Hindi", "Hindi") },
+  { code: "it", flag: "🇮🇹", name: tri("İtalyanca", "Italian", "Italiano", "Italiano", "Italienisch", "Italiano") },
+  { code: "de", flag: "🇩🇪", name: tri("Almanca", "German", "Alemán", "Alemão", "Deutsch", "Tedesco") },
 ]);
 
 export const WORLD_TOUR_DEFAULT = WORLD_TOUR_LANGUAGES[0].code;
@@ -52,7 +52,7 @@ export function worldTourChipLabel(code, language) {
   return `${entry.flag} ${pickByLanguage(language, entry.name)}`;
 }
 
-const TITLE = tri("Dünya Turu", "World Tour", "Vuelta al mundo", "Volta ao mundo", "Weltreise");
+const TITLE = tri("Dünya Turu", "World Tour", "Vuelta al mundo", "Volta ao mundo", "Weltreise", "Giro del mondo");
 export const worldTourTitle = (language) => pickByLanguage(language, TITLE);
 
 /** "Tümü" ekranının başlığı: "Dünya Turu · Korece". */
@@ -64,7 +64,7 @@ const EMPTY = tri(
   "Nothing to show in this language right now",
   "Ahora mismo no hay nada en este idioma",
   "Nada para mostrar neste idioma agora",
-  "In dieser Sprache gibt es gerade nichts zu zeigen",
+  "In dieser Sprache gibt es gerade nichts zu zeigen", "Al momento non c'è nulla da mostrare in questa lingua",
 );
 export const worldTourEmptyText = (language) => pickByLanguage(language, EMPTY);
 

@@ -4,7 +4,7 @@ import { KF_STRIDE, KIND, buildParticles } from "../utils/weatherParticles";
 
 const SCENES = [
   "swScene", "matrixScene", "hpScene", "lotrScene", "duneScene", "batScene", "spiderScene", "bbScene", "gotScene",
-  "vikScene", "pbScene", "shScene", "soprScene", "dnScene", "aotScene", "narScene", "opScene", "fmaScene", "rmScene",
+  "vikScene", "pbScene", "aotScene", "rmScene",
 ];
 
 describe("evren sahneleri — rota bütünlüğü", () => {

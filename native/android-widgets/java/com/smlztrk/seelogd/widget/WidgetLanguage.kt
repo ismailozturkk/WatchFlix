@@ -11,19 +11,20 @@ import java.util.Locale
  * çağrısına metni ver; iOS tarafı targets/reminder-widget/shared.swift'te aynı yapıda.
  */
 object WidgetLanguage {
-  private val SUPPORTED = setOf("tr", "es", "pt", "de")
+  private val SUPPORTED = setOf("tr", "es", "pt", "de", "it")
 
   fun of(raw: String?): String {
     val base = (raw ?: "tr").trim().lowercase(Locale.ROOT).substringBefore('-').substringBefore('_')
     return if (base in SUPPORTED) base else "en"
   }
 
-  fun pick(lang: String, tr: String, en: String, es: String, pt: String, de: String): String =
+  fun pick(lang: String, tr: String, en: String, es: String, pt: String, de: String, it: String): String =
     when (lang) {
       "tr" -> tr
       "es" -> es
       "pt" -> pt
       "de" -> de
+      "it" -> it
       else -> en
     }
 
@@ -33,6 +34,7 @@ object WidgetLanguage {
       "es" -> Locale("es")
       "pt" -> Locale("pt", "BR")
       "de" -> Locale("de", "DE")
+      "it" -> Locale("it", "IT")
       else -> Locale.ENGLISH
     }
 }

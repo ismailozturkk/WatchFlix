@@ -35,18 +35,18 @@ const pad2 = (n) => String(n).padStart(2, "0");
 // renk + animasyonlu ikon). Firestore'a YAZILMAZ (ensureTournament yalnız
 // tr/en/mediaType/genreId'yi saklar).
 export const SCHEDULE = [
-  { monthIndex: 0,  key: "scifi",     tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi",     mediaType: "movie", genreId: 878,   sortBy: "popularity.desc" },
-  { monthIndex: 1,  key: "romance",   tr: "Romantik",    en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" },
-  { monthIndex: 2,  key: "action",    tr: "Aksiyon & Macera", en: "Action & Adventure", es: "Acción y aventura", pt: "Ação e aventura", de: "Action & Abenteuer", mediaType: "tv", genreId: 10759, sortBy: "popularity.desc" },
-  { monthIndex: 3,  key: "comedy",    tr: "Komedi",      en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" },
-  { monthIndex: 4,  key: "adventure", tr: "Macera",      en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer",  mediaType: "movie", genreId: 12,    sortBy: "popularity.desc" },
-  { monthIndex: 5,  key: "crime",     tr: "Suç",         en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" },
-  { monthIndex: 6,  key: "animation", tr: "Animasyon",   en: "Animation", es: "Animación", pt: "Animação", de: "Animation",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" },
-  { monthIndex: 7,  key: "thriller",  tr: "Gerilim",     en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" },
-  { monthIndex: 8,  key: "drama",     tr: "Dram",        en: "Drama", es: "Drama", pt: "Drama", de: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" },
-  { monthIndex: 9,  key: "horror",    tr: "Korku",       en: "Horror", es: "Terror", pt: "Terror", de: "Horror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" },
-  { monthIndex: 10, key: "fantasy",   tr: "Bilim Kurgu & Fantastik", en: "Sci-Fi & Fantasy", es: "Ciencia ficción y fantasía", pt: "Ficção científica e fantasia", de: "Sci-Fi & Fantasy", mediaType: "tv", genreId: 10765, sortBy: "vote_count.desc" },
-  { monthIndex: 11, key: "family",    tr: "Aile",        en: "Family", es: "Familia", pt: "Família", de: "Familie",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" },
+  { monthIndex: 0,  key: "scifi",     tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi",     mediaType: "movie", genreId: 878,   sortBy: "popularity.desc" , it: "Fantascienza"},
+  { monthIndex: 1,  key: "romance",   tr: "Romantik",    en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" , it: "Romantico"},
+  { monthIndex: 2,  key: "action",    tr: "Aksiyon & Macera", en: "Action & Adventure", es: "Acción y aventura", pt: "Ação e aventura", de: "Action & Abenteuer", mediaType: "tv", genreId: 10759, sortBy: "popularity.desc" , it: "Azione e avventura"},
+  { monthIndex: 3,  key: "comedy",    tr: "Komedi",      en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" , it: "Commedia"},
+  { monthIndex: 4,  key: "adventure", tr: "Macera",      en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer",  mediaType: "movie", genreId: 12,    sortBy: "popularity.desc" , it: "Avventura"},
+  { monthIndex: 5,  key: "crime",     tr: "Suç",         en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" , it: "Crimine"},
+  { monthIndex: 6,  key: "animation", tr: "Animasyon",   en: "Animation", es: "Animación", pt: "Animação", de: "Animation",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" , it: "Animazione"},
+  { monthIndex: 7,  key: "thriller",  tr: "Gerilim",     en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" , it: "Thriller"},
+  { monthIndex: 8,  key: "drama",     tr: "Dram",        en: "Drama", es: "Drama", pt: "Drama", de: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" , it: "Drammatico"},
+  { monthIndex: 9,  key: "horror",    tr: "Korku",       en: "Horror", es: "Terror", pt: "Terror", de: "Horror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" , it: "Orrore"},
+  { monthIndex: 10, key: "fantasy",   tr: "Bilim Kurgu & Fantastik", en: "Sci-Fi & Fantasy", es: "Ciencia ficción y fantasía", pt: "Ficção científica e fantasia", de: "Sci-Fi & Fantasy", mediaType: "tv", genreId: 10765, sortBy: "vote_count.desc" , it: "Fantascienza e fantasy"},
+  { monthIndex: 11, key: "family",    tr: "Aile",        en: "Family", es: "Familia", pt: "Família", de: "Familie",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" , it: "Famiglia"},
 ];
 
 const MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
@@ -58,7 +58,7 @@ const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho"
 const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE };
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı). YENİ DİL: SCHEDULE/ROUNDS satırlarına `<kod>` alanı + MONTH_NAMES.
-const langKey = (lang) => copyLanguage(lang, ["tr", "en", "es", "pt", "de"]);
+const langKey = (lang) => copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"]);
 
 export const getScheduleEntry = (monthIndex) => SCHEDULE[((monthIndex % 12) + 12) % 12];
 export const themeLabel = (entry, lang) => entry?.[langKey(lang)] || entry?.en || "";
@@ -66,8 +66,8 @@ export const monthLabel = (monthIndex, lang) =>
   MONTH_NAMES[langKey(lang)][((monthIndex % 12) + 12) % 12];
 export const mediaLabel = (mediaType, lang) =>
   mediaType === "tv"
-    ? { tr: "Dizi", en: "TV", es: "Serie", pt: "Série", de: "TV" }[langKey(lang)]
-    : { tr: "Film", en: "Movie", es: "Película", pt: "Filme", de: "Film" }[langKey(lang)];
+    ? { tr: "Dizi", en: "TV", es: "Serie", pt: "Série", de: "TV" , it: "TV"}[langKey(lang)]
+    : { tr: "Film", en: "Movie", es: "Película", pt: "Filme", de: "Film" , it: "Film"}[langKey(lang)];
 
 // ─── Tur tanımları ────────────────────────────────────────────────────────────
 // startDay/endDay = ayın başından gün ofseti. Her erken tur 2 gün, final 6 gün.
@@ -75,11 +75,11 @@ export const mediaLabel = (mediaType, lang) =>
 export const SELECTION_DAYS = 7;
 export const RESULTS_START_DAY = 21;
 export const ROUNDS = [
-  { key: "r32",   tr: "Son 32",       en: "Round of 32", es: "Dieciseisavos", pt: "16 avos de final", de: "Sechzehntelfinale",  matches: 16, startDay: 7,  endDay: 9  },
-  { key: "r16",   tr: "Son 16",       en: "Round of 16", es: "Octavos", pt: "Oitavas de final", de: "Achtelfinale",  matches: 8,  startDay: 9,  endDay: 11 },
-  { key: "qf",    tr: "Çeyrek Final", en: "Quarterfinals", es: "Cuartos de final", pt: "Quartas de final", de: "Viertelfinale", matches: 4, startDay: 11, endDay: 13 },
-  { key: "sf",    tr: "Yarı Final",   en: "Semifinals", es: "Semifinales", pt: "Semifinais", de: "Halbfinale",   matches: 2,  startDay: 13, endDay: 15 },
-  { key: "final", tr: "Final",        en: "Final", es: "Final", pt: "Final", de: "Finale",        matches: 1,  startDay: 15, endDay: 21 },
+  { key: "r32",   tr: "Son 32",       en: "Round of 32", es: "Dieciseisavos", pt: "16 avos de final", de: "Sechzehntelfinale",  matches: 16, startDay: 7,  endDay: 9  , it: "Turno di 32"},
+  { key: "r16",   tr: "Son 16",       en: "Round of 16", es: "Octavos", pt: "Oitavas de final", de: "Achtelfinale",  matches: 8,  startDay: 9,  endDay: 11 , it: "Ottavi di finale"},
+  { key: "qf",    tr: "Çeyrek Final", en: "Quarterfinals", es: "Cuartos de final", pt: "Quartas de final", de: "Viertelfinale", matches: 4, startDay: 11, endDay: 13 , it: "Quarti di finale"},
+  { key: "sf",    tr: "Yarı Final",   en: "Semifinals", es: "Semifinales", pt: "Semifinais", de: "Halbfinale",   matches: 2,  startDay: 13, endDay: 15 , it: "Semifinali"},
+  { key: "final", tr: "Final",        en: "Final", es: "Final", pt: "Final", de: "Finale",        matches: 1,  startDay: 15, endDay: 21 , it: "Finale"},
 ];
 export const roundLabel = (round, lang) => round?.[langKey(lang)] || round?.en || "";
 
@@ -418,7 +418,11 @@ export function formatCountdown(msLeft, lang = "tr") {
   const d = Math.floor(totalMin / (60 * 24));
   const h = Math.floor((totalMin % (60 * 24)) / 60);
   const m = totalMin % 60;
-  const L = { tr: { d: "g", h: "sa", m: "dk" }, en: { d: "d", h: "h", m: "m" }, es: { d: "d", h: "h", m: "min" }, pt: { d: "d", h: "h", m: "min" }, de: { d: "d", h: "h", m: "m" } }[langKey(lang)];
+  const L = { tr: { d: "g", h: "sa", m: "dk" }, en: { d: "d", h: "h", m: "m" }, es: { d: "d", h: "h", m: "min" }, pt: { d: "d", h: "h", m: "min" }, de: { d: "d", h: "h", m: "m" } , it: {
+  d: "d",
+  h: "h",
+  m: "M"
+}}[langKey(lang)];
   if (d > 0) return `${d}${L.d} ${h}${L.h}`;
   if (h > 0) return `${h}${L.h} ${m}${L.m}`;
   return `${m}${L.m}`;

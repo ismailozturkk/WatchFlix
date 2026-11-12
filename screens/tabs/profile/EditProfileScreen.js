@@ -8,10 +8,14 @@
 // dönük uyumluluk için aynı kaldı.
 //
 // Giriş: Ayarlar > Hesap > "Hesap bilgileri" ve profil düzenleme modundaki "Hesap".
+//
+// (11 Kas) E-posta + doğrulama durumu ve katılma tarihi profil başlığından buraya
+// taşındı (components/profile/AccountEmailCard.js); doğrulanmamışsa "tekrar gönder"
+// düğmeli uyarı kutusu burada.
 
 import { normalizeAppLanguage } from "../../../utils/appLanguages";
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -28,6 +32,9 @@ import Toast from "@components/AppToast";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
+import { useAuth } from "../../../context/AuthContext";
+import useEmailVerification from "../../../hooks/useEmailVerification";
+import AccountEmailCard from "../../../components/profile/AccountEmailCard";
 import {
   DeleteAccountCode,
   deleteAccount,
@@ -65,6 +72,11 @@ import {
 } from "../../../components/profile/EditProfileKit";
 import { getDeleteAccountCopy } from "./deleteAccountCopy";
 import { getResetAccountCopy } from "./resetAccountCopy";
+import ResetScopeList, { buildResetScopeRows } from "../../../components/profile/ResetScopeList";
+import { useProfileStats } from "../../../context/ProfileStatsContext";
+import { useProfileNotes } from "../../../context/ProfileNotesContext";
+import { useProfileReminders } from "../../../context/ProfileRemindersContext";
+import { intlLocaleOf } from "../../../utils/appLanguages";
 
 
 // Geri alınamaz işlemlerin onay düğmesi bu kadar BASILI TUTULUNCA çalışır.
@@ -73,7 +85,10 @@ const RESET_HOLD_MS = 2000;
 
 export default function EditProfileScreen({ navigation }) {
   const { theme } = useTheme();
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
+  const { user } = useAuth();
+  // Doğrulama durumu: odakta/öne dönünce tazelenir; "tekrar gönder" 60 sn bekletir.
+  const emailVerification = useEmailVerification(user, language);
   const insets = useSafeAreaInsets();
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
@@ -101,6 +116,8 @@ export default function EditProfileScreen({ navigation }) {
   const [deleteProgress, setDeleteProgress] = useState(null);
   const deleteCopy = getDeleteAccountCopy(language);
   const resetCopy = getResetAccountCopy(language);
+  // Sıfırlama sayfasında "ne silinecek" özeti: sayılar bellekteki bağlamlardan.
+  const resetScopeRows = useResetScopeRows(resetCopy.scope, language);
   // Yeniden doğrulama, hesabın sağlayıcısına göre değişir: parolası olanlar
   // şifresini yazar, yalnızca Google ile açılmış hesaplar hesap seçiciyi açar.
   // Sağlayıcılar modal her açıldığında okunur — arada Ayarlar'dan Google
@@ -211,7 +228,7 @@ export default function EditProfileScreen({ navigation }) {
         type: "error",
         text1:
           verificationProvider === "apple"
-            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : de ? "Bestätige zuerst mit Apple" : "Verify with Apple first")
+            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : de ? "Bestätige zuerst mit Apple" : language === "it" ? "Verificare prima con Apple" : "Verify with Apple first")
             : i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
       });
       return false;
@@ -371,7 +388,7 @@ export default function EditProfileScreen({ navigation }) {
   // Hesap silme sayfasının metinleri (dil dallanması burada kalır).
   const deleteDescription = verificationProvider
     ? verificationProvider === "apple"
-      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : pt ? "Isso não pode ser desfeito. Verifique com a Apple para que a autorização dela também possa ser revogada." : de ? "Das kann nicht rückgängig gemacht werden. Bestätige mit Apple, damit auch dessen Autorisierung widerrufen werden kann." : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
+      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : pt ? "Isso não pode ser desfeito. Verifique com a Apple para que a autorização dela também possa ser revogada." : de ? "Das kann nicht rückgängig gemacht werden. Bestätige mit Apple, damit auch dessen Autorisierung widerrufen werden kann." : language === "it" ? "Questa operazione non può essere annullata. Verificare con Apple affinché anche la sua autorizzazione possa essere revocata." : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
       : i18nText(
           "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
           "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
@@ -388,7 +405,7 @@ export default function EditProfileScreen({ navigation }) {
   const holdMs = isReset ? RESET_HOLD_MS : DELETE_HOLD_MS;
   const verifyLabel =
     verificationProvider === "apple"
-      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : de ? "Mit Apple bestätigen" : "Verify with Apple")
+      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : de ? "Mit Apple bestätigen" : language === "it" ? "Verifica con Apple" : "Verify with Apple")
       : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula");
 
   return (
@@ -425,6 +442,26 @@ export default function EditProfileScreen({ navigation }) {
                 )}
               </FieldHint>
             </Reveal>
+
+            {/* Hesap: e-posta (+ doğrulama durumu / uyarısı) ve katılma tarihi. */}
+            {user ? (
+              <Reveal delay={30} style={authColumn}>
+                <AccountEmailCard
+                  theme={theme}
+                  language={language}
+                  email={user.email}
+                  verified={emailVerification.verified}
+                  joinedAt={user.metadata?.createdAt || user.metadata?.creationTime}
+                  verifyHint={t?.profileScreen?.emailVerified}
+                  resend={{
+                    label: emailVerification.resendLabel,
+                    onPress: emailVerification.resend,
+                    busy: emailVerification.sending,
+                    disabled: emailVerification.cooldown > 0,
+                  }}
+                />
+              </Reveal>
+            ) : null}
 
             {/* Yalnız kullanıcıya görünen bilgi. Doğum tarihi yetişkin içerik
                 ayarının kapısı; kaydedilmişse salt-okunur (kural da tek yazıma
@@ -514,6 +551,7 @@ export default function EditProfileScreen({ navigation }) {
           String(holdMs / 1000),
         )}
         passwordLabel={i18nText("autoI18n.sifre", "Şifre")}
+        summary={isReset ? <ResetScopeList theme={theme} copy={resetCopy.scope} rows={resetScopeRows} /> : null}
       />
     </View>
   );
@@ -528,3 +566,36 @@ const styles = StyleSheet.create({
   birthShell: { minHeight: 58, borderRadius: 18 },
   dangerBlock: { gap: 12 },
 });
+
+/** Sıfırlama özetinin satırları (sayılar bağlamlardan; sağlayıcı yoksa sayısız). */
+function useResetScopeRows(copy, language) {
+  const stats = useProfileStats() || {};
+  const notesCtx = useProfileNotes() || {};
+  const remindersCtx = useProfileReminders() || {};
+  const { uniqueMovieCount, uniqueTvCount, uniqueEpisodesCount, totalMinutesTime, totalMinutesTimeTv, lists } = stats;
+  const notes = notesCtx.notes;
+  const reminders = remindersCtx.reminders;
+  return useMemo(() => {
+    // Liste öğeleri: favoriler, İzleyeceklerim ve özel listeler (izlenenler ayrı satırda).
+    const listItems = (Array.isArray(lists) ? lists : []).reduce(
+      (sum, [key, items]) =>
+        key === "watchedMovies" || key === "watchedTv" || !Array.isArray(items) ? sum : sum + items.length,
+      0,
+    );
+    const size = (v) => (Array.isArray(v) ? v.length : v && typeof v === "object" ? Object.keys(v).length : 0);
+    const locale = intlLocaleOf(language);
+    return buildResetScopeRows(
+      {
+        movies: uniqueMovieCount,
+        shows: uniqueTvCount,
+        episodes: uniqueEpisodesCount,
+        minutes: (totalMinutesTime || 0) + (totalMinutesTimeTv || 0),
+        listItems,
+        notes: size(notes),
+        reminders: size(reminders?.movieReminders) + size(reminders?.tvReminders),
+      },
+      copy,
+      (n) => n.toLocaleString(locale),
+    );
+  }, [copy, language, uniqueMovieCount, uniqueTvCount, uniqueEpisodesCount, totalMinutesTime, totalMinutesTimeTv, lists, notes, reminders]);
+}

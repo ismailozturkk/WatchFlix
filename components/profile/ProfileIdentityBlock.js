@@ -1,7 +1,12 @@
 // components/profile/ProfileIdentityBlock.js
 //
 // Kendi profil başlığında avatarın YANINDAKİ bilgi sütunu: ad, @kullanıcı adı,
-// kimlik rozetleri, e-posta + doğrulama durumu, katılma tarihi ve eylem butonları.
+// kimlik rozetleri, haftalık seri kartı ve eylem butonları.
+//
+// (11 Kas) E-posta + doğrulama durumu ve katılma tarihi buradan Ayarlar > Hesap
+// bilgileri'ne taşındı (components/profile/AccountEmailCard.js). Açılan yerde
+// haftalık seri alevi artık rozetlerin yanındaki küçük hap değil, zeminsiz büyük alev +
+// seri sayısı + 7 gün noktası (`streak` yuvası; StreakFlameBadge variant="hero").
 //
 // Önceki hâl: ikon-only iki buton adın ÜSTÜNDE ayrı bir satırda yüzüyordu (adı
 // aşağı itiyor, ne işe yaradıkları etiketsizdi); e-posta ve tarih adla aynı
@@ -9,13 +14,12 @@
 // kırmızı metindi.
 //
 // Şimdi yukarıdan aşağıya tek okuma yönü:
-//   ad → @kullanıcı adı → rozetler → küçük ikonlu meta satırları → eylemler.
+//   ad → @kullanıcı adı → rozetler → seri alevi → eylemler.
 // Eylemler sütunun ALTINDA, hepsi İKON düğmeleri: Düzenle, Bildirimler (okunmamış
 // sayacıyla; `notificationsAction` olarak dışarıdan gelir), Ayarlar, Paylaş ve (açıksa) yıllık
 // hedef halkası. Eskiden "Düzenle" etiketli bir hapıydı ve bildirimler profilin altında ayrı bir
 // tam genişlik kartı kaplıyordu.
-// Sütun dar (360 px'lik ekranda ~158 px) — bu yüzden e-posta ortadan kısaltılır
-// (alan adı görünür kalır) ve tarih kısa ay adıyla tek satıra sığar.
+// Sütun dar (360 px'lik ekranda ~158 px).
 //
 // DUYARLI TEK SATIR EYLEMLER. Beş düğme de alt satıra İNMEZ (`flexWrap: "nowrap"`).
 // Sütunun ölçülen yatay genişliğine (`onLayout`, ilk karede `useWindowDimensions` tahmini)
@@ -23,21 +27,15 @@
 // dar ekranda (360 pt → 158 px sütun: 5×28 + 4×4,5 = 158 px) da geniş ekranda da yatay alanı
 // taşmadan tam doldurur.
 
-import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useState } from "react";
 import * as ReactNative from "react-native";
-import AppIcon from "../AppIcon";
 import GlassIconButton from "../common/GlassIconButton";
 import IdentityBadgesRow from "../badges/IdentityBadgesRow";
 import YearlyGoalButton from "./YearlyGoalButton";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 
-const { Pressable, StyleSheet, Text, View } = ReactNative;
-
-// Doğrulama renkleri temadan bağımsız: her zeminde okunur (eski ekranla aynı).
-const VERIFIED_COLOR = "rgb(29, 161, 242)";
-const UNVERIFIED_COLOR = "rgb(229, 20, 0)";
+const { StyleSheet, Text, View } = ReactNative;
 
 const DEFAULT_BUTTON_SIZE = 36;
 const MIN_BUTTON_SIZE = 22;
@@ -93,39 +91,12 @@ export function resolveActionRowLayout(width, count = 5) {
   return { size, gap, iconSize, shareIconSize, radius, hitSlop };
 }
 
-// Firebase `metadata.createdAt` ms cinsinden DİZGE verir; geçersizse null.
-function formatJoinDate(timestamp, language) {
-  const date = new Date(Number(timestamp));
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(intlLocaleOf(language), {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function MetaRow({ theme, icon, children, trailing }) {
-  return (
-    <View style={styles.metaRow}>
-      <AppIcon family="Ionicons" name={icon} size={14} color={theme.text.muted} />
-      {children}
-      {trailing}
-    </View>
-  );
-}
-
 function ProfileIdentityBlock({
   theme,
   language,
   displayName,
   username,
   badges,
-  email,
-  emailVerified,
-  verifyHint,
-  // Doğrulama uyarısının altındaki eylem: { label, onPress, busy?, disabled? } (yoksa yalnız metin).
-  verifyAction = null,
-  joinedAt,
   onEdit,
   // Kalem düğmesinin erişilebilirlik etiketi (profilde önizleme + düzenleme girişi).
   editLabel: editLabelProp,
@@ -134,9 +105,11 @@ function ProfileIdentityBlock({
   settingsLabel,
   notificationsAction = null,
   showGoal = false,
-  // Kimlik rozetlerinin (Premium/Max/Kurucu) hemen sağında duran öğe (günlük seri
-  // alevi, components/streak/StreakFlameBadge). Rozet yoksa satırda tek başına durur.
+  // Kimlik rozetlerinin (Premium/Max/Kurucu) hemen sağında duran küçük öğe (isteğe bağlı).
   badgeAccessory = null,
+  // Rozetlerin ALTINDA duran haftalık seri alevi
+  // (components/streak/StreakFlameBadge variant="hero"). Seri yoksa null.
+  streak = null,
 }) {
   const windowDims =
     typeof ReactNative.useWindowDimensions === "function"
@@ -168,7 +141,6 @@ function ProfileIdentityBlock({
       })
     : notificationsAction;
 
-  const joinDate = joinedAt ? formatJoinDate(joinedAt, language) : null;
   const editLabel = editLabelProp || i18nText("autoI18n.profili_duzenle", "Profili Düzenle");
 
   return (
@@ -206,93 +178,7 @@ function ProfileIdentityBlock({
         trailing={badgeAccessory}
       />
 
-      <View style={styles.meta}>
-        {!!email && (
-          <MetaRow
-            theme={theme}
-            icon="mail-outline"
-            trailing={
-              <AppIcon
-                family="MaterialIcons"
-                name="verified"
-                size={14}
-                color={emailVerified ? VERIFIED_COLOR : UNVERIFIED_COLOR}
-              />
-            }
-          >
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              ellipsizeMode="middle"
-              style={[styles.metaText, { color: theme.text.secondary }]}
-            >
-              {email}
-            </Text>
-          </MetaRow>
-        )}
-        {!!joinDate && (
-          <MetaRow theme={theme} icon="calendar-outline">
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-              style={[styles.metaText, { color: theme.text.muted }]}
-            >
-              {i18nText("autoI18n.katilma_tarihi", "Katılma tarihi:")} {joinDate}
-            </Text>
-          </MetaRow>
-        )}
-        {!!verifyHint && (
-          <View
-            style={[
-              styles.notice,
-              {
-                backgroundColor: alpha(UNVERIFIED_COLOR, 0.1),
-                borderColor: alpha(UNVERIFIED_COLOR, 0.35),
-              },
-            ]}
-          >
-            <AppIcon
-              family="Ionicons"
-              name="alert-circle"
-              size={13}
-              color={UNVERIFIED_COLOR}
-            />
-            <View style={styles.noticeBody}>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={3}
-                style={[styles.noticeText, { color: UNVERIFIED_COLOR }]}
-              >
-                {verifyHint}
-              </Text>
-              {!!verifyAction && (
-                <Pressable
-                  testID="profile-verify-resend"
-                  accessibilityRole="button"
-                  accessibilityLabel={verifyAction.label}
-                  accessibilityState={{ disabled: !!verifyAction.disabled, busy: !!verifyAction.busy }}
-                  disabled={!!verifyAction.disabled || !!verifyAction.busy}
-                  onPress={verifyAction.onPress}
-                  hitSlop={8}
-                >
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={[
-                      styles.noticeAction,
-                      { color: UNVERIFIED_COLOR, opacity: verifyAction.disabled || verifyAction.busy ? 0.55 : 1 },
-                    ]}
-                  >
-                    {verifyAction.label}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-        )}
-      </View>
+      {streak ? <View style={styles.streak}>{streak}</View> : null}
 
       <View
         style={[styles.actions, { gap: actionLayout.gap }]}
@@ -387,41 +273,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 0,
   },
-  meta: {
+  streak: {
     marginTop: 10,
-    gap: 5,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    minWidth: 0,
-  },
-  metaText: {
-    flexShrink: 1,
-    fontSize: 12.5,
-    fontWeight: "500",
-  },
-  notice: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 7,
-    borderRadius: 9,
-    borderWidth: 1,
-  },
-  noticeBody: { flex: 1, gap: 3 },
-  noticeText: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    lineHeight: 14,
-  },
-  noticeAction: {
-    fontSize: 10.5,
-    fontWeight: "800",
-    lineHeight: 14,
-    textDecorationLine: "underline",
+    width: "100%",
   },
   actions: {
     marginTop: 12,

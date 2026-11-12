@@ -1,6 +1,6 @@
 // utils/weatherUniverses.js
 //
-// Atmosferin "evren" sahneleri: 7 film, 6 dizi, 6 anime. Her sahne bir ANA OLAY
+// Atmosferin "evren" sahneleri: 15 film, 9 dizi, 10 anime. Her sahne bir ANA OLAY
 // (ejderha gelir → duvara ateş üfler → gider) ve 2–3 sürekli arka hareketten
 // (kar, kuzgun, kod yağmuru) kurulu "yaşayan döngü". Hepsi motorun saf, kare
 // başına state'siz modelinde: konum/opaklık/şekil karesi yalnız saatten.
@@ -37,13 +37,24 @@ export const UNIVERSES = Object.freeze([
   { id: "dune", group: "films", collections: [726871], movies: [841] }, // + Dune (1984)
   { id: "batman", group: "films", collections: [120794, 263, 948485] },
   { id: "spiderMan", group: "films", collections: [556, 531241, 125574, 573436] },
+  { id: "interstellar", group: "films", movies: [157336] },
+  { id: "bladeRunner", group: "films", collections: [422837], movies: [78, 335984] }, // Blade Runner + 2049
+  { id: "jurassicPark", group: "films", collections: [328] }, // Jurassic Park + Jurassic World
+  { id: "avatar", group: "films", collections: [87096] },
+  { id: "madMax", group: "films", collections: [8945] }, // Mad Max serisi + Fury Road + Furiosa
+  { id: "pirates", group: "films", collections: [295] },
+  { id: "inception", group: "films", movies: [27205] },
+  { id: "titanic", group: "films", movies: [597] },
   // diziler
   { id: "breakingBad", group: "series", tv: [1396] },
   { id: "got", group: "series", tv: [1399] },
   { id: "vikings", group: "series", tv: [44217, 116135] }, // + Valhalla
   { id: "prisonBreak", group: "series", tv: [2288] },
   { id: "sherlock", group: "series", tv: [19885] },
-  { id: "sopranos", group: "series", tv: [1398] },
+  { id: "strangerThings", group: "series", tv: [66732] },
+  { id: "lastOfUs", group: "series", tv: [100088] },
+  { id: "dark", group: "series", tv: [70523] },
+  { id: "squidGame", group: "series", tv: [93405] },
   // anime
   { id: "deathNote", group: "anime", tv: [13916] },
   { id: "aot", group: "anime", tv: [1429] },
@@ -51,6 +62,10 @@ export const UNIVERSES = Object.freeze([
   { id: "onePiece", group: "anime", tv: [37854, 111110] }, // + canlı çekim
   { id: "fma", group: "anime", tv: [31911] },
   { id: "rickAndMorty", group: "anime", tv: [60625] },
+  { id: "demonSlayer", group: "anime", tv: [85937], movies: [635302] }, // + Mugen Train
+  { id: "ghibli", group: "anime", movies: [8392, 129, 4935, 128, 16859, 12429, 10515, 81, 149870, 51739, 508883, 37797, 11621, 12477] }, // Studio Ghibli filmleri
+  { id: "hunterXHunter", group: "anime", tv: [46298] },
+  { id: "jujutsuKaisen", group: "anime", tv: [95479], movies: [810693] }, // + Jujutsu Kaisen 0
 ].map((u) => Object.freeze(u)));
 
 export const UNIVERSE_IDS = Object.freeze(UNIVERSES.map((u) => u.id));
@@ -99,57 +114,89 @@ const c3 = (low, medium, high) => ({ low, medium, high });
 // bağımsız sahne; paylar (oran) yoğunlukla ölçeklenen ortam (kar, kod yağmuru...).
 export const UNIVERSE_COMPOSITES = Object.freeze({
   starWars: Object.freeze([["skyStars", 1], ["swPlanet", { fixed: 1 }], ["swScene", { fixed: 125 }]]),
-  matrix: Object.freeze([["matrixRain", 1], ["matrixScene", { fixed: 33 }]]),
-  harryPotter: Object.freeze([["skyStars", 0.45], ["magicMotes", 0.55], ["hogwarts", { fixed: 1 }], ["hpScene", { fixed: 29 }]]),
-  lotr: Object.freeze([["mordor", { fixed: 1 }], ["embers", 0.7], ["ash", 0.3], ["lotrScene", { fixed: 4 }]]),
-  dune: Object.freeze([["dunes", { fixed: 1 }], ["sandDrift", 1], ["duneScene", { fixed: 84 }]]),
+  matrix: Object.freeze([["matrixRain", 1], ["matrixCity", { fixed: 1 }], ["matrixScene", { fixed: 3 }]]),
+  harryPotter: Object.freeze([["skyStars", 0.45], ["magicMotes", 0.55], ["hogwarts", { fixed: 1 }], ["hpScene", { fixed: 23 }]]),
+  lotr: Object.freeze([["mordor", { fixed: 1 }], ["embers", 0.7], ["ash", 0.3], ["lotrScene", { fixed: 11 }]]),
+  dune: Object.freeze([["dunes", { fixed: 1 }], ["sandDrift", 1], ["duneScene", { fixed: 40 }]]),
   batman: Object.freeze([
-    ["skyBeam", { fixed: 2 }], ["gotham", { fixed: 1 }], ["rain", 1], ["lightning", { fixed: 2 }], ["batScene", { fixed: 12 }],
+    ["skyBeam", { fixed: 2 }], ["gotham", { fixed: 1 }], ["rain", 1], ["lightning", { fixed: 2 }], ["batScene", { fixed: 11 }],
   ]),
-  spiderMan: Object.freeze([["skyline", { fixed: 1 }], ["motes", 1], ["spiderScene", { fixed: 15 }]]),
+  spiderMan: Object.freeze([["skyline", { fixed: 1 }], ["motes", 1], ["spiderScene", { fixed: 18 }]]),
   breakingBad: Object.freeze([
-    ["mesa", { fixed: 1 }], ["heatHaze", { fixed: 1 }], ["sandDrift", 0.85], ["tumbleweed", 0.15], ["bbScene", { fixed: 18 }],
+    ["mesa", { fixed: 1 }], ["heatHaze", { fixed: 1 }], ["sandDrift", 0.85], ["tumbleweed", 0.15], ["bbScene", { fixed: 4 }],
   ]),
-  got: Object.freeze([["iceWall", { fixed: 1 }], ["snow", 1], ["gotScene", { fixed: 42 }]]),
-  vikings: Object.freeze([["skyStars", 1], ["auroraBands", { fixed: 3 }], ["river", { fixed: 1 }], ["vikScene", { fixed: 37 }]]),
-  prisonBreak: Object.freeze([["blueprint", { fixed: 1 }], ["prison", { fixed: 1 }], ["motes", 1], ["pbScene", { fixed: 4 }]]),
-  sherlock: Object.freeze([["london", { fixed: 1 }], ["fog", { fixed: 2 }], ["motes", 1], ["shScene", { fixed: 20 }]]),
-  sopranos: Object.freeze([["pool", { fixed: 1 }], ["leaves", 1], ["soprScene", { fixed: 11 }]]),
-  deathNote: Object.freeze([["dnFeathers", 1], ["dnScene", { fixed: 5 }]]),
+  got: Object.freeze([["iceWall", { fixed: 1 }], ["snow", 1], ["gotScene", { fixed: 2 }]]),
+  vikings: Object.freeze([["skyStars", 1], ["auroraBands", { fixed: 3 }], ["river", { fixed: 1 }], ["vikScene", { fixed: 28 }]]),
+  prisonBreak: Object.freeze([["prison", { fixed: 1 }], ["motes", 1], ["pbScene", { fixed: 4 }]]),
+  // Sherlock, Death Note, Naruto, One Piece, FMA: tek VEKTÖR sahne (components/decor/<ad>Scene.js) + ortam
+  sherlock: Object.freeze([["sherVec", { fixed: 1 }], ["motes", 1]]),
+  deathNote: Object.freeze([["dnFeathers", 1], ["dnVec", { fixed: 1 }]]),
   aot: Object.freeze([["titanWall", { fixed: 1 }], ["aotFeathers", 1], ["aotScene", { fixed: 34 }]]),
-  naruto: Object.freeze([["narLeaves", 1], ["narScene", { fixed: 13 }]]),
-  onePiece: Object.freeze([["waves", { fixed: 3 }], ["opShip", { fixed: 1 }], ["seagulls", 0.35], ["glints", 0.65], ["opScene", { fixed: 2 }]]),
-  fma: Object.freeze([["transmute", { fixed: 1 }], ["motes", 1], ["fmaScene", { fixed: 7 }]]),
+  naruto: Object.freeze([["narVec", { fixed: 1 }], ["narLeaves", 1]]),
+  onePiece: Object.freeze([
+    ["opSky", { fixed: 1 }], ["waves", { fixed: 3 }], ["opShip", { fixed: 1 }], ["seagulls", 0.35], ["glints", 0.65],
+  ]),
+  fma: Object.freeze([["fmaVec", { fixed: 1 }], ["motes", 1]]),
+  interstellar: Object.freeze([["skyStars", 1], ["isVec", { fixed: 1 }]]),
+  strangerThings: Object.freeze([["stVec", { fixed: 1 }], ["ash", 1]]),
+  demonSlayer: Object.freeze([["dsVec", { fixed: 1 }], ["sakura", 1]]),
+  bladeRunner: Object.freeze([["brVec", { fixed: 1 }], ["rain", 1]]),
+  ghibli: Object.freeze([["ghVec", { fixed: 1 }], ["rain", 0.6], ["fireflies", 0.4]]),
+  lastOfUs: Object.freeze([["tlVec", { fixed: 1 }], ["motes", 1]]),
+  jurassicPark: Object.freeze([["jpVec", { fixed: 1 }], ["motes", 1]]),
+  avatar: Object.freeze([["avVec", { fixed: 1 }], ["fireflies", 1]]),
+  madMax: Object.freeze([["mmVec", { fixed: 1 }], ["sandDrift", 1]]),
+  pirates: Object.freeze([["pcVec", { fixed: 1 }], ["skyStars", 1]]),
+  inception: Object.freeze([["inVec", { fixed: 1 }], ["motes", 1]]),
+  titanic: Object.freeze([["tiVec", { fixed: 1 }], ["skyStars", 1]]),
+  dark: Object.freeze([["dkVec", { fixed: 1 }], ["rain", 0.7]]),
+  squidGame: Object.freeze([["sqVec", { fixed: 1 }], ["motes", 0.6]]),
+  hunterXHunter: Object.freeze([["hxVec", { fixed: 1 }], ["butterflies", 0.5]]),
+  jujutsuKaisen: Object.freeze([["jjVec", { fixed: 1 }], ["ash", 0.6]]),
   rickAndMorty: Object.freeze([["skyStars", 0.5], ["motes", 0.5], ["rmPortal", { fixed: 1 }], ["rmScene", { fixed: 18 }]]),
 });
 
 const SCENE_PART_IDS = [
   "swScene", "matrixRain", "matrixScene", "hpScene", "lotrScene", "duneScene", "batScene", "spiderScene",
-  "bbScene", "gotScene", "vikScene", "pbScene", "shScene", "soprScene", "dnFeathers", "dnScene",
-  "aotFeathers", "aotScene", "narLeaves", "narScene", "opScene", "fmaScene", "rmScene",
+  "bbScene", "gotScene", "vikScene", "pbScene", "dnFeathers", "aotFeathers", "aotScene", "narLeaves", "rmScene",
 ];
 
 // Toplam sayı = sabit sahne + ortam payı. Ortam azken bile sahne tam çizilir.
 export const UNIVERSE_SPECS = Object.freeze({
   starWars: { counts: c3(150, 210, 270) },
-  matrix: { counts: c3(97, 140, 185) }, // 8'li kod sütunları + 9 sahne
-  harryPotter: { counts: c3(52, 80, 100) },
-  lotr: { counts: c3(31, 45, 65) },
+  matrix: { counts: c3(68, 111, 156) }, // 8'li kod sütunları + 4 sahne (çatı katmanı + 2 hap + kedi)
+  harryPotter: { counts: c3(46, 74, 94) },
+  lotr: { counts: c3(38, 52, 72) },
   dune: { counts: c3(100, 150, 185) },
-  batman: { counts: c3(67, 97, 147) },
-  spiderMan: { counts: c3(30, 50, 66) },
+  batman: { counts: c3(66, 96, 146) },
+  spiderMan: { counts: c3(33, 53, 69) },
   breakingBad: { counts: c3(40, 54, 76) },
   got: { counts: c3(70, 105, 145) },
   vikings: { counts: c3(46, 80, 104) },
   prisonBreak: { counts: c3(18, 26, 38) },
-  sherlock: { counts: c3(32, 48, 64) },
-  sopranos: { counts: c3(18, 28, 40) },
-  deathNote: { counts: c3(15, 21, 29) },
+  sherlock: { counts: c3(13, 21, 29) }, // + 1 sahne
+  deathNote: { counts: c3(10, 15, 22) }, // + 1 sahne
   aot: { counts: c3(46, 80, 100) },
-  naruto: { counts: c3(28, 41, 55) },
-  onePiece: { counts: c3(25, 37, 55) },
-  fma: { counts: c3(24, 33, 46) },
+  naruto: { counts: c3(16, 25, 35) }, // + 1 sahne
+  onePiece: { counts: c3(24, 36, 54) }, // + gök sahnesi, 3 dalga, gemi
+  fma: { counts: c3(13, 19, 27) }, // + 1 sahne
   rickAndMorty: { counts: c3(52, 74, 100) },
+  jujutsuKaisen: { counts: c3(18, 30, 48) }, // + 1 sahne
+  hunterXHunter: { counts: c3(4, 6, 9) }, // + 1 sahne
+  squidGame: { counts: c3(8, 12, 18) }, // + 1 sahne
+  dark: { counts: c3(40, 60, 90) }, // + 1 sahne
+  titanic: { counts: c3(20, 32, 50) }, // + 1 sahne
+  inception: { counts: c3(14, 22, 34) }, // + 1 sahne
+  pirates: { counts: c3(20, 32, 50) }, // + 1 sahne
+  madMax: { counts: c3(24, 40, 64) }, // + 1 sahne
+  avatar: { counts: c3(10, 16, 24) }, // + 1 sahne
+  jurassicPark: { counts: c3(10, 16, 24) }, // + 1 sahne
+  lastOfUs: { counts: c3(13, 21, 29) }, // + 1 sahne
+  ghibli: { counts: c3(40, 60, 90) }, // + 1 sahne
+  bladeRunner: { counts: c3(60, 90, 130) }, // + 1 sahne
+  demonSlayer: { counts: c3(16, 25, 35) }, // + 1 sahne
+  strangerThings: { counts: c3(13, 21, 29) }, // + 1 sahne
+  interstellar: { counts: c3(36, 56, 76) }, // + 1 sahne
   ...Object.fromEntries(SCENE_PART_IDS.map((id) => [id, { counts: ONE, palette: NEUTRAL }])),
 });
 
@@ -337,28 +384,18 @@ const swing = (ax, ay, lx, ly, tm, lean = 0.9) => (tau) => {
 // Sahne silüetlerinin yükseklikleri (dp × ölçek, alt kenardan) — OverlayLayers'la ortak.
 export const SCENERY = Object.freeze({
   lift: 86, // alt kenara oturan evren silüetlerinin tab çubuğunun üstüne kaldırılışı (dp); altı zeminle dolar
-  wallTop: 190, // Game of Thrones buz duvarı
+  wallTop: 262, // Game of Thrones buz duvarı (tepe, alttan dp)
   titanWallTop: 230, // Attack on Titan duvarı
   gargoyle: { x: 0.8, top: 212 }, // Gotham: heykelli kulenin çıkıntısı
   mesaGround: 18, // Breaking Bad: çöl zemini
-  poolTop: 128, // Sopranos: havuz suyu üst kenarı
-  poolBottom: 34,
   waterline: 80, // dalgalı deniz (kıyı katmanı) gemi su hattı
-  // Vikings nehri (dp, alt kenardan): su bandı near–farBank; gemi şeritleri su hattı yükseklikleri
-  river: { near: 88, farBank: 164, far: 142, mid: 121, nearLane: 101, fortTop: 252 },
-  // Vikings gemileri (vektör, River katmanı çizer; vikScene aynı rotadan ok atar). x: ekran oranı.
-  vikShips: [
-    { S: 72, w: 142, from: -0.62, hold: 0.6, at: 0.18, ph: 1.3, stripe: "#2b5f8a" },
-    { S: 94, w: 121, from: -0.46, hold: 0.5, at: 0.2, ph: 0.4, stripe: "#c0392b" },
-    { S: 120, w: 101, from: -0.34, hold: 0.36, at: 0.22, ph: 2.6, stripe: "#c0392b" },
-  ],
 });
 
 // ── Sahne kurucuları ───────────────────────────────────────────────────────
 // (kit, { rand, count, tone }) → parçacık dizisi. Sayı yalnız ortam parçalarında
 // (kod yağmuru, tüy, yaprak) kullanılır; sahnenin kendisi her yoğunlukta tam.
 
-// Star Wars: iki saat. Kovalamaca SÜREKLİ döner (22 sn, X-wing iki geçiş); Ölüm Yıldızı ve
+// Star Wars: iki saat. Kovalamaca 22 sn sürer (X-wing iki geçiş), sonra dinlenir; Ölüm Yıldızı ve
 // Millennium Falcon sıçraması 60 sn'lik ortak döngüde (swPlanet katmanıyla aynı saat, faz 0):
 //   ~0–18 sn sakin (yalnız kovalamaca) → 18–39 sn Ölüm Yıldızı gezegeni yok eder →
 //   41–57 sn Falcon alttan ekran ortasına yükselir, hiperuzay, sıçrar → döngü başa sarar.
@@ -373,7 +410,7 @@ function swScene(kit, { rand, tone }) {
   const RC = 4; // kovalamaca ~1,5 dk'da bir
   const mix = (a, b) => pick(tone, a, b);
 
-  // ── 1 · Kovalamaca (sürekli, ekranın alt yarısında) ──
+  // ── 1 · Kovalamaca (ekranın alt yarısında) ──
   const pass = (u0, u1, y0, amp) => curve(u0, u1, 14, (tau) => ({
     x: -0.16 + 1.36 * tau,
     y: y0 - amp * Math.sin(Math.PI * tau * 1.2) + 0.04 * Math.sin(tau * 9),
@@ -392,6 +429,11 @@ function swScene(kit, { rand, tone }) {
   ];
   const green = mix(["#7dff6b", "#b8ff9e"], ["#1c9e2a", "#2bb33a"]);
   const red = mix(["#ff5a4f", "#ff8a7a"], ["#d62828", "#c0392b"]);
+  // Motorlar gemiyle aynı rotayı izler. İki ayrı sıcaklık kovalamacayı derinleştirir.
+  out.push(follow(kit, rand, lead, { sprite: SPRITE.glow, size: 23, ox: -25, color: mix("#7fc4ff", "#478dd1"), pulse: [1.8, 0.55], alpha: 0.7 }));
+  ties.forEach((tie) => out.push(follow(kit, rand, tie, {
+    sprite: SPRITE.glow, size: 15, ox: -13, color: mix("#9bd8ff", "#6695c5"), pulse: [2.4, 0.55], alpha: 0.55,
+  })));
   for (const [w0, w1] of [[0.05, 0.4], [0.55, 0.9]]) {
     for (const t of ties) {
       out.push(...emitter(kit, rand, t, {
@@ -401,7 +443,12 @@ function swScene(kit, { rand, tone }) {
     }
     out.push(...emitter(kit, rand, lead, {
       sprite: SPRITE.streak, size: 20, w: [w0 + 0.07, w1 - 0.03], life: 0.02, slots: 2, dirFace: true, spread: 0.04,
-      speed: 620, align: true, color: red, alpha: 0.95, fadeK: 3, ox: 22,
+      speed: 620, dir: Math.PI, align: true, color: red, alpha: 0.95, fadeK: 3, ox: -18,
+    }));
+    // Yeşil atışlar X-wing'in yakınından geçerken kısa, seyrek kıvılcımlar.
+    out.push(...emitter(kit, rand, lead, {
+      sprite: SPRITE.speck, size: 5, w: [w0 + 0.12, w1 - 0.04], life: 0.018, slots: 4,
+      spread: kit.TAU, speed: 48, grow: 0.5, color: mix("#dfffe9", "#65c77a"), alpha: 0.55,
     }));
   }
   out.push(...ties, lead);
@@ -413,40 +460,31 @@ function swScene(kit, { rand, tone }) {
   // dişlide toplanan yeşil ışık
   out.push(...emitter(kit, rand, dsAnchor, {
     sprite: SPRITE.glow, size: 12, w: [0.43, 0.505], life: 0.025, slots: 4, spread: kit.TAU, speed: 0, grow: 0.4,
-    color: charge, alpha: 0.7, ox: -22, oy: -22, fadeK: 1.3,
+    color: charge, alpha: 0.7, ox: -56 * 0.32, oy: -56 * 0.34, fadeK: 1.3,
   }));
-  // patlama: alev topları ve kırıklar (vektör: parlama, halkalar, ışınlar, moloz)
+  // Patlama: sıcak çekirdek, önündeki kıvılcımlar, ardından seyrelerek kalan gaz.
+  // Büyük kabuk parçaları ve halkalar vektörde; Atlas küçük, yumuşak ayrıntıları taşır.
   const boom = anchorAt(kit, rand, 0.24, 0.36, { period: P, rest: RE, phase: 0, alpha: 0.01 });
   out.push(boom);
   out.push(...emitter(kit, rand, boom, {
-    sprite: SPRITE.glow, size: 26, w: [0.52, 0.62], life: 0.05, slots: 8, spread: kit.TAU, speed: 120, grow: 2.8,
-    color: mix(["#ff9a3c", "#ff6a1a"], ["#e8590c", "#c2410c"]), alpha: 0.8, fadeK: 1.4,
+    sprite: SPRITE.glow, size: 22, w: [0.52, 0.59], life: 0.05, slots: 6, spread: kit.TAU, speed: 95, grow: 2.3,
+    color: mix(["#ffd18a", "#ff8a3c"], ["#f28a28", "#c2410c"]), alpha: 0.72, fadeK: 1.4,
   }));
   out.push(...emitter(kit, rand, boom, {
-    sprite: SPRITE.speck, size: 7, w: [0.52, 0.66], life: 0.08, slots: 16, spread: kit.TAU, speed: 190, spin: 4,
-    color: mix(["#9bb8d3", "#6b8f5a", "#d9d2c0"], ["#4a6a86", "#44683a", "#8a8472"]), alpha: 0.95,
+    sprite: SPRITE.speck, size: 5, w: [0.525, 0.68], life: 0.065, slots: 14, spread: kit.TAU, speed: 150, spin: 3.5,
+    color: mix(["#e6edf0", "#8ab0a2", "#f5bc71"], ["#9bafb9", "#658678", "#cb8151"]), alpha: 0.85,
+  }));
+  out.push(...emitter(kit, rand, boom, {
+    sprite: SPRITE.streak, size: 8, w: [0.53, 0.64], life: 0.035, slots: 8, spread: kit.TAU, speed: 210,
+    align: true, grow: 1.6, color: mix(["#fff3c8", "#ffad64"], ["#ffd083", "#e87931"]), alpha: 0.75,
+  }));
+  out.push(...emitter(kit, rand, boom, {
+    sprite: SPRITE.glow, size: 15, w: [0.57, 0.72], life: 0.085, slots: 6, spread: kit.TAU, speed: 48,
+    grow: 2.5, color: mix("#c4ccd0", "#818c95"), alpha: 0.3,
   }));
 
-  // ── 3 · Millennium Falcon alttan çıkar, hiperuzay, bekler, üstten hızla gider ──
-  // (gemi VEKTÖR çizilir: swPlanet katmanı; burada aynı rotada görünmez çapa + motor ışıkları + iz)
-  const FS = 190;
-  const rise = [
-    hide(0, 0.5, 1.6), hide(0.68, 0.5, 1.6),
-    R(0.69, 0.5, 1.5, { e: 1 }), R(0.8, 0.5, 0.58),
-    // sıçrama: merkeze (0,5 / 0,4) doğru perspektifle küçülür
-    ...curve(0.9, 0.932, 10, (tau) => ({ x: 0.5, y: 0.56 - 0.16 * tau * tau, s: 1 / (1 + 14 * tau * tau) })),
-    hide(0.934, 0.5, 0.4, { s: 0.05 }), hide(1, 0.5, 0.4, { s: 0.05 }),
-  ];
-  const ship = track(kit, rand, { sprite: SPRITE.dot, size: 1, period: P, rest: RE, phase: 0, kf: K(...rise), alpha: 0.01 });
-  // kıç motorları mavi parlar (burun yukarı → kıç aşağıda)
-  for (const ox of [-0.1, -0.05, 0, 0.05, 0.1]) {
-    out.push(follow(kit, rand, ship, {
-      sprite: SPRITE.glow, size: 20, ox: ox * FS, oy: FS * 0.4, color: mix("#7fc4ff", "#2b7be0"), pulse: [0.4, 0.55],
-      pulsePh: ox * 17, alpha: 0.9,
-    }));
-  }
-  out.push(ship);
-  // hiperuzay: yıldızlar ışınsal uzar, ekranda hafif mavi parlama
+  // ── 3 · Millennium Falcon hiperuzayı ──
+  // Gemi ve motor ışıkları aynı vektör grubunda. Atlas yalnız yıldız izlerini taşır.
   const hub = anchorAt(kit, rand, 0.5, 0.4, { period: P, rest: RE, phase: 0, alpha: 0.01 });
   out.push(...emitter(kit, rand, hub, {
     sprite: SPRITE.streak, size: 14, w: [0.8, 0.93], life: 0.012, slots: 34, spread: kit.TAU, speed: 760, align: true,
@@ -510,28 +548,7 @@ function matrixScene(kit, { rand, tone }) {
     sprite: SPRITE.pill, size: 28, kf: still(0.8, 0.66), bob: [7, 0.1], rock: [0.25, 0.07], rot0: 0.45,
     color: pick(tone, "#4da6ff", "#1f6fd6"),
   }));
-  // mermi zamanı: birkaç mermi ekranı çok yavaş geçer (iki yönde, farklı yükseklik ve hızda),
-  // her birinin ardında genişleyen hava halkaları
-  [
-    { y0: 0.5, y1: 0.47, P: 21, rest: 4, dir: 1, size: 22 },
-    { y0: 0.28, y1: 0.33, P: 17, rest: 5, dir: -1, size: 18 },
-    { y0: 0.64, y1: 0.6, P: 26, rest: 4, dir: 1, size: 20 },
-    { y0: 0.4, y1: 0.36, P: 31, rest: 3, dir: 1, size: 14 },
-    { y0: 0.56, y1: 0.58, P: 23, rest: 4, dir: -1, size: 24 },
-    { y0: 0.2, y1: 0.18, P: 19, rest: 5, dir: 1, size: 16 },
-  ].forEach((o) => {
-    const xa = o.dir > 0 ? -0.08 : 1.08;
-    const xb = o.dir > 0 ? 1.08 : -0.08;
-    const bullet = track(kit, rand, {
-      sprite: SPRITE.bullet, size: o.size, period: o.P, rest: o.rest, face: true,
-      kf: K(R(0, xa, o.y0), R(0.62, xb, o.y1), hide(0.625, xb, o.y1), hide(1, xb, o.y1)),
-    });
-    out.push(...emitter(kit, rand, bullet, {
-      sprite: SPRITE.shockRing, size: 14, w: [0.02, 0.6], life: 0.05, slots: 4, grow: 3.2, ox: -12 * o.dir, alpha: 0.6,
-      color: pick(tone, "#c8ffd8", "#2a7a4a"),
-    }));
-    out.push(bullet);
-  });
+  // Neo, Ajan ve mermi zamanı VEKTÖR (components/decor/matrixScene.js, matrixCity katmanı, matrixFrame).
   // déjà vu: kara kedi altta geçer… ve hemen ardından AYNISI yine geçer
   const walk = (u0) => curve(u0, u0 + 0.2, 1, (tau) => ({ x: -0.08 + 1.16 * tau, y: 0.8 }));
   out.push(track(kit, rand, {
@@ -563,127 +580,32 @@ function hpScene(kit, { rand, tone }) {
     }));
   }
   out.push(...glows, ...candles);
-  // Quidditch (60 sn döngü, tohumdan deterministik benzetim): altın top HER ZAMAN aynı hızda
-  // ekranın büyük bölümünde rastgele noktalara uçar; tek süpürgeli oyuncu ondan YAVAŞ ve topu
-  // kovalar. İkisi de sınırlı dönüş hızıyla yumuşak yaylar çizer. Oyuncu topa yaklaşınca top
-  // başka bir konuma yönelir (aynı hız), kovalamaca sürer. Her döngüde rota kaydırılır (jitter).
-  const QP = 60;
-  const QW = 390;
-  const QH = 844;
-  const box = { x0: 0.06 * QW, x1: 0.94 * QW, y0: 0.07 * QH, y1: 0.7 * QH };
-  const spot = () => [kit.lerp(box.x0, box.x1, rand()), kit.lerp(box.y0, box.y1, rand())];
-  const VS = 140; // top hızı (px/sn) — sabit
-  const VR = 84; // oyuncu hızı: daha yavaş
-  const TS = 2.1; // topun azami dönüş hızı (rad/sn)
-  const TR = 1.5; // oyuncunun azami dönüş hızı
-  const CATCH = 70; // bu mesafeye yaklaşınca top yer değiştirir
-  const dt = 0.1;
-  const wrapPi = (a) => {
-    let v = a;
-    while (v > Math.PI) v -= 2 * Math.PI;
-    while (v < -Math.PI) v += 2 * Math.PI;
-    return v;
-  };
-  const steer = (th, want, rate) => th + Math.max(-rate * dt, Math.min(rate * dt, wrapPi(want - th)));
-  let sp = spot();
-  let rp = spot();
-  let tgt = spot();
-  let ths = Math.atan2(tgt[1] - sp[1], tgt[0] - sp[0]);
-  let thr = Math.atan2(sp[1] - rp[1], sp[0] - rp[0]);
-  let faceR = 1;
-  let alR = 1;
-  const sRows = [];
-  const rRows = [];
-  const lRows = [];
-  const clampTilt = (v) => Math.max(-0.7, Math.min(0.7, v));
-  let tiltS = 0;
-  for (let t = 0; t <= QP + 1e-6; t += dt) {
-    const u = t / QP;
-    const vx = Math.cos(thr);
-    const vy = Math.sin(thr);
-    if (vx > 0.2) faceR = 1;
-    else if (vx < -0.2) faceR = -1;
-    alR += (faceR - alR) * Math.min(1, dt / 0.18); // -1..1 → yönlere yumuşak geçiş
-    const alRight = Math.max(0, Math.min(1, (alR + 1) / 2));
-    const want = clampTilt(faceR > 0 ? Math.atan2(vy, Math.abs(vx)) : -Math.atan2(vy, Math.abs(vx)));
-    tiltS += (want - tiltS) * Math.min(1, dt / 0.25);
-    sRows.push(R(u, sp[0] / QW, sp[1] / QH));
-    rRows.push(R(u, rp[0] / QW, rp[1] / QH, { a: tiltS, al: alRight }));
-    lRows.push(R(u, rp[0] / QW, rp[1] / QH, { a: tiltS, al: 1 - alRight }));
-    // top: sabit hızla hedefe, yumuşak dönüşle
-    const dr = Math.hypot(sp[0] - rp[0], sp[1] - rp[1]);
-    if (dr < CATCH) {
-      let best = spot();
-      for (let i = 0; i < 8; i += 1) {
-        const c = spot();
-        if (Math.hypot(c[0] - rp[0], c[1] - rp[1]) > Math.hypot(best[0] - rp[0], best[1] - rp[1])) best = c;
-      }
-      tgt = best;
-    }
-    if (Math.hypot(tgt[0] - sp[0], tgt[1] - sp[1]) < 28) tgt = spot();
-    ths = steer(ths, Math.atan2(tgt[1] - sp[1], tgt[0] - sp[0]), TS);
-    sp = [Math.max(0, Math.min(QW, sp[0] + Math.cos(ths) * VS * dt)), Math.max(0, Math.min(QH * 0.76, sp[1] + Math.sin(ths) * VS * dt))];
-    // oyuncu: topa doğru, yavaş ve yumuşak
-    thr = steer(thr, Math.atan2(sp[1] - rp[1], sp[0] - rp[0]), TR);
-    rp = [Math.max(0, Math.min(QW, rp[0] + Math.cos(thr) * VR * dt)), Math.max(0, Math.min(QH * 0.76, rp[1] + Math.sin(thr) * VR * dt))];
-  }
-  // döngü dikişi: kısa solma (başlangıç ile bitiş konumu farklı)
-  const seam = (rows) => {
-    const a = rows[0];
-    const z = rows[rows.length - 1];
-    const first = [0, a[1], a[2], 1, a[4], 0, 0, 0, 0];
-    const fadeIn = R(0.008, a[1], a[2], { a: a[4], al: a[5] });
-    const last = hide(0.992, z[1], z[2], { a: z[4] });
-    return [first, fadeIn, ...rows.filter((r) => r[0] > 0.0085 && r[0] < 0.9915), last, hide(1, z[1], z[2], { a: z[4] })];
-  };
-  const salt = 4177;
-  const jit = { jitterX: 0.22, jitterY: 0.1, salt };
-  const snitch = track(kit, rand, {
-    sprite: SPRITE.snitchOpen, size: 22, period: QP, phase: 0, flap: 11, bob: [3, 0.9], ...jit,
-    kf: K(...seam(sRows)),
-  });
-  const riderR = track(kit, rand, { sprite: SPRITE.broomRider, size: 56, period: QP, phase: 0, bob: [2, 0.4], ...jit, kf: K(...seam(rRows)) });
-  const riderL = track(kit, rand, { sprite: SPRITE.broomRiderL, size: 56, period: QP, phase: 0, bob: [2, 0.4], ...jit, kf: K(...seam(lRows)) });
-  const gold = pick(tone, "#ffd27a", "#d99a1c");
-  out.push(...emitter(kit, rand, snitch, {
-    sprite: SPRITE.glow, size: 8, life: 0.03, slots: 5, speed: 6, grow: 1.6, color: gold, alpha: 0.7, fadeK: 1.4,
+  // Şato, göl, Ruh Emiciler, Harry ve Patronus VEKTÖR (components/decor/hpScene.js, hogwarts katmanı:
+  // 75 sn, olay 30 sn, faz 0). Burada: geyiğin koşusunda gölde kalan gümüş ışık zerreleri.
+  const P = 75;
+  const RE = 2.5;
+  const lake = anchorAt(kit, rand, 0.32, 1, { dy: -(SCENERY.lift + 90), period: P, rest: RE, phase: 0, alpha: 0.01 });
+  out.push(lake);
+  out.push(...emitter(kit, rand, lake, {
+    sprite: SPRITE.glow, size: 6, w: [0.36, 0.7], life: 0.04, slots: 8, dir: -Math.PI / 2, spread: 2.4, speed: 30, grav: -10,
+    color: pick(tone, "#e6f3ff", "#7fb0e0"), alpha: 0.85, fadeK: 1.4,
   }));
-  out.push(...emitter(kit, rand, riderR, {
-    sprite: SPRITE.glow, size: 7, life: 0.04, slots: 5, spread: kit.TAU, speed: 10, grow: 1.8,
-    color: gold, alpha: 0.5, fadeK: 1.4, oy: 7,
-  }));
-  out.push(snitch, riderL, riderR);
-  // mektup taşıyan baykuş geçer, mektubu bırakır; mektup sallanarak düşer
-  const owl = track(kit, rand, {
-    sprite: SPRITE.owlOpen, size: 52, period: 17, rest: 6, flap: 2.2,
-    kf: K(...curve(0, 0.36, 8, (tau) => ({ x: -0.15 + 1.3 * tau, y: 0.2 + 0.05 * Math.sin(Math.PI * tau) })),
-      hide(0.365, 1.15, 0.2), hide(1, 1.15, 0.2)),
-  });
-  out.push(...emitter(kit, rand, owl, {
-    sprite: SPRITE.letter, size: 22, w: [0.15, 0.152], life: 0.32, slots: 1, dir: Math.PI / 2, speed: 8, grav: 26,
-    sway: [24, 0.3], rock: [0.5, 0.3], fadeK: 4, oy: 12,
-  }));
-  out.push(owl);
   return out;
 }
 
 function lotrScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // kanatlı karanlık binekler ufukta geçer
-  const beast = track(kit, rand, {
-    sprite: SPRITE.fellOpen, size: 46, period: 26, rest: 4, flap: 1.3,
-    kf: K(...curve(0, 0.42, 8, (tau) => ({ x: -0.12 + 1.24 * tau, y: 0.13 + 0.06 * Math.sin(Math.PI * tau) })),
-      hide(0.425, 1.12, 0.13), hide(1, 1.12, 0.13)),
-    color: pick(tone, "#4a4150", "#1a1720"),
-  });
-  out.push(beast, follow(kit, rand, beast, { sprite: SPRITE.fellOpen, size: 34, lag: 0.035, oy: 26, flap: 1.5, color: pick(tone, "#3d3542", "#26222c") }));
-  // yüzük süzülür, ara sıra içindeki yazı parlar
-  const ring = track(kit, rand, { sprite: SPRITE.oneRing, size: 30, kf: still(0.18, 0.32), bob: [6, 0.1], rock: [0.3, 0.07] });
-  out.push(
-    follow(kit, rand, ring, { sprite: SPRITE.glow, size: 50, color: pick(tone, "#ffcf5a", "#f0a500"), pulse: [0.12, 0.05], alpha: 0.65 }),
-    ring,
-  );
+  // Mordor, Göz, Hüküm Dağı, Nazgûllar, hobbitler ve kartallar VEKTÖR (components/decor/lotrScene.js,
+  // mordor katmanı: 75 sn, olay 30 sn, faz 0). Burada: patlamada kraterden saçılan közler.
+  const P = 75;
+  const RE = 2.5;
+  const crater = anchorAt(kit, rand, 0.27, 1, { dy: -(SCENERY.lift + 244), period: P, rest: RE, phase: 0, alpha: 0.01 });
+  out.push(crater);
+  out.push(...emitter(kit, rand, crater, {
+    sprite: SPRITE.glow, size: 6, w: [0.38, 0.62], life: 0.03, slots: 10, dir: -Math.PI / 2, spread: 1.6, speed: 160, grav: 140,
+    color: pick(tone, "#ffb347", "#ff7a1a"), alpha: 0.9, fadeK: 1.2,
+  }));
   return out;
 }
 
@@ -691,40 +613,21 @@ function duneScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
   const sand = pick(tone, ["#e0b878", "#c99a5b"], ["#a8783f", "#b98a4c"]);
-  // Solucan VEKTÖR çizilir (Dunes katmanı, 40 sn, faz 0). Burada: kum çizgisinde dalış/çıkış
-  // tozu, uzakta çalışan baharat toplayıcıların tozu ve sinen baharat parıltıları.
-  const P = 40;
-  const sandY = -(SCENERY.lift + 64);
-  const entry = anchorAt(kit, rand, 0.18, 1, { dy: sandY, period: P, rest: 2, phase: 0, alpha: 0.01 });
-  const exit = anchorAt(kit, rand, 0.82, 1, { dy: sandY, period: P, rest: 2, phase: 0, alpha: 0.01 });
-  out.push(entry, exit);
-  for (const [anchor, w] of [[entry, [0.322, 0.375]], [exit, [0.522, 0.58]], [exit, [0.615, 0.66]]]) {
+  // Solucan, Fremen, ornitopter ve hasatçı VEKTÖR (components/decor/duneScene.js, dunes katmanı:
+  // 72 sn, olay 30 sn, faz 0). Burada: solucan yükselirken ve dalarken saçılan kum zerreleri,
+  // savrulan baharat parıltıları.
+  const P = 72;
+  const RE = 2.4;
+  const at = (x, dy) => anchorAt(kit, rand, x, 1, { dy: -(SCENERY.lift + dy), period: P, rest: RE, phase: 0, alpha: 0.01 });
+  const rise = at(0.6, 70);
+  const dive = at(0.24, 72);
+  out.push(rise, dive);
+  for (const [anchor, w] of [[rise, [0.4, 0.5]], [dive, [0.62, 0.7]]]) {
     out.push(...emitter(kit, rand, anchor, {
-      sprite: SPRITE.glow, size: 16, w, life: 0.03, slots: 8, dir: -Math.PI / 2, spread: 0.9, speed: 80, grav: 70, grow: 3,
-      color: sand, alpha: 0.55,
-    }));
-    out.push(...emitter(kit, rand, anchor, {
-      sprite: SPRITE.speck, size: 6, w, life: 0.03, slots: 10, dir: -Math.PI / 2, spread: 1.5, speed: 170, grav: 260,
+      sprite: SPRITE.speck, size: 6, w, life: 0.025, slots: 12, dir: -Math.PI / 2, spread: 1.4, speed: 190, grav: 260,
       color: sand, alpha: 0.9, spin: 3,
     }));
   }
-  // toplayıcıların arkasında sürekli kalkan toz
-  for (const [x, dy] of [[0.09, -(SCENERY.lift + 70)], [0.93, -(SCENERY.lift + 84)]]) {
-    const a = anchorAt(kit, rand, x, 1, { dy, period: 10, phase: 0, alpha: 0.01 });
-    out.push(a, ...emitter(kit, rand, a, {
-      sprite: SPRITE.glow, size: 14, life: 0.1, slots: 5, dir: -Math.PI / 2, spread: 0.7, speed: 14, sway: [8, 0.2], grow: 3,
-      color: sand, alpha: 0.32,
-    }));
-  }
-  // kanat çırpan çöl uçakları havada asılı
-  for (const [i, y] of [0.22, 0.31].entries()) {
-    out.push(track(kit, rand, {
-      sprite: SPRITE.thopterA, size: 38, period: 46 + i * 12, rest: 2, flap: 8, bob: [6, 0.3],
-      kf: K(...curve(0, 1, 6, (tau) => ({ x: -0.15 + 1.3 * tau, y: y + 0.03 * Math.sin(tau * 7 + i) }))),
-      color: pick(tone, "#aab0bb", "#4b5260"),
-    }));
-  }
-  // baharat zerreleri savrulur
   for (let i = 0; i < 14; i += 1) {
     const p = kit.floating(kit.blank(rand), rand, rand(), {
       sprite: SPRITE.glow, size: [3, 7], sway: [14, 40], freq: [0.02, 0.06], drift: [10, 30], pulse: [0.2, 0.6],
@@ -739,13 +642,7 @@ function duneScene(kit, { rand, tone }) {
 function batScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // çatıdaki heykelin üstünde pelerinli silüet; pelerin rüzgârda dalgalanır
-  const fig = 42;
-  out.push(track(kit, rand, {
-    sprite: SPRITE.capeA, size: fig, flap: 0.9,
-    kf: still(SCENERY.gargoyle.x, 1, { dy: -(SCENERY.gargoyle.top + SCENERY.lift + fig * 0.46) }),
-    color: pick(tone, "#3a3f4b", "#14161b"),
-  }));
+  // Gotham, yarasa işareti, gargoyle ve Batman VEKTÖR (components/decor/batScene.js, gotham katmanı, batFrame).
   // yarasa sürüsü şehirden yükselip geçer
   const leadKf = K(...curve(0, 0.3, 8, (tau) => ({ x: -0.1 + 1.2 * tau, y: 0.62 - 0.5 * tau + 0.06 * Math.sin(tau * 6) })),
     hide(0.305, 1.1, 0.12), hide(1, 1.1, 0.12));
@@ -765,70 +662,39 @@ function spiderScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
   const webCol = pick(tone, "#e8ecf2", "#6b7280");
-  const W = 120;
-  // köşe ağları (sol üst köşe hücrenin sol üstü; sağdaki 90° döndürülür)
-  const left = track(kit, rand, { sprite: SPRITE.web, size: W, kf: still(0, 0), ox: W / 2, oy: W / 2, color: webCol, alpha: 0.55 });
-  const right = track(kit, rand, { sprite: SPRITE.web, size: W, kf: still(1, 0), ox: -W / 2, oy: W / 2, rot0: Math.PI / 2, color: webCol, alpha: 0.55 });
-  out.push(left, right);
-  // ağdaki çiy damlaları parlar
+  // Şehir, su kulesi, örümcek adam ve ağ ipleri VEKTÖR (components/decor/spiderScene.js, skyline katmanı:
+  // 66 sn, olay 30 sn, faz 0). Burada: köşe ağlarındaki çiy damlaları, konmada kalkan toz,
+  // havada süzülen ağ lifleri.
   for (const [x, y, ox, oy] of [[0, 0, 30, 70], [0, 0, 64, 38], [0, 0, 90, 20], [1, 0, -40, 62], [1, 0, -76, 30]]) {
     out.push(track(kit, rand, {
       sprite: SPRITE.glow, size: 7, kf: still(x, y), ox, oy, pulse: [kit.lerp(0.4, 0.9, rand()), 0.1], color: "#ffffff",
       alpha: 0.9,
     }));
   }
-  // Ağ sallama (16 sn): dört salınım; her salınım yeni bir ağ atışıyla başlar, uçta kısa bir
-  // takla (ağ yok) ve sonraki ağ. Gövde ipe paralel yatar, el ağı tutar.
-  const P = 16;
-  const ay = -0.02;
-  const lx = 0.17;
-  const ly = 0.34;
-  const tm = 1.0;
-  const dx = 2 * lx * Math.sin(tm);
-  const ax = [0, 1, 2, 3].map((j) => j * (dx + 0.04));
-  const rows = [hide(0, -0.2, 0.2)];
-  const win = [];
-  let u = 0.01;
-  ax.forEach((a, j) => {
-    rows.push(...curve(u, u + 0.19, 10, swing(a, ay, lx, ly, tm, 0.9)));
-    win.push([u, u + 0.19, a, ay]);
-    u += 0.19;
-    if (j < ax.length - 1) {
-      const x0 = a + lx * Math.sin(tm);
-      const x1 = ax[j + 1] - lx * Math.sin(tm);
-      const y0 = ay + ly * Math.cos(tm);
-      rows.push(...curve(u + 0.002, u + 0.044, 7, (tau) => ({
-        x: x0 + (x1 - x0) * tau, y: y0 - 0.075 * Math.sin(Math.PI * tau), a: -0.9 + (1.8 + 2 * Math.PI) * tau,
-      })));
-      u += 0.045;
-    }
-  });
-  rows.push(R(u + 0.02, ax[3] + 0.3, 0.12, { a: -0.6 }), hide(u + 0.025, ax[3] + 0.3, 0.12), hide(1, ax[3] + 0.3, 0.12));
-  const SZ = 62;
-  const body = track(kit, rand, { sprite: SPRITE.swinger, size: SZ, period: P, rest: 5, phase: 0, kf: K(...rows) });
-  out.push(tether(kit, rand, body, win, { oy: -SZ * 0.44, color: 0, width: 1.5 }));
-  // ağın izi: gövdenin ardında küçük beyaz zerreler
-  out.push(...emitter(kit, rand, body, {
-    sprite: SPRITE.glow, size: 5, w: [0.02, 0.9], life: 0.03, slots: 6, spread: 0.6, speed: 6, grow: 0.6,
-    color: webCol, alpha: 0.4, fadeK: 1.5, oy: SZ * 0.1,
+  const P = 66;
+  const RE = 2.2;
+  // su kulesi tepesi (spiderLayout: çatı 118 + bacak 22 + gövde 36 → zeminden ~182 dp)
+  const perch = anchorAt(kit, rand, 0.8, 1, { dy: -(SCENERY.lift + 180), period: P, rest: RE, phase: 0, alpha: 0.01 });
+  out.push(perch);
+  out.push(...emitter(kit, rand, perch, {
+    sprite: SPRITE.speck, size: 5, w: [0.42, 0.45], life: 0.03, slots: 8, dir: -Math.PI / 2, spread: 2.6, speed: 60, grav: 90,
+    color: pick(tone, "#cfd4dc", "#8a93a6"), alpha: 0.7, spin: 2,
   }));
-  out.push(body);
+  for (let i = 0; i < 4; i += 1) {
+    const p = kit.floating(kit.blank(rand), rand, rand(), {
+      sprite: SPRITE.thread, size: [10, 18], sway: [10, 30], freq: [0.02, 0.05], drift: [6, 16], pulse: [0.2, 0.5],
+      pulseMin: 0.4, alpha: [0.3, 0.55], yRange: [0.1, 0.5],
+    });
+    kit.paint(p, webCol);
+    out.push(p);
+  }
   return out;
 }
 
 function bbScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // karavan çöl zemininde durur; çatıdaki bacadan duman tüter
-  const rvSize = 76;
-  const rv = track(kit, rand, {
-    sprite: SPRITE.rv, size: rvSize, period: 15, kf: still(0.72, 1, { dy: -(SCENERY.mesaGround + SCENERY.lift + rvSize * 0.32) }),
-  });
-  out.push(...emitter(kit, rand, rv, {
-    sprite: SPRITE.glow, size: 12, life: 0.2, slots: 5, dir: -Math.PI / 2, spread: 0.35, speed: 16, sway: [10, 0.15],
-    grow: 3.2, color: pick(tone, "#cfcfcf", "#8a8a8a"), alpha: 0.4, ox: -14, oy: -26,
-  }));
-  out.push(rv);
+  // Karavan, Walter/Jesse, pantolon ve duman VEKTÖR (components/decor/bbScene.js, mesa katmanı, bbFrame).
   // başlık kartındaki gibi element kutucukları süzülür; arada biri parlar
   for (const [sprite, x, y, ph] of [[SPRITE.tileBr, 0.24, 0.2, 0], [SPRITE.tileBa, 0.4, 0.27, 3.1]]) {
     const tile = track(kit, rand, { sprite, size: 44, kf: still(x, y), bob: [5, 0.07], rock: [0.06, 0.05] });
@@ -837,73 +703,15 @@ function bbScene(kit, { rand, tone }) {
       tile,
     );
   }
-  // yassı şapka
-  out.push(track(kit, rand, {
-    sprite: SPRITE.hat, size: 40, kf: still(0.8, 0.34), bob: [6, 0.08], rock: [0.12, 0.06],
-    color: pick(tone, "#5a5e68", "#1f2328"),
-  }));
-  // cam şişede kabarcık
-  const flask = track(kit, rand, {
-    sprite: SPRITE.flask, size: 40, period: 8, kf: still(0.14, 0.52), bob: [4, 0.09],
-    color: pick(tone, "#d6eef8", "#5f8fa8"),
-  });
-  out.push(...emitter(kit, rand, flask, {
-    sprite: SPRITE.dot, size: 5, life: 1 / 6, slots: 6, dir: -Math.PI / 2, spread: 0.4, speed: 22, grow: 1.4,
-    color: pick(tone, "#e8f8ff", "#5f8fa8"), alpha: 0.6, oy: -6,
-  }));
-  out.push(flask);
   return out;
 }
 
 function gotScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // Ejderha (24 sn): uzaktan küçük gelir, büyüyerek duvara yaklaşır, havada durur,
-  // kanat çırparak duvara ateş üfler, sonra yükselip gider.
-  const P = 24;
+  // Ejderha, ateş, yıkılış ve ordu vektör: components/decor/gotScene.js (iceWall katmanı, gotFrame).
+  // Burada yalnız uzaktan geçen kuzgunlar.
   rand(); // tohum akışını koru
-  const phase = 0; // duvarın yıkılışıyla (iceWall, period 24, faz 0) aynı saat
-  const D = 130;
-  const kf = K(
-    hide(0, 0.06, 0.1, { s: 0.22 }),
-    R(0.02, 0.07, 0.11, { s: 0.24, e: 1 }),
-    R(0.24, 0.26, 0.38, { s: 0.9, e: 1 }),
-    R(0.31, 0.3, 0.42, { s: 1, a: 0.06, e: 1 }),
-    R(0.5, 0.31, 0.41, { s: 1, a: 0.06, e: 1 }),
-    R(0.62, 0.7, 0.2, { s: 0.8, a: -0.3, e: 1 }),
-    R(0.72, 1.25, 0.04, { s: 0.6, a: -0.2 }),
-    hide(0.722, 1.25, 0.04, { s: 0.6 }),
-    hide(1, 1.25, 0.04, { s: 0.6 }),
-  );
-  const dragon = track(kit, rand, { sprite: SPRITE.dragonOpen, size: D, period: P, rest: 3, phase, kf, flap: 1.6, bob: [6, 0.45] });
-  // ateş: ağızdan aşağı-sağa genişleyen koni (dış turuncu, iç sarı)
-  // Beyaz Yürüyen'in buz ateşi: dış mavi, iç beyaz-mavi
-  const fireOuter = pick(tone, ["#2f8cff", "#4aa8ff", "#1f6fe0"], ["#1566d6", "#0b4fb3", "#2b7be0"]);
-  const fireCore = pick(tone, ["#e8f6ff", "#bfe6ff"], ["#5aa9f0", "#7bbcf5"]);
-  const fire = { w: [0.34, 0.48], life: 0.045, dir: 1.2, spread: 0.32, speed: 345, grav: 50, ox: D * 0.4, oy: 8, fadeK: 1.5 };
-  out.push(...emitter(kit, rand, dragon, { ...fire, sprite: SPRITE.glow, size: 20, grow: 3, slots: 18, color: fireOuter, alpha: 0.85 }));
-  out.push(...emitter(kit, rand, dragon, { ...fire, sprite: SPRITE.glow, size: 11, grow: 2.3, slots: 10, spread: 0.2, color: fireCore, alpha: 0.95 }));
-  // alev içinde uçuşan parlak kıvılcımlar
-  out.push(...emitter(kit, rand, dragon, {
-    ...fire, sprite: SPRITE.dot, size: 4, grow: 0.8, slots: 8, spread: 0.55, speed: 420, life: 0.045, color: pick(tone, "#ffffff", "#2b7be0"),
-    alpha: 0.9,
-  }));
-  out.push(dragon);
-  // duvarda mavi parlama ve buhar (yıkılış katmanı iceWall ile aynı saatte)
-  const hit = anchorAt(kit, rand, 0.72, 1, { dy: -SCENERY.wallTop, period: P, rest: 3, phase });
-  out.push(...emitter(kit, rand, hit, {
-    sprite: SPRITE.glow, size: 76, w: [0.36, 0.56], life: 0.05, slots: 5, grow: 1.9, color: pick(tone, "#59b8ff", "#2b7be0"),
-    alpha: 0.5,
-  }));
-  // yıkılırken kalkan buz tozu
-  out.push(...emitter(kit, rand, hit, {
-    sprite: SPRITE.glow, size: 40, w: [0.52, 0.8], life: 0.1, slots: 7, dir: -Math.PI / 2, spread: 1.2, speed: 22,
-    grow: 3.4, sway: [14, 0.18], color: pick(tone, "#dcefff", "#9fb4c8"), alpha: 0.3,
-  }));
-  out.push(...emitter(kit, rand, hit, {
-    sprite: SPRITE.glow, size: 18, w: [0.38, 0.62], life: 0.09, slots: 10, dir: -Math.PI / 2, spread: 0.9, speed: 34,
-    grow: 3.2, sway: [12, 0.2], color: pick(tone, "#ffffff", "#9fb4c8"), alpha: 0.35,
-  }));
   // kuzgunlar
   for (const [i, per] of [13, 19].entries()) {
     out.push(track(kit, rand, {
@@ -919,40 +727,17 @@ function gotScene(kit, { rand, tone }) {
 function vikScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // Baskın (30 sn, nehir katmanı river ile AYNI saat: faz 0): üç uzun gemi nehirde
-  // yukarı gelir, kalenin önünde durur, yanan ok yağdırır; kale tutuşunca çekilirler.
-  const P = 30;
-  const L = SCENERY.river;
-  // Gemiler River katmanında vektör çizilir; burada yalnız aynı rotada görünmez çapalar
-  // (okların çıkış noktası).
-  const leads = SCENERY.vikShips.map((o) => track(kit, rand, {
-    sprite: SPRITE.dot, size: 1, period: P, rest: 3, phase: 0,
-    kf: K(
-      R(0, o.from, 1, { dy: -o.w, e: 1 }),
-      R(o.at, o.hold, 1, { dy: -o.w, e: 1 }),
-      R(0.62, o.hold + 0.03, 1, { dy: -o.w, e: 1 }),
-      R(1, 1.4, 1, { dy: -o.w }),
-    ),
-  }));
-  out.push(...leads);
-  // yanan oklar: gemiden kaleye yay çizer (saniyede birkaç ok; çakma yok)
-  const arrow = pick(tone, ["#ffb347", "#ff8a2a"], ["#e8590c", "#d9480f"]);
-  leads.forEach((lead, i) => {
-    out.push(...emitter(kit, rand, lead, {
-      sprite: SPRITE.glow, size: 7 - i, w: [0.28, 0.6], life: 0.03, slots: 4, dir: -0.85 + i * 0.07, spread: 0.12, speed: 175 + i * 14,
-      grav: 260, grow: 0.7, color: arrow, alpha: 0.95, ox: 26 + i * 8, oy: -(24 + i * 8), fadeK: 1.2,
+  // Gemiler, alevli oklar, manastır ve yangın VEKTÖR (components/decor/vikingsScene.js, river katmanı:
+  // 90 sn, olay 30 sn, faz 0). Burada: yanan çatılardan yükselen kıvılcımlar, kuzgunlar, runlar.
+  const P = 90;
+  const ember = pick(tone, ["#ffd08a", "#ff9a3c"], ["#e8590c", "#f59f00"]);
+  for (const [x, dy] of [[0.78, 252], [0.64, 228], [0.92, 296]]) {
+    const a = anchorAt(kit, rand, x, 1, { dy: -(SCENERY.lift + dy), period: P, rest: 3, phase: 0 });
+    out.push(a, ...emitter(kit, rand, a, {
+      sprite: SPRITE.dot, size: 4, w: [0.3, 0.86], life: 0.05, slots: 6, dir: -Math.PI / 2, spread: 0.9, speed: 46,
+      sway: [8, 0.3], grow: 0.6, color: ember, alpha: 0.9,
     }));
-  });
-  // kale: tutuşunca duman ve kıvılcım yükselir
-  const fort = anchorAt(kit, rand, 0.82, 1, { dy: -(L.farBank + 52), period: P, rest: 3, phase: 0 });
-  out.push(...emitter(kit, rand, fort, {
-    sprite: SPRITE.glow, size: 26, w: [0.34, 0.95], life: 0.12, slots: 8, dir: -Math.PI / 2, spread: 0.5, speed: 20,
-    sway: [14, 0.16], grow: 3.4, color: pick(tone, "#9aa3b0", "#5a6270"), alpha: 0.32,
-  }));
-  out.push(...emitter(kit, rand, fort, {
-    sprite: SPRITE.dot, size: 4, w: [0.36, 0.9], life: 0.06, slots: 6, dir: -Math.PI / 2, spread: 0.9, speed: 46,
-    sway: [8, 0.3], grow: 0.6, color: pick(tone, ["#ffd08a", "#ff9a3c"], ["#e8590c", "#f59f00"]), alpha: 0.9,
-  }));
+  }
   // kuzgun çifti
   const raven = track(kit, rand, {
     sprite: SPRITE.ravenOpen, size: 22, period: 20, rest: 4, flap: 3,
@@ -997,79 +782,6 @@ function pbScene(kit, { rand, tone }) {
   return out;
 }
 
-function shScene(kit, { rand, tone }) {
-  const { SPRITE } = kit;
-  const out = [];
-  // ayak izleri sırayla belirip söner (biri yürüyormuş gibi)
-  const N = 14;
-  const col = pick(tone, "#b3a991", "#5a5040");
-  for (let i = 0; i < N; i += 1) {
-    const tau = i / (N - 1);
-    const x = 0.08 + 0.84 * tau;
-    const y = 0.7 + 0.04 * Math.sin(2 * Math.PI * tau * 0.8);
-    const dydx = (0.04 * 2 * Math.PI * 0.8 * Math.cos(2 * Math.PI * tau * 0.8) * 844) / (0.84 * 390);
-    const a = Math.atan(dydx) + Math.PI / 2;
-    const ua = 0.04 + i * 0.03;
-    const side = i % 2 ? 7 : -7;
-    out.push(track(kit, rand, {
-      sprite: SPRITE.footprint, size: 16, period: 15, rest: 5, phase: 0.31, oy: side,
-      kf: K(hide(0, x, y, { a }), hide(ua, x, y, { a }), R(ua + 0.012, x, y, { a }), R(ua + 0.28, x, y, { a }),
-        hide(ua + 0.4, x, y, { a }), hide(1, x, y, { a })),
-      color: col, alpha: 0.65,
-    }));
-  }
-  // büyüteç ekranda gezinir
-  const pts = [[0.25, 0.3], [0.7, 0.24], [0.78, 0.5], [0.4, 0.58], [0.18, 0.45], [0.25, 0.3]];
-  out.push(track(kit, rand, {
-    sprite: SPRITE.magnifier, size: 58, period: 34, rock: [0.1, 0.05],
-    kf: K(...pts.map(([x, y], i) => R(i / (pts.length - 1), x, y, { e: 1 }))),
-  }));
-  // ipucu noktaları parlar
-  for (let i = 0; i < 5; i += 1) {
-    out.push(track(kit, rand, {
-      sprite: SPRITE.glow, size: 9, kf: still(kit.lerp(0.12, 0.88, rand()), kit.lerp(0.2, 0.6, rand())),
-      pulse: [kit.lerp(0.3, 0.6, rand()), 0.05], color: pick(tone, "#ffc24a", "#d97706"), alpha: 0.9,
-    }));
-  }
-  return out;
-}
-
-function soprScene(kit, { rand, tone }) {
-  const { SPRITE } = kit;
-  const out = [];
-  // ördek ailesi havuzda sıra halinde yüzer, birlikte uçup gider, sonra geri döner
-  const wy = -(SCENERY.poolBottom + SCENERY.poolTop) / 2 - 6 - SCENERY.lift;
-  const kf = K(
-    R(0, 0.18, 1, { dy: wy, e: 1 }),
-    R(0.12, 0.45, 1, { dy: wy + 8, e: 1 }),
-    R(0.24, 0.62, 1, { dy: wy - 4, e: 1 }),
-    R(0.34, 0.7, 1, { dy: wy }),
-    R(0.36, 0.72, 1, { dy: wy, f: 1 }),
-    R(0.42, 0.85, 1, { dy: wy - 110, f: 1, a: -0.25 }),
-    R(0.5, 1.2, 0.25, { f: 1, a: -0.2 }),
-    hide(0.502, 1.2, 0.25, { f: 1 }),
-    hide(0.74, -0.2, 0.3, { f: 1 }),
-    R(0.742, -0.2, 0.3, { f: 1, a: 0.15 }),
-    R(0.86, 0.1, 1, { dy: wy - 60, f: 1, a: 0.2 }),
-    R(0.9, 0.16, 1, { dy: wy - 2, f: 1 }),
-    R(0.92, 0.18, 1, { dy: wy, f: 0 }),
-    R(1, 0.18, 1, { dy: wy, f: 0 }),
-  );
-  const mom = track(kit, rand, { sprite: SPRITE.duckSwim, size: 34, period: 34, kf, framed: true, flapFrom: 1, flap: 5, bob: [1.5, 0.4] });
-  const kids = [];
-  for (let j = 1; j <= 4; j += 1) {
-    kids.push(follow(kit, rand, mom, { sprite: SPRITE.duckSwim, size: 20, lag: j * 0.014, framed: true, flapFrom: 1, flap: 6 }));
-  }
-  out.push(...kids.reverse(), mom);
-  // puro dumanı kıvrılarak yükselir
-  const ash = anchorAt(kit, rand, 0.9, 1, { dy: -(60 + SCENERY.lift), period: 16 });
-  out.push(...emitter(kit, rand, ash, {
-    sprite: SPRITE.glow, size: 10, life: 0.25, slots: 6, dir: -Math.PI / 2, spread: 0.25, speed: 22, sway: [16, 0.18],
-    grow: 3.5, color: pick(tone, "#d0d0d0", "#7d7d7d"), alpha: 0.35,
-  }));
-  return out;
-}
-
 const featherFall = (kit, rand, tone, cols, o = {}) => {
   const p = kit.falling(kit.blank(rand), rand, rand(), {
     sprite: kit.SPRITE.feather, size: o.size ?? [20, 34], speed: o.speed ?? [14, 30], wind: [-8, 8], sway: [20, 48],
@@ -1085,39 +797,6 @@ function dnFeathers(kit, { rand, count, tone }) {
   return Array.from({ length: n }, () => featherFall(kit, rand, tone, [["#4b4a57", "#5c5a6b"], ["#15141a", "#26242e"]]));
 }
 
-function dnScene(kit, { rand, tone }) {
-  const { SPRITE, KIND } = kit;
-  const out = [];
-  // defter sayfaları savrulur
-  for (let i = 0; i < 4; i += 1) {
-    const p = kit.blank(rand);
-    p.kind = KIND.drift;
-    kit.setSprite(p, SPRITE.page);
-    p.size = kit.lerp(26, 36, rand());
-    p.windX = (i % 2 ? -1 : 1) * kit.lerp(12, 26, rand());
-    p.y0 = kit.lerp(0.1, 0.8, rand());
-    p.swayAmp = kit.lerp(10, 24, rand());
-    p.swayFreq = kit.lerp(0.06, 0.14, rand());
-    p.driftAmpY = kit.lerp(20, 50, rand());
-    p.driftFreqY = kit.lerp(0.03, 0.07, rand());
-    p.rotSpeed = kit.lerp(-0.4, 0.4, rand());
-    p.wobbleAmp = kit.lerp(0.2, 0.5, rand());
-    p.wobbleFreq = p.swayFreq;
-    p.a = 0.8;
-    kit.paint(p, pick(tone, "#eceae4", "#8a877e"));
-    out.push(p);
-  }
-  // elma havada döner; ara sıra ısırılmış hale geçer, söner, yenisi belirir
-  const x = 0.76;
-  const y = 0.3;
-  out.push(track(kit, rand, {
-    sprite: SPRITE.apple, size: 40, period: 18, framed: true, bob: [6, 0.1], rock: [0.25, 0.09],
-    kf: K(R(0, x, y), R(0.55, x, y), R(0.56, x, y, { f: 1 }), R(0.82, x, y, { f: 1 }), hide(0.88, x, y, { f: 1 }),
-      hide(0.9, x, y), R(0.96, x, y), R(1, x, y)),
-  }));
-  return out;
-}
-
 // Beyaz tüyler (yoğunlukla).
 function aotFeathers(kit, { rand, count, tone }) {
   const n = Math.max(4, Math.min(16, Math.round(count / 2)));
@@ -1129,30 +808,8 @@ function aotFeathers(kit, { rand, count, tone }) {
 function aotScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  // Dev: 60 sn'de bir, her seferinde duvarın rastgele bir yerinden (jitterX) ve döngü başlangıcına
-  // göre rastgele bir anda (faz) duvarın ARDINDAN yükselir; duvar tam opak olduğu için gövdesinin
-  // duvarın altında kalan kısmı hiç görünmez. Sonra çöker ve 1 dakika yok olur.
-  const T = 190;
-  const P = 60;
-  const top = SCENERY.titanWallTop + SCENERY.lift;
-  const low = -(top - T * 0.62);
-  const up = -(top + 6);
-  const kf = K(
-    hide(0, 0.5, 1, { dy: low }),
-    hide(0.3, 0.5, 1, { dy: low, e: 1 }),
-    R(0.35, 0.5, 1, { dy: low - 30, e: 1 }),
-    R(0.4, 0.5, 1, { dy: up, e: 1 }),
-    R(0.5, 0.5, 1, { dy: up - 4, e: 1 }),
-    R(0.56, 0.5, 1, { dy: low - 30 }),
-    hide(0.6, 0.5, 1, { dy: low }),
-    hide(1, 0.5, 1, { dy: low }),
-  );
-  const titan = track(kit, rand, { sprite: SPRITE.titan, size: T, period: P, kf, jitterX: 0.6 });
-  const steam = { sprite: SPRITE.glow, w: [0.37, 0.57], life: 0.037, dir: -Math.PI / 2, speed: 28, sway: [14, 0.2], color: pick(tone, "#ffffff", "#c5cdd8") };
-  out.push(...emitter(kit, rand, titan, { ...steam, size: 22, slots: 10, spread: 1.2, grow: 3.4, alpha: 0.4, oy: -T * 0.32 }));
-  out.push(...emitter(kit, rand, titan, { ...steam, size: 18, slots: 4, spread: 0.9, grow: 3, alpha: 0.35, ox: -T * 0.3, oy: -T * 0.05 }));
-  out.push(...emitter(kit, rand, titan, { ...steam, size: 18, slots: 4, spread: 0.9, grow: 3, alpha: 0.35, ox: T * 0.3, oy: -T * 0.05 }));
-  out.push(titan);
+  // Dev, buharı, kapı tekmesi, enkaz ve toz VEKTÖR sahnede (components/decor/aotScene.js,
+  // titanWall katmanı, aotFrame zaman çizelgesi). Burada yalnız keşif birliği askeri kalır.
   // Keşif birliği askeri (12 sn): iki salınım ve arada takla; her salınım başında gaz püskürür,
   // en alt noktada kılıç parıltısı.
   const P2 = 12;
@@ -1231,110 +888,24 @@ function narLeaves(kit, { rand, count, tone }) {
   return out;
 }
 
-function narScene(kit, { rand, tone }) {
+// Rick and Morty: karakterler, portallar ve uzay aracı artık vektör (components/decor/rmScene.js,
+// rmPortal katmanı, rmFrame). Burada yalnız portal kıvılcımları — aynı saat (66 sn, olay 30 sn).
+function rmScene(kit, { rand, tone }) {
   const { SPRITE } = kit;
   const out = [];
-  const steel = pick(tone, "#c9d1dc", "#4b5563");
-  // dönen fırlatma yıldızları (simetrik: iki yönde de geçer)
-  out.push(track(kit, rand, {
-    sprite: SPRITE.shuriken, size: 24, period: 9, rest: 8, spin: 14, color: steel,
-    kf: K(R(0, -0.1, 0.24), R(0.14, 1.1, 0.32), hide(0.142, 1.1, 0.32), hide(1, 1.1, 0.32)),
-  }));
-  out.push(track(kit, rand, {
-    sprite: SPRITE.shuriken, size: 20, period: 13, rest: 6, spin: -12, color: steel,
-    kf: K(R(0, 1.1, 0.55), R(0.16, -0.1, 0.48), hide(0.162, -0.1, 0.48), hide(1, -0.1, 0.48)),
-  }));
-  // kunai gidişine dönük uçar
-  out.push(track(kit, rand, {
-    sprite: SPRITE.kunai, size: 30, period: 15, rest: 6, face: true, color: steel,
-    kf: K(R(0, 1.1, 0.16), R(0.12, -0.1, 0.22), hide(0.122, -0.1, 0.22), hide(1, -0.1, 0.22)),
-  }));
-  // "puf": rastgele bir yerde duman bulutu belirip dağılır
-  const spot = anchorAt(kit, rand, 0.5, 0.45, { period: 11, rest: 8, jitterX: 0.6, jitterY: 0.3 });
-  out.push(...emitter(kit, rand, spot, {
-    sprite: SPRITE.glow, size: 22, w: [0.5, 0.505], life: 0.07, slots: 10, spread: kit.TAU, speed: 60, grow: 2.6,
-    color: pick(tone, ["#ffffff", "#e5e7eb"], ["#9ca3af", "#b6bcc6"]), alpha: 0.6, fadeK: 1.4,
-  }));
-  return out;
-}
-
-function opScene(kit, { rand }) {
-  const { SPRITE } = kit;
-  return [
-    // (gemi VEKTÖR: opShip katmanı, 44 sn) hasır şapka rüzgârda takla atarak geçer
-    track(kit, rand, {
-      sprite: SPRITE.strawHat, size: 40, period: 15, rest: 5, spin: 3.2,
-      kf: K(R(0, -0.1, 0.3), R(0.12, 0.3, 0.18, { e: 1 }), R(0.24, 0.62, 0.36, { e: 1 }), R(0.36, 1.12, 0.22),
-        hide(0.362, 1.12, 0.22), hide(1, 1.12, 0.22)),
-    }),
-    // sarmal desenli meyve süzülür
-    track(kit, rand, { sprite: SPRITE.devilFruit, size: 36, kf: still(0.18, 0.36), bob: [6, 0.1], rock: [0.2, 0.08] }),
-  ];
-}
-
-function fmaScene(kit, { rand, tone }) {
-  const { SPRITE } = kit;
-  const out = [];
-  // cep saati zincirinde sarkaç gibi sallanır
-  const ax = 0.84;
-  const ay = -0.02;
-  const rows = curve(0, 1, 16, (tau) => {
-    const th = 0.32 * Math.sin(2 * Math.PI * tau);
-    return { x: ax + 0.44 * Math.sin(th), y: ay + 0.2 * Math.cos(th), a: -th };
-  });
-  const watch = track(kit, rand, { sprite: SPRITE.pocketWatch, size: 44, period: 3.2, kf: K(...rows) });
-  out.push(watch, tether(kit, rand, watch, [[0, 1.01, ax, ay]], { oy: -18, color: 2, width: 1.6 }));
-  // kırmızı taş parçası parıltıları
-  for (let i = 0; i < 5; i += 1) {
-    out.push(track(kit, rand, {
-      sprite: SPRITE.glow, size: kit.lerp(7, 12, rand()), kf: still(kit.lerp(0.1, 0.9, rand()), kit.lerp(0.12, 0.7, rand())),
-      bob: [5, 0.08], pulse: [kit.lerp(0.2, 0.45, rand()), 0.08], color: pick(tone, "#ff4d5e", "#c81e3a"), alpha: 0.9,
+  const P = 66;
+  const REST = 2.2;
+  const PY = SCENERY.lift + 26 + 44; // portal merkezi (dp, alttan)
+  const green = pick(tone, ["#7dff8a", "#b8ffbf"], ["#1c9e2a", "#2bb33a"]);
+  for (const [x, w] of [[0.8, [0.04, 0.29]], [0.2, [0.5, 0.78]]]) {
+    const portal = anchorAt(kit, rand, x, 1, { dy: -PY, period: P, rest: REST, phase: 0, alpha: 0.01 });
+    out.push(portal, ...emitter(kit, rand, portal, {
+      sprite: SPRITE.glow, size: 8, w, life: 0.025, slots: 8, spread: kit.TAU, speed: 34, grow: 0.8, color: green, alpha: 0.7, fadeK: 1.4,
     }));
   }
   return out;
 }
-
-// Rick and Morty (30 sn, rmPortal katmanıyla aynı saat): portal açılır, Rick ve Morty yürüyüp
-// içine girer ve küçülerek kaybolur, portal kapanır; sonra Rick'in uçan dairesi gökten geçer.
-function rmScene(kit, { rand, tone }) {
-  const { SPRITE } = kit;
-  const out = [];
-  const P = 30;
-  const F = SCENERY.lift + 30; // ayak hizası (dp, alttan)
-  const green = pick(tone, ["#7dff8a", "#b8ffbf"], ["#1c9e2a", "#2bb33a"]);
-  const rickDy = -(F + 31);
-  const kf = K(
-    hide(0, 0.04, 1, { dy: rickDy }), hide(0.13, 0.04, 1, { dy: rickDy }),
-    R(0.15, 0.06, 1, { dy: rickDy }), R(0.44, 0.62, 1, { dy: rickDy }),
-    R(0.5, 0.715, 1, { dy: -(F + 36), s: 0.05 }),
-    hide(0.505, 0.72, 1, { dy: -(F + 36), s: 0.05 }), hide(1, 0.72, 1, { dy: -(F + 36), s: 0.05 }),
-  );
-  const rick = track(kit, rand, { sprite: SPRITE.rick, size: 62, period: P, rest: 3, phase: 0, kf, bob: [1.6, 1.1], rock: [0.04, 2.2] });
-  const morty = follow(kit, rand, rick, { sprite: SPRITE.morty, size: 46, lag: 0.04, oy: 8 });
-  out.push(morty, rick);
-  // portal kıvılcımları
-  const portal = anchorAt(kit, rand, 0.72, 1, { dy: -(F + 36), period: P, rest: 3, phase: 0, alpha: 0.01 });
-  out.push(portal, ...emitter(kit, rand, portal, {
-    sprite: SPRITE.glow, size: 9, w: [0.12, 0.56], life: 0.03, slots: 8, spread: kit.TAU, speed: 38, grow: 0.8, color: green, alpha: 0.7, fadeK: 1.4,
-  }));
-  // uçan daire: sağdan sola
-  const saucer = track(kit, rand, {
-    sprite: SPRITE.saucer, size: 64, period: P, rest: 3, phase: 0, bob: [3, 0.4], rock: [0.05, 0.3],
-    kf: K(
-      hide(0, 1.2, 0.22), hide(0.6, 1.2, 0.22),
-      ...curve(0.62, 0.9, 10, (tau) => ({ x: 1.12 - 1.34 * tau, y: 0.22 + 0.05 * Math.sin(tau * 6), a: -0.06 })),
-      hide(0.905, -0.2, 0.22), hide(1, -0.2, 0.22),
-    ),
-  });
-  out.push(...emitter(kit, rand, saucer, {
-    sprite: SPRITE.glow, size: 10, w: [0.62, 0.9], life: 0.02, slots: 6, dir: 0, spread: 0.3, speed: 60, grow: 2, color: green, alpha: 0.55, ox: 26, oy: 6,
-  }));
-  out.push(saucer);
-  return out;
-}
-
 export const SCENE_BUILDERS = Object.freeze({
   swScene, matrixRain, matrixScene, hpScene, lotrScene, duneScene, batScene, spiderScene, bbScene, gotScene,
-  vikScene, pbScene, shScene, soprScene, dnFeathers, dnScene, aotFeathers, aotScene, narLeaves, narScene,
-  opScene, fmaScene, rmScene,
+  vikScene, pbScene, dnFeathers, aotFeathers, aotScene, narLeaves, rmScene,
 });

@@ -172,7 +172,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       updateProfile(user, { displayName: cleanName }).catch(() => {});
       Toast.show({
         type: "success",
-        text1: tr ? "Profilin hazır. Hoş geldin!" : es ? "Tu perfil está listo. ¡Te damos la bienvenida!" : pt ? "Seu perfil está pronto. Boas-vindas!" : de ? "Dein Profil ist bereit. Willkommen!" : "Your profile is ready. Welcome!",
+        text1: tr ? "Profilin hazır. Hoş geldin!" : es ? "Tu perfil está listo. ¡Te damos la bienvenida!" : pt ? "Seu perfil está pronto. Boas-vindas!" : de ? "Dein Profil ist bereit. Willkommen!" : language === "it" ? "Il tuo profilo è pronto. Benvenuto!" : "Your profile is ready. Welcome!",
       });
       navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
     } catch (error) {
@@ -182,10 +182,10 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
       if (taken) setAvailable(false);
       Toast.show({
         type: "error",
-        text1: tr ? "Profil oluşturulamadı" : es ? "No se pudo crear el perfil" : pt ? "Não foi possível criar o perfil" : de ? "Profil konnte nicht erstellt werden" : "Could not create profile",
+        text1: tr ? "Profil oluşturulamadı" : es ? "No se pudo crear el perfil" : pt ? "Não foi possível criar o perfil" : de ? "Profil konnte nicht erstellt werden" : language === "it" ? "Impossibile creare il profilo" : "Could not create profile",
         text2: taken
-          ? tr ? "Bu kullanıcı adı az önce alındı, başka bir tane dene." : es ? "Alguien acaba de usar ese nombre de usuario; prueba con otro." : pt ? "Alguém acabou de usar esse nome de usuário; tente outro." : de ? "Dieser Benutzername wurde gerade vergeben, versuche einen anderen." : "That username was just taken, try another."
-          : tr ? "Bağlantını kontrol edip tekrar dene." : es ? "Revisa tu conexión e inténtalo de nuevo." : pt ? "Verifique sua conexão e tente novamente." : de ? "Prüfe deine Verbindung und versuche es erneut." : "Check your connection and try again.",
+          ? tr ? "Bu kullanıcı adı az önce alındı, başka bir tane dene." : es ? "Alguien acaba de usar ese nombre de usuario; prueba con otro." : pt ? "Alguém acabou de usar esse nome de usuário; tente outro." : de ? "Dieser Benutzername wurde gerade vergeben, versuche einen anderen." : language === "it" ? "Quel nome utente è stato appena preso, provane un altro." : "That username was just taken, try another."
+          : tr ? "Bağlantını kontrol edip tekrar dene." : es ? "Revisa tu conexión e inténtalo de nuevo." : pt ? "Verifique sua conexão e tente novamente." : de ? "Prüfe deine Verbindung und versuche es erneut." : language === "it" ? "Controlla la connessione e riprova." : "Check your connection and try again.",
       });
     } finally {
       setSaving(false);
@@ -231,10 +231,10 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             />
           </View>
           <Text style={[styles.title, { color: theme.text.primary }]}>
-            {tr ? "Seelogd profilini tamamla" : es ? "Completa tu perfil de Seelogd" : pt ? "Complete seu perfil do Seelogd" : de ? "Vervollständige dein Seelogd-Profil" : "Complete your Seelogd profile"}
+            {tr ? "Seelogd profilini tamamla" : es ? "Completa tu perfil de Seelogd" : pt ? "Complete seu perfil do Seelogd" : de ? "Vervollständige dein Seelogd-Profil" : language === "it" ? "Completa il tuo profilo Seelogd" : "Complete your Seelogd profile"}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            {tr ? `${isAppleUser ? "Apple" : "Google"} hesabın doğrulandı. Uygulamada görünecek bilgilerini bir kez belirle.` : es ? `Tu cuenta de ${isAppleUser ? "Apple" : "Google"} está verificada. Elige los datos que se mostrarán en la app.` : pt ? `Sua conta ${isAppleUser ? "Apple" : "Google"} está verificada. Escolha os dados que serão mostrados no app.` : de ? `Dein ${isAppleUser ? "Apple" : "Google"}-Konto ist bestätigt. Lege die Angaben fest, die in der App angezeigt werden.` : `Your ${isAppleUser ? "Apple" : "Google"} account is verified. Choose the details shown in the app.`}
+            {tr ? `${isAppleUser ? "Apple" : "Google"} hesabın doğrulandı. Uygulamada görünecek bilgilerini bir kez belirle.` : es ? `Tu cuenta de ${isAppleUser ? "Apple" : "Google"} está verificada. Elige los datos que se mostrarán en la app.` : pt ? `Sua conta ${isAppleUser ? "Apple" : "Google"} está verificada. Escolha os dados que serão mostrados no app.` : de ? `Dein ${isAppleUser ? "Apple" : "Google"}-Konto ist bestätigt. Lege die Angaben fest, die in der App angezeigt werden.` : language === "it" ? `Il tuo account ${isAppleUser ? "Apple" : "Google"} è verificato. Scegli i dettagli visualizzati nell'app.` : `Your ${isAppleUser ? "Apple" : "Google"} account is verified. Choose the details shown in the app.`}
           </Text>
 
           <View
@@ -265,8 +265,8 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 >
                   {user?.displayName ||
                     (isAppleUser
-                      ? tr ? "Apple hesabı" : es ? "Cuenta de Apple" : pt ? "Conta Apple" : de ? "Apple-Konto" : "Apple account"
-                      : tr ? "Google hesabı" : es ? "Cuenta de Google" : pt ? "Conta Google" : de ? "Google-Konto" : "Google account")}
+                      ? tr ? "Apple hesabı" : es ? "Cuenta de Apple" : pt ? "Conta Apple" : de ? "Apple-Konto" : language === "it" ? "Account Apple" : "Apple account"
+                      : tr ? "Google hesabı" : es ? "Cuenta de Google" : pt ? "Conta Google" : de ? "Google-Konto" : language === "it" ? "Account Google" : "Google account")}
                 </Text>
                 <Text
                   numberOfLines={1}
@@ -283,7 +283,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             </View>
 
             <Text style={[styles.label, { color: theme.text.muted }]}>
-              {tr ? "GÖRÜNEN AD" : es ? "NOMBRE VISIBLE" : pt ? "NOME EXIBIDO" : de ? "ANZEIGENAME" : "DISPLAY NAME"}
+              {tr ? "GÖRÜNEN AD" : es ? "NOMBRE VISIBLE" : pt ? "NOME EXIBIDO" : de ? "ANZEIGENAME" : language === "it" ? "NOME VISUALIZZATO" : "DISPLAY NAME"}
             </Text>
             <GlassBox role="field"
               style={[
@@ -301,14 +301,14 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 onChangeText={setDisplayName}
                 maxLength={40}
                 style={[styles.input, { color: theme.text.primary }]}
-                placeholder={tr ? "Adın ve soyadın" : es ? "Tu nombre" : pt ? "Seu nome" : de ? "Dein Name" : "Your name"}
+                placeholder={tr ? "Adın ve soyadın" : es ? "Tu nombre" : pt ? "Seu nome" : de ? "Dein Name" : language === "it" ? "Il tuo nome" : "Your name"}
                 placeholderTextColor={theme.text.muted}
                 returnKeyType="next"
               />
             </GlassBox>
 
             <Text style={[styles.label, { color: theme.text.muted }]}>
-              {tr ? "DOĞUM TARİHİ" : es ? "FECHA DE NACIMIENTO" : pt ? "DATA DE NASCIMENTO" : de ? "GEBURTSDATUM" : "DATE OF BIRTH"}
+              {tr ? "DOĞUM TARİHİ" : es ? "FECHA DE NACIMIENTO" : pt ? "DATA DE NASCIMENTO" : de ? "GEBURTSDATUM" : language === "it" ? "DATA DI NASCITA" : "DATE OF BIRTH"}
             </Text>
             <BirthDateField
               value={birthDate}
@@ -319,7 +319,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             />
 
             <Text style={[styles.label, { color: theme.text.muted }]}>
-              {tr ? "KULLANICI ADI" : es ? "NOMBRE DE USUARIO" : pt ? "NOME DE USUÁRIO" : de ? "BENUTZERNAME" : "USERNAME"}
+              {tr ? "KULLANICI ADI" : es ? "NOMBRE DE USUARIO" : pt ? "NOME DE USUÁRIO" : de ? "BENUTZERNAME" : language === "it" ? "NOMEUTENTE" : "USERNAME"}
             </Text>
             <GlassBox role="field"
               style={[
@@ -340,7 +340,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 value={username}
                 onChangeText={(text) => setUsername(formatUsernameInput(text))}
                 style={[styles.input, { color: theme.text.primary }]}
-                placeholder={tr ? "benzersiz_kullanici_adi" : es ? "usuario_unico" : pt ? "usuario_unico" : de ? "unique_username" : "unique_username"}
+                placeholder={tr ? "benzersiz_kullanici_adi" : es ? "usuario_unico" : pt ? "usuario_unico" : de ? "unique_username" : language === "it" ? "nome_utente_univoco" : "unique_username"}
                 placeholderTextColor={theme.text.muted}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -373,16 +373,16 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               ]}
             >
               {username.length > 0 && username.length < 3
-                ? tr ? "En az 3 karakter · yalnızca a–z, 0–9, _" : es ? "Mínimo 3 caracteres · solo a–z, 0–9, _" : pt ? "Mínimo de 3 caracteres · somente a–z, 0–9, _" : de ? "Mindestens 3 Zeichen · nur a–z, 0–9, _" : "At least 3 characters · only a–z, 0–9, _"
+                ? tr ? "En az 3 karakter · yalnızca a–z, 0–9, _" : es ? "Mínimo 3 caracteres · solo a–z, 0–9, _" : pt ? "Mínimo de 3 caracteres · somente a–z, 0–9, _" : de ? "Mindestens 3 Zeichen · nur a–z, 0–9, _" : language === "it" ? "Almeno 3 caratteri · solo a–z, 0–9, _" : "At least 3 characters · only a–z, 0–9, _"
                 : username.length >= 3 && !usernameValid && /^[0-9_]+$/.test(username)
-                ? tr ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números ou sublinhados (deve conter pelo menos uma letra)." : de ? "Der Benutzername darf nicht nur aus Zahlen oder Unterstrichen bestehen (mindestens ein Buchstabe ist nötig)." : "Username cannot be only numbers or underscores (must contain at least one letter)."
+                ? tr ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números ou sublinhados (deve conter pelo menos uma letra)." : de ? "Der Benutzername darf nicht nur aus Zahlen oder Unterstrichen bestehen (mindestens ein Buchstabe ist nötig)." : language === "it" ? "Il nome utente non può essere composto solo da numeri o trattini bassi (deve contenere almeno una lettera)." : "Username cannot be only numbers or underscores (must contain at least one letter)."
                 : username.length >= 3 && !usernameValid
-                ? tr ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)." : es ? "De 3 a 20 caracteres; solo minúsculas, números y guion bajo (al menos una letra)." : pt ? "De 3 a 20 caracteres; somente letras minúsculas, números e sublinhado (pelo menos uma letra)." : de ? "3–20 Zeichen; nur Kleinbuchstaben, Zahlen und Unterstrich (mindestens ein Buchstabe)." : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."
+                ? tr ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)." : es ? "De 3 a 20 caracteres; solo minúsculas, números y guion bajo (al menos una letra)." : pt ? "De 3 a 20 caracteres; somente letras minúsculas, números e sublinhado (pelo menos uma letra)." : de ? "3–20 Zeichen; nur Kleinbuchstaben, Zahlen und Unterstrich (mindestens ein Buchstabe)." : language === "it" ? "3–20 caratteri; solo lettere minuscole, numeri e trattino basso (almeno una lettera)." : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."
                 : available === false
-                ? tr ? "Bu kullanıcı adı alınmış." : es ? "Este nombre de usuario ya está en uso." : pt ? "Este nome de usuário já está em uso." : de ? "Dieser Benutzername ist vergeben." : "This username is taken."
+                ? tr ? "Bu kullanıcı adı alınmış." : es ? "Este nombre de usuario ya está en uso." : pt ? "Este nome de usuário já está em uso." : de ? "Dieser Benutzername ist vergeben." : language === "it" ? "Questo nome utente è già utilizzato." : "This username is taken."
                 : available === true
-                ? tr ? "Kullanıcı adı kullanılabilir." : es ? "El nombre de usuario está disponible." : pt ? "O nome de usuário está disponível." : de ? "Benutzername ist verfügbar." : "Username is available."
-                : tr ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)." : es ? "De 3 a 20 caracteres; solo minúsculas, números y guion bajo (al menos una letra)." : pt ? "De 3 a 20 caracteres; somente letras minúsculas, números e sublinhado (pelo menos uma letra)." : de ? "3–20 Zeichen; nur Kleinbuchstaben, Zahlen und Unterstrich (mindestens ein Buchstabe)." : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."}
+                ? tr ? "Kullanıcı adı kullanılabilir." : es ? "El nombre de usuario está disponible." : pt ? "O nome de usuário está disponível." : de ? "Benutzername ist verfügbar." : language === "it" ? "Il nome utente è disponibile." : "Username is available."
+                : tr ? "3–20 karakter; yalnızca küçük harf, sayı ve alt çizgi (en az bir harf)." : es ? "De 3 a 20 caracteres; solo minúsculas, números y guion bajo (al menos una letra)." : pt ? "De 3 a 20 caracteres; somente letras minúsculas, números e sublinhado (pelo menos uma letra)." : de ? "3–20 Zeichen; nur Kleinbuchstaben, Zahlen und Unterstrich (mindestens ein Buchstabe)." : language === "it" ? "3–20 caratteri; solo lettere minuscole, numeri e trattino basso (almeno una lettera)." : "3–20 characters; only lowercase letters, numbers, and underscore (at least one letter)."}
             </Text>
 
             {/* Yasal bilgilendirme — e-posta kaydıyla aynı: bu ekran da bir
@@ -403,7 +403,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               ) : (
                 <>
                   <Text style={styles.primaryText}>
-                    {tr ? "Profili oluştur" : es ? "Crear perfil" : pt ? "Criar perfil" : de ? "Profil erstellen" : "Create profile"}
+                    {tr ? "Profili oluştur" : es ? "Crear perfil" : pt ? "Criar perfil" : de ? "Profil erstellen" : language === "it" ? "Crea profilo" : "Create profile"}
                   </Text>
                   <Ionicons name="arrow-forward" size={17} color="#fff" />
                 </>
@@ -415,7 +415,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               style={styles.cancel}
             >
               <Text style={[styles.cancelText, { color: theme.text.muted }]}>
-                {tr ? "Başka hesap kullan" : es ? "Usar otra cuenta" : pt ? "Usar outra conta" : de ? "Anderes Konto verwenden" : "Use another account"}
+                {tr ? "Başka hesap kullan" : es ? "Usar otra cuenta" : pt ? "Usar outra conta" : de ? "Anderes Konto verwenden" : language === "it" ? "Utilizza un altro account" : "Use another account"}
               </Text>
             </TouchableOpacity>
           </View>

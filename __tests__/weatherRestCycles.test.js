@@ -4,7 +4,7 @@ import { KIND, buildParticles, particleAlpha } from "../utils/weatherParticles";
 const H = 844;
 const SCENES = [
   "swScene", "matrixScene", "hpScene", "lotrScene", "duneScene", "batScene", "spiderScene", "gotScene", "vikScene",
-  "shScene", "aotScene", "narScene", "opScene", "rmScene",
+  "aotScene", "rmScene",
 ];
 
 describe("evren sahneleri — seyreklik", () => {

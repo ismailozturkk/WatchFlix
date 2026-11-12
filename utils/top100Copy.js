@@ -311,6 +311,83 @@ export const TOP100_COPY = {
       { icon: "albums", title: "Speichern und teilen", body: "Speichere die ersten 20, 50, 70 oder 100 Titel als Liste in deinem Profil oder schick sie im Chat an Freunde oder eine Gruppe." },
     ],
   },
-};
+
+  it: {
+  eyebrow: "SEELOGD TOP 100",
+  widgetTitle: "I 100 titoli più votati",
+  widgetSub: "Film e programmi in un unico elenco · Valutazioni TMDB + voti Seelogd",
+  open: "Elenco aperto",
+  screenTitle: "Seelogd Top 100",
+  screenSub: "Film e programmi · il maggior numero di voti in alto",
+  heroBody: "Il titolo con il maggior numero di voti è in alto. I conteggi delle valutazioni TMDB e i voti di Seelogd vengono conteggiati insieme.",
+  totalVotes: n => n === 1 ? "1 voto di Seelogd" : `${comma(n)} voti di Seelogd`,
+  myVotes: n => n === 1 ? "Hai votato per 1 titolo" : `Hai votato per ${n} titoli`,
+  saveList: "Salva come elenco",
+  sendChat: "Invia alla chat",
+  searchPlaceholder: "Cerca un film o un programma per votare…",
+  filterAll: "Tutti",
+  movie: "Film",
+  tv: "Mostra",
+  vote: "Vota",
+  voted: "Votato",
+  votes: n => n === 1 ? "1 voto" : `${comma(n)} voti`,
+  num: comma,
+  voteGain: n => `Il tuo voto conta come +${comma(n)} nella classifica`,
+  budget: (used, limit) => `I tuoi voti: ${used}/${limit}`,
+  loading: "Creazione della classifica…",
+  error: "Impossibile caricare l'elenco",
+  retry: "Riprova",
+  searching: "Ricerca…",
+  searchEmpty: "Nessun risultato",
+  searchHeader: "Risultati della ricerca",
+  outside: "Fuori dalla Top 100",
+  voteAdded: "Voto aggiunto",
+  newRank: n => `Classifica attuale: #${n}`,
+  notRanked: "Non ancora nella Top 100",
+  voteFailed: "Impossibile salvare il tuo voto",
+  pickTitleSave: "Quanti titoli salvare?",
+  pickTitleChat: "Quanti titoli inviare?",
+  pickHint: "I primi titoli della classifica vengono aggiunti in ordine.",
+  pickTop: n => `Top ${n}`,
+  listTitle: n => `Seelogd Top ${n}`,
+  cellA11y: (rank, title, votes) => `${rank ? `${rank}. ` : ""}${title}, ${comma(votes)} voti`,
+  hypeA11y: (title, hyped) => hyped ? `${title}, rimuovi il tuo voto` : `${title}, vota`,
+  infoA11y: "Come funziona la Top 100?",
+  infoTitle: "Come funziona Seelogd Top 100",
+  gotIt: "Capito",
+  menuInfo: "Informazioni",
+  menuInfoSub: "Apri la pagina del titolo",
+  menuVote: "Vota",
+  menuUnvote: "Rimuovi voto",
+  menuUnvoteSub: "Il tuo voto viene ritirato e restituito a te",
+  menuLockedSub: "La votazione si sblocca con Premium",
+  menuCancel: "Annulla",
+  menuA11y: title => `${title}, opzioni`,
+  infoSections: [{
+    icon: "trophy",
+    title: "Come viene decisa la classifica?",
+    body: "Conta il numero di voti, non il punteggio medio: il titolo con più voti è in cima. Film e serie TV competono nella stessa lista."
+  }, {
+    icon: "people",
+    title: "Le valutazioni TMDB contano come voti",
+    body: "Poiché l'app è nuova, chiunque abbia valutato un titolo su TMDB conta come un voto. Un titolo molto apprezzato è stato ampiamente visto e di cui si è parlato, il che riflette sia interesse che qualità."
+  }, {
+    icon: "flame",
+    title: "I voti di Seelogd pesano di più",
+    body: `Ogni voto di Seelogd vale ${SEELOGD_VOTE_WEIGHT} voti TMDB nella classifica, quindi la community può davvero spostare la lista. Man mano che Seelogd cresce, l'elenco diventa sempre più il nostro.`
+  }, {
+    icon: "hand-left",
+    title: "Come votare",
+    body: "Tocca un poster e scegli \"Vota\": nessun punteggio, solo \"Io sostengo questo\". Ottieni un voto per titolo; hai cambiato idea? Scegli \"Rimuovi voto\" dallo stesso menu. Nessuno vede chi ha votato. I voti sono limitati: esegui il backup fino a 10 titoli contemporaneamente con Premium, 20 con Max; riprendi un voto e lo ottieni di nuovo. In questo modo ogni voto è una vera scelta. La navigazione, il salvataggio e la condivisione dell'elenco sono aperti a tutti."
+  }, {
+    icon: "search",
+    title: "Non sei nell'elenco?",
+    body: "Trova qualsiasi film o programma con la barra di ricerca in alto e vota. Con abbastanza voti entra nella Top 100."
+  }, {
+    icon: "albums",
+    title: "Salva e condividi",
+    body: "Salva i primi 20, 50, 70 o 100 titoli come elenco sul tuo profilo o inviali a un amico o un gruppo in chat."
+  }]
+}};
 
 export const getTop100Copy = (language) => TOP100_COPY[copyLanguage(language, Object.keys(TOP100_COPY))];

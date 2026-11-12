@@ -1,8 +1,8 @@
 // components/profile/ProfileBannerBackdrop.js
 //
 // Profil kapağının (banner) ekranın en üstüne sabitlenmiş, kaydırmaya bağlı hâli.
-// Hem kendi Profil sekmesi hem arkadaş profili (ve onun önizleme/düzenleme modu)
-// kullanır.
+// Görünen profil ekranı (FriendProfileScreen: arkadaş profili ve kendi profilinin
+// önizleme/düzenleme modu) kullanır.
 //
 // GÖRÜNÜM film/dizi detayındaki arka plan posteriyle AYNI (DetailHeroStage):
 // üstte durum çubuğu altında görselin yansıyan bulanık devamı, ortada 16:9 sahnenin

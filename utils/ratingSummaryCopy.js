@@ -42,7 +42,14 @@ export const RATING_SUMMARY_COPY = {
     rated: (mine) => `Deine Bewertung ${mine}. Zum Ändern tippen`,
     locked: "Noch nicht erschienen",
   },
-};
+
+  it: {
+  score: (score, votes) => `Valutazione ${score} su 10${votes ? `, ${votes} voti` : ""}`,
+  noScore: "Ancora nessuna valutazione",
+  rate: "Tocca per valutare",
+  rated: mine => `La tua valutazione ${mine}. Tocca per cambiare`,
+  locked: "Non ancora pubblicato"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getRatingSummaryCopy = (language) =>

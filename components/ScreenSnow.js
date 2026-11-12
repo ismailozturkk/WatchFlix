@@ -9,7 +9,7 @@
 //   • İÇERİĞİN ARKASINDA durur: posterler, kartlar ve tıklanabilir yapılar
 //     efektin üstünde kalır; efekt sadece aralardaki boşluklarda görünür.
 //   • pointerEvents="none": üstündeki içeriğin dokunmalarını engellemez.
-//   • InteractionManager ile geçiş/animasyon bitince render edilir → ekran
+//   • utils/afterInteractions ile JS boşa çıkınca render edilir → ekran
 //     açılışında ve sekme geçişinde ilk-kare düşmesi (jank) olmaz.
 //   • Ekran odaktan çıkınca / uygulama arka plana geçince saat DURUR →
 //     görünmeyen katman boşuna kare çizmez; 4 sn içinde dönülmezse tuval
@@ -27,7 +27,8 @@
 // Katman sırası: ekran arka plan rengi → ikon deseni → hava efekti → içerik.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { View, StyleSheet, InteractionManager } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { runAfterInteractions } from "../utils/afterInteractions";
 import { useSnowSettings } from "../context/AppSettingsContext";
 import useReduceMotion from "../hooks/useReduceMotion";
 import useScreenFocused from "../hooks/useScreenFocused";
@@ -56,7 +57,7 @@ function ScreenSnow({ genres, titleType, titleId, collectionId }) {
       return undefined;
     }
     // Ekran yerleşene / geçiş animasyonu bitene kadar bekle.
-    const task = InteractionManager.runAfterInteractions(() => setReady(true));
+    const task = runAfterInteractions(() => setReady(true));
     return () => task.cancel?.();
   }, [enabled]);
 
@@ -70,7 +71,7 @@ function ScreenSnow({ genres, titleType, titleId, collectionId }) {
     if (!enabled) return undefined;
     if (focused) {
       if (!parked) return undefined;
-      const task = InteractionManager.runAfterInteractions(() => setParked(false));
+      const task = runAfterInteractions(() => setParked(false));
       return () => task.cancel?.();
     }
     if (parked) return undefined;

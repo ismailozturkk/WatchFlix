@@ -11,7 +11,10 @@
   var CFG = window.SITE_CONFIG || {};
   var DICT = window.HOME_I18N || {};
   var SL = window.SiteLang;
-  var LOCALES = { tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE" };
+  var LOCALES = {
+    tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE",
+    it: "it-IT", fr: "fr-FR", ja: "ja-JP", zh: "zh-CN", hi: "hi-IN", id: "id-ID", ko: "ko-KR",
+  };
 
   var $ = function (sel) { return document.querySelector(sel); };
   var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
@@ -444,8 +447,10 @@
       var fs = db.fs;
       var id = btoa(unescape(encodeURIComponent(email))).replace(/[/+=]/g, "_") + "_" + platform;
       var ref = fs.doc(db.app, "betaTesters", id);
+      var payload = { email: email, platform: platform, createdAt: fs.serverTimestamp(), source: "landing" };
+      if (["tr", "en", "es", "pt", "de"].indexOf(lang) !== -1) payload.lang = lang;
       // Okuma yok (kural: get yalnız yönetici); var olan kayıt reddedilir = zaten listede.
-      return fs.setDoc(ref, { email: email, platform: platform, lang: lang, createdAt: fs.serverTimestamp(), source: "landing" })
+      return fs.setDoc(ref, payload)
         .then(function () { return { email: email, platform: platform, exists: false }; }, function (err) {
           if (!isAlreadyListed(err)) throw err;
           return { email: email, platform: platform, exists: true };

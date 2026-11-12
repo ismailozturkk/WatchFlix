@@ -20,8 +20,8 @@ jest.mock("react-native", () => ({
   View: "View",
   useWindowDimensions: () => ({ width: mockWidth, height: 800 }),
   StyleSheet: { create: (s) => s, absoluteFill: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 } },
-  InteractionManager: { runAfterInteractions: (fn) => { fn(); return { cancel: jest.fn() }; } },
 }));
+jest.mock("../utils/afterInteractions", () => ({ runAfterInteractions: (fn) => { fn(); return { cancel: jest.fn() }; } }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 34 }) }));
 jest.mock("react-native-reanimated", () => ({ withTiming: (value) => value }));
 jest.mock("../services/storage", () => ({

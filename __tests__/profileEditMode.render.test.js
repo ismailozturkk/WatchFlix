@@ -1,6 +1,6 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 // Profil önizlemesinin DÜZENLEME MODU parçaları (9 Kas kullanıcı kararı: ayrı
 // "Profili Düzenle" ekranı yerine arkadaşın gördüğü düzen yerinde düzenlenir,
@@ -47,6 +47,7 @@ jest.mock("@expo/vector-icons/MaterialCommunityIcons", () => ({ __esModule: true
 jest.mock("@expo/vector-icons/Feather", () => ({ __esModule: true, default: "Feather" }));
 jest.mock("../components/BackButton", () => ({ __esModule: true, default: "BackButton" }));
 jest.mock("../components/common/UserAvatar", () => ({ __esModule: true, default: "UserAvatar" }));
+jest.mock("../components/profile/ProfileAvatarHalo", () => ({ __esModule: true, default: "ProfileAvatarHalo" }));
 jest.mock("../components/common/GlassIconButton", () => ({ __esModule: true, default: "GlassIconButton" }));
 jest.mock("../components/common/GlassBox", () => {
   const React = require("react");
@@ -122,6 +123,15 @@ const heroBase = {
 };
 
 describe("ProfileHero", () => {
+  it("arkadaş görünümünde yuvarlak seviye halkasını ve seri alevini gösterir", async () => {
+    await mount(<ProfileHero {...heroBase} avatarProgress={{ progress: 42, borderColor: "#123456", borderColor2: "#abcdef" }} streak={<View testID="friend-streak">🔥 3</View>} />);
+    const halo = renderer.root.findByType("ProfileAvatarHalo");
+    expect(halo.props.progress).toBe(42);
+    expect(halo.props.avatarIndex).toBe(3);
+    expect(halo.props.ringHidden).toBe(false);
+    expect(byTestId("friend-streak")).toHaveLength(1);
+  });
+
   it("salt-okumada ad / kullanıcı adı / hakkında metin olarak çizilir", async () => {
     await mount(<ProfileHero {...heroBase} />);
     expect(renderer.root.findAllByType("TextInput")).toHaveLength(0);

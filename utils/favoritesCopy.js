@@ -296,7 +296,64 @@ export const FAVORITES_COPY = {
       more: (count) => `+${count}`,
     },
   },
-};
+
+  it: {
+  kinds: {
+    movies: {
+      label: "Film",
+      add: "Aggiungi film",
+      pickTitle: "Scegli i tuoi film preferiti",
+      search: "Cerca film…",
+      icon: "film-outline"
+    },
+    shows: {
+      label: "Serie TV",
+      add: "Aggiungi serie TV",
+      pickTitle: "Scegli i tuoi programmi preferiti",
+      search: "Cerca programmi…",
+      icon: "tv-outline"
+    },
+    people: {
+      label: "Attori",
+      add: "Aggiungi attore",
+      pickTitle: "Scegli i tuoi attori preferiti",
+      search: "Cerca attori…",
+      icon: "person-outline"
+    }
+  },
+  counter: (count, max) => `${count}/${max}`,
+  section: {
+    title: "I tuoi quattro preferiti",
+    hint: "Chiunque possa vedere il tuo profilo li vede. Scegline fino a 4 per categoria o lascialo vuoto."
+  },
+  picker: {
+    done: "Fatto",
+    full: "Completo · rimuovine uno per scambiare",
+    suggestions: "Suggerimenti",
+    popular: "Popolare",
+    basedOnPicks: "In base alle tue scelte",
+    castOfPicks: "Dai cast delle tue scelte",
+    results: "Risultati",
+    noResults: "Nessun risultato trovato",
+    searchError: "Impossibile cercare. Controlla la connessione.",
+    loadError: "Impossibile caricare l'elenco.",
+    retry: "Riprova",
+    typeMore: "Digita almeno 2 lettere per cercare",
+    remove: "Rimuovi",
+    selected: "Selezionato",
+    add: title => `Aggiungi ${title}`,
+    removeLabel: title => `Rimuovi ${title} dai preferiti`
+  },
+  profile: {
+    title: "Scelte preferite",
+    open: "Apri"
+  },
+  rail: {
+    title: "In base ai tuoi preferiti",
+    subtitle: names => `Perché hai scelto ${names}`,
+    more: count => `+${count}`
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getFavoritesCopy = (language) =>

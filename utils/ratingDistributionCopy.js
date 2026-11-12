@@ -57,7 +57,17 @@ export const RATING_DISTRIBUTION_COPY = {
     a11y: (count, average) => `Verteilung: ${count} Bewertungen, Schnitt ${average} Sterne`,
     a11yStep: (stars, n) => `${stars} Sterne: ${n} Bewertungen`,
   },
-};
+
+  it: {
+  title: "Distribuzione della valutazione",
+  count: (n, shown = n) => `${shown} ${n === 1 ? "valutazioni" : "valutazioni"}`,
+  average: "media",
+  mostCommon: "più",
+  share: pct => `${pct}%`,
+  emptyOwn: "La tua diffusione di valutazioni prende forma qui mentre valuti",
+  a11y: (count, average) => `Diffusione di valutazioni: ${count} valutazioni, media ${average} stelle`,
+  a11yStep: (stars, n) => `${stars} stelle: ${n} valutazioni`
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getRatingDistributionCopy = (language) =>

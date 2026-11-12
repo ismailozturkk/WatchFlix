@@ -152,6 +152,11 @@ export const MONTHS_DE = [
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
 
+export const MONTHS_IT = [
+  "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+  "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+];
+
 const WEEKDAYS_TR = [
   "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
 ];
@@ -172,21 +177,27 @@ const WEEKDAYS_DE = [
   "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag",
 ];
 
+const WEEKDAYS_IT = [
+  "Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato",
+];
+
 // Izgara başlığı (Pazar = 0, Date#getDay sırası).
 const WEEKDAYS_SHORT_TR = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
 const WEEKDAYS_SHORT_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const WEEKDAYS_SHORT_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const WEEKDAYS_SHORT_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const WEEKDAYS_SHORT_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
 
-const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE };
-const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT, de: WEEKDAYS_DE };
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE, it: MONTHS_IT };
+const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT, de: WEEKDAYS_DE, it: WEEKDAYS_IT };
 const WEEKDAY_SHORT_NAMES = {
   tr: WEEKDAYS_SHORT_TR,
   en: WEEKDAYS_SHORT_EN,
   es: WEEKDAYS_SHORT_ES,
   pt: WEEKDAYS_SHORT_PT,
   de: WEEKDAYS_SHORT_DE,
+  it: WEEKDAYS_SHORT_IT,
 };
 
 /** Dile uygun ay adları (0-11); bilinmeyen dil İngilizce. YENİ DİL: tablolara ekle. */
@@ -200,6 +211,7 @@ export function formatLongDateParts(language, { day, monthIndex, year }) {
   if (lang === "en") return `${month} ${day}, ${year}`;
   if (lang === "es" || lang === "pt") return `${day} de ${month.toLowerCase()} de ${year}`;
   if (lang === "de") return `${day}. ${month} ${year}`;
+  if (lang === "it") return `${day} ${month.toLowerCase()} ${year}`;
   return `${day} ${month} ${year}`;
 }
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { I18nManager, InteractionManager, Keyboard, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import { I18nManager, Keyboard, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import { runAfterInteractions } from "../../utils/afterInteractions";
 import LensLoader from "../LensLoader";
 import { Screen, ScreenContainer, Tabs } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -144,7 +145,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   }, [route?.params?.initialTab, navigation]);
   useEffect(() => {
     const timers = [];
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       TAB_NAMES.filter((name) => name !== "discover").forEach((name, index) => {
         timers.push(setTimeout(() => dispatch({ type: "warm", name }), 6000 + 1200 * index));
       });

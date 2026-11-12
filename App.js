@@ -12,10 +12,10 @@ if (!__DEV__) {
 import {
     AppState,
     StyleSheet,
-      View,
-    InteractionManager,
-  DeviceEventEmitter,
+    View,
+    DeviceEventEmitter,
 } from "react-native";
+import { runAfterInteractions } from "./utils/afterInteractions";
 import { flushSnapshotWrites } from "./services/snapshotCache";
 import UserDataSyncHost from "./components/UserDataSyncHost";
 import ExternalEntryHost from "./components/ExternalEntryHost";
@@ -333,7 +333,7 @@ function AppContent() {
     }
 
     let timer = null;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       // ChatModal (AI sohbet host'u) ~1400 satırlık ağır bir ağaç; 1,2 sn'de
       // mount edilince splash sonrası donma penceresine denk geliyordu.
       // Kullanıcının ilk saniyelerde ihtiyaç duymadığı bu katmanı daha geç kur.

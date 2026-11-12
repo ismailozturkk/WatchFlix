@@ -1,18 +1,18 @@
 // components/streak/StreakFlame.js
 //
 // Haftalık seri ALEVİ — Snapchat'teki 🔥 gibi, ama kademe kademe gelişen, renkli ve
-// canlı. Kararlar (kademe, ihtişam, mola) utils/streakFlame.js'te; bu dosya yalnız çizer.
+// canlı. Kararlar (kademe, ihtişam) utils/streakFlame.js'te; bu dosya yalnız çizer.
 //
 // YAPI: en fazla üç SVG alev katmanı (dış → orta → çekirdek) üst üste; her biri kendi
 // Animated.View'ında TABANINDAN (transformOrigin alt-orta) esner, daralır ve
 // sallanır. Katmanlar farklı fazda oynadığı için alev "titrer", tek parça
 // zıplamaz. Görünüş utils/streakFlame.js streakLook()'tan gelir:
-//   palet (4 haftada bir) → 13 renk, ilk ay turuncu … Efsane; mola → gri
+//   palet (HER hafta) → 16 renk, 1. hafta turuncu … 16. hafta Efsane (rengarenk:
+//   çok renkli katmanlar, her parçacık tayftan ayrı renk)
 //   ihtişam (bu haftanın günleri, 1..7):
 //       1 tek alev dili · 2 iki katman · 3 üç katman · 4 kıvılcımlar ·
 //       5 uçuşan minik kıvılcımlar · 6 taç (arkada ikinci alev) · 7 yıldız ışıltısı
-//   kıvılcım biçimi (HER hafta) → kor · yıldız · elmas · kar tanesi
-//   52. haftadan sonra dönen gökkuşağı halkası
+//   kıvılcım biçimi (4 haftada bir) → kor · yıldız · elmas · kar tanesi
 //
 // TEK SAAT: bütün hareket tek bir paylaşılan değerden (0→1, doğrusal, sonsuz)
 // türer. Her bileşen saat üzerinden TAM SAYI frekanslarla sinüs alır; 1'deki poz
@@ -43,7 +43,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from "react-native-svg";
-import { streakLook } from "@utils/streakFlame";
+import { SPECTRUM_COLORS, streakLook } from "@utils/streakFlame";
 import { FLAME_ASPECT } from "@utils/streakFlameShader";
 import { useFlameRenderer } from "../../services/devLab";
 import SkiaStreakFlame, { SKIA_FLAME_READY } from "./SkiaStreakFlame";
@@ -81,8 +81,6 @@ const LOCKED = Object.freeze({
   mid: ["#5C606B", "#848995"],
   core: ["#9A9EA8", "#C4C7CE"],
 });
-
-const RAINBOW = ["#FF1744", "#FF9100", "#FFEA00", "#00E676", "#00B0FF", "#D500F9", "#FF1744"];
 
 // Katman başına hareket genliği. İç katmanlar daha oynak: çekirdek en çok titrer.
 const LAYERS = Object.freeze([
@@ -158,35 +156,6 @@ const Glow = memo(function Glow({ clock, color, diameter, left, top, gradId, ene
   );
 });
 
-// Alevin çevresinde dönen gökkuşağı halkası (yıllık kademe). 360° = bir döngü.
-const RainbowRing = memo(function RainbowRing({ clock, diameter, left, top, gradId, stroke }) {
-  const style = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${clock.value * 360}deg` }],
-  }));
-  return (
-    <Animated.View pointerEvents="none" style={[styles.abs, { left, top, width: diameter, height: diameter }, style]}>
-      <Svg width={diameter} height={diameter}>
-        <Defs>
-          <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-            {RAINBOW.map((color, i) => (
-              <Stop key={i} offset={String(i / (RAINBOW.length - 1))} stopColor={color} />
-            ))}
-          </LinearGradient>
-        </Defs>
-        <Circle
-          cx={diameter / 2}
-          cy={diameter / 2}
-          r={(diameter - stroke) / 2}
-          stroke={`url(#${gradId})`}
-          strokeWidth={stroke}
-          strokeOpacity={0.9}
-          fill="none"
-        />
-      </Svg>
-    </Animated.View>
-  );
-});
-
 // Alevden kopup yukarı süzülen kıvılcım. Doğarken belirir, yükseldikçe küçülüp söner.
 // Biçimi haftadan haftaya değişir (kor / yıldız / elmas / kar tanesi).
 const Ember = memo(function Ember({ clock, index, count, color, dot, left, top, rise, drift, shape = "ember" }) {
@@ -253,7 +222,7 @@ const Sparkle = memo(function Sparkle({ clock, index, color, size, left, top }) 
 /**
  * @param {object} props
  * @param {object} props.look  utils/streakFlame.js streakLook() çıktısı:
- *                             { palette, layers, effects, spark, heat, growth, paused }.
+ *                             { palette, layers, effects, spark, heat, growth }.
  *                             Yalnız `palette` verilirse efektsiz, üç katman, tam boy.
  * @param {number} [props.size=24]    Alevin yüksekliği (pt). Genişlik = size × 0,78.
  *                                    Hale/halka/pırıltılar bu kutunun DIŞINA taşar,
@@ -278,7 +247,6 @@ function SvgStreakFlame({
   const growth = Number.isFinite(look.growth) ? look.growth : 1;
   const layerCount = Math.max(1, Math.min(3, Math.floor(Number(look.layers) || 3)));
   const sparkShape = look.spark?.shape || "ember";
-  const paused = Boolean(look.paused);
   const rid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const clock = useSharedValue(0);
   const moving = animated && !locked;
@@ -300,18 +268,15 @@ function SvgStreakFlame({
   const compact = size < 40;
   // İHTİŞAM: haftanın her yeni günü alev biraz daha harlı titrer (look.heat).
   const heat = Number.isFinite(look.heat) ? look.heat : 1;
-  const energy = (dimmed && !paused ? 0.45 : 1) * heat;
+  const energy = (dimmed ? 0.45 : 1) * heat;
 
   const geo = useMemo(() => {
     const cx = width / 2;
     const glowD = Math.round(height * 1.5);
     const glowCy = height * 0.64;
-    const ringD = Math.round(height * 1.42);
-    const ringCy = height * 0.6;
     return {
       glow: { diameter: glowD, left: cx - glowD / 2, top: glowCy - glowD / 2 },
       flurryDot: Math.max(1.5, Math.round(height * 0.035)),
-      ring: { diameter: ringD, left: cx - ringD / 2, top: ringCy - ringD / 2, stroke: Math.max(1.5, height * 0.035) },
       emberDot: Math.max(2, Math.round(height * 0.065)),
       emberTop: height * 0.42,
       emberRise: height * 0.62,
@@ -321,8 +286,11 @@ function SvgStreakFlame({
   }, [width, height]);
 
   const palette = locked ? LOCKED : tier;
-  // Mola: gri alev, efektsiz (seri durdu). Kilitli basamak da efektsiz.
-  const showEffects = !locked && !paused;
+  // Efsane (rengarenk): her parçacık tayftan kendi rengini alır.
+  const spectrum = !locked && Boolean(tier.spectrum);
+  const particleColor = (index, fallback) => (spectrum ? SPECTRUM_COLORS[index % SPECTRUM_COLORS.length] : fallback);
+  // Kilitli basamak efektsiz.
+  const showEffects = !locked;
   // Kıvılcım sayısı renk kademesiyle artar (look.spark.count).
   const sparkTotal = Math.max(1, Math.floor(Number(look.spark?.count) || 3));
   const emberCount = Math.min(EMBER_OFFSETS.length, compact ? Math.min(3, sparkTotal) : sparkTotal);
@@ -344,9 +312,6 @@ function SvgStreakFlame({
             strength={dimmed ? 0.5 : Math.min(1.15, 0.8 + 0.25 * heat)}
             {...geo.glow}
           />
-        ) : null}
-        {showEffects && has("rainbow") ? (
-          <RainbowRing clock={clock} gradId={`sfr${rid}`} {...geo.ring} />
         ) : null}
         {showEffects && has("corona") ? (
           // TAÇ: alevin arkasında, daha büyük ve yarı saydam ikinci bir alev — kendi
@@ -383,7 +348,7 @@ function SvgStreakFlame({
                 index={index}
                 count={emberCount}
                 shape={sparkShape}
-                color={tier.ember}
+                color={particleColor(index, tier.ember)}
                 dot={geo.emberDot}
                 left={width / 2 + offset * width - geo.emberDot / 2}
                 top={geo.emberTop}
@@ -402,7 +367,7 @@ function SvgStreakFlame({
                 index={index + 3}
                 count={FLURRY_OFFSETS.length}
                 shape="ember"
-                color={palette.core[0]}
+                color={particleColor(index + 3, palette.core[0])}
                 dot={geo.flurryDot}
                 left={width / 2 + offset * width - geo.flurryDot / 2}
                 top={geo.emberTop}
@@ -417,7 +382,7 @@ function SvgStreakFlame({
                 key={index}
                 clock={clock}
                 index={index}
-                color={tier.ember}
+                color={particleColor(index + 1, tier.ember)}
                 size={geo.sparkle}
                 left={x * width - geo.sparkle / 2}
                 top={y * height - geo.sparkle / 2}

@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, View, StyleSheet, useWindowDimensions } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import useScreenSections, { setSectionShown } from "../../hooks/useSectionVisibility";
 import { updatePrivacy } from "../../services/userService";
-import useEmailVerification from "../../hooks/useEmailVerification";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
@@ -40,52 +39,31 @@ import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import ChallengeMedalsRow from "../../components/challenges/ChallengeMedalsRow";
 import { usePremium } from "../../context/PremiumContext";
 import { readProfileFavorites } from "../../utils/fourFavorites";
-import { readProfileBanner } from "../../utils/profileBanner";
-import ProfileBannerBackdrop, { profileBannerSpacer } from "../../components/profile/ProfileBannerBackdrop";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SocialLinksRow from "../../components/profile/SocialLinksRow";
 import ProfileLogoutButton from "../../components/profile/ProfileLogoutButton";
 import ProfileNotificationsButton from "../../components/profile/ProfileNotificationsButton";
 import { hasAnySocialLinks, readProfileSocialLinks } from "../../utils/socialLinks";
 import { PROFILE_PREVIEW } from "../../utils/profileViewer";
 import { i18nText } from "../../utils/i18nText";
+import { profileAvatarProgress } from "../../utils/profileAvatarProgress";
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
 // görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
 // Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
-// Animated: kapak (banner) kaydırmaya native sürücüyle bağlı.
-const MarkedScrollView = markTabScroll(Animated.ScrollView);
-// Kapak varken avatarın üstündeki EN AZ boşluk; asıl değer kapak boyundan (profileBannerSpacer).
-const BANNER_SPACER = 96;
+const MarkedScrollView = markTabScroll(ScrollView);
 
 const ProfileScreen = ({ navigation }) => {
   const { contentBottom } = useTabBarLayout();
   const onTabBarScroll = useTabBarScrollSync();
-  // Kaydırma konumu → kapak yakınlaşır / yavaş kayar / söner (ProfileBannerBackdrop).
-  // Native sürücü; sekme çubuğu senkronu aynı olayı dinleyici olarak alır.
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const onScroll = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
-        listener: onTabBarScroll,
-      }),
-    [scrollY, onTabBarScroll],
-  );
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen bölümler
   // (utils/sectionVisibility.js "profile"). Kimlik bloğu (avatar + ad) her zaman görünür.
   const { isVisible: showSection, allHidden: allSectionsHidden } = useScreenSections("profile");
   const { user } = useAuth();
-  // E-posta doğrulama durumu: odakta/öne dönünce tazelenir, "tekrar gönder" burada.
-  const emailVerification = useEmailVerification(user, language);
+  // E-posta + doğrulama durumu ve katılma tarihi (11 Kas) Ayarlar > Hesap bilgileri'nde
+  // (screens/tabs/profile/EditProfileScreen.js → components/profile/AccountEmailCard.js).
   const { profile } = useUserProfile();
-  const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  // Ayarlar > Ekran bölümleri > "Arka plan afişi": yalnız bu (kendi) sekmede gizler;
-  // arkadaşların gördüğü profil (FriendProfileScreen) kapağı göstermeye devam eder.
-  const showBanner = showSection("banner");
   // Ayarlar > Ekran bölümleri > Profil > "Hesap bağlantıları". Eskiden Gizlilik
   // ekranındaki "Profil sekmemde göster" anahtarıydı (Firestore
   // privacy.showSocialLinksOnOwnProfile). O anahtarı kapatmış kullanıcının tercihi
@@ -98,10 +76,6 @@ const ProfileScreen = ({ navigation }) => {
     updatePrivacy(user.uid, { showSocialLinksOnOwnProfile: true }).catch(() => {});
   }, [legacySocialLinksHidden, user?.uid]);
   const showSocialLinks = showSection("socialLinks") && !legacySocialLinksHidden;
-  const profileBanner = useMemo(
-    () => (showBanner ? readProfileBanner(profile) : null),
-    [showBanner, profile?.profileBanner]
-  );
   const { isPremium, isUnlimited } = usePremium();
   const isFounder = Boolean(profile?.badges?.founder);
   const identityBadges = useMemo(
@@ -181,17 +155,17 @@ const ProfileScreen = ({ navigation }) => {
   // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
   // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
 
-  // Günlük seri alevi: art arda 3+ gün işaretleyince Premium/Max rozetinin
-  // yanında (Free'de rozet satırında tek başına) yanar
-  // (utils/streakFlame.js). Ayarlar > Ekran bölümleri > Profil > "Seri alevi" ile
-  // gizlenir. Kimlik bloğu memo'lu; eleman yalnız seri değişince yenilenir.
+  // Haftalık seri alevi: kimlik rozetlerinin ALTINDA, zeminsiz büyük alev + sayı + 7 gün noktası
+  // (StreakFlameBadge variant="hero"; utils/streakFlame.js). Ayarlar > Ekran
+  // bölümleri > Profil > "Seri alevi" ile gizlenir. Kimlik bloğu memo'lu; eleman
+  // yalnız seri değişince yenilenir.
   const showStreak = showSection("streak");
   // __DEV__: Ayarlar > Geliştirici Laboratuvarı'ndaki seri simülatörü açıksa sahte seri.
   const seriler = useDevStreakOverride(watchProgress?.seriler);
   const streakBadge = useMemo(
     () =>
       showStreak && seriler ? (
-        <StreakFlameBadge seriler={seriler} theme={theme} language={language} />
+        <StreakFlameBadge seriler={seriler} theme={theme} language={language} variant="hero" />
       ) : null,
     [showStreak, seriler, theme, language]
   );
@@ -202,10 +176,7 @@ const ProfileScreen = ({ navigation }) => {
   // etrafında artık film/dizi için ayrı iki halka değil, ikisinin toplamına
   // göre dolan TEK bir halka var (bkz. ProfileStatsContext.rankInfo).
   const totalMinutesCombined = (totalMinutesTime ?? 0) + (totalMinutesTimeTv ?? 0);
-  const rawProgress = (totalMinutesCombined % 10080) / 10080;
-  const safeProgress = parseInt(
-    Math.min(Math.max(rawProgress, 0), 1).toFixed(3) * 100
-  );
+  const safeProgress = profileAvatarProgress(totalMinutesCombined).progress;
   const friendsState = useFriends();
   const receivedCount =
     friendsState?.incomingRequests?.length ??
@@ -301,37 +272,17 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <ScreenDecor scope="profile" iconOpacity={0.3} />
-      {/* Profil kapağı (banner): ekrana sabit; kaydırınca yakınlaşıp yavaşça kayar ve
-          söner, üstten çekince esner. Arkadaş profiliyle aynı hareket. */}
-      <ProfileBannerBackdrop
-        banner={profileBanner}
-        scrollY={scrollY}
-        width={windowWidth}
-      />
 
       <MarkedScrollView
         contentContainerStyle={{ paddingBottom: contentBottom }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
+        onScroll={onTabBarScroll}
         scrollEventThrottle={16}
       >
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
-          {profileBanner ? (
-            <View
-              style={{
-                // Avatar satırı güvenli alanın altından (+10 dolgu) başlar.
-                height: profileBannerSpacer({
-                  width: windowWidth,
-                  topInset: insets.top,
-                  contentTop: insets.top + 10,
-                  min: BANNER_SPACER,
-                }),
-              }}
-            />
-          ) : null}
           <View style={styles.images}>
             <ProfileAvatarHalo
               source={avatar}
@@ -351,24 +302,6 @@ const ProfileScreen = ({ navigation }) => {
               displayName={profile?.displayName || user?.displayName}
               username={profileUsername}
               badges={identityBadges}
-              email={user?.email}
-              emailVerified={emailVerification.verified}
-              // user, çıkış anındaki render'da null olabilir — doğrudan erişim çökertir
-              verifyHint={
-                user && !emailVerification.verified ? t.profileScreen.emailVerified : ""
-              }
-              // "Tekrar gönder": doğrulama e-postası kaybolduysa ya da kayıtta gönderilemediyse.
-              verifyAction={
-                user && !emailVerification.verified
-                  ? {
-                      label: emailVerification.resendLabel,
-                      onPress: emailVerification.resend,
-                      busy: emailVerification.sending,
-                      disabled: emailVerification.cooldown > 0,
-                    }
-                  : null
-              }
-              joinedAt={user?.metadata?.createdAt}
               onEdit={goOwnProfilePreview}
               editLabel={i18nText("autoI18n.profilini_gor", "Profilini gör")}
               onShare={openStoryExport}
@@ -380,7 +313,7 @@ const ProfileScreen = ({ navigation }) => {
               // Yıllık hedef halkası düğmesi (Düzenle / Paylaş'ın yanında). Ayarlar > Ekran
               // bölümleri > Profil > "Yıllık izleme hedefi" ile gizlenir.
               showGoal={showSection("goal")}
-              badgeAccessory={streakBadge}
+              streak={streakBadge}
             />
           </View>
           {showSocialLinks && hasAnySocialLinks(socialLinks) && (

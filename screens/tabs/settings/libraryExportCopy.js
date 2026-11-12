@@ -290,8 +290,48 @@ const de = {
     "Große Bibliotheken werden als -1, -2 ... aufgeteilt, um unter dem 1-MB-Limit zu bleiben; lade sie der Reihe nach hoch.",
   ].join("\n"),
 };
+const it = {
+  title: "Esporta la tua libreria",
+  rowTitle: "Esporta la tua libreria",
+  rowSub: "Ottieni i tuoi elenchi, la cronologia delle visualizzazioni e le valutazioni in formato JSON o CSV",
+  heroTitle: "I tuoi dati sono tuoi",
+  selectAll: "Seleziona tutto",
+  selectNone: "Cancella",
+  noneSelected: "Seleziona almeno un elemento",
+  infoLabel: "Informazioni",
+  sectionsSelected: "{n}/{total} items selected",
+  statFilms: "Film",
+  statShows: "Serie TV",
+  statEpisodes: "Episodi",
+  statRatings: "Valutazioni",
+  heroText: "I titoli, gli elenchi, le date di visione e le valutazioni guardati vengono visualizzati come file sul tuo dispositivo. Spostali in un'altra app o conservali come backup.",
+  sectionIncluded: "Cosa è incluso",
+  films: n => n === 1 ? "1 film guardato" : `${n} film guardati`,
+  shows: (n, episodes) => `${n} programmi · ${episodes} episodi`,
+  watchList: n => n === 1 ? "1 nella tua lista di titoli" : `${n} nella tua lista di titoli`,
+  favorites: n => n === 1 ? "1 preferito" : `${n} preferiti`,
+  customLists: (lists, items) => `${lists} elenchi personalizzati · ${items} titoli`,
+  ratings: n => n === 1 ? "1 valutazione" : `${n} valutazioni`,
+  loading: "Caricamento della libreria…",
+  empty: "Ancora niente da esportare. Aggiungi un film o un programma e verrà visualizzato qui.",
+  notIncluded: "Non inclusi: commenti, post, note, promemoria, chat e dettagli dell'account.",
+  sectionExport: "Esportare",
+  jsonTitle: "Backup completo (JSON)",
+  jsonSub: "Tutto: elenchi, date di visione, cronologia degli episodi per serie TV, valutazioni",
+  zipTitle: "Foglio di calcolo e cassetta delle lettere (ZIP)",
+  zipSub: "Library.csv (Excel/Fogli) + CSV che puoi importare in Letterboxd",
+  ready: "Esportazione pronta",
+  noteLetterboxd: "Letterboxd riconosce solo i film: gli serie TV sono in JSON e Library.csv ma ​​non nei file Letterboxd. Per caricare, utilizza Impostazioni > Importa ed esporta su letterboxd.com; importare separatamente i film visti e la watchlist.",
+  notePrivacy: "Il file viene creato solo sul tuo dispositivo. Scegli dove inviarlo dal foglio di condivisione.",
+  errWrite: "Impossibile creare il file",
+  errSharing: "La condivisione non è disponibile su questo dispositivo",
+  errZip: "Impossibile creare il file ZIP",
+  errEmpty: "Non ci sono dati da esportare",
+  readme: ["Libreria Seelogd export", "", "library.csv Tutti gli elenchi in una tabella (Excel/Fogli Google).", "letterboxd-watched*.csv Film che hai guardato (data, valutazione, riguarda). Importabile in Letterboxd.", "letterboxd-watchlist*.csv Film nella tua watchlist. Importabile in Letterboxd.", "", "Letterboxd: letterboxd.com > Impostazioni > Importa ed esporta. I file corrispondono ai film per tmdbID.", "Letterboxd conosce solo i film; gli serie TV sono in libreria.csv e nel backup JSON.", "Le librerie di grandi dimensioni sono suddivise in -1, -2... per rimanere sotto il limite di 1 MB; caricali in ordine."].join("\n")
+};
 
-export const LIBRARY_EXPORT_COPY = { tr, en, es, pt, de };
+export const LIBRARY_EXPORT_COPY = { tr, en, es, pt, de ,
+  it: it};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getLibraryExportCopy = (language) =>

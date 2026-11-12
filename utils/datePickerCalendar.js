@@ -119,8 +119,6 @@ export function clampParts(input, { minIso, maxIso, years }) {
   return { parts: out, hint };
 }
 
-export const sameParts = (a, b) => a?.y === b?.y && a?.m === b?.m && a?.d === b?.d;
-
 /** Ayın TAMAMI sınır dışındaysa hangi sınır ("min" | "max"); en az bir günü açıksa null. */
 export function monthBound(year, month, minIso, maxIso) {
   const first = partsToIso({ y: year, m: month, d: 1 });

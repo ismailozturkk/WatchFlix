@@ -7,7 +7,10 @@
   if (!AM) return;
   var H = AM.helpers, t = H.t, ic = H.ic, img = H.img, nav = H.nav, rated = H.rated, avatar = H.avatar, MOV = H.MOV, TVS = H.TVS;
   var S = AM.screens;
-  var LOCALES = { tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE" };
+  var LOCALES = {
+    tr: "tr-TR", en: "en-GB", es: "es-ES", pt: "pt-BR", de: "de-DE",
+    it: "it-IT", fr: "fr-FR", ja: "ja-JP", zh: "zh-CN", hi: "hi-IN", id: "id-ID", ko: "ko-KR",
+  };
 
   AM.addIcons({
     gamepad: '<rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="16" cy="11.5" r="1" fill="currentColor"/><circle cx="18" cy="13.8" r="1" fill="currentColor"/>',
@@ -195,15 +198,32 @@
 
   /* ═══ Görünüm ve dil (Kişiselleştirme) ═══════════════════════════════ */
   S.custom = function (st) {
-    var langs = [["Türkçe", "Turkish", 0], ["English", "English", 1], ["Español", "Spanish", 0], ["Português", "Portuguese", 0], ["Deutsch", "German", 0]];
+    var allLangs = [
+      ["tr", "TR", "Türkçe", "Turkish"],
+      ["en", "EN", "English", "English"],
+      ["es", "ES", "Español", "Spanish"],
+      ["pt", "PT", "Português", "Portuguese"],
+      ["de", "DE", "Deutsch", "German"],
+      ["it", "IT", "Italiano", "Italian"],
+      ["fr", "FR", "Français", "French"],
+      ["ja", "JA", "日本語", "Japanese"],
+      ["zh", "ZH", "中文", "Chinese"],
+      ["hi", "HI", "हिन्दी", "Hindi"],
+      ["id", "ID", "Bahasa Indonesia", "Indonesian"],
+      ["ko", "KO", "한국어", "Korean"],
+    ];
     var cur = AM.lang();
-    var code = { tr: 0, en: 1, es: 2, pt: 3, de: 4 }[cur];
+    var idx = allLangs.map(function (x) { return x[0]; }).indexOf(cur);
+    if (idx > 4) {
+      var picked = allLangs.splice(idx, 1)[0];
+      allLangs.unshift(picked);
+    }
     return '<div class="am-scroll am-pushed">' + nav(t("mGrpAppearance"), "") +
       H.themeCard(st).replace(/<\/div>$/, '<div class="am-swatch"><span class="a"><b>Aa</b></span><span class="b"><b>Aa</b></span><span class="c"><b>Aa</b></span></div></div>') +
       '<div class="am-card stacked">' + H.row("palette", t("mThemeStudio"), null, { tone: "violet" }) + H.row("font", t("mFontsAll"), null, { tone: "orange" }) + H.row("key", t("mAppIcon"), null, { tone: "teal", right: '<span class="am-icons"><i style="--g:radial-gradient(circle at 50% 36%,#14c8e8 0 29%,transparent 30%),radial-gradient(circle at 50% 64%,#ff3d5e 0 29%,transparent 30%),#0d0e13"></i><i style="--g:radial-gradient(circle at 50% 36%,#14c8e8 0 29%,transparent 30%),radial-gradient(circle at 50% 64%,#ff3d5e 0 29%,transparent 30%),#e7e9f2"></i><i class="am-icon-s" style="--g:#6d4aff">S</i></span>' }) + "</div>" +
       '<div class="am-lab">' + t("mLanguage").toUpperCase() + "</div>" +
-      '<div class="am-card">' + langs.map(function (l, i) {
-        return '<div class="am-row"><span class="am-lang-c">' + ["TR", "EN", "ES", "PT", "DE"][i] + '</span><span class="am-row-tx"><b>' + l[0] + "</b><small>" + l[1] + "</small></span>" + (i === code ? '<span class="am-chev on">' + ic("check", 15) + "</span>" : "") + "</div>";
+      '<div class="am-card">' + allLangs.map(function (l) {
+        return '<div class="am-row"><span class="am-lang-c">' + l[1] + '</span><span class="am-row-tx"><b>' + l[2] + "</b><small>" + l[3] + "</small></span>" + (l[0] === cur ? '<span class="am-chev on">' + ic("check", 15) + "</span>" : "") + "</div>";
       }).join("") + "</div>" +
       '<div class="am-card stacked">' + H.row("lock", t("mRowAdult"), null, { tone: "red", right: H.toggle(false) }) + H.row("phone", t("mRowHaptics"), null, { right: H.toggle(true) }) + "</div></div>";
   };

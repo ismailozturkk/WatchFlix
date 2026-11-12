@@ -94,7 +94,7 @@ Seelogd/
 ├── context/               # 29 Context API sağlayıcısı (Global State)
 ├── hooks/                 # 50 özel React hook'u
 ├── utils/                 # 176 yardımcı fonksiyon ve matematik/tarih araçları
-├── translations/          # 5 dilde (TR, EN, DE, ES, PT) i18n JSON dosyaları ve yapılandırma
+├── translations/          # 6 dilde (TR, EN, DE, ES, PT, IT) i18n JSON dosyaları ve yapılandırma
 ├── functions/             # 32 dosya Firebase Cloud Functions backend kodu
 ├── theme/                 # Tema renkleri, stiller ve tipografi tanımları
 ├── native/ & targets/     # iOS WidgetKit hedefleri ve yerel modüller

@@ -351,7 +351,7 @@ export const ONBOARDING_COPY = {
     next: "Weiter",
     start: "Letzter Schritt",
     back: "Zurück",
-    language: "Türkçe",
+    language: "Italiano",
     features: [
       {
         kind: "discover",
@@ -425,6 +425,69 @@ export const ONBOARDING_COPY = {
       haveAccount: "Du hast schon ein Konto?",
       login: "Anmelden",
       trust: "Kostenlos · Keine Kreditkarte · In einer Minute startklar",
+    },
+  },
+  it: {
+    tagline: "Trova cosa guardare. Ricorda ciò che hai amato. Condividi la tua storia.",
+    introEyebrow: "IL TUO UNIVERSO DI FILM E SERIE",
+    introTap: "Tocca per continuare",
+    skip: "Salta il tour",
+    next: "Continua",
+    start: "Ultimo passo",
+    back: "Indietro",
+    language: "Türkçe",
+    features: [
+      {
+        kind: "discover", icon: "compass-outline",
+        eyebrow: "SCOPRI E TIENI TRACCIA",
+        title: "Il tuo prossimo preferito è qui.", titleAccent: "preferito",
+        desc: "Scopri migliaia di film e serie TV e organizza in un unico posto ciò che hai visto, amato e vuoi guardare.",
+        tags: ["Scoperte su misura", "Liste personali", "Film e serie TV"],
+      },
+      {
+        kind: "ai", icon: "sparkles-outline",
+        eyebrow: "SEELOGD AI",
+        title: "Sai sempre cosa guardare.", titleAccent: "cosa guardare",
+        desc: "Ricevi suggerimenti in base ai tuoi gusti, confronta i titoli e scegli cosa guardare dopo.",
+        tags: ["Suggerimenti personali", "Confronta", "Piani di visione"],
+      },
+      {
+        kind: "profile", icon: "stats-chart-outline",
+        eyebrow: "CONDIVIDI E RICORDA",
+        title: "La tua storia di visione è tua.", titleAccent: "è tua",
+        desc: "Esplora le tue statistiche e il tuo Wrapped, condividili con gli amici, sfidali nei giochi di scene e non perdere traccia di ciò che guardi.",
+        tags: ["Wrapped", "Amici", "Giochi"],
+      },
+    ],
+    genre: {
+      eyebrow: "SCOPERTE PER TE", title: "Affiniamo i tuoi gusti.", titleAccent: "gusti",
+      desc: "Scegli fino a 3 generi per i film e 3 per le serie TV. Puoi anche saltare questo passaggio.",
+      movies: "Film", shows: "Serie TV", max: "Fino a 3", pickHint: "Scegli un genere",
+    },
+    provider: {
+      eyebrow: "LE TUE PIATTAFORME", title: "Quali piattaforme usi?", titleAccent: "piattaforme",
+      desc: "Scegli le piattaforme che usi per vedere prima i titoli più pertinenti. Puoi continuare anche senza sceglierne nessuna.",
+      movies: "Film", shows: "Serie TV",
+      selected: (n) => (n === 0 ? "Nessuna selezione" : `${n} selezionate`),
+      more: "Mostra altro", less: "Mostra meno",
+      hint: "Puoi cambiare questa scelta quando vuoi nelle Impostazioni.",
+    },
+    favorites: {
+      eyebrow: "LA VETRINA DEL TUO PROFILO", title: "I preferiti che ti raccontano.", titleAccent: "ti raccontano",
+      desc: "Scegli i tuoi film, serie TV e attori preferiti. Puoi selezionarne fino a 4 per categoria o lasciare tutto vuoto.",
+      selected: (n) => (n === 0 ? "Nessuna selezione" : `${n} selezionati`),
+      hint: "Puoi saltare questo passo e aggiungerli più tardi in Modifica profilo.",
+    },
+    cta: {
+      freeBadge: "INIZIA GRATIS", title: "La tua storia di visione inizia ora.", titleAccent: "ora",
+      desc: "Crea un account gratuito e inizia oggi a scoprire, raccogliere e condividere.",
+      benefits: [
+        { icon: "cloud-done-outline", text: "Le tue liste su ogni dispositivo" },
+        { icon: "sparkles-outline", text: "Scoperte in base ai tuoi gusti" },
+        { icon: "people-outline", text: "Uno spazio da condividere con gli amici" },
+      ],
+      register: "Registrati gratis", haveAccount: "Hai già un account?", login: "Accedi",
+      trust: "Gratis · Nessuna carta di credito · Pronto in un minuto",
     },
   },
 };

@@ -111,8 +111,29 @@ const de = {
   chosenBackdropBadge: "Ausgewählter Hintergrund",
   premiumTag: "Premium",
 };
+const it = {
+  useAsPoster: "Usa come poster",
+  currentPoster: "Il tuo poster",
+  resetPoster: "Torna alle impostazioni predefinite",
+  chosenToast: "Poster aggiornato",
+  chosenToastSub: "Questo poster verrà visualizzato nella tua libreria, negli elenchi e nel profilo.",
+  resetToast: "Torna al poster predefinito",
+  fullToast: max => `Puoi scegliere fino a ${max} poster`,
+  fullToastSub: "Riporta un altro titolo a quello predefinito per sceglierne uno nuovo.",
+  signInNeeded: "Accedi per scegliere un poster",
+  chosenBadge: "Poster selezionato",
+  useAsBackdrop: "Utilizza come sfondo",
+  currentBackdrop: "Il tuo sfondo",
+  backdropChosenToast: "Sfondo aggiornato",
+  backdropChosenToastSub: "Questo sfondo verrà visualizzato nella pagina del film o del programma e nella ricerca.",
+  backdropResetToast: "Torna allo sfondo predefinito",
+  backdropFullToast: max => `Puoi scegliere fino a ${max} sfondi`,
+  chosenBackdropBadge: "Sfondo selezionato",
+  premiumTag: "Premium"
+};
 
-export const POSTER_CHOICES_COPY = Object.freeze({ tr, en, es, pt, de });
+export const POSTER_CHOICES_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getPosterChoicesCopy = (language) =>

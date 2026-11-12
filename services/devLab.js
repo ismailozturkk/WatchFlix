@@ -14,7 +14,7 @@ import { useMemo, useSyncExternalStore } from "react";
 
 export const isDevLabAvailable = () => typeof __DEV__ !== "undefined" && __DEV__ === true;
 
-export const DEV_STREAK_STATUSES = Object.freeze(["lit", "risk", "repair", "shield", "paused"]);
+export const DEV_STREAK_STATUSES = Object.freeze(["lit", "risk", "repair", "shield"]);
 export const DEV_STREAK_MAX_WEEKS = 120;
 // Eski ad (çağıranlar): üst sınır artık HAFTA.
 export const DEV_STREAK_MAX_DAYS = DEV_STREAK_MAX_WEEKS;
@@ -88,14 +88,14 @@ export function useFlameRenderer() {
  * Simülatör ayarı → utils/streakFlame'in beklediği `seriler.alev` biçimi
  * (utils/streakWeekly alevHesapla çıktısı). Telafi/kalkan beklerken `weeks`
  * KURTARILACAK seri sayılır. Durum gün sayısını tutarlı yapar ("lit" en az 2 gün,
- * "risk"/"paused" en fazla 1 gün, telafi en fazla 3 gün).
+ * "risk" en fazla 1 gün, telafi en fazla 3 gün).
  */
 export function buildDevSeriler(sim) {
   const weeks = clampInt(sim?.weeks ?? sim?.days, 0, DEV_STREAK_MAX_WEEKS);
   const status = DEV_STREAK_STATUSES.includes(sim?.status) ? sim.status : "lit";
   let gun = clampInt(sim?.weekDays ?? 2, 0, 7);
   if (status === "lit") gun = Math.max(2, gun);
-  if (status === "risk" || status === "paused") gun = Math.min(1, gun);
+  if (status === "risk") gun = Math.min(1, gun);
   const repairHave = clampInt(sim?.repairHave, 0, 3);
   if (status === "repair" || status === "shield") gun = Math.min(3, Math.max(Math.min(gun, 1), repairHave));
   const kalkan = clampInt(sim?.shields, 0, 3);
@@ -114,7 +114,6 @@ export function buildDevSeriler(sim) {
       kalkan: status === "shield" ? Math.max(1, kalkan) : status === "repair" ? 0 : kalkan,
       kalkanTavani: 3,
       kalkanaKalan: 4 - (weeks % 4),
-      mola: { aktif: status === "paused", buHafta: status === "paused", hakVar: status !== "paused", gecenHafta: false },
       sonYama: null,
       esik: 2,
       telafiEsigi: 4,

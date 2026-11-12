@@ -431,7 +431,85 @@ export const REFERRAL_COPY = {
     loadFailed: "Einladungsdetails konnten nicht geladen werden",
     retry: "Erneut versuchen",
   },
-};
+
+  it: {
+  rowTitle: "Invita un amico",
+  rowSubtitle: "Condividi il tuo codice e ricevi 1 mese gratis per ogni amico che si abbona",
+  screenTitle: "Invita un amico",
+  hero: {
+    title: "Porta un amico, ricevi 1 mese di Premium",
+    body: percent => `Quando un amico inserisce il tuo codice e si iscrive, ricevi 1 mese di Premium gratis e lui riceverà uno sconto del ${percent}% sul suo primo abbonamento.`
+  },
+  yourCode: "Il tuo codice di invito",
+  copy: "Copia",
+  copied: "Codice copiato",
+  share: "Invia invito",
+  shareMessage: (code, percent, links) => `Prova Seelogd! Dopo la registrazione, inserisci il mio codice ${code} nella sezione "Hai un codice?" nella pagina Premium per ottenere uno sconto del ${percent}% sul tuo primo abbonamento.
+
+${links}`,
+  steps: {
+    title: "Come funziona",
+    one: "Invia il tuo codice a un amico",
+    two: days => `Il tuo amico lo inserisce entro ${days} giorni`,
+    three: "Quando si abbona, ricevi 1 mese di Premium gratis"
+  },
+  reward: {
+    title: "I tuoi mesi gratuiti",
+    none: "Non hai ancora guadagnato un mese gratuito",
+    available: n => n === 1 ? "1 mese gratuito ti sta aspettando" : `${n} mesi gratuiti ti stanno aspettando`,
+    start: "Inizia il mese gratuito",
+    starting: "Inizio…",
+    active: date => `Premi gratuito è attivo fino al ${date}`,
+    started: date => `Premi gratuito è attivo fino al ${date}`,
+    storeActive: "Mesi gratuiti aspettano mentre l'abbonamento al tuo negozio è attivo; iniziane uno quando finisce",
+    earned: (n, max) => `${n} di ${max} mesi guadagnati`,
+    capped: max => `Puoi guadagnare fino a ${max} mesi`
+  },
+  list: {
+    title: "Amici che hai invitato",
+    empty: "Nessuno ha ancora inserito il tuo codice. Gli amici vengono visualizzati qui dopo averlo condiviso.",
+    counts: (registered, subscribed) => `${registered} ha inserito il tuo codice · ${subscribed} si è iscritto`,
+    status: {
+      registered: "Iscritto",
+      subscribed: "Iscritto",
+      rewarded: "Iscritto · hai guadagnato un mese gratuito"
+    },
+    statusHint: "Se un amico ha inserito solo il tuo codice, verrà visualizzato come \"Iscritto\""
+  },
+  invitedBy: {
+    title: name => name ? `${name} ti ha invitato` : "Ti sei iscritto con un invito",
+    discount: percent => `${percent}% di sconto sul tuo primo abbonamento ti aspetta. Lo sconto viene applicato al momento del pagamento.`,
+    used: "Hai utilizzato lo sconto sull'invito"
+  },
+  redeem: {
+    entryTitle: "Hai un codice?",
+    entryHint: "Inserisci un codice di invito o promozionale",
+    sheetTitle: "Inserisci un codice",
+    sheetBody: "Inserisci il codice di invito di un amico (sconto sul tuo primo abbonamento) o un codice promozionale (1 mese di Premium gratuito).",
+    placeholder: "ABCD-EFGH",
+    apply: "Riscatta il codice",
+    applying: "Controllo…",
+    promoSuccess: (days, date) => `${days} giorni di Premium gratuito sbloccato · fino al ${date}`,
+    referralSuccess: (percent, name) => name ? `hai accettato l'invito di ${name}. Verrà applicato uno sconto del ${percent}% sul tuo primo abbonamento.` : `Invito accettato. Verrà applicato uno sconto del ${percent}% sul tuo primo abbonamento.`,
+    discountPending: percent => `Lo sconto sull'invito (${percent}%) verrà visualizzato al momento del pagamento una volta che l'offerta del negozio sarà attiva.`
+  },
+  errors: {
+    "code-not-found": "Questo codice non è valido. Controlla l'ortografia.",
+    "code-exhausted": "Questo codice è stato utilizzato.",
+    "code-expired": "Questo codice è scaduto.",
+    "code-inactive": "Questo codice non può più essere utilizzato.",
+    "already-redeemed": "Hai già utilizzato un codice; ogni account può utilizzarne uno.",
+    "own-code": "Non puoi utilizzare il tuo codice di invito.",
+    "window-closed": days => `Un codice di invito può essere inserito entro i primi ${days} giorni dopo la registrazione.`,
+    "already-purchased": "Lo sconto sull'invito è valido solo per il primo abbonamento; ti sei abbonato in precedenza.",
+    "store-subscription-active": "Questo codice non può essere utilizzato mentre hai un abbonamento.",
+    "rate-limited": "Troppi tentativi sbagliati. Riprova domani.",
+    "no-credit": "Non hai un mese gratuito da regalare.",
+    generic: "Non ha funzionato. Controlla la connessione e riprova."
+  },
+  loadFailed: "Impossibile caricare i dettagli dell'invito",
+  retry: "Riprova"
+}};
 
 /** Uygulama diline göre metin tablosu (tabloda olmayan dil → İngilizce). */
 export const getReferralCopy = (language) =>

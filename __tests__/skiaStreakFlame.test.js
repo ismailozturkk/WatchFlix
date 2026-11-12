@@ -16,7 +16,7 @@ import {
   flameUniforms,
   hexToRgb,
 } from "../utils/streakFlameShader";
-import { PAUSED_PALETTE, streakLook, streakPalette } from "../utils/streakFlame";
+import { streakLook, streakPalette } from "../utils/streakFlame";
 
 const UNIFORM_NAMES = [...FLAME_SKSL.matchAll(/uniform\s+\w+\s+(\w+);/g)].map((m) => m[1]);
 const flat = (u) => UNIFORM_NAMES.flatMap((n) => (Array.isArray(u[n]) ? u[n] : [u[n]]));
@@ -29,13 +29,15 @@ describe("uniform hesapları", () => {
   });
 
   test("kademe, biçim, efekt bayrakları ve küçük boy ayrıntısı", () => {
-    const u = flameUniforms(streakLook(2, 7), { width: 31, height: 40 });
-    expect(u).toMatchObject({ stage: 7, shape: 1, effects: 1, rainbow: 0, detail: 1 });
-    expect(flameUniforms(streakLook(3, 4), { width: 20, height: 26 })).toMatchObject({ shape: 2, detail: 0.55 });
-    expect(flameUniforms(streakLook(53, 7), { width: 78, height: 100 }).rainbow).toBe(1);
-    const mola = flameUniforms(streakLook(53, 5, { paused: true }), { width: 78, height: 100 });
-    expect(mola).toMatchObject({ effects: 0, rainbow: 0 });
-    expect(mola.c2).toEqual(hexToRgb(PAUSED_PALETTE.mid[1]));
+    // Kıvılcım biçimi 4 haftada bir: 5. hafta yıldız (1), 9. hafta elmas (2).
+    const u = flameUniforms(streakLook(5, 7), { width: 31, height: 40 });
+    expect(u).toMatchObject({ stage: 7, shape: 1, effects: 1, detail: 1 });
+    expect(u.rainbow).toBeUndefined();
+    expect(flameUniforms(streakLook(9, 4), { width: 20, height: 26 })).toMatchObject({ shape: 2, detail: 0.55 });
+    expect(flameUniforms(streakLook(200, 7), { width: 78, height: 100 }).rainbow).toBeUndefined();
+    // Yalnız Efsane (16. hafta ve sonrası) rengarenk.
+    expect(flameUniforms(streakLook(15, 7), { width: 78, height: 100 }).spectrum).toBe(0);
+    expect(flameUniforms(streakLook(16, 7), { width: 78, height: 100 }).spectrum).toBe(1);
     expect(flameUniforms(streakLook(5, 3), { width: 78, height: 100, dimmed: true })).toMatchObject({ dim: 0.45 });
   });
 
@@ -52,7 +54,7 @@ describe("uniform hesapları", () => {
     expect(flameRamp(p)).toEqual([p.outer[0], p.outer[1], p.mid[1], p.core[0], p.core[1]].map(hexToRgb));
     expect(hexToRgb("#FF8000")).toEqual([1, 0.502, 0]);
     expect(hexToRgb("kırmızı")).toEqual([1, 1, 1]);
-    expect(flameTimeScale({ paused: true })).toBeLessThan(flameTimeScale({ dimmed: true }));
+    expect(flameTimeScale({ dimmed: true })).toBeLessThan(flameTimeScale());
   });
 });
 
@@ -107,17 +109,37 @@ describe("FLAME_SKSL gerçek Skia'da (canvaskit-wasm)", () => {
     expect(bad).toBe(0);
   });
 
-  test("ihtişam büyüdükçe çizilen alan artar; mola efektsiz ve gri", () => {
+  test("ihtişam büyüdükçe çizilen alan artar", () => {
     const s1 = draw(streakLook(6, 1)).covered;
     const s5 = draw(streakLook(6, 5)).covered;
     const s7 = draw(streakLook(6, 7)).covered;
     expect(s5).toBeGreaterThan(s1 * 1.5);
     expect(s7).toBeGreaterThanOrEqual(s5 * 0.95);
-    const mola = draw(streakLook(6, 7, { paused: true }));
-    expect(mola.covered).toBeLessThan(s5);
-    const { at, box } = mola;
-    const [r, g, b] = at(Math.round(box.width / 2), Math.round(box.height / 2 + 22));
-    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(40);
+  });
+
+  // Görünür piksellerin ton (hue) kovaları: 12 dilim, en az 40 pikseli olanlar sayılır.
+  const hueBuckets = (px) => {
+    const kova = new Array(12).fill(0);
+    for (let i = 0; i < px.length; i += 4) {
+      const a = px[i + 3];
+      if (a < 120) continue;
+      const r = px[i] / a, g = px[i + 1] / a, b = px[i + 2] / a;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx - mn < 0.25) continue; // beyaz/gri sayılmaz
+      let h;
+      if (mx === r) h = ((g - b) / (mx - mn) + 6) % 6;
+      else if (mx === g) h = (b - r) / (mx - mn) + 2;
+      else h = (r - g) / (mx - mn) + 4;
+      kova[Math.floor((h / 6) * 12) % 12] += 1;
+    }
+    return kova.filter((n) => n >= 40).length;
+  };
+
+  test("Efsane rengarenk: gövdede çok sayıda ton; önceki kademe tek renk ailesi", () => {
+    const efsane = hueBuckets(draw(streakLook(16, 7), 2.3).px);
+    const onceki = hueBuckets(draw(streakLook(1, 7), 2.3).px);
+    expect(efsane).toBeGreaterThanOrEqual(5);
+    expect(onceki).toBeLessThanOrEqual(3);
   });
 
   test("zaman ilerleyince alev kıpırdar (aynı kare değil)", () => {

@@ -86,7 +86,7 @@ const BadgeCell = memo(function BadgeCell({ badge, selected, dimmed, lang, theme
 export default function ShowcaseBadgePickerSheet({ visible, value, onChange, onClose }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
   const copy = getBadgeShowcaseCopy(lang);
   const kartlar = useWatchProgressContext()?.kartlar;
   const ids = Array.isArray(value) ? value : [];

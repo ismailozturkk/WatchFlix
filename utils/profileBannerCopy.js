@@ -123,7 +123,31 @@ const COPY = {
     selected: "Ausgewählt",
     bannerLabel: (title) => (title ? `Profilbanner: ${title}` : "Profilbanner"),
   },
-};
+
+  it: {
+  title: "Copertina del profilo",
+  subtitle: "Scegli la scena che si trova nella parte superiore del tuo profilo",
+  movies: "Film",
+  shows: "Mostra",
+  searchMovies: "Cerca film",
+  searchShows: "Cerca programmi",
+  suggestions: "Suggerimenti",
+  results: "Risultati",
+  scenes: "Scegli una scena",
+  scenesSub: n => `${n} scene`,
+  noScenes: "Nessuna immagine di scena trovata per questo titolo.",
+  noResults: "Nessun risultato.",
+  loadError: "Impossibile caricare. Controlla la connessione.",
+  retry: "Riprova",
+  typeMore: "Digita almeno 2 lettere per cercare",
+  close: "Chiudi",
+  back: "Indietro",
+  add: "Aggiungi copertina",
+  change: "Cambia copertina",
+  remove: "Rimuovi",
+  selected: "Selezionato",
+  bannerLabel: title => title ? `Copertina del profilo: ${title}` : "Copertina del profilo"
+}};
 
 export function getProfileBannerCopy(language) {
   return COPY[normalizeAppLanguage(language)] || COPY.en;

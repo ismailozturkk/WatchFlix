@@ -165,7 +165,7 @@ describe("grup tablosu", () => {
   });
 });
 
-describe("destek tablosu (Sohbet içi: kar yok)", () => {
+describe("destek tablosu (Sohbet içi atmosfer)", () => {
   test("her grubun destek listesi dolu ve yalnız bilinen efektlerden oluşur", () => {
     for (const s of DECOR_SCOPES) {
       expect(s.effects.length).toBeGreaterThan(0);
@@ -173,21 +173,18 @@ describe("destek tablosu (Sohbet içi: kar yok)", () => {
     }
   });
 
-  test("conversation ikon + ambiyans destekler, kar desteklemez; diğerleri hepsini", () => {
-    expect(decorScopeSupports("conversation", "icon")).toBe(true);
-    expect(decorScopeSupports("conversation", "ambient")).toBe(true);
-    expect(decorScopeSupports("conversation", "snow")).toBe(false);
-    for (const id of DECOR_SCOPE_IDS.filter((x) => x !== "conversation")) {
+  test("sohbet içi dahil her grup üç efekti destekler", () => {
+    for (const id of DECOR_SCOPE_IDS) {
       for (const e of DECOR_EFFECTS) expect(decorScopeSupports(id, e)).toBe(true);
     }
     expect(decorScopeSupports("yok", "snow")).toBe(false);
-    expect(decorScopesFor("snow")).not.toContain("conversation");
+    expect(decorScopesFor("snow")).toContain("conversation");
     expect(decorScopesFor("ambient")).toContain("conversation");
   });
 
-  test("grup desteklemiyorsa efekt ASLA görünmez (seçim boş olsa bile)", () => {
+  test("sohbet içi varsayılan olarak atmosferi gösterir", () => {
     expect(decorVisibility(null, "conversation")).toEqual({
-      snow: false,
+      snow: true,
       icon: true,
       ambient: true,
     });
@@ -202,21 +199,19 @@ describe("destek tablosu (Sohbet içi: kar yok)", () => {
     expect(decorVisibility(geri, "conversation").ambient).toBe(true);
   });
 
-  test("desteklenmeyen çift yazılamaz ve bozuk kayıttan atılır", () => {
-    expect(setDecorVisible(null, "snow", "conversation", false)).toEqual({
-      snow: [],
-      icon: [],
-      ambient: [],
-    });
-    expect(normalizeDecorScopes({ snow: ["conversation", "chat"] }).snow).toEqual(["chat"]);
+  test("sohbet içi atmosferi sohbet listesinden bağımsız açılıp kapanır", () => {
+    const hidden = setDecorVisible(null, "snow", "conversation", false);
+    expect(hidden.snow).toEqual(["conversation"]);
+    expect(decorVisibility(hidden, "conversation").snow).toBe(false);
+    expect(decorVisibility(hidden, "chat").snow).toBe(true);
+    expect(setDecorVisible(hidden, "snow", "conversation", true).snow).toEqual([]);
+    expect(normalizeDecorScopes({ snow: ["conversation", "chat"] }).snow).toEqual(["chat", "conversation"]);
   });
 
   test("toplu kapatma yalnız destekleyen gruplara yazar; Nowhere/Everywhere tutarlı", () => {
     const kapali = setDecorEffectVisible(null, "snow", false);
     expect(kapali.snow).toEqual(decorScopesFor("snow"));
-    expect(kapali.snow).not.toContain("conversation");
-    // Kar her destekleyen grupta kapalı → "hiçbir yerde"; conversation yüzünden
-    // "karışık"a düşmemeli.
+    expect(kapali.snow).toContain("conversation");
     expect(isDecorEffectNowhere(kapali, "snow")).toBe(true);
     expect(isDecorEffectEverywhere(setDecorEffectVisible(kapali, "snow", true), "snow")).toBe(true);
     // Ambiyans tüm gruplarda (conversation dahil) kapanır.

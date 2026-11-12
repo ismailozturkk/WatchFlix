@@ -71,7 +71,38 @@ export const FLOATING_NOTICE_COPY = {
       results: { title: "Das Turnier ist entschieden", detail: (theme) => `Der Champion im ${theme}-Turnier steht fest.`, cta: "Ergebnisse ansehen" },
     },
   },
-};
+
+  it: {
+  inviteEyebrow: "Invito",
+  eventEyebrow: "Elementi",
+  minimize: "Riduci a icona",
+  next: "Prossima notifica",
+  bubble: n => `${n} notifica in attesa${n === 1 ? "" : "s"}`,
+  bubbleHint: "Tocca per aprire, trascina per spostarlo su un bordo",
+  eventDone: "OK",
+  tournament: {
+    selection: {
+      title: "È iniziato un nuovo torneo",
+      detail: theme => `Tema di questo mese: ${theme}. I candidati vengono scelti.`,
+      cta: "Vai al torneo"
+    },
+    r32: {
+      title: "La votazione del torneo è aperta",
+      detail: theme => `I round di 32 partite sono in diretta nel torneo ${theme}.`,
+      cta: "Guarda le partite"
+    },
+    final: {
+      title: "È l'ultima volta",
+      detail: theme => `Gli ultimi voti incoroneranno il campione di ${theme}.`,
+      cta: "Guarda la finale"
+    },
+    results: {
+      title: "Il torneo è finito",
+      detail: theme => `Il campione di ${theme} è stato deciso.`,
+      cta: "Guarda i risultati"
+    }
+  }
+}};
 
 export const floatingNoticeCopy = (language) =>
   FLOATING_NOTICE_COPY[copyLanguage(language, Object.keys(FLOATING_NOTICE_COPY))];

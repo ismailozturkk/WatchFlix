@@ -83,14 +83,16 @@ export const MediaNotesProvider = ({ children }) => {
                 es: "Has alcanzado tu límite de notas de series",
                 pt: "Você atingiu seu limite de notas de séries",
                 de: "Du hast dein Limit für Serien-Notizen erreicht",
-              }
+
+  it: "Hai raggiunto il limite di note dello serie TV"}
             : {
                 tr: "Film notu limitin doldu",
                 en: "You've reached your movie notes limit",
                 es: "Has alcanzado tu límite de notas de películas",
                 pt: "Você atingiu seu limite de notas de filmes",
                 de: "Du hast dein Limit für Film-Notizen erreicht",
-              },
+
+  it: "Hai raggiunto il limite delle note sul film"},
         ),
       });
       return false;

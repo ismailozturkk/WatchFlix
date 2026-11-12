@@ -8,172 +8,71 @@
 // (ortak izlenen · favori · puan uyumu) + ortak tür çipleri → içgörü satırları → ortak izlenen afişleri →
 // sohbete gönder. Açıklayıcı uzun cümleler "!" sayfasına (TasteMatchInfoSheet) taşındı.
 //
+// KOMPAKT (12 Kas): Derin analiz, İçgörüler ve Ortak izlenenler KATLANIR bölümlerdir (Collapsible), varsayılan
+// kapalı. Başlık satırı kapalıyken de kısa özet gösterir (güven düzeyi / satır sayısı / afiş sayısı).
+//
 // DÜRÜST ÇIKTI: yeterli veri yoksa yüzde ÇİZİLMEZ (nedeni yazılır). Arkadaş yalnız film YA DA yalnız dizi
 // paylaşıyorsa diğer kutu "Paylaşılmıyor" diye sönük gösterilir (puan uydurulmaz). Davet düğmesi yalnız arkadaşa
 // ve adayı olan kullanıcıya görünür.
 import React, { memo, useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Svg, { Circle } from "react-native-svg";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import usePosterUri from "../../hooks/usePosterUri";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
 import { localizeGenreList, localizeGenreName } from "../../utils/genreDisplay";
-import { TASTE_HEAT_THRESHOLDS, tasteMatchHeat } from "../../utils/tasteMatchVisuals";
+import { tasteMatchHeat } from "../../utils/tasteMatchVisuals";
 import GlassBox from "../common/GlassBox";
 import TasteMatchInfoSheet from "./TasteMatchInfoSheet";
+import { Bar, GenreChips, HeatBar, StatsStrip, TasteHead, TypeTiles } from "./TasteMatchParts";
+import { DEEP_COMPONENTS } from "../../utils/tasteMatch";
 
 const THUMBS_SHOWN = 8;
-const RING = 58;
-const RING_STROKE = 5.5;
+const LOW_DATA_COLOR = "#F5A524";
 const EMPTY = [];
 
-/** Yüzde halkası: iz + vurgu yayı. Merkez metni çağıran verir. */
-function Ring({ ratio, accent, track, children }) {
-  const r = (RING - RING_STROKE) / 2;
-  const c = 2 * Math.PI * r;
-  const o = Math.max(0, Math.min(1, Number(ratio) || 0));
+/**
+ * Katlanır bölüm: başlık satırı (ikon · ad · sağda kısa özet · ok) her zaman görünür; gövde dokununca açılır.
+ * Kapalıyken kart kısa kalır; ayrıntı isteyen tek dokunuşla açar.
+ */
+function Collapsible({ icon, title, summary, summaryColor, open, onToggle, toggleCopy, theme, primary, muted, children }) {
   return (
-    <View style={styles.ring}>
-      <Svg width={RING} height={RING}>
-        <Circle cx={RING / 2} cy={RING / 2} r={r} stroke={track} strokeWidth={RING_STROKE} fill="none" />
-        {o > 0 ? (
-          <Circle
-            cx={RING / 2}
-            cy={RING / 2}
-            r={r}
-            stroke={accent}
-            strokeWidth={RING_STROKE}
-            strokeLinecap="round"
-            fill="none"
-            strokeDasharray={`${c}`}
-            strokeDashoffset={c * (1 - o)}
-            transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
-          />
-        ) : null}
-      </Svg>
-      <View pointerEvents="none" style={styles.ringCenter}>
-        {children}
-      </View>
-    </View>
-  );
-}
-
-function Bar({ value, color, track }) {
-  return (
-    <View style={[styles.barTrack, { backgroundColor: track }]}>
-      <View style={[styles.barFill, { backgroundColor: color, width: `${Math.max(4, Math.min(100, value))}%` }]} />
-    </View>
-  );
-}
-
-/** Ana uyum puanı: 60/70/80/90 eşiklerinde rengi ve alev yoğunluğu artan çubuk. */
-function HeatBar({ score, heat, track }) {
-  return (
-    <View
-      accessible
-      accessibilityLabel={`heat-${heat.level}`}
-      style={styles.heatBarWrap}
-    >
-      <View style={[styles.heatTrack, { backgroundColor: track }]}>
-        <LinearGradient
-          colors={heat.colors}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={[styles.heatFill, { width: `${Math.max(3, heat.score)}%` }]}
-        />
-        {TASTE_HEAT_THRESHOLDS.map((threshold) => (
-          <View
-            key={threshold}
-            pointerEvents="none"
-            style={[styles.heatMark, { left: `${threshold}%`, backgroundColor: alpha("#FFFFFF", score >= threshold ? 0.9 : 0.36) }]}
-          />
-        ))}
-      </View>
-      {heat.level > 0 ? (
-        <View style={[styles.heatFlames, { backgroundColor: alpha(heat.accent, 0.16) }]}>
-          {Array.from({ length: heat.level }, (_, index) => (
-            <Ionicons key={index} name={index === heat.level - 1 ? "flame" : "flame-outline"} size={11} color={heat.accent} />
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-/** Film / Dizi kompakt yatay kartı: başlık + yüzde aynı satırda, altında ince çubuk ve ortak sayısı. */
-function TypeTile({ icon, label, info, color, copy, theme, track, primary, muted, pct }) {
-  const tone = color || theme.accent;
-  if (!info.shared) {
-    return (
-      <View
-        accessible
-        accessibilityLabel={`${label}: ${copy.types.notShared}`}
-        style={[styles.tile, styles.tileOff, { borderColor: theme.border, backgroundColor: alpha(muted, 0.05) }]}
+    <View style={[styles.section, { borderColor: theme.border, backgroundColor: alpha(muted, 0.05) }]}>
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityHint={open ? toggleCopy.collapse : toggleCopy.expand}
+        accessibilityState={{ expanded: open }}
+        hitSlop={4}
+        style={({ pressed }) => [styles.sectionHead, pressed && styles.pressed]}
       >
-        <View style={styles.tileTopRow}>
-          <View style={styles.tileHead}>
-            <Ionicons name={icon} size={13} color={muted} />
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.tileLabel, { color: muted }]}>
-              {label}
-            </Text>
-          </View>
-          <Ionicons name="lock-closed-outline" size={12} color={muted} />
-        </View>
-        <Text allowFontScaling={false} numberOfLines={1} style={[styles.tileCaption, { color: muted }]}>
-          {copy.types.notShared}
+        <Ionicons name={icon} size={14} color={theme.accent} />
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.sectionHeadTitle, { color: primary }]}>
+          {title}
         </Text>
-      </View>
-    );
-  }
-  const scored = info.score !== null;
-  return (
-    <View
-      accessible
-      accessibilityLabel={`${label}: ${scored ? pct(info.score) : copy.types.notEnough}`}
-      style={[styles.tile, { borderColor: alpha(tone, 0.28), backgroundColor: alpha(tone, 0.07) }]}
-    >
-      <View style={styles.tileTopRow}>
-        <View style={styles.tileHead}>
-          <Ionicons name={icon} size={13} color={tone} />
-          <Text allowFontScaling={false} numberOfLines={1} style={[styles.tileLabel, { color: primary }]}>
-            {label}
+        {summary ? (
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.sectionSummary, { color: summaryColor || muted }]}>
+            {summary}
           </Text>
-        </View>
-        <Text allowFontScaling={false} style={[styles.tileValue, { color: scored ? tone : muted }]}>
-          {scored ? pct(info.score) : "–"}
-        </Text>
-      </View>
-      {scored ? <Bar value={info.score} color={tone} track={track} /> : null}
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.tileCaption, { color: muted }]}>
-        {scored ? copy.types.common(info.overlap) : copy.types.notEnough}
-      </Text>
+        ) : null}
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={15} color={muted} />
+      </Pressable>
+      {open ? <View style={styles.sectionBody}>{children}</View> : null}
     </View>
   );
 }
 
-/** Sayı hücresi: tek şerit içinde ikonlu değer + kısa etiket + ince çubuk. */
-function Stat({ icon, value, label, bar, color, theme, track, primary, muted }) {
-  const tone = color || theme.accent;
-  return (
-    <View accessible accessibilityLabel={`${label}: ${value}`} style={styles.stat}>
-      <View style={styles.statTop}>
-        <Ionicons name={icon} size={13} color={tone} />
-        <Text allowFontScaling={false} numberOfLines={1} style={[styles.statValue, { color: primary }]}>
-          {value}
-        </Text>
-      </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.statLabel, { color: muted }]}>
-        {label}
-      </Text>
-      {typeof bar === "number" ? <Bar value={bar} color={tone} track={track} /> : null}
-    </View>
-  );
+function animateNext() {
+  try {
+    LayoutAnimation?.configureNext?.(LayoutAnimation.Presets?.easeInEaseOut);
+  } catch {
+    // animasyon yoksa (test / desteklenmeyen platform) düz aç-kapa
+  }
 }
 
 function InsightRow({ icon, text, color, muted }) {
@@ -217,6 +116,15 @@ function TasteMatchCard({
   const [infoOpen, setInfoOpen] = useState(false);
   const openInfo = useCallback(() => setInfoOpen(true), []);
   const closeInfo = useCallback(() => setInfoOpen(false), []);
+  // Ayrıntı bölümleri varsayılan KAPALI (kart kompakt); her biri bağımsız açılır.
+  const [openSections, setOpenSections] = useState(() => ({ deep: false, insights: false, shared: false }));
+  const toggleSection = useCallback((key) => {
+    animateNext();
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+  const toggleDeep = useCallback(() => toggleSection("deep"), [toggleSection]);
+  const toggleInsights = useCallback(() => toggleSection("insights"), [toggleSection]);
+  const toggleShared = useCallback(() => toggleSection("shared"), [toggleSection]);
 
   const muted = theme.text?.secondary ?? "#aaa";
   const primary = theme.text?.primary ?? "#fff";
@@ -227,6 +135,7 @@ function TasteMatchCard({
   const rose = "#E11D48";
   const pct = (n) => copy.percent(n);
   const heat = tasteMatchHeat(match.score, theme.accent);
+  const tone = { primary, muted, track, border: theme.border, accent: theme.accent, strip: theme.between };
 
   const percent = match.ratings.agreement === null ? null : Math.round(match.ratings.agreement * 100);
   const valueOf = (id) => match.breakdown?.find((part) => part.id === id)?.value;
@@ -243,7 +152,31 @@ function TasteMatchCard({
           ? copy.insights.leanTheirs(localizeGenreName(lean.theirs, language), friendName)
           : null;
   const sharedGenres = localizeGenreList(match.genres.shared, language);
-  const hasInsights = loved.length > 0 || !!split || !!leanText;
+  const deep = match.deep ?? null;
+  const deepParts = DEEP_COMPONENTS.map((id) => ({ id, value: valueOf(id) })).filter((p) => p.value !== undefined);
+  const deepTexts = [];
+  if (deep?.genreAgree) deepTexts.push({ icon: "heart-circle-outline", color: green, text: copy.insights.genreAgree(localizeGenreName(deep.genreAgree.genre, language)) });
+  if (deep?.genreSplit) {
+    deepTexts.push({
+      icon: "swap-horizontal-outline",
+      color: orange,
+      text: copy.insights.genreSplit(localizeGenreName(deep.genreSplit.genre, language), deep.genreSplit.mine, deep.genreSplit.theirs, friendName),
+    });
+  }
+  const trend = valueOf("ratingTrend");
+  if (trend !== undefined && trend >= 70) deepTexts.push({ icon: "trending-up-outline", color: green, text: copy.insights.trendHigh() });
+  else if (trend !== undefined && trend <= 40) deepTexts.push({ icon: "trending-down-outline", color: orange, text: copy.insights.trendLow() });
+  if (deep?.generous) {
+    deepTexts.push({
+      icon: "scale-outline",
+      color: blue,
+      text: deep.generous.who === "mine" ? copy.insights.generousMine(deep.generous.gap) : copy.insights.generousTheirs(deep.generous.gap, friendName),
+    });
+  }
+  const genreTable = match.genres?.table ?? EMPTY;
+  const tableMax = genreTable.reduce((m, row) => Math.max(m, row.mine, row.theirs), 1);
+  const insightCount = (loved.length > 0 ? 1 : 0) + (split ? 1 : 0) + (leanText ? 1 : 0) + deepTexts.length;
+  const hasInsights = insightCount > 0;
   const hasData = match.state !== "no-data";
   const scope = match.scope ?? "both";
   const showTypes = hasData && !!match.byType && scope !== "none";
@@ -263,120 +196,171 @@ function TasteMatchCard({
 
   return (
     <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      {/* ── Başlık: kompakt halka · kademe · hızlı eylemler (sohbete gönder + !) ── */}
-      <View
-        style={[
-          styles.head,
-          heat.level > 0 && styles.hotHead,
-          heat.level > 0 && { backgroundColor: alpha(heat.accent, heat.level >= 3 ? 0.12 : 0.07), borderColor: alpha(heat.accent, 0.28) },
-        ]}
-      >
-        {match.score !== null ? (
-          <View accessible accessibilityLabel={`${copy.title}: ${pct(match.score)}`}>
-            <Ring ratio={match.score / 100} accent={heat.accent} track={track}>
-              <Text allowFontScaling={false} style={[styles.ringText, { color: heat.level > 0 ? heat.accent : primary }]}>
-                {pct(match.score)}
+      {/* ── Üst kısım (türler dahil): sohbete giden kartla AYNI parçalar (TasteMatchParts) ── */}
+      <TasteHead
+        score={match.score}
+        title={match.tier ? copy.tiers[match.tier] : copy.title}
+        heat={heat}
+        tone={tone}
+        percentText={{ label: `${copy.title}: ${pct(match.score)}`, value: pct(match.score) }}
+        sub={
+          <>
+            {subText ? (
+              <Text allowFontScaling={false} numberOfLines={1} style={[styles.sub, { color: muted }]}>
+                {subText}
               </Text>
-            </Ring>
-          </View>
-        ) : (
-          <Ring ratio={0} accent={theme.accent} track={track}>
-            <Ionicons name="help" size={20} color={muted} />
-          </Ring>
-        )}
-        <View style={styles.headText}>
-          <Text allowFontScaling={false} numberOfLines={2} style={[styles.title, { color: primary }]}>
-            {match.tier ? copy.tiers[match.tier] : copy.title}
-          </Text>
-          {subText ? (
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.sub, { color: muted }]}>
-              {subText}
-            </Text>
-          ) : null}
-          {match.state === "no-data" ? (
-            <Text style={[styles.sub, { color: muted }]}>
-              {noWatchedVisible ? copy.noData.hidden(friendName) : copy.noData.notEnough}
-            </Text>
-          ) : null}
-        </View>
-        <Pressable
-          onPress={openInfo}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={copy.info.open}
-          style={({ pressed }) => [styles.infoButton, { backgroundColor: alpha(muted, 0.14) }, pressed && styles.pressed]}
-        >
-          <Ionicons name="information" size={16} color={muted} />
-        </Pressable>
-      </View>
+            ) : null}
+            {match.state === "no-data" ? (
+              <Text style={[styles.sub, { color: muted }]}>
+                {noWatchedVisible ? copy.noData.hidden(friendName) : copy.noData.notEnough}
+              </Text>
+            ) : null}
+          </>
+        }
+        trailing={
+          <Pressable
+            onPress={openInfo}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={copy.info.open}
+            style={({ pressed }) => [styles.infoButton, { backgroundColor: alpha(muted, 0.14) }, pressed && styles.pressed]}
+          >
+            <Ionicons name="information" size={16} color={muted} />
+          </Pressable>
+        }
+      />
 
       {match.score !== null ? <HeatBar score={match.score} heat={heat} track={track} /> : null}
 
-      {/* ── Film / Dizi ayrı uyum (kompakt yatay ikili) ── */}
-      {showTypes ? (
-        <View style={styles.tiles}>
-          <TypeTile icon="film-outline" label={copy.types.movie} info={match.byType.movie} color={blue} {...{ copy, theme, track, primary, muted, pct }} />
-          <TypeTile icon="tv-outline" label={copy.types.tv} info={match.byType.tv} color={green} {...{ copy, theme, track, primary, muted, pct }} />
+      {/* ── Az veri uyarısı ── */}
+      {hasData && match.lowData ? (
+        <View
+          accessible
+          accessibilityRole="alert"
+          style={[styles.lowData, { backgroundColor: alpha(LOW_DATA_COLOR, 0.12), borderColor: alpha(LOW_DATA_COLOR, 0.35) }]}
+        >
+          <Ionicons name="warning-outline" size={14} color={LOW_DATA_COLOR} />
+          <Text allowFontScaling={false} style={[styles.lowDataText, { color: primary }]}>
+            {copy.lowData}
+          </Text>
         </View>
       ) : null}
+
+      {/* ── Film / Dizi ayrı uyum (kompakt yatay ikili) ── */}
+      {showTypes ? <TypeTiles movie={match.byType.movie} tv={match.byType.tv} colors={{ movie: blue, tv: green }} {...{ copy, tone, pct }} /> : null}
 
       {/* ── Sayı şeridi + ortak türler ── */}
       {hasData ? (
         <>
-          <View style={[styles.statsStrip, { backgroundColor: theme.between, borderColor: theme.border }]}>
-            <Stat
-              icon="checkmark-done-outline"
-              value={String(match.watched.overlap.length)}
-              label={copy.parts.overlap}
-              bar={valueOf("overlap")}
-              color={theme.accent}
-              {...{ theme, track, primary, muted }}
-            />
-            {favoritesShown ? (
-              <>
-                <View style={[styles.statDivider, { backgroundColor: alpha(theme.border, 0.9) }]} />
-                <Stat
-                  icon="heart-outline"
-                  value={String(match.favorites?.length ?? 0)}
-                  label={copy.parts.favorites}
-                  bar={valueOf("favorites")}
-                  color={rose}
-                  {...{ theme, track, primary, muted }}
-                />
-              </>
-            ) : null}
-            {percent !== null ? (
-              <>
-                <View style={[styles.statDivider, { backgroundColor: alpha(theme.border, 0.9) }]} />
-                <Stat
-                  icon="star-half-outline"
-                  value={pct(percent)}
-                  label={copy.parts.ratings}
-                  bar={valueOf("ratings")}
-                  color={orange}
-                  {...{ theme, track, primary, muted }}
-                />
-              </>
-            ) : null}
-          </View>
-          {sharedGenres.length > 0 ? (
-            <View style={styles.chips} accessible accessibilityLabel={`${copy.parts.genres}: ${sharedGenres.join(", ")}`}>
-              <Ionicons name="pricetags-outline" size={13} color={muted} />
-              {sharedGenres.map((genre) => (
-                <View key={genre} style={[styles.chip, { backgroundColor: alpha(theme.accent, 0.13), borderColor: alpha(theme.accent, 0.25) }]}>
-                  <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipText, { color: theme.accent }]}>
-                    {genre}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
+          <StatsStrip
+            tone={tone}
+            stats={[
+              { key: "overlap", icon: "checkmark-done-outline", value: String(match.watched.overlap.length), label: copy.parts.overlap, bar: valueOf("overlap"), color: theme.accent },
+              favoritesShown
+                ? { key: "favorites", icon: "heart-outline", value: String(match.favorites?.length ?? 0), label: copy.parts.favorites, bar: valueOf("favorites"), color: rose }
+                : null,
+              percent !== null ? { key: "ratings", icon: "star-half-outline", value: pct(percent), label: copy.parts.ratings, bar: valueOf("ratings"), color: orange } : null,
+            ].filter(Boolean)}
+          />
+          <GenreChips genres={sharedGenres} label={copy.parts.genres} tone={tone} />
         </>
       ) : null}
 
-      {/* ── İçgörüler ── */}
+      {/* ── Derin analiz: ek bileşenler + güven + incelenen veri ── */}
+      {hasData && (deepParts.length > 0 || match.confidence || genreTable.length > 0) ? (
+        <Collapsible
+          icon="analytics-outline"
+          title={copy.deepTitle}
+          summary={match.confidence ? copy.confidence[match.confidence] : null}
+          summaryColor={match.lowData ? LOW_DATA_COLOR : theme.accent}
+          open={openSections.deep}
+          onToggle={toggleDeep}
+          toggleCopy={copy.sectionToggle}
+          {...{ theme, primary, muted }}
+        >
+          {deepParts.map((part) => (
+            <View key={part.id} style={styles.deepRow} accessible accessibilityLabel={`${copy.parts[part.id]}: ${pct(part.value)}`}>
+              <Text allowFontScaling={false} numberOfLines={1} style={[styles.deepLabel, { color: muted }]}>
+                {copy.parts[part.id]}
+              </Text>
+              <View style={styles.deepBar}>
+                <Bar value={part.value} color={theme.accent} track={track} />
+              </View>
+              <Text allowFontScaling={false} style={[styles.deepValue, { color: primary }]}>
+                {pct(part.value)}
+              </Text>
+            </View>
+          ))}
+          {genreTable.length > 0 ? (
+            <View style={styles.genreTable}>
+              <View style={styles.genreTableHead}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[styles.genreTableTitle, { color: primary }]}>
+                  {copy.genreTableTitle}
+                </Text>
+                <View style={[styles.legendDot, { backgroundColor: theme.accent }]} />
+                <Text allowFontScaling={false} style={[styles.legendText, { color: muted }]}>
+                  {copy.you}
+                </Text>
+                <View style={[styles.legendDot, { backgroundColor: blue }]} />
+                <Text allowFontScaling={false} numberOfLines={1} style={[styles.legendText, styles.legendName, { color: muted }]}>
+                  {friendName}
+                </Text>
+              </View>
+              <Text allowFontScaling={false} numberOfLines={1} style={[styles.deepBasis, { color: muted }]}>
+                {copy.genreTableHint}
+              </Text>
+              {genreTable.map((row) => {
+                const label = localizeGenreName(row.genre, language);
+                const mineText = `${pct(row.mine)}${row.mineAvg != null ? ` · ${row.mineAvg}` : ""}`;
+                const theirText = `${pct(row.theirs)}${row.theirAvg != null ? ` · ${row.theirAvg}` : ""}`;
+                return (
+                  <View
+                    key={row.genre}
+                    style={styles.genreRow}
+                    accessible
+                    accessibilityLabel={`${label}: ${copy.you} ${mineText}, ${friendName} ${theirText}`}
+                  >
+                    <Text allowFontScaling={false} numberOfLines={1} style={[styles.genreName, { color: primary }]}>
+                      {label}
+                    </Text>
+                    <View style={styles.genreBars}>
+                      <View style={[styles.genreTrack, { backgroundColor: track }]}>
+                        <View style={[styles.genreFill, { backgroundColor: theme.accent, width: `${Math.max(row.mine ? 3 : 0, (row.mine / tableMax) * 100)}%` }]} />
+                      </View>
+                      <View style={[styles.genreTrack, { backgroundColor: track }]}>
+                        <View style={[styles.genreFill, { backgroundColor: blue, width: `${Math.max(row.theirs ? 3 : 0, (row.theirs / tableMax) * 100)}%` }]} />
+                      </View>
+                    </View>
+                    <View style={styles.genreNums}>
+                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.genreNum, { color: theme.accent }]}>
+                        {mineText}
+                      </Text>
+                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.genreNum, { color: blue }]}>
+                        {theirText}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.deepBasis, { color: muted }]}>
+            {copy.basis(match.watched.overlap.length, match.ratings.pairs)}
+          </Text>
+        </Collapsible>
+      ) : null}
+
+      {/* ── İçgörüler (katlanır; başlıkta satır sayısı) ── */}
       {hasData && hasInsights ? (
-        <View style={[styles.insights, { backgroundColor: alpha(theme.accent, 0.08), borderColor: alpha(theme.accent, 0.2) }]}>
+        <Collapsible
+          icon="bulb-outline"
+          title={copy.insightsTitle}
+          summary={String(insightCount)}
+          open={openSections.insights}
+          onToggle={toggleInsights}
+          toggleCopy={copy.sectionToggle}
+          {...{ theme, primary, muted }}
+        >
           {loved.length > 0 ? (
             <InsightRow icon="sparkles-outline" color={theme.accent} muted={muted} text={copy.insights.loved(loved.map((entry) => entry.name).join(", "))} />
           ) : null}
@@ -389,15 +373,23 @@ function TasteMatchCard({
             />
           ) : null}
           {leanText ? <InsightRow icon="compass-outline" color={blue} muted={muted} text={leanText} /> : null}
-        </View>
+          {deepTexts.map((row) => (
+            <InsightRow key={row.text} icon={row.icon} color={row.color} muted={muted} text={row.text} />
+          ))}
+        </Collapsible>
       ) : null}
 
-      {/* ── Ortak izlenenler (kompakt afiş şeridi + iki taraf puanı) ── */}
+      {/* ── Ortak izlenenler (katlanır afiş şeridi + iki taraf puanı) ── */}
       {hasData && highlights.length > 0 ? (
-        <View style={styles.railSection}>
-          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: muted }]}>
-            {copy.sharedTitle}
-          </Text>
+        <Collapsible
+          icon="albums-outline"
+          title={copy.sharedTitle}
+          summary={String(highlights.length)}
+          open={openSections.shared}
+          onToggle={toggleShared}
+          toggleCopy={copy.sectionToggle}
+          {...{ theme, primary, muted }}
+        >
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
             {highlights.map((item) => {
               const bothRated = item.mine !== null && item.theirs !== null;
@@ -420,7 +412,7 @@ function TasteMatchCard({
               );
             })}
           </ScrollView>
-        </View>
+        </Collapsible>
       ) : null}
 
       {/* ── Birlikte izleyelim ── */}
@@ -509,14 +501,7 @@ function TasteMatchCard({
 export default memo(TasteMatchCard);
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 10 },
-  head: { flexDirection: "row", alignItems: "center", gap: 11 },
-  hotHead: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, margin: -4, padding: 4 },
-  ring: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
-  ringCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  ringText: { fontSize: 16, fontWeight: "900", letterSpacing: -0.4 },
-  headText: { flexShrink: 1, flexGrow: 1, gap: 2 },
-  title: { fontSize: 15.5, lineHeight: 20, fontWeight: "800", letterSpacing: -0.2 },
+  card: { borderRadius: 20, borderWidth: 1, padding: 12, gap: 8 },
   sub: { fontSize: 12, lineHeight: 16 },
   infoButton: {
     width: 30,
@@ -527,48 +512,39 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
 
-  heatBarWrap: { minHeight: 18, flexDirection: "row", alignItems: "center", gap: 8 },
-  heatTrack: { flex: 1, height: 8, borderRadius: 999, overflow: "hidden", position: "relative" },
-  heatFill: { height: "100%", borderRadius: 999 },
-  heatMark: { position: "absolute", top: 1, bottom: 1, width: 1, marginLeft: -0.5 },
-  heatFlames: { minWidth: 25, height: 18, borderRadius: 9, paddingHorizontal: 5, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 },
 
-  tiles: { flexDirection: "row", gap: 8 },
-  tile: { flex: 1, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 4 },
-  tileOff: { borderStyle: "dashed", justifyContent: "space-between" },
-  tileTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  tileHead: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1 },
-  tileLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.1, flexShrink: 1 },
-  tileValue: { fontSize: 16, lineHeight: 19, fontWeight: "900", letterSpacing: -0.3 },
-  tileCaption: { fontSize: 11, fontWeight: "600" },
 
-  statsStrip: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  stat: { flex: 1, minWidth: 0, paddingHorizontal: 8, gap: 2, justifyContent: "center" },
-  statDivider: { width: StyleSheet.hairlineWidth * 2, marginVertical: 2 },
-  statTop: { flexDirection: "row", alignItems: "center", gap: 5 },
-  statValue: { fontSize: 16, lineHeight: 19, fontWeight: "900", letterSpacing: -0.3 },
-  statLabel: { fontSize: 10.5, lineHeight: 13, fontWeight: "700" },
 
-  barTrack: { height: 3, borderRadius: 1.5, overflow: "hidden", marginTop: 2 },
-  barFill: { height: "100%", borderRadius: 1.5 },
 
-  chips: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 5 },
-  chip: { borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 9, paddingVertical: 3.5, maxWidth: "100%" },
-  chipText: { fontSize: 11.5, fontWeight: "800" },
 
-  insights: { gap: 5, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, paddingVertical: 8 },
+  lowData: { flexDirection: "row", alignItems: "flex-start", gap: 7, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8 },
+  lowDataText: { flex: 1, fontSize: 11.5, fontWeight: "700", lineHeight: 16 },
+  section: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  sectionHead: { flexDirection: "row", alignItems: "center", gap: 7, minHeight: 38, paddingHorizontal: 10 },
+  sectionHeadTitle: { flex: 1, fontSize: 12.5, fontWeight: "800" },
+  sectionSummary: { fontSize: 11, fontWeight: "800", maxWidth: "40%" },
+  sectionBody: { gap: 7, paddingHorizontal: 10, paddingBottom: 10 },
+  deepRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  deepLabel: { width: 112, fontSize: 11, fontWeight: "700" },
+  deepBar: { flex: 1 },
+  deepValue: { width: 38, textAlign: "right", fontSize: 11, fontWeight: "800" },
+  deepBasis: { fontSize: 10, fontWeight: "600" },
+  genreTable: { gap: 6, marginTop: 4 },
+  genreTableHead: { flexDirection: "row", alignItems: "center", gap: 5 },
+  genreTableTitle: { flex: 1, fontSize: 11.5, fontWeight: "800" },
+  legendDot: { width: 7, height: 7, borderRadius: 4 },
+  legendText: { fontSize: 10, fontWeight: "700" },
+  legendName: { maxWidth: 80 },
+  genreRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  genreName: { width: 92, fontSize: 11, fontWeight: "700" },
+  genreBars: { flex: 1, gap: 3 },
+  genreTrack: { height: 5, borderRadius: 3, overflow: "hidden" },
+  genreFill: { height: 5, borderRadius: 3 },
+  genreNums: { width: 74, alignItems: "flex-end", gap: 1 },
+  genreNum: { fontSize: 9.5, fontWeight: "800" },
   insightRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   insightText: { flexShrink: 1, fontSize: 11.5, lineHeight: 15.5, fontWeight: "600" },
 
-  railSection: { gap: 6 },
-  sectionTitle: { fontSize: 12, fontWeight: "800", letterSpacing: 0.1 },
   divider: { height: StyleSheet.hairlineWidth * 2, marginVertical: 1 },
 
   togetherSection: { gap: 7 },

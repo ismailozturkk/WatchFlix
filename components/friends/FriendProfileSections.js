@@ -19,7 +19,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Feather from "@expo/vector-icons/Feather";
 import BackButton from "@components/BackButton";
-import UserAvatar from "@components/common/UserAvatar";
+import ProfileAvatarHalo from "@components/profile/ProfileAvatarHalo";
 import GlassIconButton from "@components/common/GlassIconButton";
 import IdentityBadgesRow from "@components/badges/IdentityBadgesRow";
 import SocialLinksRow from "@components/profile/SocialLinksRow";
@@ -30,13 +30,6 @@ import { alpha } from "@theme/colors";
 import PillButton from "./PillButton";
 import GlassBox from "../common/GlassBox";
 import ProfileBannerBackdrop from "@components/profile/ProfileBannerBackdrop";
-
-const AVATAR_SIZE = 100;
-// UserAvatar squircle yarıçapı `round(size * 0.33)`; halka onun etrafında
-// padding + çerçeve kadar büyür ki iç içe köşeler paralel dursun.
-const RING_PADDING = 5;
-const RING_BORDER = 3;
-const RING_RADIUS = Math.round(AVATAR_SIZE * 0.33) + RING_PADDING + RING_BORDER;
 
 // Backdrop'un kaydırmayla sönme / yukarı kayma mesafesi.
 const BACKDROP_HEIGHT = 340;
@@ -56,7 +49,7 @@ const ListIcon = ({ name, iconLib, color, size = 16 }) => {
 // kayıp söner. `scrollY` native sürücüyle bağlı: JS iş parçacığına yük bindirmez.
 // `banner` (utils/profileBanner.js) verilirse accent degradenin yerine sahne
 // görseli çizilir: kaydırınca yakınlaşıp çok yavaş kayar, çekince esner
-// (components/profile/ProfileBannerBackdrop — Profil sekmesiyle ortak).
+// (components/profile/ProfileBannerBackdrop).
 export function ProfileBackdrop({ scrollY, banner = null, width }) {
   const { theme } = useTheme();
   if (banner) {
@@ -217,6 +210,8 @@ export const ProfileHero = memo(function ProfileHero({
   name,
   username,
   badges,
+  avatarProgress,
+  streak,
   language,
   bio,
   socialLinks,
@@ -258,27 +253,18 @@ export const ProfileHero = memo(function ProfileHero({
       ]}
     >
       <View style={styles.avatarWrap}>
-        {/* Degrade çerçeve + tema renginde iç disk: avatar zeminden "kesilmiş"
-            gibi durur, arkadaki accent gradyanı çerçevenin dışında kalır. */}
-        <LinearGradient
-          colors={[theme.accent, alpha(theme.accent, 0.28)]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarRing}
-        >
-          <View style={[styles.avatarInner, { backgroundColor: theme.primary }]}>
-            <UserAvatar
-              avatarIndex={avatarIndex}
-              photoURL={photoURL}
-              size={AVATAR_SIZE}
-              shape="squircle"
-              iconRatio={0.794}
-              onPress={onAvatarPress}
-              onLongPress={onAvatarLongPress}
-              delayLongPress={220}
-            />
-          </View>
-        </LinearGradient>
+        <ProfileAvatarHalo
+          avatarIndex={avatarIndex}
+          photoURL={photoURL}
+          isCustomPhoto={avatarIndex === -1}
+          progress={avatarProgress?.progress ?? 0}
+          ringColor={avatarProgress?.borderColor ?? theme.accent}
+          ringColor2={avatarProgress?.borderColor2 ?? theme.accent}
+          ringHidden={!avatarProgress}
+          backgroundColor={theme.primary}
+          onPress={onAvatarPress}
+          onLongPress={onAvatarLongPress}
+        />
         {/* Düzenleme modunda avatara dokununca seçici açılır: köşede küçük kalem. */}
         {editor ? (
           <View
@@ -381,6 +367,8 @@ export const ProfileHero = memo(function ProfileHero({
         language={language}
         style={styles.badgesRow}
       />
+
+      {!editor && streak ? <View style={styles.streakRow}>{streak}</View> : null}
 
       {!editor && bio ? (
         <Text
@@ -829,14 +817,6 @@ const styles = StyleSheet.create({
   // ── Hero ───────────────────────────────────────────────────────────────────
   hero: { alignItems: "center", marginTop: 6, marginBottom: 20 },
   avatarWrap: { alignSelf: "center" },
-  avatarRing: {
-    padding: RING_BORDER,
-    borderRadius: RING_RADIUS,
-  },
-  avatarInner: {
-    padding: RING_PADDING,
-    borderRadius: RING_RADIUS - RING_BORDER,
-  },
   name: {
     marginTop: 14,
     fontSize: 26,
@@ -881,6 +861,7 @@ const styles = StyleSheet.create({
   fieldInputName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
   fieldInputMultiline: { minHeight: 44, maxHeight: 120, lineHeight: 21, textAlignVertical: "top" },
   badgesRow: { justifyContent: "center", marginTop: 8, marginBottom: 0 },
+  streakRow: { marginTop: 12, alignItems: "center" },
   bio: {
     marginTop: 12,
     maxWidth: 330,

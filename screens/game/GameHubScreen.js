@@ -226,7 +226,7 @@ export default function GameHubScreen({ navigation }) {
           {modeBests.length > 0 ? (
             <>
               <SectionHeader
-                title={pickByLanguage(language, { tr: "Rekorlar", en: "Records", es: "Récords", pt: "Recordes", de: "Rekorde" })}
+                title={pickByLanguage(language, { tr: "Rekorlar", en: "Records", es: "Récords", pt: "Recordes", de: "Rekorde" , it: "Record"})}
                 theme={theme}
               />
               <GlassBox role="card" style={[styles.panel, styles.recordPanel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>

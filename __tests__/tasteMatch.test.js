@@ -29,7 +29,7 @@ describe("computeTasteMatch", () => {
     expect(out.watched.overlap).toHaveLength(10);
     expect(out.ratings).toEqual({ pairs: 10, agreement: 1 });
     expect(out.genres.shared.sort()).toEqual(["Drama", "Komedi"]);
-    expect(out.components.sort()).toEqual(["genres", "overlap", "ratings"]);
+    expect(out.components.sort()).toEqual(["genreRatings", "genres", "overlap", "ratings"]);
   });
 
   it("hiç ortak yok + farklı türler: düşük puan", () => {
@@ -43,14 +43,23 @@ describe("computeTasteMatch", () => {
     expect(out.state).toBe("limited");
   });
 
-  it("tür sözlüğü farklı dilde (Dram / Drama): tür bileşeni HESABA GİRMEZ", () => {
+  it("tür sözlüğü farklı dilde (Dram / Drama): kanonik türle karşılaştırılır, adlar benim kayıtlarımdan gelir", () => {
     const tr = range(1, 8, (i) => movie(i, ["Dram", "Komedi"]));
     const en = range(1, 8, (i) => movie(i, ["Drama", "Comedy"]));
     const out = computeTasteMatch(side({ watchedMovies: tr }), side({ watchedMovies: en }));
-    expect(out.genres.comparable).toBe(false);
-    expect(out.genres.similarity).toBeNull();
-    expect(out.components).toEqual(["overlap"]);
+    expect(out.genres.comparable).toBe(true);
+    expect(out.genres.similarity).toBeCloseTo(1, 5);
+    expect(out.components).toEqual(["genres", "overlap"]);
+    expect(out.genres.shared.sort()).toEqual(["Dram", "Komedi"]);
     expect(out.watched.overlap).toHaveLength(8); // ortak izlenen yine bulunur
+  });
+
+  it("tanınmayan tür adları (kanonik eşleşmesi yok) farklıysa tür bileşeni yine düşer", () => {
+    const a = range(1, 8, (i) => movie(i, ["Xyz"]));
+    const b = range(1, 8, (i) => movie(i, ["Qwe"]));
+    const out = computeTasteMatch(side({ watchedMovies: a }), side({ watchedMovies: b }));
+    expect(out.genres.comparable).toBe(false);
+    expect(out.components).toEqual(["overlap"]);
   });
 
   it("puan uyumu: ortak izlenenlerde fark büyüdükçe düşer; 3'ten az çiftte yok", () => {
@@ -159,6 +168,7 @@ describe("computeTasteMatch: bileşen dökümü ve içgörüler", () => {
       { id: "genres", value: 100, weight: WEIGHTS.genres },
       { id: "overlap", value: 100, weight: WEIGHTS.overlap },
       { id: "ratings", value: 100, weight: WEIGHTS.ratings },
+      { id: "genreRatings", value: 100, weight: WEIGHTS.genreRatings },
     ]);
   });
 
@@ -240,10 +250,101 @@ describe("computeTasteMatch: bileşen dökümü ve içgörüler", () => {
     expect(computeTasteMatch(side({ watchedMovies: flat }), side({ watchedMovies: flat })).genres.lean).toEqual({ mine: null, theirs: null });
   });
 
-  it("farklı dilde tür eğilimi üretilmez (karşılaştırılamaz sözlük)", () => {
+  it("aynı dağılım farklı dilde yazılmışsa tür eğilimi üretilmez (kanonik türler eşit)", () => {
     const tr = range(1, 8, (i) => movie(i, ["Dram", "Komedi"]));
     const en = range(1, 8, (i) => movie(i, ["Drama", "Comedy"]));
     expect(computeTasteMatch(side({ watchedMovies: tr }), side({ watchedMovies: en })).genres.lean).toEqual({ mine: null, theirs: null });
+  });
+
+  it("derin analiz: sert/cömert puanlayan ama aynı sıralamayı yapan iki kişi yüksek eğilim uyumu alır", () => {
+    const list = range(1, 12, (i) => movie(i, i <= 6 ? ["Dram"] : ["Korku"]));
+    const mine = Object.fromEntries(list.map((m) => [`movie_${m.id}`, m.id <= 6 ? 9 : 5]));
+    const theirs = Object.fromEntries(list.map((m) => [`movie_${m.id}`, m.id <= 6 ? 7 : 3])); // hep 2 eksik
+    const out = computeTasteMatch(side({ watchedMovies: list, ratings: mine }), side({ watchedMovies: list, ratings: theirs }));
+    expect(out.deep.correlation).toBeCloseTo(1, 5);
+    expect(out.components).toEqual(expect.arrayContaining(["ratingTrend", "genreRatings"]));
+    expect(out.breakdown.find((p) => p.id === "genreRatings").value).toBe(100); // göreli tür tercihi aynı
+    expect(out.deep.generous).toEqual({ who: "mine", gap: 2 });
+    expect(out.breakdown.find((p) => p.id === "ratingTrend").value).toBeGreaterThan(80);
+  });
+
+  it("derin analiz: bir türde ayrışma ve ortak sevilen tür", () => {
+    const list = range(1, 12, (i) => movie(i, i <= 6 ? ["Dram"] : ["Korku"]));
+    const mine = Object.fromEntries(list.map((m) => [`movie_${m.id}`, m.id <= 6 ? 9 : 9]));
+    const theirs = Object.fromEntries(list.map((m) => [`movie_${m.id}`, m.id <= 6 ? 9 : 3]));
+    const out = computeTasteMatch(side({ watchedMovies: list, ratings: mine }), side({ watchedMovies: list, ratings: theirs }));
+    expect(out.deep.genreSplit).toEqual({ genre: "Korku", mine: 9, theirs: 3 });
+    expect(out.deep.genreAgree).toMatchObject({ genre: "Dram" });
+    expect(out.breakdown.find((p) => p.id === "genreRatings").value).toBeLessThan(50);
+  });
+
+  it("izleme listesi zevk uyumunu ETKİLEMEZ (boş, gizli ya da dolu olması fark etmez)", () => {
+    const list = range(1, 10, (i) => movie(i, i % 2 ? ["Dram"] : ["Komedi"]));
+    const ratings = Object.fromEntries(list.map((m) => [`movie_${m.id}`, 5 + (m.id % 4)]));
+    const base = computeTasteMatch(side({ watchedMovies: list, ratings }), side({ watchedMovies: list, ratings }));
+    const wl = range(200, 220, (i) => movie(i));
+    const withLists = computeTasteMatch(
+      side({ watchedMovies: list, ratings, watchList: wl }),
+      side({ watchedMovies: list, ratings, watchList: wl.slice(0, 5) }),
+    );
+    const hidden = computeTasteMatch(side({ watchedMovies: list, ratings }), { ...side({ watchedMovies: list, ratings }), watchList: null });
+    expect(withLists.score).toBe(base.score);
+    expect(hidden.score).toBe(base.score);
+    expect(withLists.components).not.toContain("watchlist");
+    expect(WEIGHTS.watchlist).toBeUndefined();
+  });
+
+  it("çok türlü içerik profili şişirmez; ana tür (ilk sıradaki) yan türden ağır sayılır", () => {
+    const single = range(1, 10, (i) => movie(i, ["Dram"]));
+    const leadDrama = range(101, 110, (i) => movie(i, ["Dram", "Aksiyon", "Macera", "Bilim Kurgu"]));
+    const tailDrama = range(201, 210, (i) => movie(i, ["Aksiyon", "Macera", "Bilim Kurgu", "Dram"]));
+    const sim = (x, y) => computeTasteMatch(side({ watchedMovies: x }), side({ watchedMovies: y })).genres.similarity;
+    expect(sim(single, leadDrama)).toBeGreaterThan(0.7);
+    expect(sim(single, tailDrama)).toBeLessThan(0.3);
+    expect(sim(single, single)).toBeCloseTo(1, 5);
+  });
+
+  it("tür tablosu: en az 5 tür (varsa), en çok 8; paylar ve ortalama puanlar", () => {
+    const G = ["Dram", "Komedi", "Korku", "Aksiyon", "Gerilim", "Romantik", "Animasyon", "Belgesel", "Western", "Müzik"];
+    const mineList = range(1, 40, (i) => movie(i, [G[i % 10], G[(i + 3) % 10]]));
+    const theirList = range(1, 40, (i) => movie(i, [G[(i + 1) % 10]]));
+    const ratings = Object.fromEntries(mineList.map((m) => [`movie_${m.id}`, 7]));
+    const out = computeTasteMatch(side({ watchedMovies: mineList, ratings }), side({ watchedMovies: theirList, ratings }));
+    expect(out.genres.table.length).toBeGreaterThanOrEqual(5);
+    expect(out.genres.table.length).toBeLessThanOrEqual(8);
+    const row = out.genres.table[0];
+    expect(row).toEqual(expect.objectContaining({ genre: expect.any(String), mine: expect.any(Number), theirs: expect.any(Number) }));
+    expect(out.genres.table.some((r) => r.mineAvg === 7)).toBe(true);
+    // Azsa hepsi: yalnız 2 tür varsa tablo 2 satır.
+    const two = range(1, 6, (i) => movie(i, i % 2 ? ["Dram"] : ["Komedi"]));
+    expect(computeTasteMatch(side({ watchedMovies: two }), side({ watchedMovies: two })).genres.table).toHaveLength(2);
+  });
+
+  it("az veri: lowData kalkar; bol veride iner", () => {
+    const few = range(1, 6, (i) => movie(i));
+    const small = computeTasteMatch(side({ watchedMovies: few }), side({ watchedMovies: few }));
+    expect(small.lowData).toBe(true);
+    expect(small.confidence).toBe("low");
+
+    const many = range(1, 60, (i) => movie(i, i % 3 ? ["Dram"] : ["Komedi", "Dram"]));
+    const r = Object.fromEntries(many.map((m) => [`movie_${m.id}`, 4 + (m.id % 6)]));
+    const big = computeTasteMatch(side({ watchedMovies: many, ratings: r }), side({ watchedMovies: many, ratings: r }));
+    expect(big.lowData).toBe(false);
+    expect(big.confidence).toBe("high");
+
+    expect(computeTasteMatch(null, null).lowData).toBe(false); // veri hiç yoksa uyarı değil "no-data"
+  });
+
+  it("tür puan profili arkadaşın yalnız GÖRÜNÜR izlenenlerinden okunur", () => {
+    const visible = range(1, 6, (i) => movie(i, ["Dram"]));
+    const theirRatings = { ...Object.fromEntries(visible.map((m) => [`movie_${m.id}`, 8])) };
+    // Arkadaşın listede görünmeyen 50 Korku puanı hesaba girmemeli.
+    for (let i = 100; i < 150; i += 1) theirRatings[`movie_${i}`] = 1;
+    const out = computeTasteMatch(
+      side({ watchedMovies: visible, ratings: Object.fromEntries(visible.map((m) => [`movie_${m.id}`, 8])) }),
+      side({ watchedMovies: visible, ratings: theirRatings }),
+    );
+    expect(out.deep.ratedTheirs).toBe(6);
   });
 
   it("veri yokken içgörüler boş ve çökmez", () => {

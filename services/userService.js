@@ -288,8 +288,8 @@ export async function createUserProfile({
       pendingRequestsOutCount: 0,
       unreadNotifsCount: 0,
 
-      // NOT: isOnline/lastActiveAt/lastSeen ARTIK Presence/{uid}'de.
-      // Bkz. services/presenceService.js
+      // NOT: isOnline/lastActiveAt/lastSeen artık hiç tutulmuyor (10 Kas: çevrimiçi durumu kaldırıldı);
+      // Presence/{uid} yalnız bağlantı + sohbette-mi bilgisini taşır. Bkz. services/presenceService.js
 
       privacy: DEFAULT_PRIVACY,
       listVisible: DEFAULT_LIST_VISIBLE,
@@ -370,7 +370,10 @@ export async function changeUsername(uid, newUsername) {
 
     if (!userSnap.exists()) throw new Error("Profil bulunamadı");
     if (newUsernameSnap.exists() && newUsernameSnap.data().uid !== uid) {
-      throw new Error("Bu kullanıcı adı zaten alınmış");
+      throw new UserProfileError(
+        UserProfileErrorCode.USERNAME_TAKEN,
+        "Bu kullanıcı adı zaten alınmış",
+      );
     }
 
     const oldLower = userSnap.data().usernameLower;

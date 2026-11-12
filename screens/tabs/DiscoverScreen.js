@@ -39,7 +39,8 @@
 // kayıt yanlış listeye düşerse yalnız sistemin kenar efekti etkilenir, çubuk ölçeği
 // JS'ten sürülür ve iki listede de çalışır).
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { InteractionManager, StyleSheet, View, useWindowDimensions } from "react-native";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { runAfterInteractions } from "../../utils/afterInteractions";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withTiming } from "react-native-reanimated";
 import TvShowScreen from "./TvShowScreen";
@@ -112,7 +113,7 @@ export default function DiscoverScreen({ navigation }) {
   useEffect(() => {
     if (!warmAllowed) return undefined;
     let timer;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       timer = setTimeout(() => {
         setMounted((current) => (current.size === MEDIA_TYPES.length ? current : new Set(MEDIA_TYPES)));
       }, WARM_OTHER_MEDIA_MS);

@@ -35,9 +35,9 @@ const langOf = legacyFlagToLanguage;
 /** ReminderWidgetRemoteViewsService.kt `countdown` ile aynı metinler. */
 export const countdownLabel = (days, isTr) => {
   const lang = langOf(isTr);
-  if (days <= 0) return pickByLanguage(lang, { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" });
-  if (days === 1) return pickByLanguage(lang, { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" });
-  return pickByLanguage(lang, { tr: `${days} gün`, en: `${days} days`, es: `${days} días`, pt: `${days} dias`, de: `${days} Tage` });
+  if (days <= 0) return pickByLanguage(lang, { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" , it: "Oggi"});
+  if (days === 1) return pickByLanguage(lang, { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" , it: "Domani"});
+  return pickByLanguage(lang, { tr: `${days} gün`, en: `${days} days`, es: `${days} días`, pt: `${days} dias`, de: `${days} Tage` , it: `${days} giorni`});
 };
 
 /** `SimpleDateFormat("d MMM")` karşılığı. */
@@ -61,7 +61,8 @@ export function buildReminderSamples({ now = new Date(), isTr }) {
             es: `T${template.season} · Episodio ${template.episode}`,
             pt: `T${template.season} · Episódio ${template.episode}`,
             de: `S${template.season} · Folge ${template.episode}`,
-          })
+
+  it: `S${template.season} · Episodio ${template.episode}`})
         : "";
     return {
       id: `sample-${index}`,
@@ -78,15 +79,15 @@ export function buildReminderSamples({ now = new Date(), isTr }) {
 /** Listelerim örnekleri (iOS satırları ve Android liste adı). Sayılar listsWidgetService şekliyle aynı. */
 export function buildListSamples({ isTr }) {
   const lang = langOf(isTr);
-  const L = (tr, en, es, pt, de) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en });
+  const L = (tr, en, es, pt, de, it) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en });
   return [
-    { id: "watchedTv", name: L("İzlenen Diziler", "Watched Series", "Series vistas", "Séries assistidas", "Gesehene Serien"), icon: "tv", count: 37 },
-    { id: "watchedMovies", name: L("İzlenen Filmler", "Watched Movies", "Películas vistas", "Filmes assistidos", "Gesehene Filme"), icon: "film", count: 184 },
-    { id: "watchList", name: L("İzlenecekler", "Watchlist", "Lista de seguimiento", "Lista para assistir", "Merkliste"), icon: "bookmark", count: 52 },
-    { id: "favorites", name: L("Favoriler", "Favorites", "Favoritos", "Favoritos", "Favoriten"), icon: "heart", count: 24 },
-    { id: "custom1", name: L("Hafta Sonu Filmleri", "Weekend Movies", "Películas de fin de semana", "Filmes de fim de semana", "Wochenend-Filme"), icon: "list", count: 12 },
-    { id: "custom2", name: L("Korku Gecesi", "Horror Night", "Noche de terror", "Noite de terror", "Horrornacht"), icon: "list", count: 9 },
-    { id: "custom3", name: L("Animeler", "Anime", "Anime", "Anime", "Anime"), icon: "list", count: 15 },
-    { id: "custom4", name: L("Kısa Filmler", "Short Films", "Cortometrajes", "Curtas-metragens", "Kurzfilme"), icon: "list", count: 6 },
+    { id: "watchedTv", name: L("İzlenen Diziler", "Watched Series", "Series vistas", "Séries assistidas", "Gesehene Serien", "Serie viste"), icon: "tv", count: 37 },
+    { id: "watchedMovies", name: L("İzlenen Filmler", "Watched Movies", "Películas vistas", "Filmes assistidos", "Gesehene Filme", "Film visti"), icon: "film", count: 184 },
+    { id: "watchList", name: L("İzlenecekler", "Watchlist", "Lista de seguimiento", "Lista para assistir", "Merkliste", "Da vedere"), icon: "bookmark", count: 52 },
+    { id: "favorites", name: L("Favoriler", "Favorites", "Favoritos", "Favoritos", "Favoriten", "Preferiti"), icon: "heart", count: 24 },
+    { id: "custom1", name: L("Hafta Sonu Filmleri", "Weekend Movies", "Películas de fin de semana", "Filmes de fim de semana", "Wochenend-Filme", "Film del weekend"), icon: "list", count: 12 },
+    { id: "custom2", name: L("Korku Gecesi", "Horror Night", "Noche de terror", "Noite de terror", "Horrornacht", "Notte horror"), icon: "list", count: 9 },
+    { id: "custom3", name: L("Animeler", "Anime", "Anime", "Anime", "Anime", "Anime"), icon: "list", count: 15 },
+    { id: "custom4", name: L("Kısa Filmler", "Short Films", "Cortometrajes", "Curtas-metragens", "Kurzfilme", "Cortometraggi"), icon: "list", count: 6 },
   ];
 }

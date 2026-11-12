@@ -118,9 +118,6 @@ export const SECTION_SCREENS = Object.freeze(
       id: "profile",
       icon: "person-circle-outline",
       sections: [
-        // Profil kapağı (arka plan afişi): yalnız KENDİ profil sekmesinde gizlenir;
-        // arkadaşların gördüğü profil (FriendProfileScreen) kapağı göstermeye devam eder.
-        section("banner", "image-outline", "purple"),
         // Başlıktaki (Düzenle / Paylaş'ın yanındaki) halka düğmesi: ekranda en üstte.
         section("goal", "flag-outline", "amber"),
         // Adın yanındaki haftalık seri alevi (components/streak/StreakFlameBadge.js).

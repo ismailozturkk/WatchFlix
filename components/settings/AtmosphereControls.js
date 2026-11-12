@@ -95,13 +95,28 @@ export const WEATHER_LABELS = {
   vikings: () => i18nText("autoI18n.evren_vikings", "Vikings"),
   prisonBreak: () => i18nText("autoI18n.evren_prison_break", "Prison Break"),
   sherlock: () => i18nText("autoI18n.evren_sherlock", "Sherlock"),
-  sopranos: () => i18nText("autoI18n.evren_sopranos", "Sopranos"),
   deathNote: () => i18nText("autoI18n.evren_death_note", "Death Note"),
   aot: () => i18nText("autoI18n.evren_attack_on_titan", "Attack on Titan"),
   naruto: () => i18nText("autoI18n.evren_naruto", "Naruto"),
   onePiece: () => i18nText("autoI18n.evren_one_piece", "One Piece"),
   fma: () => i18nText("autoI18n.evren_fullmetal", "Fullmetal Alchemist"),
   rickAndMorty: () => i18nText("autoI18n.evren_rick_morty", "Rick and Morty"),
+  jujutsuKaisen: () => i18nText("autoI18n.evren_jujutsu_kaisen", "Jujutsu Kaisen"),
+  hunterXHunter: () => i18nText("autoI18n.evren_hunter_x_hunter", "Hunter x Hunter"),
+  squidGame: () => i18nText("autoI18n.evren_squid_game", "Squid Game"),
+  dark: () => i18nText("autoI18n.evren_dark", "Dark"),
+  titanic: () => i18nText("autoI18n.evren_titanic", "Titanik"),
+  inception: () => i18nText("autoI18n.evren_inception", "Inception"),
+  pirates: () => i18nText("autoI18n.evren_pirates", "Karayip Korsanları"),
+  madMax: () => i18nText("autoI18n.evren_mad_max", "Mad Max"),
+  avatar: () => i18nText("autoI18n.evren_avatar", "Avatar"),
+  jurassicPark: () => i18nText("autoI18n.evren_jurassic_park", "Jurassic Park"),
+  lastOfUs: () => i18nText("autoI18n.evren_last_of_us", "The Last of Us"),
+  ghibli: () => i18nText("autoI18n.evren_ghibli", "Ghibli dünyası"),
+  bladeRunner: () => i18nText("autoI18n.evren_blade_runner", "Blade Runner"),
+  demonSlayer: () => i18nText("autoI18n.evren_demon_slayer", "Demon Slayer"),
+  strangerThings: () => i18nText("autoI18n.evren_stranger_things", "Stranger Things"),
+  interstellar: () => i18nText("autoI18n.evren_interstellar", "Yıldızlararası"),
 };
 
 export const WEATHER_GROUP_LABELS = {
@@ -149,13 +164,28 @@ export const WEATHER_ICONS = {
   vikings: { family: MCI, name: "sail-boat" },
   prisonBreak: { family: MCI, name: "fence" },
   sherlock: { family: MCI, name: "magnify" },
-  sopranos: { family: MCI, name: "duck" },
   deathNote: { family: MCI, name: "notebook-outline" },
   aot: { family: MCI, name: "castle" },
   naruto: { family: MCI, name: "ninja" },
   onePiece: { family: MCI, name: "treasure-chest" },
   fma: { family: MCI, name: "hexagram-outline" },
   rickAndMorty: { family: MCI, name: "alien-outline" },
+  jujutsuKaisen: { family: MCI, name: "eye-circle-outline" },
+  hunterXHunter: { family: MCI, name: "fishbowl-outline" },
+  squidGame: { family: MCI, name: "shape-outline" },
+  dark: { family: MCI, name: "timer-sand" },
+  titanic: { family: MCI, name: "ferry" },
+  inception: { family: MCI, name: "rotate-3d-variant" },
+  pirates: { family: MCI, name: "skull-crossbones-outline" },
+  madMax: { family: MCI, name: "tanker-truck" },
+  avatar: { family: MCI, name: "tree-outline" },
+  jurassicPark: { family: MCI, name: "google-downasaur" },
+  lastOfUs: { family: MCI, name: "sprout" },
+  ghibli: { family: MCI, name: "bus-side" },
+  bladeRunner: { family: MCI, name: "city-variant-outline" },
+  demonSlayer: { family: MCI, name: "sword" },
+  strangerThings: { family: MCI, name: "lightbulb-group" },
+  interstellar: { family: MCI, name: "orbit" },
 };
 
 // Seçicide olmayan, yalnız tür karışımında çizilen efektlerin adları/simgeleri
@@ -357,7 +387,7 @@ export function ChipRow({ items, colors }) {
   );
 }
 
-// Atmosfer seçici: grup başlığı + çip şeridi (7 grup, en çok 7 simge, 37 seçenek).
+// Atmosfer seçici: grup başlığı + kayan çip şeridi (7 grup, en çok 15 simge).
 // Kapalıyken de seçilebilir — önizleme seçileni gösterir (Free da görür).
 export function WeatherPicker({ value, onChange, colors }) {
   return (
@@ -387,7 +417,104 @@ export function WeatherPicker({ value, onChange, colors }) {
   );
 }
 
+// ── Hızlı seçim şeridi (tam ekran önizlemenin altı) ─────────────────────────
+// Tüm seçenekler tek yatay sırada küçük simge; gruplar arasında ince ayraç.
+// Üstte seçilinin adı. Seçili simge açılışta ve değişince ortaya kayar.
+// Zemin her zaman koyu (tam ekran perdesi) → renkler sabit beyaz tonlar.
+const QS_ITEM = 34;
+const QS_GAP = 6;
+const QS_SEP = 13; // ayraç genişliği (iki yanında QS_GAP)
+const QS_PAD = 16;
+
+// Sıra + her simgenin x'i (onLayout beklemeden ortalamak için hesapla).
+const QS_LAYOUT = (() => {
+  const items = [];
+  let x = QS_PAD;
+  WEATHER_GROUPS.forEach((group, gi) => {
+    if (gi > 0) x += QS_SEP + QS_GAP;
+    group.effects.forEach((c) => {
+      items.push({ key: c, x, sepBefore: gi > 0 && c === group.effects[0] });
+      x += QS_ITEM + QS_GAP;
+    });
+  });
+  return { items, width: x - QS_GAP + QS_PAD };
+})();
+
+export function QuickWeatherStrip({ value, effect, onChange, accent, width }) {
+  const scrollRef = useRef(null);
+  const first = useRef(true);
+  useEffect(() => {
+    const it = QS_LAYOUT.items.find((i) => i.key === value);
+    if (!it || !scrollRef.current || !width) return;
+    const max = Math.max(0, QS_LAYOUT.width - width);
+    const target = Math.min(max, Math.max(0, it.x + QS_ITEM / 2 - width / 2));
+    scrollRef.current.scrollTo({ x: target, animated: !first.current });
+    first.current = false;
+  }, [value, width]);
+  return (
+    <View style={s.qsWrap}>
+      <Text allowFontScaling={false} numberOfLines={1} style={s.qsName}>
+        {weatherChoiceLabel(value, effect)}
+      </Text>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.qsRow}
+        accessibilityRole="radiogroup"
+      >
+        {QS_LAYOUT.items.map(({ key, sepBefore }) => {
+          const active = key === value;
+          const icon = WEATHER_ICONS[key];
+          return (
+            <React.Fragment key={key}>
+              {sepBefore ? <View style={s.qsSep} /> : null}
+              <GlassTouchable
+                glass={false}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={WEATHER_LABELS[key]()}
+                activeOpacity={0.7}
+                style={[
+                  s.qsItem,
+                  active
+                    ? { backgroundColor: accent, borderColor: accent }
+                    : { backgroundColor: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.14)" },
+                ]}
+                onPress={() => {
+                  if (active) return;
+                  Haptics.selectionAsync();
+                  onChange(key);
+                }}
+              >
+                <AppIcon
+                  family={icon?.family}
+                  name={icon?.name || "ellipse-outline"}
+                  size={16}
+                  color={active ? "#ffffff" : "rgba(255,255,255,0.72)"}
+                />
+              </GlassTouchable>
+            </React.Fragment>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  qsWrap: { alignSelf: "stretch", gap: 8 },
+  qsName: { color: "#ffffff", fontSize: 13, fontWeight: "700", textAlign: "center", paddingHorizontal: QS_PAD },
+  qsRow: { paddingHorizontal: QS_PAD, gap: QS_GAP, alignItems: "center" },
+  qsItem: {
+    width: QS_ITEM,
+    height: QS_ITEM,
+    borderRadius: QS_ITEM / 2,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qsSep: { width: QS_SEP, height: 1, alignSelf: "center", backgroundColor: "rgba(255,255,255,0.22)" },
   segOpt: {
     flex: 1,
     paddingVertical: 8,

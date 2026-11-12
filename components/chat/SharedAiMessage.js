@@ -80,7 +80,11 @@ export function durationText(minutes, language) {
     es: { hour: "h", minute: "min" },
     pt: { hour: "h", minute: "min" },
     de: { hour: "h", minute: "m" },
-  });
+
+  it: {
+  hour: "h",
+  minute: "M"
+}});
   const h = Math.floor(total / 60);
   const m = total % 60;
   if (h === 0) return `${m} ${minute}`;

@@ -28,4 +28,3 @@ export const SPLASH_POSTER_CATALOG = Object.freeze([
   { mediaType: "tv", id: 1418, title: "The Big Bang Theory", voteCount: 12667, source: require("../assets/splash-posters/tv-1418.jpg") },
 ]);
 
-export const SPLASH_POSTER_CATALOG_UPDATED_AT = "2026-08-10";

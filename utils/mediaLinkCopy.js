@@ -41,7 +41,14 @@ export const MEDIA_LINK_COPY = {
     notFound: "Der Titel zu diesem Link wurde nicht gefunden",
     clipboardFailed: "Die Zwischenablage konnte nicht gelesen werden",
   },
-};
+
+  it: {
+  pasteLabel: "Apri il film o mostra il collegamento dagli appunti",
+  opening: "Collegamento di apertura...",
+  emptyClipboard: "Non è presente alcun collegamento IMDb o TMDB negli appunti",
+  notFound: "Impossibile trovare il titolo per questo collegamento",
+  clipboardFailed: "Impossibile leggere gli appunti"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getMediaLinkCopy = (language) =>

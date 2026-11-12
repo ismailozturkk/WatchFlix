@@ -44,6 +44,7 @@ jest.mock("../services/userService", () => ({
   isUsernameAvailable: (...args) => mockIsAvailable(...args),
   normalizeUsername: (v) => String(v || "").trim().toLowerCase(),
   setListVisibility: (...args) => mockSetListVisibility(...args),
+  UserProfileErrorCode: { USERNAME_TAKEN: "profile/username-taken" },
 }));
 const mockSaveSocialLinks = jest.fn(() => Promise.resolve());
 jest.mock("../services/socialLinksService", () => ({
@@ -232,6 +233,27 @@ describe("useOwnProfileEditor", () => {
       await save();
       expect(mockChangeUsername).toHaveBeenCalledWith("yeniad");
       expect(mockPropagate).toHaveBeenCalledWith("u1", { displayName: undefined, username: "yeniad" });
+    });
+
+    it("kontrolden sonra alınan ad: servis metni değil çevrili metin gösterilir", async () => {
+      mockChangeUsername.mockRejectedValueOnce(
+        Object.assign(new Error("Bu kullanıcı adı zaten alınmış"), { code: "profile/username-taken" }),
+      );
+      await render();
+      await run((e) => e.setUsername("yeniad"));
+      await flush();
+      await save();
+      expect(mockToast.show).toHaveBeenCalledWith({ type: "error", text1: "Bu kullanıcı adı alınmış" });
+      expect(ed().editing).toBe(true);
+    });
+
+    it("bilinmeyen hata ham mesajı değil genel çevrili metni gösterir", async () => {
+      mockChangeUsername.mockRejectedValueOnce(new Error("FirebaseError: permission-denied"));
+      await render();
+      await run((e) => e.setUsername("yeniad"));
+      await flush();
+      await save();
+      expect(mockToast.show).toHaveBeenCalledWith({ type: "error", text1: "Güncellenemedi" });
     });
 
     it("an invalid name is blocked without asking the server", async () => {

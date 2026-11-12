@@ -436,6 +436,7 @@ export function DeleteProgress({ theme, progress, copy }) {
  * basılı tutulunca dolar ve `onConfirm` çalışır. `canStart` basışın başında
  * çağrılır; false dönerse (şifre boş…) dolum başlamaz. Aynı sayfa hem hesap
  * silme hem sıfırlama için kullanılır — `icon`, başlık ve metinler değişir.
+ * `summary`: açıklamanın altında, doğrulama alanının üstünde gösterilen öğe.
  */
 export function DeleteAccountSheet({
   visible,
@@ -464,6 +465,7 @@ export function DeleteAccountSheet({
   canStart,
   icon = "warning-outline",
   passwordLabel,
+  summary = null,
 }) {
   const insets = useSafeAreaInsets();
   const [showPassword, setShowPassword] = useState(false);
@@ -505,6 +507,9 @@ export function DeleteAccountSheet({
             {showProgress ? progressCopy.hint : description}
           </Text>
         </View>
+
+        {/* İsteğe bağlı kapsam özeti (sıfırlama: silinecekler / kalacaklar). */}
+        {showProgress ? null : summary}
 
         {showProgress ? (
           <DeleteProgress theme={theme} progress={progress} copy={progressCopy} />

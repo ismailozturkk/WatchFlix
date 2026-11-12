@@ -117,11 +117,7 @@ Dosyalar: utils/weatherUniverses.js (eşleme, sahne kurucuları, SCENERY), utils
   gezinir; altında kalan ipucu noktası parlar. Sis akar.
 - Motor: sıralı belirme (iz dizisi), gezinen büyüteç.
 
-**13 · The Sopranos** — New Jersey
-- Öğeler: havuzdaki ördek ailesi, puro dumanı, banliyö ağaçları.
-- Döngü: ördek ve yavruları havuzda sıra halinde yüzer. Arada uçup giderler, bir süre
-  sonra geri dönerler. Puro dumanı kıvrılarak yükselir.
-- Motor: sıralı takip (yavrular anneyi izler), su yüzeyi (mevcut kıyı katmanı uyarlanır).
+**13 · The Sopranos** — KALDIRILDI (12 Kas 2026, kullanıcı isteği).
 
 ### Anime
 

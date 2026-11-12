@@ -93,7 +93,19 @@ export const GAME_BOARDS_COPY = {
     quickNote: "Dein Rekord in diesem Spiel wird nach Spielende eingetragen (beim nächsten Spiel, falls du offline gespielt hast). Beim Unscharfen Poster ist die Punktzahl deine Punktesumme.",
     posterNote: "Die Poster-Puzzle-Rangliste nutzt Ergebnisse aus Klassik + Normal; Spiele mit eigenen Listen zählen nicht.",
   },
-};
+
+  it: {
+  overall: "Complessiva",
+  overallSubtitle: "Classifica tra tutti i giochi",
+  gameSubtitle: title => `${title} classifica`,
+  overallMeta: (games, firsts) => `${games} ${games === 1 ? "gioco" : "giochi"}${firsts ? ` · ${firsts} ${firsts === 1 ? "primo posto" : "primi posti"}` : ""}`,
+  correctMeta: n => `${n} corretto`,
+  partial: "Impossibile caricare alcune schede; la classifica generale potrebbe essere incompleta.",
+  overallRules: ["Il tuo posto sul tabellone di ogni gioco fa guadagnare punti: il 1° ottiene " + RANK_POINTS_MAX + ", il 2° ottiene " + (RANK_POINTS_MAX - 1) + "… " + RANK_POINTS_MAX + "esimo ottiene 1.", "Il tuo punteggio complessivo è la somma dei punti di ogni partita.", "I giocatori con punteggi uguali condividono lo stesso posto e gli stessi punti.", "Se i punteggi complessivi sono pari, vincono più primi posti, quindi si classifica in più giochi."],
+  overallNote: "I punteggi dei giochi utilizzano scale diverse, quindi non vengono sommati; conta solo il tuo posto in ogni partita. La parte superiore" + RANK_POINTS_MAX + "i giocatori di ogni gioco guadagnano punti.",
+  quickNote: "Il tuo record in questo gioco viene pubblicato al termine della partita (dopo la partita successiva se hai giocato offline). In Poster sfocato il punteggio corrisponde al totale dei tuoi punti.",
+  posterNote: "Il tabellone Poster Puzzle utilizza i risultati Classico + Normale; i giochi della lista personale non hanno effetto."
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getGameBoardsCopy = (language) => GAME_BOARDS_COPY[copyLanguage(language, Object.keys(GAME_BOARDS_COPY))];

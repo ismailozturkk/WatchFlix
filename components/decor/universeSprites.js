@@ -333,12 +333,18 @@ const CAPE_B = "M42 28 C26 36 14 58 4 86 C18 84 30 90 50 86 C70 90 82 82 96 88 C
 
 // ── Spider-Man ──────────────────────────────────────────────────────────────
 // Köşe ağı: köşe hücrenin sol üstünde; kollar ve sarkık halkalar kutunun içinde.
-const WEB = (() => {
-  const angles = [0, 0.3, 0.62, 0.95, 1.27, Math.PI / 2];
-  const reach = (a) => Math.min(97 / Math.max(Math.cos(a), 1e-3), 97 / Math.max(Math.sin(a), 1e-3), 132);
+// Ekrandaki köşe ağları bu yolları VEKTÖR çizer (universeOverlays · CornerWebs): 128 px'lik
+// atlas hücresinden ~3× büyütülünce bulanıyordu. Hücre yalnız atlas bütünlüğü için kalır.
+const WEB_ANGLES = [0, 0.3, 0.62, 0.95, 1.27, Math.PI / 2];
+const webReach = (a) => Math.min(97 / Math.max(Math.cos(a), 1e-3), 97 / Math.max(Math.sin(a), 1e-3), 132);
+export const WEB_SPOKES = WEB_ANGLES.map(
+  (a) => `M0 0 L${(Math.cos(a) * webReach(a)).toFixed(1)} ${(Math.sin(a) * webReach(a)).toFixed(1)}`,
+).join(" ");
+export const WEB_RINGS = (() => {
+  const angles = WEB_ANGLES;
+  const reach = webReach;
   let d = "";
-  for (const a of angles) d += `M0 0 L${(Math.cos(a) * reach(a)).toFixed(1)} ${(Math.sin(a) * reach(a)).toFixed(1)} `;
-  for (const r of [18, 34, 50, 66, 82]) {
+  for (const r of [12, 23, 34, 45, 56, 67, 78, 89]) {
     angles.forEach((a, i) => {
       const x = Math.cos(a) * Math.min(r, reach(a));
       const y = Math.sin(a) * Math.min(r, reach(a));
@@ -353,6 +359,7 @@ const WEB = (() => {
   }
   return d.trim();
 })();
+const WEB = `${WEB_SPOKES} ${WEB_RINGS}`;
 
 // Ağ sallanan kahraman (renkli; kırmızı-mavi kostüm, ağ desenli maske, beyaz göz camları).
 // Üstte kaldırılmış el ağı tutar (50, 5); gövde hafif kıvrık, bacaklar geride.

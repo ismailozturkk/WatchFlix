@@ -12,6 +12,7 @@ import { db } from "../firebase";
 import {
   collection,
   addDoc,
+  deleteDoc,
   doc,
   query,
   where,
@@ -129,12 +130,18 @@ export function subscribeUserGroups(uid, callback) {
 }
 
 // ─── Tek grubu dinle (sohbet ekranı header + üyeler) ─────────────────────────
-export function subscribeGroup(groupId, callback) {
+// `onError`: grup silinince ya da üye çıkarılınca okuma kuralı (members şartı)
+// dinleyiciyi permission-denied ile keser — sohbet ekranı bunu "erişim bitti"
+// diye okur.
+export function subscribeGroup(groupId, callback, onError) {
   if (!groupId) return () => {};
   return onSnapshot(
     doc(db, "groups", groupId),
     (snap) => callback(snap.exists() ? { id: snap.id, ...snap.data() } : null),
-    (err) => __DEV__ && console.warn("subscribeGroup:", err.message)
+    (err) => {
+      if (__DEV__) console.warn("subscribeGroup:", err.message);
+      onError?.(err);
+    }
   );
 }
 
@@ -200,6 +207,26 @@ export async function removeGroupMember(groupId, uid) {
     [`memberInfo.${uid}`]: deleteField(),
     updatedAt: serverTimestamp(),
   });
+}
+
+// ─── Grubu kalıcı sil (YALNIZ kurucu) ────────────────────────────────────────
+// firestore.rules: `allow delete` yalnız createdBy. Belge silinince bütün
+// üyelerin listesinden ve açık sohbet ekranından düşer (ChatScreen grubun
+// yok olduğunu görünce kapanır). Alt koleksiyonlar (messages, pins,
+// clubRounds…) ve üyelerin gelen kutusu sayaçları istemcinin silemeyeceği
+// kadar çok/başkasına ait → functions/index.js `cleanupGroupOnDelete`
+// tetikleyicisi Admin yetkisiyle süpürür. Kendi sayacımı burada da silerim ki
+// Mesajlar ekranındaki okunmamış toplamı tetikleyiciyi beklemeden düşsün.
+export async function deleteGroup(groupId, uid) {
+  if (!groupId) throw new Error("Geçersiz grup");
+  await deleteDoc(doc(db, "groups", groupId));
+  if (uid) {
+    try {
+      await deleteDoc(groupInboxDoc(uid, groupId));
+    } catch {
+      // sayaç zaten yoksa / çevrimdışıysa sorun değil — tetikleyici temizler
+    }
+  }
 }
 
 export async function updateGroupAvatar(groupId, avatarIndex) {

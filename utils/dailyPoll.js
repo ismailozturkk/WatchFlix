@@ -44,7 +44,7 @@ export function questionForDay(dayKey, order = ORDER) {
 /** Sorunun bir dildeki görünümü: { id, prompt, a, b }. Bilinmeyen dil İngilizce. */
 export function localizeQuestion(question, language) {
   if (!question) return null;
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
   const [prompt, a, b] = question[lang] || question.en;
   return { id: question.id, prompt, a, b };
 }

@@ -77,8 +77,22 @@ const de = {
   sendWait: "Senden ({n})",
   spamHint: "Kommt sie nicht an, prüfe auch den Spam-Ordner.",
 };
+const it = {
+  invalidEmail: "Inserisci un indirizzo email valido.",
+  offline: "Nessuna connessione Internet. Riprova quando sei online.",
+  tooMany: "Troppi tentativi. Aspetta un po' e riprova.",
+  noSession: "Nessuna sessione trovata. Per favore accedi di nuovo.",
+  generic: "Non è stato possibile inviare l'e-mail. Riprova tra un attimo.",
+  resendVerification: "Invia nuovamente l'e-mail di verifica",
+  resendWait: "Attendi {n} secondi per inviare nuovamente",
+  verificationSent: "Email di verifica inviata a {email}",
+  nowVerified: "La tua email è verificata",
+  sendWait: "Invia ({n})",
+  spamHint: "Se non arriva, controlla anche la cartella spam."
+};
 
-export const AUTH_EMAIL_COPY = Object.freeze({ tr, en, es, pt, de });
+export const AUTH_EMAIL_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 export const getAuthEmailCopy = (language) =>
   AUTH_EMAIL_COPY[copyLanguage(language, Object.keys(AUTH_EMAIL_COPY))];

@@ -39,21 +39,21 @@ const HIGHLIGHTS = Object.freeze([
     icon: "sparkles",
     tint: "accent",
     pick: (limit) => limit.daily,
-    label: { tr: "AI mesajı / gün", en: "AI chats / day", es: "Chats IA/día", pt: "Conversas de IA/dia", de: "KI-Chats / Tag" },
+    label: { tr: "AI mesajı / gün", en: "AI chats / day", es: "Chats IA/día", pt: "Conversas de IA/dia", de: "KI-Chats / Tag" , it: "Chat AI/giorno"},
   },
   {
     id: "friends",
     icon: "people",
     tint: "green",
     pick: (limit) => limit,
-    label: { tr: "Arkadaş", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde" },
+    label: { tr: "Arkadaş", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde" , it: "Amici"},
   },
   {
     id: "custom_lists",
     icon: "albums",
     tint: "orange",
     pick: (limit) => limit,
-    label: { tr: "Özel liste", en: "Custom lists", es: "Mis listas", pt: "Minhas listas", de: "Eigene Listen" },
+    label: { tr: "Özel liste", en: "Custom lists", es: "Mis listas", pt: "Minhas listas", de: "Eigene Listen" , it: "Elenchi personalizzati"},
   },
 ]);
 
@@ -98,7 +98,8 @@ export function buildShowcasePerks(language = "en") {
         es: "Juegos y CineSwipe",
         pt: "Jogos e CineSwipe",
         de: "Spiele & CineSwipe",
-      }),
+
+  it: "Giochi e CineSwipe"}),
     });
   }
   if (isLockedFor("identity_badge", FREE) && !isLockedFor("identity_badge", PREMIUM)) {
@@ -114,8 +115,8 @@ export function buildShowcasePerks(language = "en") {
 // ── Fiyat satırı ─────────────────────────────────────────────────────────────
 
 const PERIOD_SUFFIX = Object.freeze({
-  monthly: { tr: "/ ay", en: "/ month", es: "/ mes", pt: "/ mês", de: "/ month" },
-  annual: { tr: "/ yıl", en: "/ year", es: "/ año", pt: "/ ano", de: "/ year" },
+  monthly: { tr: "/ ay", en: "/ month", es: "/ mes", pt: "/ mês", de: "/ month" , it: "/mese"},
+  annual: { tr: "/ yıl", en: "/ year", es: "/ año", pt: "/ ano", de: "/ year" , it: "/anno"},
 });
 
 /** "İlk 3 ay" / "First 3 months" (PremiumScreen.offerDurationLabel'in kısa kardeşi). */
@@ -129,7 +130,7 @@ function offerDuration(offer, lang) {
     year: pickByLanguage(lang, { tr: "yıl", en: one ? "year" : "years", es: one ? "año" : "años", pt: one ? "ano" : "anos", de: one ? "Jahr" : "Jahre" }),
   };
   const unit = units[offer.unit];
-  if (!unit) return pickByLanguage(lang, { tr: "İlk dönem", en: "Intro", es: "Inicial", pt: "Inicial", de: "Einführung" });
+  if (!unit) return pickByLanguage(lang, { tr: "İlk dönem", en: "Intro", es: "Inicial", pt: "Inicial", de: "Einführung" , it: "Intro"});
   if (lang === "es") return one ? `${unit} inicial` : `${count} ${unit} iniciales`;
   if (lang === "tr") return one ? `İlk ${unit}` : `İlk ${count} ${unit}`;
   return one ? `First ${unit}` : `First ${count} ${unit}`;
@@ -184,7 +185,8 @@ export function showcaseOfferText(offer, language = "en") {
       es: `${offer.duration} gratis`,
       pt: `${offer.duration} grátis`,
       de: `${offer.duration} kostenlos`,
-    });
+
+  it: `${offer.duration} gratis`});
   }
   return pickByLanguage(lang, {
     tr: `${offer.duration} %${offer.percent} indirim`,
@@ -192,7 +194,8 @@ export function showcaseOfferText(offer, language = "en") {
     es: `${offer.duration} -${offer.percent} %`,
     pt: `${offer.duration} -${offer.percent}%`,
     de: `${offer.duration} ${offer.percent} % Rabatt`,
-  });
+
+  it: `${offer.duration} ${offer.percent}% di sconto`});
 }
 
 /**
@@ -208,7 +211,8 @@ export function showcaseCtaSubtitle(pricing, language = "en", { inlineOffer = fa
     es: "Cancela cuando quieras",
     pt: "Cancele quando quiser",
     de: "Jederzeit kündbar",
-  });
+
+  it: "Annulla in qualsiasi momento"});
   if (!pricing) {
     return pickByLanguage(lang, {
       tr: "Doğrudan fiyatlandırma · Dilediğin an iptal",
@@ -216,7 +220,8 @@ export function showcaseCtaSubtitle(pricing, language = "en", { inlineOffer = fa
       es: "Precios claros · Cancela cuando quieras",
       pt: "Preços claros · Cancele quando quiser",
       de: "Direkter Preis · Jederzeit kündbar",
-    });
+
+  it: "Prezzo diretto · Annulla in qualsiasi momento"});
   }
   const tail = inlineOffer && pricing.offer ? showcaseOfferText(pricing.offer, lang) : cancel;
   return `${pricing.price} ${pricing.period} · ${tail}`;
@@ -227,11 +232,11 @@ export function showcaseOfferBadge(offer, language = "en") {
   if (!offer) return null;
   const lang = normalizeAppLanguage(language);
   const big = offer.free
-    ? pickByLanguage(lang, { tr: "Ücretsiz", en: "Free", es: "Gratis", pt: "Grátis", de: "Kostenlos" })
+    ? pickByLanguage(lang, { tr: "Ücretsiz", en: "Free", es: "Gratis", pt: "Grátis", de: "Kostenlos" , it: "Gratis"})
     : lang === "tr"
       ? `%${offer.percent}`
       : lang === "es"
         ? `-${offer.percent} %`
-        : lang === "pt" ? `-${offer.percent}%` : lang === "de" ? `${offer.percent} % Rabatt` : `${offer.percent}% off`;
+        : lang === "pt" ? `-${offer.percent}%` : lang === "de" ? `${offer.percent} % Rabatt` : lang === "it" ? `${offer.percent}% di sconto` : `${offer.percent}% off`;
   return { big, small: offer.duration };
 }

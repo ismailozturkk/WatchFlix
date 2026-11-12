@@ -154,7 +154,7 @@ Gizlilik politikası 1.4 / Şartlar 1.3 (`website/privacy.html`, `terms.html`) b
 
 | Play kategorisi | Ne | Kaynak | Amaç |
 |---|---|---|---|
-| App activity › **Other user-generated content** | Sosyal hesap kullanıcı adları (`Users.socialLinks`: Instagram, X, TikTok, YouTube, Twitch, Letterboxd, Snapchat, Threads — yalnız kullanıcı adı) | `utils/socialLinks.js`, `SocialLinksEditor.js` | App functionality |
+| App activity › **Other user-generated content** | Sosyal hesap kullanıcı adları (`Users.socialLinks`: Instagram, X, TikTok, YouTube, Twitch, Letterboxd, Snapchat, Threads — yalnız kullanıcı adı) | `utils/socialLinks.js`, `components/profile/SocialLinksEditRow.js` + `hooks/useOwnProfileEditor.js` (profilde yerinde düzenleme) | App functionality |
 | App activity › **Other user-generated content** | Davet kodu, davet bağı, promosyon kodu kullanımı (yalnız sunucuda; kurallar istemciye kapalı) | `functions/referral.js` | App functionality |
 | Financial info › **Purchase history** | Davetli için yalnız "abone oldu" bilgisi (tutar/ürün tutulmaz) | `functions/referral.js` | App functionality |
 

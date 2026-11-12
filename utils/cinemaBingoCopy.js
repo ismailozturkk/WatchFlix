@@ -295,7 +295,118 @@ export const BINGO_COPY = {
       twoShows: { short: "2 Serien", long: "Schau diesen Monat Folgen aus 2 verschiedenen Serien" },
     },
   },
-};
+
+  it: {
+  eyebrow: "MENSILE BINGO",
+  title: "Cinema Bingo",
+  cardHint: "La carta di questo mese è pronta",
+  intro: "Una nuova carta arriva ogni mese. I quadrati si spuntano dalla cronologia visualizzazioni. Piccoli obiettivi settimanali sono riportati di seguito.",
+  weeklyTitle: "I piccoli obiettivi di questa settimana",
+  weeklyHint: "Contano sia i film che gli episodi; aggiornamenti sui progressi mentre guardi.",
+  badgeTitle: "Il tuo distintivo del Bingo",
+  badgeHint: "Completa le carte complete per sbloccare nuovi livelli.",
+  weeklyGoals: {
+    firstWatch: "Guarda qualcosa",
+    twoWatches: "Guarda 2 cose in totale",
+    twoDays: "Guardalo per 2 giorni"
+  },
+  weeklyCount: n => `${n}/3 gol`,
+  lines: n => n === 1 ? "1 riga" : `${n} righe`,
+  squares: (done, total) => `${done}/${total} quadrati`,
+  daysLeft: n => n === 1 ? "Ultimo giorno" : `${n} giorni rimasti`,
+  streak: n => `${n}-mesi consecutivi`,
+  streakLabel: "Serie",
+  linesLabel: "Linee",
+  squaresLabel: "Quadrati",
+  oneAway: "Un quadrato di distanza!",
+  oneAwayHint: "Uno qualsiasi di questi quadrati completa una riga",
+  fullCard: "Carta piena!",
+  newLine: "Nuova linea di bingo!",
+  newFull: "Carta piena!",
+  howTitle: "I quadrati di questo mese",
+  doneMark: "Completato",
+  progress: (have, need) => `${have}/${need}`,
+  cellA11y: (label, done) => `${label}, ${done ? "fatto" : "non fatto"}`,
+  openLabel: "Apri Cinema Bingo",
+  loading: "Preparazione della cartella",
+  lastMonth: n => n > 0 ? `Il mese scorso hai realizzato ${n} ${n === 1 ? "line" : "lines"}` : "Nessuna riga il mese scorso",
+  fullCards: n => n === 1 ? "1 cartella intera" : `${n} cartelle intere`,
+  monthRange: (a, b) => `${a} – ${b}`,
+  share: "Condividi",
+  shareMessage: (lines, done, total) => `Seelogd Cinema Bingo: ${lines} ${lines === 1 ? "line" : "lines"} e ${done}/${total} caselle questo mese. Quanti ne puoi ottenere?`,
+  genres: {
+    action: "Azione",
+    comedy: "Commedia",
+    drama: "Drammatico",
+    horror: "Orrore",
+    scifi: "Fantascienza",
+    thriller: "Thriller",
+    romance: "Romantico",
+    animation: "Animazione",
+    documentary: "Documentario",
+    crime: "Crimine",
+    fantasy: "Fantasy",
+    mystery: "Mistero"
+  },
+  cells: {
+    any: {
+      short: "Guarda qualsiasi cosa",
+      long: "Guarda un film o un episodio questo mese"
+    },
+    watches: {
+      short: n => `${n} visioni`,
+      long: n => `Guarda ${n} film o episodi in totale questo mese`
+    },
+    movies: {
+      short: n => `${n} film`,
+      long: n => `Guarda ${n} film diversi questo mese`
+    },
+    episodes: {
+      short: n => `${n} episodi`,
+      long: n => `Guarda ${n} episodi questo mese`
+    },
+    days: {
+      short: n => `${n} giorni`,
+      long: n => `Guarda qualcosa in ${n} giorni diversi questo mese`
+    },
+    genre: {
+      short: g => g,
+      long: g => `Guarda qualcosa in "${g}" questo mese`
+    },
+    newGenre: {
+      short: "Nuovo genere",
+      long: "Guarda qualcosa di un genere che non hai mai visto prima"
+    },
+    shortMovie: {
+      short: "Film corto",
+      long: "Guarda un film di 100 minuti o meno"
+    },
+    longMovie: {
+      short: "Film lungo",
+      long: "Guarda un film di almeno 140 minuti"
+    },
+    weekend: {
+      short: "Fine settimana",
+      long: "Guarda qualcosa sabato o domenica"
+    },
+    newShow: {
+      short: "Nuova serie",
+      long: "Inizia una serie che non hai mai visto prima"
+    },
+    rewatch: {
+      short: "Riguarda",
+      long: "Riguarda un film che hai visto prima"
+    },
+    bothTypes: {
+      short: "Film + serie",
+      long: "Guarda sia un film che una serie questo mese"
+    },
+    twoShows: {
+      short: "2 serie",
+      long: "Guarda episodi di 2 serie diverse questo mese"
+    }
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getBingoCopy = (language) =>

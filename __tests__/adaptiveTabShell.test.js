@@ -11,9 +11,9 @@ jest.mock("react-native", () => ({
   Platform: { OS: "ios", Version: "18.2" },
   StyleSheet: { create: (s) => s, absoluteFill: { position: "absolute" } },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
-  InteractionManager: { runAfterInteractions: () => ({ cancel: jest.fn() }) },
   Keyboard: { addListener: (name, fn) => { mockKeyboardListeners.set(name, fn); return { remove: () => mockKeyboardListeners.delete(name) }; } },
 }));
+jest.mock("../utils/afterInteractions", () => ({ runAfterInteractions: () => ({ cancel: jest.fn() }) }));
 jest.mock("react-native-screens", () => ({ Screen: "Scene", ScreenContainer: "Scenes", Tabs: { Host: "NativeTabs", Screen: "NativeScene" } }));
 jest.mock("react-native-reanimated", () => ({
   __esModule: true,

@@ -154,8 +154,39 @@ const de = {
     "Neue Listen sind zunächst sichtbar. Ausgeschaltete Listen zählen auch nicht beim Geschmacks-Match deiner Freunde mit dir. Wenn keine Liste sichtbar sein soll, wähle oben „Nur ich“.",
   saveFailed: "Einstellung konnte nicht gespeichert werden",
 };
+const it = {
+  title: "Elenchi visibili",
+  rowTitle: "Elenchi sul tuo profilo",
+  rowSub: (shown, total) => `${shown} di ${total} ${total === 1 ? "elenco" : "elenchi"} visualizzati`,
+  intro: "Scegli quale dei tuoi elenchi le persone possono vedere quando aprono il tuo profilo. Un elenco che disattivi non viene mostrato sul tuo profilo; vedi sempre tutti i tuoi elenchi.",
+  whoLabel: "CHI PUÒ VEDERLI?",
+  audience: {
+    public: "Tutti",
+    friends: "Amici",
+    private: "Solo io"
+  },
+  audienceNote: {
+    public: "Gli elenchi che attivi sono visibili a chiunque visualizzi il tuo profilo.",
+    friends: "Gli elenchi che attivi sono visibili solo ai tuoi amici.",
+    private: "Al momento nessuno può vedere i tuoi elenchi. Le scelte riportate di seguito si applicano una volta modificato questo."
+  },
+  limitedNote: {
+    friends: "Il tuo profilo è visibile solo ai tuoi amici, quindi lo sono anche i tuoi elenchi.",
+    private: "Il tuo profilo è privato, quindi nessuno può vedere i tuoi elenchi."
+  },
+  whichLabel: "QUALI ELENCHI?",
+  shownCount: (shown, total) => `${shown} di ${total} su`,
+  showAll: "Accendi tutto",
+  hideAll: "Disattiva tutto",
+  shownSub: n => `${n} ${n === 1 ? "titolo" : "titoli"} · mostrato sul tuo profilo`,
+  emptySub: "Vuoto · appare sul tuo profilo una volta aggiunti titoli",
+  hiddenSub: n => `${n} ${n === 1 ? "titolo" : "titoli"} · solo tu puoi vederlo`,
+  footer: "I nuovi elenchi iniziano a essere visibili. Anche le liste che disattivi verranno escluse dalla corrispondenza dei gusti dei tuoi amici con te. Se non vuoi che nessun elenco sia visibile, scegli “Solo io” qui sopra.",
+  saveFailed: "Impossibile salvare l'impostazione"
+};
 
-export const LIST_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de });
+export const LIST_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getListVisibilityCopy = (language) =>

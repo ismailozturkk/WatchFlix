@@ -132,7 +132,32 @@ export const OLDER_COPY = {
     plays: (n) => (n === 1 ? "1 Spiel" : `${n} Spiele`),
     close: "Schließen",
   },
-};
+
+  it: {
+  title: "Quale è arrivato per primo?",
+  prompt: "Quale è uscito PER PRIMO?",
+  cardHint: "Due poster, una domanda: quale è più vecchio?",
+  cardBest: n => `Il migliore ${n}`,
+  cardNew: "Nuovo",
+  scoreLabel: "Corretto",
+  bestLabel: "Migliore",
+  livesLabel: n => n === 1 ? "1 vita rimasta" : `${n} vite rimaste`,
+  playAgain: "Riproduci",
+  loading: "Sto preparando i poster",
+  errorTitle: "Impossibile avviare il gioco",
+  errorBody: "Impossibile caricare i poster. Controlla la connessione e riprova.",
+  retry: "Riprova",
+  correct: "Esatto!",
+  wrong: "Sbagliato",
+  posterA11y: title => `${title}, scegli questo`,
+  endTitle: "Game over",
+  endScore: n => `${n} corretto`,
+  newBest: "Nuovo migliore!",
+  bestIs: n => `Migliore: ${n}`,
+  accuracy: p => `Precisione ${p}%`,
+  plays: n => n === 1 ? "1 gioco" : `${n} giochi`,
+  close: "Chiudi"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getOlderCopy = (language) => OLDER_COPY[copyLanguage(language, Object.keys(OLDER_COPY))];

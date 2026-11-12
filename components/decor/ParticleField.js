@@ -19,8 +19,8 @@
 //   • Kare hızı sınırı (frameIntervalMs): "Tam"/"Orta" 60 fps, "Kapalı" 30.
 //   • Büyük çizilen şimşek ve kıyı dokuda değil, vektör (VectorLayers.js),
 //     aynı saat ve aynı tuvalde. Tür ışık katmanları (sis, vinyet, ekolayzer…)
-//     da vektör (OverlayLayers.js): OVERLAY_FRONT Atlas'ın önünde, gerisi
-//     arkasında.
+//     ve mevsim/evren sahneleri de vektör (OverlayLayers.js): OVERLAY_FRONT
+//     Atlas'ın önünde, OVERLAY_UNDER kıyının da altında, gerisi arkasında.
 //
 // Bu modül Skia'yı içe aktarır; açılış paketine girmesin diye WeatherLayer
 // onu yalnız efekt açıkken `require` eder.
@@ -57,6 +57,7 @@ import OverlayLayers from "./OverlayLayers";
 import {
   KIND,
   OVERLAY_FRONT,
+  OVERLAY_UNDER,
   SPRITE_CELL,
   SPRITE_COLS,
   SPRITE_ROWS,
@@ -67,6 +68,7 @@ import {
   needsAnimatedSprites,
   particleAlpha,
   particlePose,
+  shoreStyle,
   particleSprite,
   sceneScale,
   spriteOrigin,
@@ -132,7 +134,7 @@ function ParticleField({
     [planKey, seed, lightSurface],
   );
   // Şimşek çizgisi ve dalga/kum vektör katmanda (VectorLayers); gerisi Atlas'ta.
-  const { particles, waves, sand, bolts, backLights, frontLights } = useMemo(() => {
+  const { particles, waves, sand, bolts, underLights, backLights, frontLights } = useMemo(() => {
     const vectorParts = all.filter(isVectorParticle);
     const shore = vectorParts.filter((p) => p.kind === KIND.tile);
     const lights = vectorParts.filter((p) => p.kind === KIND.overlay);
@@ -141,7 +143,8 @@ function ParticleField({
       waves: shore.filter((p) => p.part < 3),
       sand: shore.find((p) => p.part === 3) || null,
       bolts: vectorParts.filter((p) => p.kind === KIND.bolt),
-      backLights: lights.filter((p) => !OVERLAY_FRONT.includes(p.part)),
+      underLights: lights.filter((p) => OVERLAY_UNDER.includes(p.part)),
+      backLights: lights.filter((p) => !OVERLAY_FRONT.includes(p.part) && !OVERLAY_UNDER.includes(p.part)),
       frontLights: lights.filter((p) => OVERLAY_FRONT.includes(p.part)),
     };
   }, [all]);
@@ -195,16 +198,22 @@ function ParticleField({
   });
 
   const hasShore = waves.length > 0 || sand !== null;
-  // evren denizi (One Piece): tab çubuğunun üstüne kaldırılır, altı derin suyla dolar
+  // evren denizi (One Piece) / yaz kıyısı: tab çubuğunun üstüne kaldırılır, altı derin su ya da kumla dolar
   const seaLift = waves.length && waves[0].lift ? waves[0].lift * sceneScale(w, h) : 0;
-  if (!n && !hasShore && !bolts.length && !backLights.length && !frontLights.length) return null;
+  if (!n && !hasShore && !bolts.length && !underLights.length && !backLights.length && !frontLights.length) return null;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Canvas style={styles.fill}>
+        {/* kıyının da altındaki katman (yaz: gök + ufuk denizi) */}
+        {underLights.length ? (
+          <Group opacity={fade}>
+            <OverlayLayers overlays={underLights} clock={clock} width={w} height={h} lightSurface={lightSurface} />
+          </Group>
+        ) : null}
         {/* kıyı Atlas'ın altında: ışıltı ve martılar suyun üstünde */}
         {hasShore ? (
           <Group opacity={fade}>
-            {seaLift > 0 ? (
+            {seaLift > 0 && !sand ? (
               <Rect x={0} y={h - seaLift} width={w} height={seaLift + 4}>
                 <LinearGradient
                   start={vec(0, h - seaLift)}
@@ -216,6 +225,16 @@ function ParticleField({
             <Group transform={seaLift > 0 ? [{ translateY: -seaLift }] : undefined}>
               <ShoreLayer waves={waves} sand={sand} clock={clock} width={w} height={h} lightSurface={lightSurface} seed={seed} />
             </Group>
+            {/* yaz kıyısı: kumun sekme çubuğu arkasında kalan devamı (taşan dalga dolgusunu da örter) */}
+            {seaLift > 0 && sand ? (
+              <Rect x={0} y={h - seaLift - 0.5} width={w} height={seaLift + 4}>
+                <LinearGradient
+                  start={vec(0, h - seaLift)}
+                  end={vec(0, h)}
+                  colors={[shoreStyle(lightSurface).sand.bottom, shoreStyle(lightSurface).sand.wet]}
+                />
+              </Rect>
+            ) : null}
           </Group>
         ) : null}
         {backLights.length ? (

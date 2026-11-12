@@ -77,7 +77,20 @@ export const PROVIDER_WATCH_COPY = {
       "Aktiviere „Bei Verfügbarkeit benachrichtigen“ unter Einstellungen > Benachrichtigungen, um diesen Filter zu nutzen. Die ersten Ergebnisse kommen am nächsten Abend um 18 Uhr",
     region: "Die Plattformdaten wurden für eine andere Region vorbereitet; sie werden bei der nächsten Prüfung aktualisiert",
   },
-};
+
+  it: {
+  section: "PLATFORM",
+  chip: "Sulle mie piattaforme",
+  chipCount: count => `Sulle mie piattaforme · ${count}`,
+  chipLabel: count => `Solo i titoli disponibili sulle mie piattaforme, ${count} titoli`,
+  ready: (yes, total) => `${yes} di ${total} titoli sono disponibili sulle piattaforme che hai scelto`,
+  none: "Niente qui è disponibile sulle piattaforme che hai scelto",
+  unknown: count => `${count} titoli non sono stati ancora controllati; non verranno visualizzati con questo filtro`,
+  age: days => `Ultimo controllo ${days} giorni fa`,
+  off: "Per prima cosa scegli le tue piattaforme in Impostazioni > I miei abbonamenti",
+  noData: "Attiva \"Notifica quando disponibile\" in Impostazioni > Notifiche per utilizzare questo filtro. I primi risultati arrivano alle 18 della sera successiva",
+  region: "I dati della piattaforma sono stati preparati per un'altra regione; si aggiorna al controllo successivo"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getProviderWatchCopy = (language) =>

@@ -30,7 +30,7 @@ import {
 const buildStages = (lang) => [
   {
     key: "selection", icon: "checkbox", roundIndex: null,
-    label: lang === "tr" ? "Seçim" : lang === "es" ? "Elección" : lang === "pt" ? "Escolha" : lang === "de" ? "Tipps" : "Picks",
+    label: lang === "tr" ? "Seçim" : lang === "es" ? "Elección" : lang === "pt" ? "Escolha" : lang === "de" ? "Tipps" : lang === "it" ? "Scelte" : "Picks",
     startDay: 0, endDay: SELECTION_DAYS,
   },
   ...ROUNDS.map((r, i) => ({
@@ -42,13 +42,13 @@ const buildStages = (lang) => [
       : r.key === "r16" ? "16"
       : r.key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : lang === "pt" ? "QF" : lang === "de" ? "VF" : "QF")
       : r.key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : lang === "pt" ? "SF" : lang === "de" ? "HF" : "SF")
-      : (lang === "tr" ? "Final" : lang === "es" ? "Final" : lang === "pt" ? "Final" : lang === "de" ? "Finale" : "Final"),
+      : (lang === "tr" ? "Final" : lang === "es" ? "Final" : lang === "pt" ? "Final" : lang === "de" ? "Finale" : lang === "it" ? "Finale" : "Final"),
     startDay: r.startDay,
     endDay: r.endDay,
   })),
   {
     key: "results", icon: "trophy", roundIndex: ROUNDS.length - 1,
-    label: lang === "tr" ? "Kupa" : lang === "es" ? "Copa" : lang === "pt" ? "Taça" : lang === "de" ? "Pokal" : "Cup",
+    label: lang === "tr" ? "Kupa" : lang === "es" ? "Copa" : lang === "pt" ? "Taça" : lang === "de" ? "Pokal" : lang === "it" ? "Coppa" : "Cup",
     startDay: RESULTS_START_DAY, endDay: 31,
   },
 ];

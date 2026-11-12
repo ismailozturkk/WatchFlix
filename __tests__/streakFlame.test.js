@@ -55,13 +55,14 @@ jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 let mockMotion = true;
 jest.mock("../components/streak/useStreakFlameMotion", () => ({ __esModule: true, default: () => mockMotion }));
 jest.mock("../hooks/useScreenFocused", () => ({ __esModule: true, default: () => true }));
-const mockActions = { takeBreak: jest.fn(), breakBusy: false, reminderOn: true, toggleReminder: jest.fn() };
+const mockActions = { reminderOn: true, toggleReminder: jest.fn() };
 jest.mock("../hooks/useStreakActions", () => ({ __esModule: true, default: () => mockActions }));
 
 const {
   STREAK_MONTHS,
   MAX_TIER,
-  RAINBOW_WEEK,
+  JOURNEY_WEEKS,
+  STREAK_EFFECTS,
   SPARK_SHAPES,
   streakLevel,
   nextStreakMilestones,
@@ -94,7 +95,6 @@ const alev = (seri, ek = {}) => {
       kalkan: 0,
       kalkanTavani: 3,
       kalkanaKalan: 4,
-      mola: { aktif: false, buHafta: false, hakVar: true, gecenHafta: false },
       sonYama: null,
       esik: 2,
       telafiEsigi: 4,
@@ -104,34 +104,41 @@ const alev = (seri, ek = {}) => {
 };
 const bekleyen = (ek = {}) => ({ hafta: 0, gerekli: 4, mevcut: 1, kalkan: false, korunanSeri: 10, ...ek });
 
-describe("kademe: renk 4 haftada, kıvılcım her hafta", () => {
-  test("renk kademesi ve kıvılcım biçimi", () => {
-    expect(streakLevel(1)).toMatchObject({ weeks: 1, tier: 0, weekInTier: 1, sparkStage: 0 });
-    expect(streakLevel(4)).toMatchObject({ tier: 0, weekInTier: 4, sparkStage: 3 });
-    expect(streakLevel(5)).toMatchObject({ tier: 1, weekInTier: 1, sparkStage: 0 });
-    expect(streakLevel(49).tier).toBe(MAX_TIER);
-    expect(streakLevel(500).tier).toBe(MAX_TIER);
+describe("kademe: 16 haftalık macera — her hafta yeni renk, 4 haftada bir yeni kıvılcım", () => {
+  test("renk kademesi her hafta; kıvılcım 4 haftada bir; macera ilerlemesi", () => {
+    expect(JOURNEY_WEEKS).toBe(16);
+    expect(streakLevel(1)).toMatchObject({ weeks: 1, tier: 0, sparkStage: 0 });
+    expect(streakLevel(2)).toMatchObject({ tier: 1, sparkStage: 0 });
+    expect(streakLevel(5)).toMatchObject({ tier: 4, sparkStage: 1 });
+    expect(streakLevel(8).journey).toBeCloseTo(0.5);
+    expect(streakLevel(16)).toMatchObject({ tier: MAX_TIER, sparkStage: 3, journey: 1 });
+    expect(streakLevel(500)).toMatchObject({ tier: MAX_TIER, sparkStage: 3, journey: 1 });
     for (const bozuk of [-5, NaN, null, undefined, "x"]) expect(streakLevel(bozuk).weeks).toBe(0);
   });
 
-  test("kıvılcım biçimi her hafta değişir", () => {
-    for (let w = 1; w < 30; w++) {
-      expect(streakLook(w + 1).spark.shape).not.toBe(streakLook(w).spark.shape);
-    }
+  test("kıvılcım biçimi: 1–4 kor · 5–8 yıldız · 9–12 elmas · 13+ kar tanesi", () => {
+    expect([1, 4, 5, 8, 9, 12, 13, 16, 40].map((w) => streakLook(w).spark.shape)).toEqual([
+      "ember", "ember", "star", "star", "diamond", "diamond", "flake", "flake", "flake",
+    ]);
     expect(SPARK_SHAPES).toEqual(["ember", "star", "diamond", "flake"]);
   });
 
-  test("palet: 1–4 turuncu, 5 kızıl … 49+ Efsane", () => {
-    expect(streakLook(4).palette.id).toBe("orange");
-    expect(streakLook(5).palette.id).toBe("crimson");
-    expect(streakLook(49).palette.id).toBe("legendary");
+  test("palet: her hafta yeni renk; 16. hafta Efsane, Platin yok", () => {
+    const ids = Array.from({ length: 16 }, (_, i) => streakLook(i + 1).palette.id);
+    expect(new Set(ids).size).toBe(16);
+    expect(ids[0]).toBe("orange");
+    expect(ids[1]).toBe("crimson");
+    expect(ids[15]).toBe("legendary");
+    expect(streakLook(30).palette.id).toBe("legendary");
     expect(STREAK_MONTHS).toHaveLength(MAX_TIER + 1);
+    expect(STREAK_MONTHS.map((p) => p.id)).not.toContain("platinum");
   });
 
-  test("sonraki renk kademesi", () => {
-    expect(nextStreakMilestones(3)).toMatchObject({ tierAt: 5, weeksToTier: 2 });
-    expect(nextStreakMilestones(5)).toMatchObject({ tierAt: 9, weeksToTier: 4 });
-    expect(nextStreakMilestones(60)).toMatchObject({ tierAt: null, nextPalette: null });
+  test("sonraki renk her zaman bir hafta sonra; Efsane'de son", () => {
+    expect(nextStreakMilestones(3)).toMatchObject({ tierAt: 4, weeksToTier: 1 });
+    expect(nextStreakMilestones(15)).toMatchObject({ tierAt: 16, weeksToTier: 1 });
+    expect(nextStreakMilestones(15).nextPalette.id).toBe("legendary");
+    expect(nextStreakMilestones(16)).toMatchObject({ tierAt: null, nextPalette: null });
   });
 
   test("ihtişam (gün): 1 tek alev … 7 yıldızlar; boy hiç küçülmeden büyür", () => {
@@ -150,17 +157,14 @@ describe("kademe: renk 4 haftada, kıvılcım her hafta", () => {
     }
   });
 
-  test("gökkuşağı yalnız 52. haftadan sonra; mola gri ve efektsiz renk", () => {
-    expect(lookHasEffect(streakLook(RAINBOW_WEEK - 1, 7), "rainbow")).toBe(false);
-    expect(lookHasEffect(streakLook(RAINBOW_WEEK, 2), "rainbow")).toBe(true);
-    const molada = streakLook(RAINBOW_WEEK, 1, { paused: true });
-    expect(molada.palette.id).toBe("paused");
-    expect(molada.paused).toBe(true);
-    expect(lookHasEffect(molada, "rainbow")).toBe(false);
+  test("gökkuşağı halkası ve mola yok", () => {
+    expect(STREAK_EFFECTS).not.toContain("rainbow");
+    expect(lookHasEffect(streakLook(200, 7), "rainbow")).toBe(false);
+    expect(streakLook(5, 1).paused).toBeUndefined();
   });
 
   test("kıvılcım sayısı renk kademesiyle artar", () => {
-    expect(streakLook(40, 4).spark.count).toBeGreaterThan(streakLook(1, 4).spark.count);
+    expect(streakLook(16, 4).spark.count).toBeGreaterThan(streakLook(1, 4).spark.count);
   });
 });
 
@@ -196,11 +200,11 @@ describe("streakFlameState", () => {
     expect(s.protection.shields).toBe(1);
   });
 
-  test("mola aktif → paused (gri), seri sayısı korunur", () => {
-    const s = streakFlameState(alev(7, { buHaftaGun: 0, mola: { aktif: true, buHafta: true, hakVar: false } }));
-    expect(s).toMatchObject({ visible: true, weeks: 7, status: "paused", paused: true });
-    expect(s.look.palette.id).toBe("paused");
-    expect(s.protection.canBreak).toBe(false);
+  test("eski kayıttaki mola alanı yok sayılır; macera ilerlemesi durumda", () => {
+    const s = streakFlameState(alev(8, { buHaftaGun: 0, mola: { aktif: true, buHafta: true, hakVar: false } }));
+    expect(s).toMatchObject({ visible: true, weeks: 8, status: "risk" });
+    expect(s.journeyProgress).toBeCloseTo(0.5);
+    expect(s.protection.canBreak).toBeUndefined();
   });
 
   test("rekor", () => {
@@ -225,8 +229,10 @@ describe("kutlama adımı", () => {
 
   test("yeni hafta / yeni renk / ilk yanış", () => {
     expect(streakCelebrationStep(v2(-1), alev(1)).celebrate.kind).toBe("lit");
-    expect(streakCelebrationStep(v2(1), alev(2)).celebrate.kind).toBe("week");
-    expect(streakCelebrationStep(v2(4), alev(5)).celebrate.kind).toBe("tier");
+    // Her hafta yeni renk: 16. haftaya kadar "tier", sonra "week".
+    expect(streakCelebrationStep(v2(1), alev(2)).celebrate.kind).toBe("tier");
+    expect(streakCelebrationStep(v2(15), alev(16)).celebrate.kind).toBe("tier");
+    expect(streakCelebrationStep(v2(16), alev(17)).celebrate.kind).toBe("week");
     expect(streakCelebrationStep(v2(3), alev(3))).toEqual({ celebrate: null, patch: null, store: null });
   });
 
@@ -276,7 +282,6 @@ const STAR = "M10 0 C11";
 // Alev katmanı yolları 100×128 kutusunda; kıvılcım/yıldız yolları "M10 0" ile başlar.
 const flameLayers = (root) => count(root, "Path", (n) => !n.props.d.startsWith("M10 0"));
 const sparkles = (root) => count(root, "Path", (n) => n.props.d.startsWith(STAR));
-const rainbow = (root) => count(root, "Stop", (n) => n.props.stopColor === "#00E676");
 const roundEmbers = (root) =>
   root.findAllByType("AnimatedView").filter((n) => [].concat(n.props.style).flat().some((s) => s && s.shadowRadius)).length;
 
@@ -302,7 +307,7 @@ describe("StreakFlame", () => {
     root = draw(1, 5);
     expect(roundEmbers(root)).toBe(kivilcim + 6); // + 6 uçuşan minik kıvılcım
     unmount();
-    root = draw(2, 5); // yıldız biçimli haftada da uçuşanlar yuvarlak kalır
+    root = draw(5, 5); // yıldız biçimli haftada da uçuşanlar yuvarlak kalır
     expect(roundEmbers(root)).toBe(6);
     unmount();
     root = draw(1, 6);
@@ -312,23 +317,31 @@ describe("StreakFlame", () => {
     expect(sparkles(draw(1, 7))).toBeGreaterThan(0);
   });
 
-  test("kıvılcım biçimi haftaya göre: 2. hafta yıldız yolu çizer", () => {
-    const root = draw(2, 4);
+  test("kıvılcım biçimi haftaya göre: 5. hafta yıldız yolu çizer", () => {
+    const root = draw(5, 4);
     expect(roundEmbers(root)).toBe(0);
     expect(sparkles(root)).toBeGreaterThan(0);
   });
 
-  test("52. hafta gökkuşağı; hareket kapalıyken kıvılcım yok", () => {
-    expect(rainbow(draw(RAINBOW_WEEK, 2))).toBeGreaterThan(0);
+  test("Efsane (rengarenk): parçacıklar tayftan farklı renkler alır; öncekiler tek renk", () => {
+    const renkler = (root) =>
+      new Set(
+        root.findAllByType("AnimatedView")
+          .map((n) => Object.assign({}, ...[].concat(n.props.style).flat().filter(Boolean)))
+          .filter((st) => st.shadowRadius && st.backgroundColor)
+          .map((st) => st.backgroundColor),
+      );
+    expect(streakLook(16).palette.spectrum).toBe(true);
+    expect(streakLook(15).palette.spectrum).toBeUndefined();
+    expect(renkler(draw(16, 5)).size).toBeGreaterThanOrEqual(4);
     unmount();
+    expect(renkler(draw(1, 5)).size).toBeLessThanOrEqual(2);
+  });
+
+  test("hareket kapalıyken kıvılcım yok", () => {
     expect(roundEmbers(draw(1, 7, { animated: false }))).toBe(0);
   });
 
-  test("mola: gri ve efektsiz", () => {
-    const root = render(<StreakFlame look={streakLook(RAINBOW_WEEK, 7, { paused: true })} size={120} dimmed />);
-    expect([roundEmbers(root), sparkles(root), rainbow(root)]).toEqual([0, 0, 0]);
-    expect(count(root, "RadialGradient")).toBe(0);
-  });
 });
 
 describe("StreakFlameBadge", () => {
@@ -361,19 +374,38 @@ describe("StreakFlameBadge", () => {
     expect(root.findByType("Icon").props.name).toBe("bandage");
   });
 
-  test("mola: ⏸", () => {
-    const root = render(<StreakFlameBadge seriler={alev(3, { buHaftaGun: 0, mola: { aktif: true, buHafta: true, hakVar: false } })} theme={theme} language="tr" />);
-    expect(root.findByType("Icon").props.name).toBe("pause-circle");
-  });
 
-  test("dokununca ayrıntı açılır; mola ve hatırlatıcı eylemleri sayfaya geçer", () => {
+  test("dokununca ayrıntı açılır; hatırlatıcı eylemi sayfaya geçer", () => {
     const root = render(<StreakFlameBadge seriler={alev(9)} theme={theme} language="tr" />);
     act(() => root.findByProps({ testID: "profile-streak-flame" }).props.onPress());
     const sheet = root.findByType("StreakFlameSheet");
     expect(sheet.props.visible).toBe(true);
-    expect(sheet.props.onTakeBreak).toBe(mockActions.takeBreak);
+    expect(sheet.props.onTakeBreak).toBeUndefined();
     expect(sheet.props.onToggleReminder).toBe(mockActions.toggleReminder);
     expect(root.findByType(Flame).props.animated).toBe(false);
+  });
+});
+
+describe("StreakFlameBadge hero (profil, kompakt)", () => {
+  const theme = { text: { primary: "#fff", secondary: "#bbb", muted: "#888" } };
+
+  test("büyük alev + seri sayısı; etiket/simge yok", () => {
+    const root = render(<StreakFlameBadge seriler={alev(12, { buHaftaGun: 4 })} theme={theme} language="tr" variant="hero" />);
+    expect(root.findByType(Flame).props.size).toBe(46);
+    expect(root.findAllByType("Text").map((x) => x.props.children)).toEqual(["12"]);
+    expect(root.findAllByType("Icon")).toHaveLength(0);
+    expect(root.findByProps({ testID: "profile-streak-flame" }).props.accessibilityLabel).toBe(
+      "12 haftalık izleme serisi, bu hafta kazanıldı. Ayrıntılar",
+    );
+  });
+
+  test("7 gün noktası: izlenen günler dolu", () => {
+    const boxes = [true, false, true, false, false, false, false];
+    const root = render(
+      <StreakFlameBadge seriler={alev(6, { buHaftaGun: 2, buHaftaKutulari: boxes })} theme={theme} language="tr" variant="hero" />,
+    );
+    const dots = root.findAllByProps({ testID: "streak-week-dots" }).find((n) => n.props.children)?.props.children;
+    expect(dots).toHaveLength(7);
   });
 });
 
@@ -391,24 +423,26 @@ describe("StreakFlameSheet", () => {
         state={streakFlameState(s)}
         theme={theme}
         language={language}
-        onTakeBreak={jest.fn()}
         onToggleReminder={jest.fn()}
         {...props}
       />,
     );
 
-  test("hafta, renk · kıvılcım, ihtişam, sonraki renk, rekor, 13 basamak", () => {
+  test("hafta, renk · kıvılcım, ihtişam, sonraki renk, rekor, 16 basamaklı macera", () => {
     const root = open(alev(6, { buHaftaGun: 3, rekor: 20 }));
     const t = metin(root);
     expect(t).toContain("haftalık seri");
-    expect(t).toContain("Kızıl Alev · Yıldız kıvılcımı");
+    expect(t).toContain("Mavi Alev · Yıldız kıvılcımı"); // 6. hafta: 6. renk, 2. bölüm
     expect(t).toContain("3/7 · Üç katman");
-    expect(t).toContain("Pembe Alev için 3 hafta");
+    expect(t).toContain("Turkuaz Alev için 1 hafta");
+    expect(t).toContain("16 haftalık macera");
+    expect(t).toContain("16. hafta");
     expect(t).toContain("Rekorun: 20 hafta");
     expect(t).toContain("Bu haftayı kazandın (3/7 gün)");
     const alevler = root.findAllByType(Flame);
     expect(alevler).toHaveLength(1 + STREAK_MONTHS.length);
-    expect(alevler.filter((a) => a.props.locked)).toHaveLength(MAX_TIER - 1);
+    // 6. haftada: 6 basamak açık, 6 kilitli.
+    expect(alevler.filter((a) => a.props.locked)).toHaveLength(MAX_TIER + 1 - 6);
   });
 
   test("risk ve telafi metinleri", () => {
@@ -416,18 +450,13 @@ describe("StreakFlameSheet", () => {
     unmount();
     const t = metin(open(alev(0, { buHaftaGun: 2, bekleyen: bekleyen({ mevcut: 2 }) })));
     expect(t).toContain("bu hafta 4 farklı gün işaretle (2/4)");
-    expect(t).toContain("Geçen haftayı mola say");
+    expect(t).not.toContain("mola");
   });
 
-  test("mola düğmesi bu haftaya mola verir; hak bittiyse düğme yok", () => {
-    const onTakeBreak = jest.fn();
-    let root = open(alev(4, { buHaftaGun: 1 }), { onTakeBreak });
-    act(() => root.findByProps({ testID: "streak-break-button" }).props.onPress());
-    expect(onTakeBreak).toHaveBeenCalled();
-    unmount();
-    root = open(alev(4, { mola: { aktif: false, buHafta: false, hakVar: false } }));
+  test("mola düğmesi yok", () => {
+    const root = open(alev(4, { buHaftaGun: 1 }));
     expect(root.findAllByProps({ testID: "streak-break-button" })).toHaveLength(0);
-    expect(metin(root)).toContain("Bu ayki molanı kullandın");
+    expect(metin(root)).not.toMatch(/[Mm]ola/);
   });
 
   test("hatırlatıcı anahtarı", () => {
@@ -446,12 +475,13 @@ describe("StreakFlameSheet", () => {
     expect(t).toContain("en az 2 farklı gün");
     expect(t).toContain("ertesi hafta 4 farklı gün");
     expect(t).toContain("Her 4 başarılı haftada 1 kalkan");
-    expect(t).toContain("Her ay 1 hafta mola");
+    expect(t).toContain("16 haftada Turuncu'dan Efsane'ye");
+    expect(t).not.toMatch(/[Mm]ola/);
   });
 
   test("zirvede en yüksek renk metni, gradyan yok", () => {
     const root = open(alev(60), {}, "de");
-    expect(metin(root)).toContain("höchste Farbe");
+    expect(metin(root)).toContain("16-Wochen-Abenteuer geschafft");
     expect(root.findAllByType("LinearGradient")).toHaveLength(0);
   });
 });
@@ -459,11 +489,12 @@ describe("StreakFlameSheet", () => {
 describe("bağlantılar (bekçi)", () => {
   const oku = (...p) => fs.readFileSync(path.join(__dirname, "..", ...p), "utf8");
 
-  test("profil: alev kimlik rozetlerinin yanında ve 'streak' bölümüyle gizlenebilir", () => {
+  test("profil: alev rozetlerin altında büyük kart ve 'streak' bölümüyle gizlenebilir", () => {
     const src = oku("screens", "tabs", "ProfileScreen.js");
     expect(src).toMatch(/showSection\("streak"\)/);
-    expect(src).toMatch(/badgeAccessory=\{streakBadge\}/);
-    expect(oku("components", "profile", "ProfileIdentityBlock.js")).toMatch(/trailing=\{badgeAccessory\}/);
+    expect(src).toMatch(/streak=\{streakBadge\}/);
+    expect(src).toMatch(/variant="hero"/);
+    expect(oku("components", "profile", "ProfileIdentityBlock.js")).toMatch(/\{streak \? <View style=\{styles\.streak\}>\{streak\}<\/View> : null\}/);
   });
 
   test("kutlama ve hatırlatma uygulama genelinde koşar", () => {

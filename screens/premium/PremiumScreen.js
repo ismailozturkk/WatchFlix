@@ -64,10 +64,10 @@ function packageTitle(aPackage, language) {
   const pt = language === "pt";
   const de = language === "de";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "Yıllık Plan" : es ? "Plan anual" : pt ? "Plano anual" : de ? "Jahresplan" : "Annual Plan";
-  if (key === "monthly") return tr ? "Aylık Plan" : es ? "Plan mensual" : pt ? "Plano mensal" : de ? "Monatsplan" : "Monthly Plan";
-  if (key === "weekly") return tr ? "Haftalık Plan" : es ? "Plan semanal" : pt ? "Plano semanal" : de ? "Wochenplan" : "Weekly Plan";
-  if (key === "lifetime") return tr ? "Ömür Boyu" : es ? "De por vida" : pt ? "Vitalício" : de ? "Lebenslang" : "Lifetime";
+  if (key === "annual") return tr ? "Yıllık Plan" : es ? "Plan anual" : pt ? "Plano anual" : de ? "Jahresplan" : language === "it" ? "Piano annuale" : "Annual Plan";
+  if (key === "monthly") return tr ? "Aylık Plan" : es ? "Plan mensual" : pt ? "Plano mensal" : de ? "Monatsplan" : language === "it" ? "Piano mensile" : "Monthly Plan";
+  if (key === "weekly") return tr ? "Haftalık Plan" : es ? "Plan semanal" : pt ? "Plano semanal" : de ? "Wochenplan" : language === "it" ? "Piano settimanale" : "Weekly Plan";
+  if (key === "lifetime") return tr ? "Ömür Boyu" : es ? "De por vida" : pt ? "Vitalício" : de ? "Lebenslang" : language === "it" ? "A vita" : "Lifetime";
   return aPackage?.product?.title || aPackage?.identifier || "Plan";
 }
 
@@ -77,9 +77,9 @@ function packagePeriodLabel(aPackage, language) {
   const pt = language === "pt";
   const de = language === "de";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : "/ year";
-  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : "/ month";
-  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : "/ week";
+  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : language === "it" ? "/anno" : "/ year";
+  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : language === "it" ? "/mese" : "/ month";
+  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : language === "it" ? "/settimana" : "/ week";
   return "";
 }
 
@@ -89,11 +89,11 @@ function packageRenewalNote(aPackage, language) {
   const pt = language === "pt";
   const de = language === "de";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "Yıllık tek faturalandırma" : es ? "Facturación anual única" : pt ? "Cobrança anual única" : de ? "Jährliche Abrechnung" : "Billed annually";
+  if (key === "annual") return tr ? "Yıllık tek faturalandırma" : es ? "Facturación anual única" : pt ? "Cobrança anual única" : de ? "Jährliche Abrechnung" : language === "it" ? "Fatturato annualmente" : "Billed annually";
   if (key === "monthly") {
-    return tr ? "Aylık yenilenir, dilediğinde iptal" : es ? "Se renueva cada mes; cancela cuando quieras" : pt ? "Renova todo mês; cancele quando quiser" : de ? "Verlängert sich monatlich, jederzeit kündbar" : "Renews monthly, cancel anytime";
+    return tr ? "Aylık yenilenir, dilediğinde iptal" : es ? "Se renueva cada mes; cancela cuando quieras" : pt ? "Renova todo mês; cancele quando quiser" : de ? "Verlängert sich monatlich, jederzeit kündbar" : language === "it" ? "Rinnova mensilmente, annulla in qualsiasi momento" : "Renews monthly, cancel anytime";
   }
-  return tr ? "Dilediğinde iptal" : es ? "Cancela cuando quieras" : pt ? "Cancele quando quiser" : de ? "Jederzeit kündbar" : "Cancel anytime";
+  return tr ? "Dilediğinde iptal" : es ? "Cancela cuando quieras" : pt ? "Cancele quando quiser" : de ? "Jederzeit kündbar" : language === "it" ? "Annulla in qualsiasi momento" : "Cancel anytime";
 }
 
 // Giriş teklifinin süresi: "İlk 3 ay", "İlk yıl" (faz birimi × tekrar sayısı).
@@ -103,18 +103,19 @@ function offerDurationLabel(offer, language) {
   const es = language === "es";
   const pt = language === "pt";
   const de = language === "de";
+  const it = language === "it";
   const count = (offer.cycles || 1) * (offer.unitCount || 1);
   const one = count === 1;
   const units = {
-    day: tr ? "gün" : es ? (one ? "día" : "días") : pt ? one ? "dia" : "dias" : de ? (one ? "Tag" : "Tage") : one ? "day" : "days",
-    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : pt ? one ? "semana" : "semanas" : de ? (one ? "Woche" : "Wochen") : one ? "week" : "weeks",
-    month: tr ? "ay" : es ? (one ? "mes" : "meses") : pt ? one ? "mês" : "meses" : de ? (one ? "Monat" : "Monate") : one ? "month" : "months",
-    year: tr ? "yıl" : es ? (one ? "año" : "años") : pt ? one ? "ano" : "anos" : de ? (one ? "Jahr" : "Jahre") : one ? "year" : "years",
+    day: tr ? "gün" : es ? (one ? "día" : "días") : pt ? one ? "dia" : "dias" : de ? (one ? "Tag" : "Tage") : it ? (one ? "giorno" : "giorni") : one ? "day" : "days",
+    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : pt ? one ? "semana" : "semanas" : de ? (one ? "Woche" : "Wochen") : it ? (one ? "settimana" : "settimane") : one ? "week" : "weeks",
+    month: tr ? "ay" : es ? (one ? "mes" : "meses") : pt ? one ? "mês" : "meses" : de ? (one ? "Monat" : "Monate") : it ? (one ? "mese" : "mesi") : one ? "month" : "months",
+    year: tr ? "yıl" : es ? (one ? "año" : "años") : pt ? one ? "ano" : "anos" : de ? (one ? "Jahr" : "Jahre") : it ? (one ? "anno" : "anni") : one ? "year" : "years",
   };
   const unit = units[offer.unit];
-  if (!unit) return tr ? "İlk dönem" : es ? "Periodo inicial" : pt ? "Período inicial" : de ? "Einführungszeitraum" : "Intro period";
-  if (one) return tr ? `İlk ${unit}` : es ? `${unit} inicial` : pt ? `${unit} inicial` : de ? `${DE_FIRST[offer.unit]} ${unit}` : `First ${unit}`;
-  return tr ? `İlk ${count} ${unit}` : es ? `${count} ${unit} iniciales` : pt ? `${count} ${unit} iniciais` : de ? `Erste ${count} ${unit}` : `First ${count} ${unit}`;
+  if (!unit) return tr ? "İlk dönem" : es ? "Periodo inicial" : pt ? "Período inicial" : de ? "Einführungszeitraum" : language === "it" ? "Periodo di introduzione" : "Intro period";
+  if (one) return tr ? `İlk ${unit}` : es ? `${unit} inicial` : pt ? `${unit} inicial` : de ? `${DE_FIRST[offer.unit]} ${unit}` : it ? `${offer.unit === "week" ? "Prima" : "Primo"} ${unit}` : `First ${unit}`;
+  return tr ? `İlk ${count} ${unit}` : es ? `${count} ${unit} iniciales` : pt ? `${count} ${unit} iniciais` : de ? `Erste ${count} ${unit}` : it ? `${offer.unit === "week" ? "Prime" : "Primi"} ${count} ${unit}` : `First ${count} ${unit}`;
 }
 
 // Teklif fazının fatura aralığı ("/ ay"); faz birden uzun birimse boş.
@@ -124,9 +125,9 @@ function offerPeriodLabel(offer, language) {
   const pt = language === "pt";
   const de = language === "de";
   if ((offer.unitCount || 1) !== 1) return "";
-  if (offer.unit === "year") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : "/ year";
-  if (offer.unit === "month") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : "/ month";
-  if (offer.unit === "week") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : "/ week";
+  if (offer.unit === "year") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : language === "it" ? "/anno" : "/ year";
+  if (offer.unit === "month") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : language === "it" ? "/mese" : "/ month";
+  if (offer.unit === "week") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : language === "it" ? "/settimana" : "/ week";
   return "";
 }
 
@@ -140,10 +141,10 @@ function offerDisclosure(offer, aPackage, language) {
   const duration = offerDurationLabel(offer, language);
   const after = `${offer.regularPriceString}${packagePeriodLabel(aPackage, language).replace(" ", "")}`;
   if (offer.free) {
-    return tr ? `${duration} ücretsiz, sonra ${after}` : es ? `${duration} gratis, después ${after}` : pt ? `${duration} grátis, depois ${after}` : de ? `${duration} kostenlos, danach ${after}` : `${duration} free, then ${after}`;
+    return tr ? `${duration} ücretsiz, sonra ${after}` : es ? `${duration} gratis, después ${after}` : pt ? `${duration} grátis, depois ${after}` : de ? `${duration} kostenlos, danach ${after}` : language === "it" ? `${duration} gratis, poi ${after}` : `${duration} free, then ${after}`;
   }
   const intro = `${offer.priceString}${offerPeriodLabel(offer, language).replace(" ", "")}`;
-  return tr ? `${duration} ${intro}, sonra ${after}` : es ? `${duration} ${intro}, después ${after}` : pt ? `${duration} ${intro}, depois ${after}` : de ? `${duration} ${intro}, danach ${after}` : `${duration} ${intro}, then ${after}`;
+  return tr ? `${duration} ${intro}, sonra ${after}` : es ? `${duration} ${intro}, después ${after}` : pt ? `${duration} ${intro}, depois ${after}` : de ? `${duration} ${intro}, danach ${after}` : language === "it" ? `${duration} ${intro}, poi ${after}` : `${duration} ${intro}, then ${after}`;
 }
 
 export default function PremiumScreen() {
@@ -328,8 +329,8 @@ export default function PremiumScreen() {
         refresh?.().catch?.(() => {});
         Toast.show({
           type: "info",
-          text1: tr ? "Ödemen alındı" : es ? "Hemos recibido tu pago" : pt ? "Recebemos seu pagamento" : de ? "Deine Zahlung ist eingegangen" : "Your payment was received",
-          text2: tr ? "Ayrıcalıkların açılması birkaç dakika sürebilir." : es ? "Tus ventajas pueden tardar unos minutos en activarse." : pt ? "Seus benefícios podem levar alguns minutos para serem ativados." : de ? "Es kann ein paar Minuten dauern, bis deine Vorteile aktiv sind." : "It may take a few minutes for your benefits to activate.",
+          text1: tr ? "Ödemen alındı" : es ? "Hemos recibido tu pago" : pt ? "Recebemos seu pagamento" : de ? "Deine Zahlung ist eingegangen" : language === "it" ? "Il pagamento è stato ricevuto" : "Your payment was received",
+          text2: tr ? "Ayrıcalıkların açılması birkaç dakika sürebilir." : es ? "Tus ventajas pueden tardar unos minutos en activarse." : pt ? "Seus benefícios podem levar alguns minutos para serem ativados." : de ? "Es kann ein paar Minuten dauern, bis deine Vorteile aktiv sind." : language === "it" ? "Potrebbero essere necessari alcuni minuti per l'attivazione dei vantaggi." : "It may take a few minutes for your benefits to activate.",
         });
         return;
       }
@@ -337,20 +338,20 @@ export default function PremiumScreen() {
       // Premium kutlaması: altın kart + kıvılcım (components/toast).
       Toast.show({
         type: "premium",
-        text1: tr ? `Seelogd ${planName} aktif edildi!` : es ? `¡Seelogd ${planName} está activo!` : pt ? `O Seelogd ${planName} está ativo!` : de ? `Seelogd ${planName} ist aktiv!` : `Seelogd ${planName} is active!`,
-        text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : es ? "Todas tus ventajas están listas." : pt ? "Todos os seus benefícios estão prontos." : de ? "Alle deine Vorteile sind bereit." : "All your benefits are ready.",
+        text1: tr ? `Seelogd ${planName} aktif edildi!` : es ? `¡Seelogd ${planName} está activo!` : pt ? `O Seelogd ${planName} está ativo!` : de ? `Seelogd ${planName} ist aktiv!` : language === "it" ? `Seelogd ${planName} è attivo!` : `Seelogd ${planName} is active!`,
+        text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : es ? "Todas tus ventajas están listas." : pt ? "Todos os seus benefícios estão prontos." : de ? "Alle deine Vorteile sind bereit." : language === "it" ? "Tutti i vantaggi sono pronti." : "All your benefits are ready.",
       });
     } catch (error) {
       if (error?.userCancelled) return;
       // Davet indirimi mağazadan alınamadı: tam fiyata sormadan geçilmez.
       if (error?.code === REFERRAL_OFFER_UNAVAILABLE) {
         appAlert(
-          tr ? "İndirim şu an uygulanamıyor" : es ? "El descuento no está disponible ahora" : pt ? "O desconto não está disponível agora" : de ? "Der Rabatt ist gerade nicht verfügbar" : "The discount isn't available right now",
-          tr ? "Davet indirimi mağazadan alınamadı. Tam fiyatla devam edebilir ya da daha sonra tekrar deneyebilirsin." : es ? "No se pudo obtener el descuento de invitación de la tienda. Puedes continuar con el precio completo o intentarlo más tarde." : pt ? "Não foi possível obter o desconto de convite na loja. Você pode continuar com o preço cheio ou tentar mais tarde." : de ? "Der Einladungsrabatt konnte nicht vom Store abgerufen werden. Du kannst zum vollen Preis fortfahren oder es später erneut versuchen." : "The invite discount couldn't be retrieved from the store. You can continue at full price or try again later.",
+          tr ? "İndirim şu an uygulanamıyor" : es ? "El descuento no está disponible ahora" : pt ? "O desconto não está disponível agora" : de ? "Der Rabatt ist gerade nicht verfügbar" : language === "it" ? "Lo sconto non è disponibile al momento" : "The discount isn't available right now",
+          tr ? "Davet indirimi mağazadan alınamadı. Tam fiyatla devam edebilir ya da daha sonra tekrar deneyebilirsin." : es ? "No se pudo obtener el descuento de invitación de la tienda. Puedes continuar con el precio completo o intentarlo más tarde." : pt ? "Não foi possível obter o desconto de convite na loja. Você pode continuar com o preço cheio ou tentar mais tarde." : de ? "Der Einladungsrabatt konnte nicht vom Store abgerufen werden. Du kannst zum vollen Preis fortfahren oder es später erneut versuchen." : language === "it" ? "Impossibile recuperare lo sconto sull'invito dal negozio. Puoi continuare a prezzo pieno o riprovare più tardi." : "The invite discount couldn't be retrieved from the store. You can continue at full price or try again later.",
           [
-            { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
+            { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : language === "it" ? "Annulla" : "Cancel", style: "cancel" },
             {
-              text: tr ? "Tam fiyatla devam et" : es ? "Continuar con precio completo" : pt ? "Continuar com preço cheio" : de ? "Zum vollen Preis fortfahren" : "Continue at full price",
+              text: tr ? "Tam fiyatla devam et" : es ? "Continuar con precio completo" : pt ? "Continuar com preço cheio" : de ? "Zum vollen Preis fortfahren" : language === "it" ? "Continua a prezzo pieno" : "Continue at full price",
               onPress: () => purchase(aPackage, null),
             },
           ],
@@ -359,7 +360,7 @@ export default function PremiumScreen() {
       }
       Toast.show({
         type: "error",
-        text1: tr ? "Satın alma tamamlanamadı" : es ? "No se pudo completar la compra" : pt ? "Não foi possível concluir a compra" : de ? "Der Kauf konnte nicht abgeschlossen werden" : "Purchase could not be completed",
+        text1: tr ? "Satın alma tamamlanamadı" : es ? "No se pudo completar la compra" : pt ? "Não foi possível concluir a compra" : de ? "Der Kauf konnte nicht abgeschlossen werden" : language === "it" ? "Impossibile completare l'acquisto" : "Purchase could not be completed",
         text2: error?.message,
       });
     }
@@ -378,13 +379,13 @@ export default function PremiumScreen() {
       Toast.show({
         type: restored ? "premium" : "info",
         text1: restored
-          ? tr ? "Satın alımın başarıyla geri yüklendi" : es ? "Compra restaurada correctamente" : pt ? "Compra restaurada com sucesso" : de ? "Kauf erfolgreich wiederhergestellt" : "Purchase successfully restored"
-          : tr ? "Aktif bir abonelik bulunamadı" : es ? "No se encontró ninguna suscripción activa" : pt ? "Nenhuma assinatura ativa encontrada" : de ? "Kein aktives Abo gefunden" : "No active subscription found",
+          ? tr ? "Satın alımın başarıyla geri yüklendi" : es ? "Compra restaurada correctamente" : pt ? "Compra restaurada com sucesso" : de ? "Kauf erfolgreich wiederhergestellt" : language === "it" ? "Acquisto ripristinato con successo" : "Purchase successfully restored"
+          : tr ? "Aktif bir abonelik bulunamadı" : es ? "No se encontró ninguna suscripción activa" : pt ? "Nenhuma assinatura ativa encontrada" : de ? "Kein aktives Abo gefunden" : language === "it" ? "Nessun abbonamento attivo trovato" : "No active subscription found",
       });
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr ? "Satın alımlar geri yüklenemedi" : es ? "No se pudieron restaurar las compras" : pt ? "Não foi possível restaurar as compras" : de ? "Käufe konnten nicht wiederhergestellt werden" : "Purchases could not be restored",
+        text1: tr ? "Satın alımlar geri yüklenemedi" : es ? "No se pudieron restaurar las compras" : pt ? "Não foi possível restaurar as compras" : de ? "Käufe konnten nicht wiederhergestellt werden" : language === "it" ? "Impossibile ripristinare gli acquisti" : "Purchases could not be restored",
         text2: error?.message,
       });
     }
@@ -397,7 +398,7 @@ export default function PremiumScreen() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : pt ? "Não foi possível abrir as configurações da assinatura" : de ? "Die Abo-Einstellungen konnten nicht geöffnet werden" : "Subscription settings could not be opened",
+        text1: tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : pt ? "Não foi possível abrir as configurações da assinatura" : de ? "Die Abo-Einstellungen konnten nicht geöffnet werden" : language === "it" ? "Impossibile aprire le impostazioni dell'abbonamento" : "Subscription settings could not be opened",
         text2: error?.message,
       });
     }
@@ -483,14 +484,14 @@ export default function PremiumScreen() {
               <View style={[styles.heroStatusPill, { backgroundColor: C.iconGreen }]}>
                 <View style={[styles.statusDot, { backgroundColor: C.green }]} />
                 <Text style={[styles.heroStatusText, { color: C.green }]}>
-                  {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : es ? "ACTIVO" : pt ? "ATIVO" : de ? "AKTIV" : "ACTIVE"}
+                  {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : es ? "ACTIVO" : pt ? "ATIVO" : de ? "AKTIV" : language === "it" ? "ATTIVO" : "ACTIVE"}
                 </Text>
               </View>
             ) : (
               <View style={[styles.heroStatusPill, { backgroundColor: alpha(C.accent, 0.15) }]}>
                 <AppIcon name="sparkles" size={11} color={C.accent} />
                 <Text style={[styles.heroStatusText, { color: C.accent }]}>
-                  {tr ? "AYRICALIKLARI AÇ" : es ? "DESBLOQUEA TODO" : pt ? "DESBLOQUEIE TUDO" : de ? "ALLES FREISCHALTEN" : "UNLOCK ALL"}
+                  {tr ? "AYRICALIKLARI AÇ" : es ? "DESBLOQUEA TODO" : pt ? "DESBLOQUEIE TUDO" : de ? "ALLES FREISCHALTEN" : language === "it" ? "SBLOCCA TUTTO" : "UNLOCK ALL"}
                 </Text>
               </View>
             )}
@@ -499,21 +500,21 @@ export default function PremiumScreen() {
           <View style={styles.heroBody}>
             <Text style={[styles.heroTitle, { color: C.text }]}>
               {isUnlimited
-                ? tr ? "Premium Max aktif." : es ? "Premium Max está activo." : pt ? "Premium Max está ativo." : de ? "Premium Max ist aktiv." : "Premium Max is active."
+                ? tr ? "Premium Max aktif." : es ? "Premium Max está activo." : pt ? "Premium Max está ativo." : de ? "Premium Max ist aktiv." : language === "it" ? "Premium Max è attivo." : "Premium Max is active."
                 : isPremium
-                ? tr ? "Premium planın aktif." : es ? "Tu plan Premium está activo." : pt ? "Seu plano Premium está ativo." : de ? "Dein Premium-Plan ist aktiv." : "Your Premium plan is active."
-                : tr ? "Sana uygun planı seç." : es ? "Elige el plan que te conviene." : pt ? "Escolha o plano ideal para você." : de ? "Wähle den passenden Plan." : "Choose the plan that fits you."}
+                ? tr ? "Premium planın aktif." : es ? "Tu plan Premium está activo." : pt ? "Seu plano Premium está ativo." : de ? "Dein Premium-Plan ist aktiv." : language === "it" ? "Il tuo piano Premium è attivo." : "Your Premium plan is active."
+                : tr ? "Sana uygun planı seç." : es ? "Elige el plan que te conviene." : pt ? "Escolha o plano ideal para você." : de ? "Wähle den passenden Plan." : language === "it" ? "Scegli il piano adatto a te." : "Choose the plan that fits you."}
             </Text>
             <Text style={[styles.heroSubtitle, { color: C.muted }]}>
-              {tr ? "AI kotası, sosyal limitler ve kişiselleştirme seçeneklerini tek yerden karşılaştır." : es ? "Compara la cuota de IA, los límites sociales y la personalización en un solo lugar." : pt ? "Compare a cota de IA, os limites sociais e a personalização em um só lugar." : de ? "Vergleiche KI-Kontingent, soziale Limits und Personalisierung an einem Ort." : "Compare AI allowance, social limits and personalization in one place."}
+              {tr ? "AI kotası, sosyal limitler ve kişiselleştirme seçeneklerini tek yerden karşılaştır." : es ? "Compara la cuota de IA, los límites sociales y la personalización en un solo lugar." : pt ? "Compare a cota de IA, os limites sociais e a personalização em um só lugar." : de ? "Vergleiche KI-Kontingent, soziale Limits und Personalisierung an einem Ort." : language === "it" ? "Confronta l'indennità AI, i limiti sociali e la personalizzazione in un unico posto." : "Compare AI allowance, social limits and personalization in one place."}
             </Text>
           </View>
 
           <View style={styles.heroBenefitsRow}>
             {[
-              ["sparkles", tr ? "Daha fazla AI" : es ? "Más IA" : pt ? "Mais IA" : de ? "Mehr KI" : "More AI"],
-              ["people", tr ? "Daha geniş limitler" : es ? "Más límites" : pt ? "Mais limites" : de ? "Höhere Limits" : "Higher limits"],
-              ["color-palette", tr ? "Kişiselleştirme" : es ? "Personalización" : pt ? "Personalização" : de ? "Personalisierung" : "Personalization"],
+              ["sparkles", tr ? "Daha fazla AI" : es ? "Más IA" : pt ? "Mais IA" : de ? "Mehr KI" : language === "it" ? "Più AI" : "More AI"],
+              ["people", tr ? "Daha geniş limitler" : es ? "Más límites" : pt ? "Mais limites" : de ? "Höhere Limits" : language === "it" ? "Limiti più alti" : "Higher limits"],
+              ["color-palette", tr ? "Kişiselleştirme" : es ? "Personalización" : pt ? "Personalização" : de ? "Personalisierung" : language === "it" ? "Personalizzazione" : "Personalization"],
             ].map(([icon, label]) => (
               <View key={icon} style={styles.heroBenefitItem}>
                 <AppIcon name={icon} size={14} color={C.accent} />
@@ -528,10 +529,10 @@ export default function PremiumScreen() {
       <View style={styles.pricingSection}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? "Plan seç" : es ? "Elige un plan" : pt ? "Escolha um plano" : de ? "Plan wählen" : "Choose a plan"}
+            {tr ? "Plan seç" : es ? "Elige un plan" : pt ? "Escolha um plano" : de ? "Plan wählen" : language === "it" ? "Scegli un piano" : "Choose a plan"}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr ? "Önce planı, ardından ödeme dönemini seç." : es ? "Primero el plan y después el periodo de pago." : pt ? "Primeiro o plano, depois o período de pagamento." : de ? "Wähle zuerst den Plan, dann den Abrechnungszeitraum." : "Pick a plan, then choose the billing period."}
+            {tr ? "Önce planı, ardından ödeme dönemini seç." : es ? "Primero el plan y después el periodo de pago." : pt ? "Primeiro o plano, depois o período de pagamento." : de ? "Wähle zuerst den Plan, dann den Abrechnungszeitraum." : language === "it" ? "Scegli un piano, quindi scegli il periodo di fatturazione." : "Pick a plan, then choose the billing period."}
           </Text>
         </View>
 
@@ -582,7 +583,7 @@ export default function PremiumScreen() {
                     {isMax && !isSelected && (
                       <View style={[styles.tierTabMiniBadge, { backgroundColor: isSelected ? "rgba(255,255,255,0.22)" : alpha("#F59E0B", 0.16) }]}>
                         <Text style={[styles.tierTabMiniBadgeText, { color: isSelected ? "#fff" : "#F59E0B" }]}>
-                          {tr ? "EN YÜKSEK" : es ? "MÁXIMO" : pt ? "MÁXIMO" : de ? "MAXIMAL" : "HIGHEST"}
+                          {tr ? "EN YÜKSEK" : es ? "MÁXIMO" : pt ? "MÁXIMO" : de ? "MAXIMAL" : language === "it" ? "PIÙ ALTO" : "HIGHEST"}
                         </Text>
                       </View>
                     )}
@@ -594,8 +595,8 @@ export default function PremiumScreen() {
                     ]}
                   >
                     {isMax
-                      ? tr ? `${AI_PLAN_LIMITS.unlimited.daily} AI / gün · En geniş limitler` : es ? `${AI_PLAN_LIMITS.unlimited.daily} IA/día · Límites máximos` : pt ? `${AI_PLAN_LIMITS.unlimited.daily} IA/dia · Limites máximos` : de ? `${AI_PLAN_LIMITS.unlimited.daily} KI/Tag · Höchste Limits` : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Highest limits`
-                      : tr ? `${AI_PLAN_LIMITS.premium.daily} AI / gün · Dengeli seçenek` : es ? `${AI_PLAN_LIMITS.premium.daily} IA/día · Opción equilibrada` : pt ? `${AI_PLAN_LIMITS.premium.daily} IA/dia · Opção equilibrada` : de ? `${AI_PLAN_LIMITS.premium.daily} KI/Tag · Ausgewogene Wahl` : `${AI_PLAN_LIMITS.premium.daily} AI/day · Balanced choice`}
+                      ? tr ? `${AI_PLAN_LIMITS.unlimited.daily} AI / gün · En geniş limitler` : es ? `${AI_PLAN_LIMITS.unlimited.daily} IA/día · Límites máximos` : pt ? `${AI_PLAN_LIMITS.unlimited.daily} IA/dia · Limites máximos` : de ? `${AI_PLAN_LIMITS.unlimited.daily} KI/Tag · Höchste Limits` : language === "it" ? `${AI_PLAN_LIMITS.unlimited.daily} AI/giorno · Limiti più alti` : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Highest limits`
+                      : tr ? `${AI_PLAN_LIMITS.premium.daily} AI / gün · Dengeli seçenek` : es ? `${AI_PLAN_LIMITS.premium.daily} IA/día · Opción equilibrada` : pt ? `${AI_PLAN_LIMITS.premium.daily} IA/dia · Opção equilibrada` : de ? `${AI_PLAN_LIMITS.premium.daily} KI/Tag · Ausgewogene Wahl` : language === "it" ? `${AI_PLAN_LIMITS.premium.daily} AI/giorno · Scelta bilanciata` : `${AI_PLAN_LIMITS.premium.daily} AI/day · Balanced choice`}
                   </Text>
                 </View>
               </Pressable>
@@ -608,7 +609,7 @@ export default function PremiumScreen() {
           <View style={styles.packagesLoader}>
             <LensLoader size="large" color={C.accent} />
             <Text style={[styles.packagesLoaderText, { color: C.muted }]}>
-              {tr ? "Mağaza fiyatları alınıyor…" : es ? "Cargando precios de la tienda…" : pt ? "Carregando preços da loja…" : de ? "Store-Preise werden geladen…" : "Loading store prices…"}
+              {tr ? "Mağaza fiyatları alınıyor…" : es ? "Cargando precios de la tienda…" : pt ? "Carregando preços da loja…" : de ? "Store-Preise werden geladen…" : language === "it" ? "Caricamento dei prezzi del negozio in corso..." : "Loading store prices…"}
             </Text>
           </View>
         ) : selectedTierPackages.length > 0 ? (
@@ -649,13 +650,13 @@ export default function PremiumScreen() {
                       <View style={[styles.popularBadge, { backgroundColor: "#F59E0B" }]}>
                         <AppIcon name="flame" size={11} color="#fff" />
                         <Text style={styles.popularBadgeText}>
-                          {tr ? "EN AVANTAJLI" : es ? "MEJOR PRECIO" : pt ? "MELHOR PREÇO" : de ? "BESTES ANGEBOT" : "BEST VALUE"}
+                          {tr ? "EN AVANTAJLI" : es ? "MEJOR PRECIO" : pt ? "MELHOR PREÇO" : de ? "BESTES ANGEBOT" : language === "it" ? "MIGLIOR VALORE" : "BEST VALUE"}
                         </Text>
                       </View>
                     ) : (
                       <View style={[styles.flexibleBadge, { backgroundColor: C.cardAlt }]}>
                         <Text style={[styles.flexibleBadgeText, { color: C.muted }]}>
-                          {tr ? "ESNEK DÖNEM" : es ? "FLEXIBLE" : pt ? "FLEXÍVEL" : de ? "FLEXIBEL" : "FLEXIBLE"}
+                          {tr ? "ESNEK DÖNEM" : es ? "FLEXIBLE" : pt ? "FLEXÍVEL" : de ? "FLEXIBEL" : language === "it" ? "FLESSIBILE" : "FLEXIBLE"}
                         </Text>
                       </View>
                     )}
@@ -697,15 +698,15 @@ export default function PremiumScreen() {
                           <View style={[styles.savingsPill, { backgroundColor: alpha(OFFER_COLOR, 0.16) }]}>
                             <Text style={[styles.savingsText, { color: OFFER_COLOR }]}>
                               {offer.free
-                                ? tr ? "ÜCRETSİZ DENEME" : es ? "PRUEBA GRATIS" : pt ? "TESTE GRÁTIS" : de ? "KOSTENLOS TESTEN" : "FREE TRIAL"
-                                : tr ? `%${offer.percent} İNDİRİM` : es ? `${offer.percent}% DE DESCUENTO` : pt ? `${offer.percent}% DE DESCONTO` : de ? `${offer.percent} % RABATT` : `${offer.percent}% OFF`}
+                                ? tr ? "ÜCRETSİZ DENEME" : es ? "PRUEBA GRATIS" : pt ? "TESTE GRÁTIS" : de ? "KOSTENLOS TESTEN" : language === "it" ? "PROVA GRATUITA" : "FREE TRIAL"
+                                : tr ? `%${offer.percent} İNDİRİM` : es ? `${offer.percent}% DE DESCUENTO` : pt ? `${offer.percent}% DE DESCONTO` : de ? `${offer.percent} % RABATT` : language === "it" ? `${offer.percent}% DI SCONTO` : `${offer.percent}% OFF`}
                             </Text>
                           </View>
                         )}
                         {savings && (
                           <View style={[styles.savingsPill, { backgroundColor: C.iconGreen }]}>
                             <Text style={[styles.savingsText, { color: C.green }]}>
-                              {tr ? `%${savings.percent} TASARRUF` : es ? `AHORRA ${savings.percent}%` : pt ? `ECONOMIZE ${savings.percent}%` : de ? `${savings.percent} % SPAREN` : `SAVE ${savings.percent}%`}
+                              {tr ? `%${savings.percent} TASARRUF` : es ? `AHORRA ${savings.percent}%` : pt ? `ECONOMIZE ${savings.percent}%` : de ? `${savings.percent} % SPAREN` : language === "it" ? `RISPARMIA ${savings.percent}%` : `SAVE ${savings.percent}%`}
                             </Text>
                           </View>
                         )}
@@ -720,7 +721,7 @@ export default function PremiumScreen() {
                           </Text>
                           <View style={styles.priceRow}>
                             <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
-                              {offer.free ? (tr ? "Ücretsiz" : es ? "Gratis" : pt ? "Grátis" : de ? "Kostenlos" : "Free") : offer.priceString}
+                              {offer.free ? (tr ? "Ücretsiz" : es ? "Gratis" : pt ? "Grátis" : de ? "Kostenlos" : language === "it" ? "Gratis" : "Free") : offer.priceString}
                             </Text>
                             <Text style={[styles.pricePeriod, { color: C.muted }]}>
                               {offer.free ? "" : offerPeriodLabel(offer, language)}
@@ -761,11 +762,11 @@ export default function PremiumScreen() {
                     <View style={[styles.monthlyEquivalentCallout, { backgroundColor: alpha(C.accent, 0.08), borderColor: alpha(C.accent, 0.16) }]}>
                       <AppIcon name="calculator-outline" size={13} color={C.accent} />
                       <Text style={[styles.monthlyEquivalentText, { color: C.text }]}>
-                        {tr ? "Sadece " : es ? "Solo " : pt ? "Apenas " : de ? "Nur " : "Only "}
+                        {tr ? "Sadece " : es ? "Solo " : pt ? "Apenas " : de ? "Nur " : language === "it" ? "Solo " : "Only "}
                         <Text style={{ color: C.accent, fontWeight: "900" }}>
                           {monthlyEquivalent}
                         </Text>
-                        {tr ? " / aya denk gelir" : es ? " / mes (equivalente)" : pt ? " / mês (equivalente)" : de ? " / Monat umgerechnet" : " / month equivalent"}
+                        {tr ? " / aya denk gelir" : es ? " / mes (equivalente)" : pt ? " / mês (equivalente)" : de ? " / Monat umgerechnet" : language === "it" ? "/mese equivalente" : " / month equivalent"}
                       </Text>
                     </View>
                   )}
@@ -778,8 +779,8 @@ export default function PremiumScreen() {
             <AppIcon family="Ionicons" name="construct-outline" size={20} color={C.amber} />
             <Text style={[styles.noticeText, { color: C.muted }]}>
               {configurationError === "missing-api-key"
-                ? tr ? "RevenueCat API anahtarı bekleniyor." : es ? "Falta la clave de la API de RevenueCat." : pt ? "A chave da API do RevenueCat não foi encontrada." : de ? "Der RevenueCat-API-Schlüssel fehlt." : "RevenueCat API key is missing."
-                : tr ? `${selectedPlanName} mağaza paketleri henüz hazır değil.` : es ? `Los paquetes de ${selectedPlanName} aún no se han cargado.` : pt ? `Os pacotes de ${selectedPlanName} ainda não foram carregados.` : de ? `${selectedPlanName}-Pakete wurden noch nicht geladen.` : `${selectedPlanName} packages not loaded yet.`}
+                ? tr ? "RevenueCat API anahtarı bekleniyor." : es ? "Falta la clave de la API de RevenueCat." : pt ? "A chave da API do RevenueCat não foi encontrada." : de ? "Der RevenueCat-API-Schlüssel fehlt." : language === "it" ? "Manca la chiave APIRevenueCat." : "RevenueCat API key is missing."
+                : tr ? `${selectedPlanName} mağaza paketleri henüz hazır değil.` : es ? `Los paquetes de ${selectedPlanName} aún no se han cargado.` : pt ? `Os pacotes de ${selectedPlanName} ainda não foram carregados.` : de ? `${selectedPlanName}-Pakete wurden noch nicht geladen.` : language === "it" ? `${selectedPlanName} pacchetti non ancora caricati.` : `${selectedPlanName} packages not loaded yet.`}
             </Text>
           </GlassBox>
         )}
@@ -815,17 +816,17 @@ export default function PremiumScreen() {
                 <View style={styles.ctaTextContainer}>
                   <Text style={styles.ctaMainText}>
                     {selectedTier === plan
-                      ? tr ? "Aboneliği Yönet" : es ? "Gestionar suscripción" : pt ? "Gerenciar assinatura" : de ? "Abo verwalten" : "Manage Subscription"
+                      ? tr ? "Aboneliği Yönet" : es ? "Gestionar suscripción" : pt ? "Gerenciar assinatura" : de ? "Abo verwalten" : language === "it" ? "Gestisci abbonamento" : "Manage Subscription"
                       : isPremium
-                      ? tr ? `${selectedPlanName}'e Yükselt` : es ? `Pasar a ${selectedPlanName}` : pt ? `Mudar para ${selectedPlanName}` : de ? `Auf ${selectedPlanName} upgraden` : `Upgrade to ${selectedPlanName}`
-                      : tr ? "Hemen Başla" : es ? "Empieza ahora" : pt ? "Comece agora" : de ? "Jetzt loslegen" : "Get Started Now"}
+                      ? tr ? `${selectedPlanName}'e Yükselt` : es ? `Pasar a ${selectedPlanName}` : pt ? `Mudar para ${selectedPlanName}` : de ? `Auf ${selectedPlanName} upgraden` : language === "it" ? `Aggiorna a ${selectedPlanName}` : `Upgrade to ${selectedPlanName}`
+                      : tr ? "Hemen Başla" : es ? "Empieza ahora" : pt ? "Comece agora" : de ? "Jetzt loslegen" : language === "it" ? "Inizia subito" : "Get Started Now"}
                   </Text>
                   {selectedTier !== plan && selectedDisplayPackage && (
                     <Text style={styles.ctaSubText}>
                       {selectedOffer
                         ? offerDisclosure(selectedOffer, selectedDisplayPackage, language)
                         : `${getPackageRegularPrice(selectedDisplayPackage).priceString} ${packagePeriodLabel(selectedDisplayPackage, language)}`}
-                      {tr ? " · İstediğin an iptal et" : es ? " · Cancela cuando quieras" : pt ? " · Cancele quando quiser" : de ? " · Jederzeit kündbar" : " · Cancel anytime"}
+                      {tr ? " · İstediğin an iptal et" : es ? " · Cancela cuando quieras" : pt ? " · Cancele quando quiser" : de ? " · Jederzeit kündbar" : language === "it" ? "· Annulla in qualsiasi momento" : " · Cancel anytime"}
                     </Text>
                   )}
                 </View>
@@ -838,7 +839,7 @@ export default function PremiumScreen() {
         <View style={styles.purchaseNoteRow}>
           <AppIcon name="shield-checkmark-outline" size={14} color={C.green} />
           <Text style={[styles.purchaseNoteText, { color: C.muted }]}>
-            {tr ? "Ödeme mağaza hesabın üzerinden güvenle işlenir · İstediğin an iptal" : es ? "Pago seguro mediante tu cuenta de la tienda · Cancela cuando quieras" : pt ? "Pagamento seguro pela sua conta da loja · Cancele quando quiser" : de ? "Sichere Zahlung über dein Store-Konto · Jederzeit kündbar" : "Secure payment through your store account · Cancel anytime"}
+            {tr ? "Ödeme mağaza hesabın üzerinden güvenle işlenir · İstediğin an iptal" : es ? "Pago seguro mediante tu cuenta de la tienda · Cancela cuando quieras" : pt ? "Pagamento seguro pela sua conta da loja · Cancele quando quiser" : de ? "Sichere Zahlung über dein Store-Konto · Jederzeit kündbar" : language === "it" ? "Pagamento sicuro tramite il tuo account del negozio · Annulla in qualsiasi momento" : "Secure payment through your store account · Cancel anytime"}
           </Text>
         </View>
       </View>
@@ -847,10 +848,10 @@ export default function PremiumScreen() {
       <View style={styles.featuresSection}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? `${selectedPlanName} ile gelenler` : es ? `Incluido con ${selectedPlanName}` : pt ? `Incluído no ${selectedPlanName}` : de ? `In ${selectedPlanName} enthalten` : `Included with ${selectedPlanName}`}
+            {tr ? `${selectedPlanName} ile gelenler` : es ? `Incluido con ${selectedPlanName}` : pt ? `Incluído no ${selectedPlanName}` : de ? `In ${selectedPlanName} enthalten` : language === "it" ? `Incluso in ${selectedPlanName}` : `Included with ${selectedPlanName}`}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr ? `${selectedBenefits.length} özelliğin tamamı` : es ? `Las ${selectedBenefits.length} funciones incluidas` : pt ? `Todos os ${selectedBenefits.length} recursos incluídos` : de ? `Alle ${selectedBenefits.length} enthaltenen Funktionen` : `All ${selectedBenefits.length} included features`}
+            {tr ? `${selectedBenefits.length} özelliğin tamamı` : es ? `Las ${selectedBenefits.length} funciones incluidas` : pt ? `Todos os ${selectedBenefits.length} recursos incluídos` : de ? `Alle ${selectedBenefits.length} enthaltenen Funktionen` : language === "it" ? `Tutte le funzionalità incluse di ${selectedBenefits.length}` : `All ${selectedBenefits.length} included features`}
           </Text>
         </View>
 
@@ -896,8 +897,8 @@ export default function PremiumScreen() {
           >
             <Text style={[styles.benefitToggleText, { color: C.accent }]}>
               {showAllBenefits
-                ? tr ? "Daralt" : es ? "Ver menos" : pt ? "Ver menos" : de ? "Weniger anzeigen" : "Show less"
-                : tr ? `Tümünü göster (${selectedBenefits.length})` : es ? `Ver todo (${selectedBenefits.length})` : pt ? `Ver tudo (${selectedBenefits.length})` : de ? `Alle anzeigen (${selectedBenefits.length})` : `Show all (${selectedBenefits.length})`}
+                ? tr ? "Daralt" : es ? "Ver menos" : pt ? "Ver menos" : de ? "Weniger anzeigen" : language === "it" ? "Mostra meno" : "Show less"
+                : tr ? `Tümünü göster (${selectedBenefits.length})` : es ? `Ver todo (${selectedBenefits.length})` : pt ? `Ver tudo (${selectedBenefits.length})` : de ? `Alle anzeigen (${selectedBenefits.length})` : language === "it" ? `Mostra tutto (${selectedBenefits.length})` : `Show all (${selectedBenefits.length})`}
             </Text>
             <AppIcon
               name={showAllBenefits ? "chevron-up" : "chevron-down"}
@@ -957,19 +958,19 @@ export default function PremiumScreen() {
               <View style={[styles.accordionSmallBadge, { backgroundColor: alpha(C.accent, 0.14) }]}>
                 <View style={[styles.accordionDot, { backgroundColor: C.accent }]} />
                 <Text style={[styles.accordionSmallBadgeText, { color: C.accent }]}>
-                  {tr ? "PLAN KARŞILAŞTIRMA" : es ? "COMPARACIÓN DE PLANES" : pt ? "COMPARAÇÃO DE PLANOS" : de ? "PLANVERGLEICH" : "PLAN COMPARISON"}
+                  {tr ? "PLAN KARŞILAŞTIRMA" : es ? "COMPARACIÓN DE PLANES" : pt ? "COMPARAÇÃO DE PLANOS" : de ? "PLANVERGLEICH" : language === "it" ? "CONFRONTO DEI PIANI" : "PLAN COMPARISON"}
                 </Text>
               </View>
               <Text style={[styles.accordionFeatureCount, { color: C.muted }]}>
-                {tr ? `${comparisonSections.length} Kategori · ${comparisonRowCount} Özellik` : es ? `${comparisonSections.length} categorías · ${comparisonRowCount} funciones` : pt ? `${comparisonSections.length} categorias · ${comparisonRowCount} recursos` : de ? `${comparisonSections.length} Kategorien · ${comparisonRowCount} Funktionen` : `${comparisonSections.length} Categories · ${comparisonRowCount} Features`}
+                {tr ? `${comparisonSections.length} Kategori · ${comparisonRowCount} Özellik` : es ? `${comparisonSections.length} categorías · ${comparisonRowCount} funciones` : pt ? `${comparisonSections.length} categorias · ${comparisonRowCount} recursos` : de ? `${comparisonSections.length} Kategorien · ${comparisonRowCount} Funktionen` : language === "it" ? `${comparisonSections.length} Categorie · ${comparisonRowCount} Funzionalità` : `${comparisonSections.length} Categories · ${comparisonRowCount} Features`}
               </Text>
             </View>
 
             <Text style={[styles.accordionToggleTitle, { color: C.text }]}>
-              {tr ? "Planları Karşılaştır" : es ? "Comparar planes" : pt ? "Comparar planos" : de ? "Pläne vergleichen" : "Compare Plans"}
+              {tr ? "Planları Karşılaştır" : es ? "Comparar planes" : pt ? "Comparar planos" : de ? "Pläne vergleichen" : language === "it" ? "Confronta i piani" : "Compare Plans"}
             </Text>
             <Text style={[styles.accordionToggleSub, { color: C.muted }]}>
-              {tr ? "Free, Premium ve Premium Max'te her özelliğin sınırı" : es ? "El límite de cada función en Gratis, Premium y Premium Max" : pt ? "O limite de cada recurso no Grátis, no Premium e no Premium Max" : de ? "Das Limit jeder Funktion bei Kostenlos, Premium und Premium Max" : "Every feature's limit on Free, Premium and Premium Max"}
+              {tr ? "Free, Premium ve Premium Max'te her özelliğin sınırı" : es ? "El límite de cada función en Gratis, Premium y Premium Max" : pt ? "O limite de cada recurso no Grátis, no Premium e no Premium Max" : de ? "Das Limit jeder Funktion bei Kostenlos, Premium und Premium Max" : language === "it" ? "Limite di ogni funzionalità su Free, Premium e Premium Max" : "Every feature's limit on Free, Premium and Premium Max"}
             </Text>
           </View>
 
@@ -999,7 +1000,7 @@ export default function PremiumScreen() {
               contentContainerStyle={styles.categoryFilterRow}
             >
               {[
-                { id: "all", title: tr ? "✦ Tümü" : es ? "✦ Todo" : pt ? "✦ Tudo" : de ? "✦ Alle" : "✦ All", icon: "sparkles", color: "#6366F1" },
+                { id: "all", title: tr ? "✦ Tümü" : es ? "✦ Todo" : pt ? "✦ Tudo" : de ? "✦ Alle" : language === "it" ? "✦ Tutti" : "✦ All", icon: "sparkles", color: "#6366F1" },
                 ...comparisonSections,
               ].map((cat) => {
                 const isCatActive = categoryFilter === cat.id;
@@ -1177,7 +1178,7 @@ export default function PremiumScreen() {
             <LensLoader size="small" color={C.accent} />
           ) : (
             <Text style={[styles.restoreBtnText, { color: C.accent }]}>
-              {tr ? "Önceki Satın Alımları Geri Yükle" : es ? "Restaurar compras anteriores" : pt ? "Restaurar compras anteriores" : de ? "Frühere Käufe wiederherstellen" : "Restore Previous Purchases"}
+              {tr ? "Önceki Satın Alımları Geri Yükle" : es ? "Restaurar compras anteriores" : pt ? "Restaurar compras anteriores" : de ? "Frühere Käufe wiederherstellen" : language === "it" ? "Ripristina gli acquisti precedenti" : "Restore Previous Purchases"}
             </Text>
           )}
         </Pressable>
@@ -1186,7 +1187,7 @@ export default function PremiumScreen() {
       {/* LEGAL FOOTER */}
       <View style={styles.legalSection}>
         <Text style={[styles.legalDisclaimer, { color: C.muted }]}>
-          {tr ? "Satın alma tutarı uygulama mağazası hesabınızdan tahsil edilir. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. İstediğiniz zaman mağaza hesap ayarlarınızdan iptal edebilir veya yönetebilirsiniz." : es ? "El pago se cargará a tu cuenta de la tienda. La suscripción se renueva automáticamente salvo que la canceles al menos 24 horas antes de que termine el periodo actual. Puedes gestionarla o cancelarla en cualquier momento en los ajustes de tu cuenta de la tienda." : pt ? "O pagamento será cobrado na sua conta da loja. A assinatura é renovada automaticamente, a menos que seja cancelada pelo menos 24 horas antes do fim do período atual. Você pode gerenciá-la ou cancelá-la a qualquer momento nas configurações da sua conta da loja." : de ? "Die Zahlung wird deinem Store-Konto belastet. Das Abo verlängert sich automatisch, sofern es nicht mindestens 24 Stunden vor Ende des laufenden Zeitraums gekündigt wird. Du kannst es jederzeit in den Einstellungen deines Store-Kontos verwalten oder kündigen." : "Payment will be charged to your store account. The subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account settings."}
+          {tr ? "Satın alma tutarı uygulama mağazası hesabınızdan tahsil edilir. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. İstediğiniz zaman mağaza hesap ayarlarınızdan iptal edebilir veya yönetebilirsiniz." : es ? "El pago se cargará a tu cuenta de la tienda. La suscripción se renueva automáticamente salvo que la canceles al menos 24 horas antes de que termine el periodo actual. Puedes gestionarla o cancelarla en cualquier momento en los ajustes de tu cuenta de la tienda." : pt ? "O pagamento será cobrado na sua conta da loja. A assinatura é renovada automaticamente, a menos que seja cancelada pelo menos 24 horas antes do fim do período atual. Você pode gerenciá-la ou cancelá-la a qualquer momento nas configurações da sua conta da loja." : de ? "Die Zahlung wird deinem Store-Konto belastet. Das Abo verlängert sich automatisch, sofern es nicht mindestens 24 Stunden vor Ende des laufenden Zeitraums gekündigt wird. Du kannst es jederzeit in den Einstellungen deines Store-Kontos verwalten oder kündigen." : language === "it" ? "Il pagamento verrà addebitato sul conto del tuo negozio. L'abbonamento si rinnova automaticamente salvo disdetta almeno 24 ore prima della fine del periodo corrente. Puoi gestire o annullare in qualsiasi momento nelle impostazioni dell'account del tuo negozio." : "Payment will be charged to your store account. The subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account settings."}
         </Text>
 
         <View style={styles.legalLinksRow}>

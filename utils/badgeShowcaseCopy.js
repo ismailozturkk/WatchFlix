@@ -110,8 +110,29 @@ export const BADGE_SHOWCASE_COPY = {
     resetFilters: "Suche und Filter zurücksetzen",
     removeSlotA11y: (name) => `${name} aus der Vitrine entfernen`,
   },
-};
+
+  it: {
+  profileTitle: "Badge in primo piano",
+  cardTitle: "Vetrina del profilo",
+  cardSubtitle: "Scegli fino a 6 badge da visualizzare sul profilo del tuo amico",
+  selectingHint: "Tocca i badge sbloccati di seguito per aggiungere o rimuovere dalla tua vetrina",
+  edit: "Modifica",
+  done: "Fatto",
+  emptySlot: "Scegli badge",
+  addToShowcase: "Aggiungi al profilo Vetrina",
+  inShowcaseRemove: "In Vetrina · Rimuovi",
+  showcaseBadgeTag: "INSERITO",
+  showcaseFullTitle: "Vetrina piena (6/6)",
+  showcaseFullBody: "Rimuovi prima uno dei 6 badge in mostra per aggiungerne un altro.",
+  lockedBadgeHint: "Solo i badge sbloccati che hai guadagnato possono essere aggiunti alla tua vetrina.",
+  searchPlaceholder: "Cerca nome, descrizione o sezione del badge…",
+  searchClear: "Cancella ricerca",
+  searchResultsCount: n => `${n} badge trovati`,
+  searchEmpty: "Nessun badge corrisponde alla tua ricerca.",
+  resetFilters: "Reimposta ricerca e filtri",
+  removeSlotA11y: name => `Rimuovi ${name} dalla vetrina`
+}};
 
 export function getBadgeShowcaseCopy(language) {
-  return BADGE_SHOWCASE_COPY[copyLanguage(language, ["tr", "en", "es", "pt", "de"])];
+  return BADGE_SHOWCASE_COPY[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"])];
 }

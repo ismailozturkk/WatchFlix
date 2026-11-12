@@ -59,6 +59,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("expo-image", () => ({ Image: "Image" }));
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "Gradient" }));
+jest.mock("react-native-svg", () => ({ __esModule: true, default: "Svg", Circle: "Circle" }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
 jest.mock("../utils/i18nText", () => ({
   // Eski davranışı taklit eder: cihaz diliyle büyük harf, Türkçe yüzde.
@@ -1105,11 +1106,33 @@ describe("SharedTasteMatchMessage", () => {
     );
   const mount = (share, props = {}) => render(<SharedTasteMatchMessage share={share} getTmdbUrl={getTmdbUrl} {...props} />).root;
 
-  test("shows the percent, the tier, both names and the shared facts in the receiver's language", () => {
-    const text = textOf(mount(taste()));
-    ["ZEVK UYUMU", "Ali & Ada", "%72", "Epey benzer zevkleriniz var", "3 ortak izlenen", "1 ortak favori", "Ortak türler: Dram, Komedi", "Puanlarda %83 uyum · 4 ortak puan", "Ortak sevdiğiniz: Film 1"].forEach(
-      (part) => expect(text).toContain(part),
+  test("profil kartının üst kısmı (türler dahil): yüzde, kademe, adlar, sayı şeridi ve tür çipleri — alıcının dilinde", () => {
+    const root = mount(taste());
+    const text = textOf(root);
+    ["ZEVK UYUMU", "Ali & Ada", "%72", "Epey benzer zevkleriniz var", "Ortak izlenen", "Ortak favori", "Puan uyumu", "%83", "Dram", "Komedi"].forEach((part) =>
+      expect(text).toContain(part),
     );
+    // halka puanı oranla çizer
+    const arc = root.findAllByType("Circle").find((c) => c.props.strokeDasharray);
+    expect(arc.props.strokeDashoffset).toBeCloseTo(Number(arc.props.strokeDasharray) * (1 - 0.72), 5);
+    // içgörü ve afiş sohbete gitmez
+    expect(text).not.toContain("Ortak sevdiğiniz");
+    expect(root.findAllByType("Image")).toHaveLength(0);
+  });
+
+  test("Film / Dizi kutuları profildeki gibi: puan + ortak sayısı; paylaşılmayan kategori kilitli", () => {
+    const text = textOf(
+      mount(taste({ byType: { movie: { shared: true, score: 80, overlap: 3 }, tv: { shared: false, score: null } }, scope: "movies" })),
+    );
+    expect(text).toContain("Film");
+    expect(text).toContain("%80");
+    expect(text).toContain("3 ortak");
+    expect(text).toContain("Paylaşılmıyor");
+  });
+
+  test("az veri ve yaklaşık notu gövdeyle taşınır", () => {
+    const text = textOf(mount(taste({ state: "limited", lowData: true })));
+    expect(text).toContain("Analiz edilecek içerik az");
   });
 
   test.each([
@@ -1126,24 +1149,19 @@ describe("SharedTasteMatchMessage", () => {
     expect(progress).toBeTruthy();
   });
 
-  test("shows the movie / show split only for the categories that have a score", () => {
-    const both = textOf(mount(taste({ byType: { movie: { score: 80 }, tv: { score: 61 } } })));
-    expect(both).toContain("Film %80");
-    expect(both).toContain("Dizi %61");
-    const onlyShows = textOf(mount(taste({ byType: { movie: { score: null }, tv: { score: 66 } } })));
-    expect(onlyShows).toContain("Dizi %66");
-    expect(onlyShows).not.toContain("Film %");
-    expect(textOf(mount(taste()))).not.toContain("Dizi %");
+  test("eski gövde (types yok): düz film / dizi puanından kutu; hiç yoksa kutu yok", () => {
+    const legacy = mount({ v: 1, type: "tasteMatch", score: 72, tier: "high", movie: 80, tv: 61 });
+    const text = textOf(legacy);
+    expect(text).toContain("%80");
+    expect(text).toContain("%61");
+    expect(textOf(mount(taste()))).not.toContain("Dizi");
   });
 
-  test("renders the shared posters and omits empty rows", () => {
-    const root = mount(taste({ favorites: [], genres: { shared: [] }, ratings: { pairs: 0, agreement: null }, loved: [], highlights: [] }));
-    const text = textOf(root);
-    expect(text).not.toContain("ortak favori");
-    expect(text).not.toContain("Ortak türler");
-    expect(text).not.toContain("Puanlarda");
-    expect(root.findAllByType("Image")).toHaveLength(0);
-    expect(mount(taste()).findAllByType("Image")).toHaveLength(1);
+  test("boş hücreler çizilmez", () => {
+    const text = textOf(mount(taste({ favorites: [], genres: { shared: [] }, ratings: { pairs: 0, agreement: null }, loved: [], highlights: [] })));
+    expect(text).not.toContain("Ortak favori");
+    expect(text).not.toContain("Puan uyumu");
+    expect(text).not.toContain("Dram");
   });
 
   test("MessageBubble draws a taste match share with this body (no tap target)", () => {

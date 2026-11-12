@@ -257,6 +257,51 @@ export const LEAGUE_COPY = {
     ],
     rowA11y: (rank, name, xp) => `${rank}. ${name}, ${xp} XP`,
   },
-};
+
+  it: {
+  eyebrow: "WEEKLY LEAGUE",
+  tiers: ["Bronzo", "Argento", "Oro", "Diamond", "Legend"],
+  league: name => `${name} Lega`,
+  rank: n => `#${n}`,
+  rankOf: (n, size) => `#${n} di ${size}`,
+  xp: n => `${n} XP`,
+  daysLeft: n => n === 1 ? "1 giorno rimasto" : `${n} giorni rimasti`,
+  hoursLeft: n => n === 1 ? "1 ora rimasta" : `${n} ore rimaste`,
+  lastHour: "Ultima ora",
+  joinTitle: "Il campionato di questa settimana ti aspetta",
+  joinSub: "Gioca, guarda o vota: i tuoi primi XP ti collocano in un gruppo di 30.",
+  pending: "Calcolo dei risultati della settimana scorsa…",
+  resultUp: league => `Promosso: ${league}`,
+  resultDown: league => `Detrocesso: ${league}`,
+  resultStay: league => `Rimanuto a ${league}`,
+  open: "Apri il tavolo",
+  screenTitle: "Weekly League",
+  screenSub: "Un nuovo gruppo ogni lunedì",
+  loading: "Caricamento campionato…",
+  error: "Impossibile caricare il campionato",
+  retry: "Riprova",
+  ladderTitle: "Campionati",
+  tableTitle: "Gruppo di questa settimana",
+  you: "Tu",
+  player: "Giocatore Seelogd",
+  promoteZone: "Zona promozione",
+  demoteZone: "Zona di retrocessione",
+  promoteNeeds: min => `Hai bisogno di almeno ${min} XP per essere promosso`,
+  noDemote: "Meno di 5 giocatori: nessuno perde questa settimana",
+  topTier: "Sei nella lega più alta: nessuna promozione, rimani in cima",
+  lastWeek: "La scorsa settimana",
+  lastWeekBody: (rank, size, xp) => `Hai finito #${rank} di ${size} · ${xp} XP`,
+  howTitle: "Come guadagnare XP",
+  perEvent: (xp, daily) => `+${xp} XP · fino a ${daily} volte al giorno`,
+  sources: {
+    game: ["Termina un gioco", "Giochi veloci, Indovina scena, Puzzle poster, Film Chain gratuito"],
+    daily: ["Puzzle quotidiano", "Frame of the Day, Film Chain e la sfida quotidiana (una volta al giorno ciascuno)"],
+    watch: ["Segna come guardato", "Film, episodi e stagioni guardati oggi o ieri"],
+    vote: ["Vota", "Domanda del giorno e Seelogd Top 100"]
+  },
+  rulesTitle: "Regole",
+  rules: ["La settimana inizia lunedì alle 00:00 (ora della Turchia) e termina domenica a mezzanotte.", "Il 20% più alto del gruppo sale di livello, il 20% più basso scende.", "A parità di XP, chi lo ha raggiunto per primo si classifica più in alto.", "Ogni evento conta una volta alla settimana; ogni fonte ha un limite giornaliero."],
+  rowA11y: (rank, name, xp) => `${rank}. ${name}, ${xp} XP`
+}};
 
 export const getLeagueCopy = (language) => LEAGUE_COPY[copyLanguage(language, Object.keys(LEAGUE_COPY))];

@@ -160,7 +160,7 @@ export default function TournamentWidget({ navigation }) {
     const done = bracketPreview.rounds.reduce(
       (n, r) => n + r.matches.filter((m) => m.decided && m.winnerSide).length, 0,
     );
-    return lang === "tr" ? `${TOTAL_MATCHES} maçın ${done} tanesi tamamlandı` : lang === "es" ? `${done} de ${TOTAL_MATCHES} partidos completados` : lang === "pt" ? `${done} de ${TOTAL_MATCHES} partidas concluídas` : lang === "de" ? `${done} von ${TOTAL_MATCHES} Duellen abgeschlossen` : `${done} of ${TOTAL_MATCHES} matches complete`;
+    return lang === "tr" ? `${TOTAL_MATCHES} maçın ${done} tanesi tamamlandı` : lang === "es" ? `${done} de ${TOTAL_MATCHES} partidos completados` : lang === "pt" ? `${done} de ${TOTAL_MATCHES} partidas concluídas` : lang === "de" ? `${done} von ${TOTAL_MATCHES} Duellen abgeschlossen` : lang === "it" ? `${done} di ${TOTAL_MATCHES} partite completate` : `${done} of ${TOTAL_MATCHES} matches complete`;
   }, [bracketPreview, lang]);
 
   // Katılımcı sayısı (agg varsa). Kartta yalnız sayı + ikon görünür (dar

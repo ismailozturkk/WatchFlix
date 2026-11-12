@@ -11,12 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  InteractionManager,
 } from "react-native";
+import { runAfterInteractions } from "../../utils/afterInteractions";
 import LensLoader from "../../components/LensLoader";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../context/LanguageContext";
+import { useAuth } from "../../context/AuthContext";
 import AppIcon from "../../components/AppIcon";
 import GlassCloseButton from "../../components/common/GlassCloseButton";
 import { useTheme } from "../../context/ThemeContext";
@@ -337,6 +338,9 @@ export default function SettingsScreen() {
   // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
   const { logo: appLogo } = useAppLogo();
   const navigation = useNavigation();
+  // Doğrulanmamış e-posta: "Hesap bilgileri" satırında kırmızı uyarı (ayrıntı o ekranda).
+  const { user } = useAuth();
+  const emailUnverified = Boolean(user?.email) && !user?.emailVerified;
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
@@ -344,7 +348,7 @@ export default function SettingsScreen() {
   // Arka planda Settings etkileşimleri bittiğinde PremiumScreen modülünü önceden yükle (preload)
   // Böylece butona dokunulduğunda JS thread takılmadan 60 FPS anında açılır.
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       try {
         require("../premium/PremiumScreen");
       } catch {}
@@ -382,56 +386,64 @@ export default function SettingsScreen() {
         es: "Tu plan, límites y ventajas de la membresía",
         pt: "Seu plano, limites e benefícios da assinatura",
         de: "Dein Plan, Kontingente und Mitgliedsvorteile",
-      }),
+
+  it: "Il tuo piano, i vantaggi e i vantaggi dell'abbonamento"}),
       account: pickByLanguage(language, {
         tr: "Giriş yöntemleri, gizlilik ve davetler",
         en: "Sign-in methods, privacy, and invites",
         es: "Métodos de acceso, privacidad e invitaciones",
         pt: "Métodos de acesso, privacidade e convites",
         de: "Anmeldung, Datenschutz und Einladungen",
-      }),
+
+  it: "Metodi di accesso, privacy e inviti"}),
       appearance: pickByLanguage(language, {
         tr: "Tema, posterler ve uygulamanın görünümü",
         en: "Theme, posters, and how the app looks",
         es: "Tema, pósteres y apariencia de la app",
         pt: "Tema, pôsteres e aparência do app",
         de: "Design, Poster und App-Darstellung",
-      }),
+
+  it: "Tema, poster e aspetto dell'app"}),
       content: pickByLanguage(language, {
         tr: "Dil, platformlar ve izleme tercihleri",
         en: "Language, services, and viewing preferences",
         es: "Idioma, servicios y preferencias de contenido",
         pt: "Idioma, serviços e preferências de conteúdo",
         de: "Sprache, Dienste und Inhaltspräferenzen",
-      }),
+
+  it: "Lingua, servizi e preferenze di visualizzazione"}),
       notifications: pickByLanguage(language, {
         tr: "Hatırlatmalar ve sosyal bildirimler",
         en: "Reminders and social notifications",
         es: "Recordatorios y notificaciones sociales",
         pt: "Lembretes e notificações sociais",
         de: "Erinnerungen und soziale Mitteilungen",
-      }),
+
+  it: "Promemoria e notifiche social"}),
       data: pickByLanguage(language, {
         tr: "Kalite, çevrimdışı kullanım ve aktarımlar",
         en: "Quality, offline use, and transfers",
         es: "Calidad, uso sin conexión y transferencias",
         pt: "Qualidade, uso offline e transferências",
         de: "Qualität, Offline-Nutzung und Übertragungen",
-      }),
+
+  it: "Qualità, utilizzo offline e trasferimenti"}),
       support: pickByLanguage(language, {
         tr: "Sorun bildir veya yeni bir fikir paylaş",
         en: "Report a problem or share a new idea",
         es: "Informa de un problema o comparte una idea",
         pt: "Relate um problema ou compartilhe uma ideia",
         de: "Problem melden oder eine Idee teilen",
-      }),
+
+  it: "Segnala un problema o condividi una nuova idea"}),
       about: pickByLanguage(language, {
         tr: "Sürüm, kaynaklar ve uygulama bilgileri",
         en: "Version, sources, and app information",
         es: "Versión, fuentes e información de la app",
         pt: "Versão, fontes e informações do app",
         de: "Version, Quellen und App-Informationen",
-      }),
+
+  it: "Informazioni su versione, fonti e app"}),
     }),
     [language],
   );
@@ -567,14 +579,16 @@ export default function SettingsScreen() {
           es: `${streamingProviderIds.length} servicios seleccionados`,
           pt: `${streamingProviderIds.length} serviços selecionados`,
           de: `${streamingProviderIds.length} Dienste ausgewählt`,
-        })
+
+  it: `${streamingProviderIds.length} servizi selezionati`})
     : pickByLanguage(language, {
         tr: "Henüz platform seçilmedi",
         en: "No services selected yet",
         es: "Aún no has elegido servicios",
         pt: "Você ainda não escolheu serviços",
         de: "Noch keine Dienste ausgewählt",
-      });
+
+  it: "Nessun servizio ancora selezionato"});
 
   const filteredProviders = useMemo(() => {
     const locale = intlLocaleOf(language);
@@ -667,9 +681,22 @@ export default function SettingsScreen() {
             iconColor={C.blue}
             iconName="id-card-outline"
             title={i18nText("autoI18n.hesap_bilgileri_baslik", "Hesap bilgileri")}
-            subtitle={i18nText("autoI18n.hesap_bilgileri_aciklama", "Doğum tarihi, hesabı sıfırla veya sil")}
+            subtitle={
+              emailUnverified
+                ? i18nText("autoI18n.hesap_bilgileri_eposta_dogrulanmadi", "E-postan doğrulanmadı — doğrulamak için dokun")
+                : i18nText("autoI18n.hesap_bilgileri_aciklama", "E-posta, katılma tarihi, doğum tarihi, hesabı sıfırla veya sil")
+            }
             onPress={() => navigation.navigate("EditProfileScreen")}
-            right={<Chevron color={C.muted} />}
+            right={
+              emailUnverified ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <AppIcon family="Ionicons" name="alert-circle" size={16} color="rgb(229, 57, 53)" />
+                  <Chevron color={C.muted} />
+                </View>
+              ) : (
+                <Chevron color={C.muted} />
+              )
+            }
           />
           <SettingRow
             colors={C}

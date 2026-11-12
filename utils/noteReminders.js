@@ -78,8 +78,6 @@ export function isReminderPast(isoDate, time, now = Date.now()) {
 
 /** Kutudaki kaydın kimliği: not + hatırlatma anı (yeniden kurulan hatırlatma yeni kayıttır). */
 export const noteReminderItemId = (noteId, fireMs) => `${ID_PREFIX}${noteId}@${fireMs}`;
-export const isNoteReminderItem = (item) => item?.type === NOTE_REMINDER_TYPE;
-
 function previewOf(note) {
   if (note?.type === "todo") {
     const open = (note.todos || []).filter((todo) => todo && !todo.done && todo.text);

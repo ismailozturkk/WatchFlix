@@ -27,14 +27,14 @@ const {
 } = require("../components/profile/ProfileIdentityBlock");
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
+const Text = "Text";
 
 const theme = {
   primary: "#111111", secondary: "#1b1b1b", border: "#333333", accent: "#3388ff",
   text: { primary: "#ffffff", secondary: "#bbbbbb", muted: "#888888" },
 };
 const baseProps = {
-  theme, language: "tr", displayName: "Ada", username: "ada", badges: [], email: "", emailVerified: true,
-  verifyHint: "", joinedAt: null, onEdit: jest.fn(), onShare: jest.fn(),
+  theme, language: "tr", displayName: "Ada", username: "ada", badges: [], onEdit: jest.fn(), onShare: jest.fn(),
 };
 
 let renderer;
@@ -147,37 +147,16 @@ describe("eylem satırı", () => {
     expect(renderer.root.findAllByProps({ testID: "profile-settings-button" })).toHaveLength(0);
   });
 
-  describe("e-posta doğrulama uyarısı", () => {
-    const resend = () => renderer.root.findByProps({ testID: "profile-verify-resend" });
+  test("e-posta ve katılma tarihi profilde çizilmez (Ayarlar > Hesap bilgileri'nde)", () => {
+    render({ email: "a@b.co", emailVerified: false, verifyHint: "x", joinedAt: "1700000000000" });
+    expect(renderer.root.findAllByProps({ testID: "profile-verify-resend" })).toHaveLength(0);
+    const all = JSON.stringify(renderer.toJSON());
+    expect(all).not.toContain("a@b.co");
+    expect(all).not.toContain("Katılma tarihi");
+  });
 
-    test("uyarı metni var ama eylem verilmediyse 'tekrar gönder' çizilmez", () => {
-      render({ email: "a@b.co", emailVerified: false, verifyHint: "E-postanı doğrula" });
-      expect(renderer.root.findAllByProps({ testID: "profile-verify-resend" })).toHaveLength(0);
-    });
-
-    test("eylem etiketiyle çizilir ve dokunuşu bağlıdır", () => {
-      const onPress = jest.fn();
-      render({ email: "a@b.co", emailVerified: false, verifyHint: "E-postanı doğrula", verifyAction: { label: "Tekrar gönder", onPress } });
-      expect(resend().props.accessibilityLabel).toBe("Tekrar gönder");
-      expect(resend().props.accessibilityRole).toBe("button");
-      expect(resend().props.disabled).toBe(false);
-      act(() => resend().props.onPress());
-      expect(onPress).toHaveBeenCalledTimes(1);
-    });
-
-    test("bekleme sürerken (disabled) ve gönderilirken (busy) dokunuş kapalı", () => {
-      render({ email: "a@b.co", emailVerified: false, verifyHint: "x", verifyAction: { label: "30 sn", onPress: jest.fn(), disabled: true } });
-      expect(resend().props.disabled).toBe(true);
-      expect(resend().props.accessibilityState).toEqual({ disabled: true, busy: false });
-      act(() => renderer.unmount());
-      render({ email: "a@b.co", emailVerified: false, verifyHint: "x", verifyAction: { label: "...", onPress: jest.fn(), busy: true } });
-      expect(resend().props.disabled).toBe(true);
-      expect(resend().props.accessibilityState).toEqual({ disabled: false, busy: true });
-    });
-
-    test("uyarı metni yoksa (doğrulanmış) eylem de çizilmez", () => {
-      render({ email: "a@b.co", emailVerified: true, verifyHint: "", verifyAction: { label: "Tekrar gönder", onPress: jest.fn() } });
-      expect(renderer.root.findAllByProps({ testID: "profile-verify-resend" })).toHaveLength(0);
-    });
+  test("seri kartı yuvası rozetlerin altında çizilir", () => {
+    render({ streak: <Text testID="streak-card">12</Text> });
+    expect(renderer.root.findAllByProps({ testID: "streak-card" })).toHaveLength(1);
   });
 });

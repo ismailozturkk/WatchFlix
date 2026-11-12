@@ -181,7 +181,80 @@ export const QUICK_COPY = {
       thriller: "Thriller", war: "Krieg", western: "Western",
     },
   },
-};
+
+  it: {
+  gridTitle: "Giochi veloci",
+  games: {
+    popular: {
+      title: "Quale è più popolare?",
+      hint: "Due poster: quale ha ottenuto più voti?",
+      prompt: "Quale ha ottenuto più voti?"
+    },
+    decade: {
+      title: "Quale decennio?",
+      hint: "Guarda il poster e dai un nome al decennio",
+      prompt: "Quale decennio è uscito?"
+    },
+    kind: {
+      title: "Film o serie?",
+      hint: "Guarda il poster: film o serie?",
+      prompt: "È un film o una serie?"
+    },
+    genre: {
+      title: "Quale genere?",
+      hint: "Indovina il genere dal poster",
+      prompt: "Quale di questi è uno dei suoi generi?"
+    },
+    blur: {
+      title: "Poster sfocato",
+      hint: "Dagli un nome prima che diventi più nitido, prendi i punti",
+      prompt: "Che titolo è questo?"
+    },
+    rating: {
+      title: "Quale ha il punteggio più alto?",
+      hint: "Scegli il poster con il punteggio più alto · Un errore lo fa finire",
+      prompt: "Quale titolo ha il punteggio TMDB più alto?"
+    }
+  },
+  blur: {
+    scoreLabel: "Punti",
+    points: n => `+${n} punti`,
+    endScore: n => n === 1 ? "1 punto" : `${n} punti`,
+    timeUp: "Tempo scaduto",
+    secondsLeft: n => `${n}s`,
+    posterA11y: "Poster sfocato"
+  },
+  rating: {
+    format: r => `★ ${r.toFixed(1)}`,
+    ratingA11y: (title, r) => `${title}, valutazione TMDB ${r.toFixed(1)}`
+  },
+  kind: {
+    movie: "Film",
+    tv: "Serie"
+  },
+  decadeLabel: d => `${d}s`,
+  votes: n => n >= 1e6 ? `${compact(n / 1e6, ".")}M voti` : n >= 1e3 ? `${compact(n / 1e3, ".")}K voti` : n === 1 ? "1 voto" : `${n} voti`,
+  genres: {
+    action: "Azione",
+    adventure: "Avventura",
+    animation: "Animazione",
+    comedy: "Commedia",
+    crime: "Crimine",
+    documentary: "Documentario",
+    drama: "Drammatico",
+    family: "Famiglia",
+    fantasy: "Fantasy",
+    history: "Storia",
+    horror: "Orrore",
+    music: "Musica",
+    mystery: "Mistero",
+    romance: "Romantico",
+    scifi: "Fantascienza",
+    thriller: "Thriller",
+    war: "Guerra",
+    western: "Western"
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getQuickCopy = (language) => QUICK_COPY[copyLanguage(language, Object.keys(QUICK_COPY))];

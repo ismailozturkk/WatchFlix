@@ -41,7 +41,7 @@ describe("devLab seri simülatörü", () => {
   test("sahte seri, profildeki alevle aynı hesaptan geçer (her durum)", () => {
     const lit = streakFlameState(buildDevSeriler({ weeks: 6, status: "lit", shields: 1 }));
     expect(lit).toMatchObject({ visible: true, weeks: 6, status: "lit" });
-    expect(lit.level.tier).toBe(1);
+    expect(lit.level.tier).toBe(5); // her hafta yeni renk: 6. hafta → 6. palet
 
     const risk = streakFlameState(buildDevSeriler({ weeks: 10, status: "risk" }));
     expect(risk).toMatchObject({ weeks: 10, status: "risk", dimmed: true });
@@ -53,8 +53,8 @@ describe("devLab seri simülatörü", () => {
     const shield = streakFlameState(buildDevSeriler({ weeks: 15, status: "shield", shields: 0 }));
     expect(shield).toMatchObject({ weeks: 15, status: "shield" });
 
-    const paused = streakFlameState(buildDevSeriler({ weeks: 8, status: "paused" }));
-    expect(paused).toMatchObject({ weeks: 8, status: "paused", paused: true });
+    // Mola kaldırıldı: bilinmeyen durum "lit"e düşer.
+    expect(streakFlameState(buildDevSeriler({ weeks: 8, status: "paused" })).status).toBe("lit");
 
     expect(streakFlameState(buildDevSeriler({ weeks: 0 })).visible).toBe(false);
     expect(streakFlameState(buildDevSeriler({ weeks: 5, record: 100 })).record).toBe(100);

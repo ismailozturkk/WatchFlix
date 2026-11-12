@@ -31,11 +31,11 @@ jest.mock("react-native", () => {
       loop: () => anim,
       sequence: () => anim,
     },
-    InteractionManager: { runAfterInteractions: (fn) => { fn(); return { cancel() {} }; } },
     useWindowDimensions: () => mockWindow,
     __React: React,
   };
 });
+jest.mock("../utils/afterInteractions", () => ({ runAfterInteractions: (fn) => { fn(); return { cancel() {} }; } }));
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("@components/common/ScreenSafeAreaView", () => "SafeAreaView");
 jest.mock("../components/BackButton", () => "BackButton");

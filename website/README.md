@@ -6,12 +6,12 @@ Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 | --- | --- |
 | [index.html](index.html) | Tanıtım sayfası (hero · özellikler · planlar [beta süresince gizli] · SSS · son çağrı). Yalnız işaretleme; metinler JS'ten gelir |
 | [site-config.js](site-config.js) | **Elle değiştirilen ayarlar:** mağaza bağlantıları, lansman tarihi, planların görünürlüğü (`showPlans`), Firebase, sayaç ofseti |
-| [home-i18n.js](home-i18n.js) | Tanıtım sayfasının 5 dillik metin sözlüğü (tr · en · es · pt · de) |
+| [home-i18n.js](home-i18n.js) | Tanıtım sayfasının 12 dillik metin sözlüğü (tr · en · es · pt · de · it · fr · ja · zh · hi · id · ko) |
 | [home.js](home.js) | Davranış: dil uygulama, mağaza düğmeleri, bekleme listesi, poster şeridi, animasyonlar |
 | [site.css](site.css) | Tanıtım sayfası stili |
 | [app-mock.js](app-mock.js) · [app-mock.css](app-mock.css) | **Etkileşimli uygulama maketi**: telefon çerçevesi, 4 sekme + CineMatch düğmesi, Film&Dizi/Eğlence/Kütüphane/Profil/Ayarlar ekranları, 9 temalı tema değişkenleri |
 | [app-mock-tour.js](app-mock-tour.js) · [app-mock-tour.css](app-mock-tour.css) | "İçeride neler var" turunun ek ekranları (dizi takibi, Ne izlesem?, istatistik, sohbet, oyun, listeler, hikâye kartı, görünüm) |
-| [mock-i18n.js](mock-i18n.js) | Maket metinlerinin 5 dilli sözlüğü — **uygulamanın kendi çevirilerinden** üretilir (`scripts/site-mock-i18n/gen.mjs`) |
+| [mock-i18n.js](mock-i18n.js) | Maket metinlerinin 12 dilli sözlüğü — **uygulamanın kendi çevirilerinden** üretilir (`scripts/site-mock-i18n/gen.mjs`) |
 | [site-lang.js](site-lang.js) · [lang-menu.css](lang-menu.css) | **Ortak** dil mantığı + dil menüsü (tanıtım ve yasal sayfalar kullanır) |
 | [privacy.html](privacy.html) · [terms.html](terms.html) · [delete-account.html](delete-account.html) | Gizlilik / Şartlar / Hesap silme — mağaza formlarının istediği URL'ler |
 | [legal.css](legal.css) · [legal.js](legal.js) | Üç yasal sayfanın ortak stili ve davranışı |
@@ -19,24 +19,25 @@ Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 | [admin.html](admin.html) · [admin.js](admin.js) · [admin.css](admin.css) · [admin-stats.js](admin-stats.js) | **Yönetim paneli** (`/admin`): ziyaret istatistiği, beta testçileri, bekleme listesi. Arama motorlarına kapalı |
 | `lens-mark.svg` · `favicon.svg` · `favicon.ico` · `apple-touch-icon.png` · `og-image.png` | Lens logosu (5 Kas 2026): üst çubuk/altbilgi işareti, sekme simgesi, paylaşım görseli. Kaynak `marketing/marka/yeni-logo/lens`; altbilgideki büyük logo `index.html` içinde satır içi SVG (göz kırpar, bebek imleci izler: `home.js → setupEyes`). Eski "S" görselleri kaldırıldı |
 
-## Diller (5)
+## Diller (12)
 
-Site, uygulamanın dilleriyle aynı beş dili bilir: **tr · en · es · pt (Brasil) · de**
-(kaynak: `utils/appLanguages.js`). Hitap uygulamayla aynı: sen / tú / você / du.
+Site 12 dili destekler: **tr · en · es · pt (Brasil) · de · it · fr · ja · zh · hi · id · ko**.
 
-- **Seçim sırası** (`site-lang.js → resolve()`): adresteki `?lang=xx` → kayıtlı tercih
-  (`localStorage.wf_lang`) → tarayıcı dili → İngilizce. Parametre ayrıca kaydedilir;
-  kullanıcı dili menüden değiştirince adresteki `?lang=` de güncellenir (yenilemede eski dile dönmesin).
-- **Tanıtım sayfası** tam çevrilidir. Eksik anahtar İngilizceye düşer. **Yeni dil eklemek:**
-  `site-lang.js` (LANGS/NAMES/SHORT) → `home-i18n.js` (sözlük) → `legal.js` (CHROME). Metin
-  uzunluğunu 375 px'te ve Almanca'da (en uzun) kontrol et.
-- **Yasal metinler yalnız tr/en.** es/pt/de seçiliyse İngilizce metin gösterilir; sayfanın çerçevesi
+- **Seçim sırası** (`site-lang.js → resolve()` / `detect()`): adresteki `?lang=xx` → kayıtlı tercih
+  (`localStorage.wf_lang`) → izin istemeyen istemci sinyalleriyle otomatik algılama (birincil telefon/tarayıcı
+  dili `navigator.languages[0]` → tercih listesindeki diğer diller → BCP-47 bölge alt etiketi `REGION_LANG`
+  [`en-TR`, `mr-IN`, `jv-ID`, `ca-ES` vb.] → IANA saat dilimi `TZ_LANG` [`Intl.DateTimeFormat().resolvedOptions().timeZone`])
+  → varsayılan **İngilizce (`en`)**. Parametre ayrıca kaydedilir; kullanıcı dili menüden değiştirince adresteki
+  `?lang=` de güncellenir (yenilemede eski dile dönmesin).
+- **Tanıtım sayfası ve etkileşimli maket** 12 dilde tam çevrilidir. Eksik anahtar İngilizceye düşer. **Yeni dil eklemek:**
+  `site-lang.js` (LANGS/NAMES/SHORT/REGION_LANG/TZ_LANG) → `home-i18n.js` (sözlük) → `mock-i18n.js` (maket sözlüğü) → `legal.js` (CHROME).
+- **Yasal metinler yalnız tr/en.** Diğer 10 dil seçiliyse İngilizce metin gösterilir; sayfanın çerçevesi
   (başlık, içindekiler, altbilgi) seçilen dildedir ve üstte o dilde bir not çıkar ("metin tr/en;
   çelişkide Türkçe esas"). **Neden çevrilmedi:** hukuki metin çevirisi hukuki inceleme ister ve her
-  değişiklikte 5 kopya senkron tutulur. Çevrilirse `<section data-lang-block="xx">` ekle,
+  değişiklikte kopyalar senkron tutulur. Çevrilirse `<section data-lang-block="xx">` ekle,
   `legal.js → BLOCK_LANGS`'e yaz, `CHROME.<dil>.note`'u sil.
 - Uygulama içi bağlantılar (Ayarlar → Hakkında) `?lang=tr|en` ekler (`utils/appLanguages.legalLanguageOf`);
-  es/pt/de için `en` gider. İstenirse uygulama gerçek kodu (`?lang=es`) da gönderebilir — site kabul eder.
+  diğer diller için `en` gider. İstenirse uygulama gerçek kodu (`?lang=es`, `?lang=ja` vb.) da gönderebilir — site kabul eder.
 
 ## Mağaza bağlantıları
 
@@ -236,7 +237,7 @@ uygulama değişince elle güncelle — etiketler `home-i18n.js` `num1–6`:
 | 158 rozet | `components/badges/watchBadgeCatalog.js` (`__tests__/watchBadgeCatalog.test.js` sayıyı sabitler) |
 | 56 yazı tipi | `utils/premiumFeatures.js → FONT_CATALOG_SIZE` |
 | 6 uygulama simgesi | `utils/appIcons.js → APP_ICONS` (5 Kas: 3 Lens + 3 S) |
-| 5 dil | `utils/appLanguages.js` |
+| 12 dil | `website/site-lang.js` (tr · en · es · pt · de · it · fr · ja · zh · hi · id · ko) |
 
 Planlar bölümü ve "…ve çok daha fazlası" (16 kutucuk, `home.js → MORE_ICONS` sırasıyla `mo1–16`) da aynı gün
 `utils/premiumFeatures.js` ve `store/play/*/full-description.txt` ile eşitlendi.

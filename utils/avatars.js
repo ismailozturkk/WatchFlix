@@ -3,7 +3,7 @@
 // Avatar asset map. Modül seviyesinde tanımlı — her require() bir kez çalışır,
 // Metro bundle'da cache'lenir, runtime'da yeni allocation yok.
 //
-// FIRESTORE/AsyncStorage'da sadece "index" sayısı saklanır (0-55).
+// Firestore'da ve cihaz deposunda (MMKV) sadece "index" sayısı saklanır (0-55).
 // UI tarafında `getAvatarSource(index)` ile gerçek resource'a çevrilir.
 // Bu sayede:
 //   - Firestore'a ~3 byte yazılır (URL string'i yerine)

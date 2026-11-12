@@ -99,6 +99,18 @@ export const APP_LANGUAGES = Object.freeze([
     legalLang: "en",
     aiPromptName: "German (de)",
   },
+  {
+    code: "it",
+    name: "Italian",
+    nativeName: "Italiano",
+    flag: "it",
+    intlLocale: "it-IT",
+    tmdbLanguage: "it-IT",
+    tmdbRegion: "IT",
+    tmdbImageLanguages: ["it", "en"],
+    legalLang: "en",
+    aiPromptName: "Italian (it)",
+  },
 ]);
 
 /**
@@ -114,7 +126,6 @@ export const COMING_SOON_LANGUAGES = Object.freeze([
   { code: "fr", name: "French", nativeName: "Français", flag: "fr" },
   { code: "ja", name: "Japanese", nativeName: "日本語", flag: "jp" },
   { code: "ko", name: "Korean", nativeName: "한국어", flag: "kr" },
-  { code: "it", name: "Italian", nativeName: "Italiano", flag: "it" },
   { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "id" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "in" },
   { code: "ar", name: "Arabic", nativeName: "العربية", flag: "sa" },

@@ -48,17 +48,17 @@ function stateColor(state, C) {
 }
 
 /** Sağ üst köşedeki kısa değer: "3 / 5", "Sınırsız", "Açık", Premium rozeti. */
-function ValueChip({ row, C, tr, es, pt, de }) {
+function ValueChip({ row, C, tr, es, pt, de, it }) {
   if (row.state === "locked") return <PremiumPill />;
   const color = stateColor(row.state, C);
   let text;
-  if (row.state === "included") text = tr ? "Açık" : es ? "Activado" : pt ? "Ativado" : de ? "An" : "On";
-  else if (row.state === "unlimited") text = tr ? "Sınırsız" : es ? "Ilimitado" : pt ? "Ilimitado" : de ? "Unbegrenzt" : "Unlimited";
+  if (row.state === "included") text = tr ? "Açık" : es ? "Activado" : pt ? "Ativado" : de ? "An" : it ? "Attivo" : "On";
+  else if (row.state === "unlimited") text = tr ? "Sınırsız" : es ? "Ilimitado" : pt ? "Ilimitado" : de ? "Unbegrenzt" : it ? "Illimitato" : "Unlimited";
   else if (row.kind === "ai_quota") {
     text =
       row.remaining === null
         ? "—"
-        : tr ? `${row.remaining} kaldı` : es ? `${row.remaining} restantes` : pt ? `${row.remaining} restantes` : de ? `Noch ${row.remaining}` : `${row.remaining} left`;
+        : tr ? `${row.remaining} kaldı` : es ? `${row.remaining} restantes` : pt ? `${row.remaining} restantes` : de ? `Noch ${row.remaining}` : it ? `${row.remaining} rimasti` : `${row.remaining} left`;
   } else {
     text = `${row.used === null ? "–" : row.used} / ${row.limit}`;
   }
@@ -72,34 +72,34 @@ function ValueChip({ row, C, tr, es, pt, de }) {
 }
 
 /** Başlığın altındaki tek satırlık durum cümlesi. */
-function statusLine(row, tr, es, pt, de) {
+function statusLine(row, tr, es, pt, de, it) {
   switch (row.state) {
     case "locked":
       return row.kind === "access"
-        ? tr ? "Bu planda kapalı" : es ? "No incluido en este plan" : pt ? "Não incluído neste plano" : de ? "Im Plan nicht enthalten" : "Not included in this plan"
-        : tr ? "Bu planda dahil değil" : es ? "No incluido en este plan" : pt ? "Não incluído neste plano" : de ? "Im Plan nicht enthalten" : "Not included in this plan";
+        ? tr ? "Bu planda kapalı" : es ? "No incluido en este plan" : pt ? "Não incluído neste plano" : de ? "Im Plan nicht enthalten" : it ? "Non incluso in questo piano" : "Not included in this plan"
+        : tr ? "Bu planda dahil değil" : es ? "No incluido en este plan" : pt ? "Não incluído neste plano" : de ? "Im Plan nicht enthalten" : it ? "Non incluso in questo piano" : "Not included in this plan";
     case "included":
       return row.valueLabel;
     case "unlimited":
       return row.used !== null
-        ? tr ? `${row.used} kullanılıyor` : es ? `${row.used} en uso` : pt ? `${row.used} em uso` : de ? `${row.used} in Nutzung` : `${row.used} in use`
-        : tr ? "Sınırsız kullanım" : es ? "Uso ilimitado" : pt ? "Uso ilimitado" : de ? "Unbegrenzte Nutzung" : "Unlimited use";
+        ? tr ? `${row.used} kullanılıyor` : es ? `${row.used} en uso` : pt ? `${row.used} em uso` : de ? `${row.used} in Nutzung` : it ? `${row.used} in uso` : `${row.used} in use`
+        : tr ? "Sınırsız kullanım" : es ? "Uso ilimitado" : pt ? "Uso ilimitado" : de ? "Unbegrenzte Nutzung" : it ? "Uso illimitato" : "Unlimited use";
     case "unknown":
-      return tr ? "Yükleniyor…" : es ? "Cargando…" : pt ? "Carregando…" : de ? "Wird geladen…" : "Loading…";
+      return tr ? "Yükleniyor…" : es ? "Cargando…" : pt ? "Carregando…" : de ? "Wird geladen…" : it ? "Caricamento…" : "Loading…";
     case "full":
       return row.kind === "ai_quota"
-        ? tr ? "Şu an mesaj gönderemezsin" : es ? "Ahora mismo no puedes enviar mensajes" : pt ? "Você não pode enviar mensagens agora" : de ? "Du kannst gerade keine Nachrichten senden" : "You can't send messages right now"
-        : tr ? "Hak doldu" : es ? "Límite alcanzado" : pt ? "Limite atingido" : de ? "Limit erreicht" : "Limit reached";
+        ? tr ? "Şu an mesaj gönderemezsin" : es ? "Ahora mismo no puedes enviar mensajes" : pt ? "Você não pode enviar mensagens agora" : de ? "Du kannst gerade keine Nachrichten senden" : it ? "Al momento non puoi inviare messaggi" : "You can't send messages right now"
+        : tr ? "Hak doldu" : es ? "Límite alcanzado" : pt ? "Limite atingido" : de ? "Limit erreicht" : it ? "Limite raggiunto" : "Limit reached";
     default:
       break;
   }
   if (row.kind === "ai_quota") {
-    return tr ? `Şu an ${row.remaining} mesaj gönderebilirsin` : es ? `Aún puedes enviar ${row.remaining} mensajes más` : pt ? `Você ainda pode enviar mais ${row.remaining} mensagens` : de ? `Du kannst gerade noch ${row.remaining} Nachrichten senden` : `You can send ${row.remaining} more messages right now`;
+    return tr ? `Şu an ${row.remaining} mesaj gönderebilirsin` : es ? `Aún puedes enviar ${row.remaining} mensajes más` : pt ? `Você ainda pode enviar mais ${row.remaining} mensagens` : de ? `Du kannst gerade noch ${row.remaining} Nachrichten senden` : it ? `Puoi ancora inviare ${row.remaining} messaggi` : `You can send ${row.remaining} more messages right now`;
   }
-  return tr ? `Kalan: ${row.remaining}` : es ? `${row.remaining} restantes` : pt ? `${row.remaining} restantes` : de ? `Noch ${row.remaining}` : `${row.remaining} left`;
+  return tr ? `Kalan: ${row.remaining}` : es ? `${row.remaining} restantes` : pt ? `${row.remaining} restantes` : de ? `Noch ${row.remaining}` : it ? `${row.remaining} rimasti` : `${row.remaining} left`;
 }
 
-function UsageRow({ row, C, tr, es, pt, de, last, onPress }) {
+function UsageRow({ row, C, tr, es, pt, de, it, last, onPress }) {
   const color = stateColor(row.state, C);
   const locked = row.state === "locked";
   const Body = onPress ? Pressable : View;
@@ -121,13 +121,13 @@ function UsageRow({ row, C, tr, es, pt, de, last, onPress }) {
           >
             {row.title}
           </Text>
-          <ValueChip row={row} C={C} tr={tr} es={es} pt={pt} de={de} />
+          <ValueChip row={row} C={C} tr={tr} es={es} pt={pt} de={de} it={it} />
         </View>
 
         <Text allowFontScaling={false} style={[st.rowStatus, { color: row.state === "full" ? C.danger : C.muted }]}>
-          {statusLine(row, tr, es, pt, de)}
+          {statusLine(row, tr, es, pt, de, it)}
           {row.overflow > 0
-            ? tr ? ` · ${row.overflow} yapım takip dışı` : es ? ` · ${row.overflow} sin contabilizar` : pt ? ` · ${row.overflow} sem contabilizar` : de ? ` · ${row.overflow} nicht erfasst` : ` · ${row.overflow} not tracked`
+            ? tr ? ` · ${row.overflow} yapım takip dışı` : es ? ` · ${row.overflow} sin contabilizar` : pt ? ` · ${row.overflow} sem contabilizar` : de ? ` · ${row.overflow} nicht erfasst` : it ? ` · ${row.overflow} non conteggiati` : ` · ${row.overflow} not tracked`
             : ""}
         </Text>
 
@@ -180,6 +180,7 @@ export default function PremiumUsageScreen({ navigation }) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
+  const it = normalizeAppLanguage(language) === "it";
   const { plan, usage } = usePremiumUsage();
   const { storePlan, openCustomerCenter, busyAction } = usePremium();
   // Yönetilecek bir MAĞAZA aboneliği yalnız mağazadan gelen planda var; sunucu promosyonu ya da
@@ -192,7 +193,7 @@ export default function PremiumUsageScreen({ navigation }) {
       await openCustomerCenter();
     } catch (error) {
       Toast.error(
-        tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : pt ? "Não foi possível abrir as configurações da assinatura" : de ? "Die Abo-Einstellungen konnten nicht geöffnet werden" : "Subscription settings could not be opened",
+        tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : pt ? "Não foi possível abrir as configurações da assinatura" : de ? "Die Abo-Einstellungen konnten nicht geöffnet werden" : language === "it" ? "Impossibile aprire le impostazioni dell'abbonamento" : "Subscription settings could not be opened",
         error,
       );
     }
@@ -213,13 +214,13 @@ export default function PremiumUsageScreen({ navigation }) {
   const { counts } = model.summary;
   const summaryLine = [
     counts.locked > 0
-      ? tr ? `${counts.locked} özellik bu planda kapalı` : es ? `${counts.locked} funciones no incluidas en este plan` : pt ? `${counts.locked} recursos não incluídos neste plano` : de ? `${counts.locked} Funktionen nicht im Plan` : `${counts.locked} features not in this plan`
+      ? tr ? `${counts.locked} özellik bu planda kapalı` : es ? `${counts.locked} funciones no incluidas en este plan` : pt ? `${counts.locked} recursos não incluídos neste plano` : de ? `${counts.locked} Funktionen nicht im Plan` : language === "it" ? `${counts.locked} funzionalità non presenti in questo piano` : `${counts.locked} features not in this plan`
       : null,
     counts.full > 0
-      ? tr ? `${counts.full} hak doldu` : es ? `${counts.full} límites alcanzados` : pt ? `${counts.full} limites atingidos` : de ? `${counts.full} Limits erreicht` : `${counts.full} limits reached`
+      ? tr ? `${counts.full} hak doldu` : es ? `${counts.full} límites alcanzados` : pt ? `${counts.full} limites atingidos` : de ? `${counts.full} Limits erreicht` : language === "it" ? `${counts.full} limiti raggiunti` : `${counts.full} limits reached`
       : null,
     counts.low > 0
-      ? tr ? `${counts.low} hak azalıyor` : es ? `${counts.low} a punto de agotarse` : pt ? `${counts.low} quase acabando` : de ? `${counts.low} werden knapp` : `${counts.low} running low`
+      ? tr ? `${counts.low} hak azalıyor` : es ? `${counts.low} a punto de agotarse` : pt ? `${counts.low} quase acabando` : de ? `${counts.low} werden knapp` : language === "it" ? `${counts.low} in esaurimento` : `${counts.low} running low`
       : null,
   ].filter(Boolean);
 
@@ -256,7 +257,7 @@ export default function PremiumUsageScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text allowFontScaling={false} style={[st.summaryEyebrow, { color: C.muted }]}>
-              {tr ? "AKTİF PLAN" : es ? "PLAN ACTUAL" : pt ? "PLANO ATUAL" : de ? "AKTUELLER PLAN" : "CURRENT PLAN"}
+              {tr ? "AKTİF PLAN" : es ? "PLAN ACTUAL" : pt ? "PLANO ATUAL" : de ? "AKTUELLER PLAN" : language === "it" ? "PIANO CORRENTE" : "CURRENT PLAN"}
             </Text>
             <Text allowFontScaling={false} style={[st.summaryPlan, { color: C.text }]}>
               {model.planName}
@@ -266,7 +267,7 @@ export default function PremiumUsageScreen({ navigation }) {
         <Text allowFontScaling={false} style={[st.summaryLine, { color: C.muted }]}>
           {summaryLine.length > 0
             ? summaryLine.join(" · ")
-            : tr ? "Tüm haklarının durumu aşağıda." : es ? "Así van todos tus límites." : pt ? "É assim que estão todos os seus limites." : de ? "So stehen alle deine Limits." : "Here's where all your limits stand."}
+            : tr ? "Tüm haklarının durumu aşağıda." : es ? "Así van todos tus límites." : pt ? "É assim que estão todos os seus limites." : de ? "So stehen alle deine Limits." : language === "it" ? "Ecco dove si trovano tutti i tuoi limiti." : "Here's where all your limits stand."}
         </Text>
         {model.canUpgrade ? (
           <GlassPressable
@@ -275,7 +276,7 @@ export default function PremiumUsageScreen({ navigation }) {
             style={[st.summaryCta, { backgroundColor: C.accent }]}
           >
             <Text allowFontScaling={false} style={st.summaryCtaText}>
-              {tr ? "Planları ve fiyatları gör" : es ? "Ver planes y precios" : pt ? "Ver planos e preços" : de ? "Pläne & Preise ansehen" : "View plans & pricing"}
+              {tr ? "Planları ve fiyatları gör" : es ? "Ver planes y precios" : pt ? "Ver planos e preços" : de ? "Pläne & Preise ansehen" : language === "it" ? "Visualizza piani e prezzi" : "View plans & pricing"}
             </Text>
             <AppIcon family="Ionicons" name="arrow-forward" size={14} color="#FFFFFF" />
           </GlassPressable>
@@ -309,7 +310,7 @@ export default function PremiumUsageScreen({ navigation }) {
                   allowFontScaling={false}
                   style={[st.summaryCtaText, model.canUpgrade && { color: C.accent }]}
                 >
-                  {tr ? "Aboneliği yönet" : es ? "Gestionar suscripción" : pt ? "Gerenciar assinatura" : de ? "Abo verwalten" : "Manage subscription"}
+                  {tr ? "Aboneliği yönet" : es ? "Gestionar suscripción" : pt ? "Gerenciar assinatura" : de ? "Abo verwalten" : language === "it" ? "Gestisci l'abbonamento" : "Manage subscription"}
                 </Text>
               </>
             )}
@@ -328,7 +329,7 @@ export default function PremiumUsageScreen({ navigation }) {
                 C={C}
                 tr={tr}
                 es={es}
-                pt={pt} de={de}
+                pt={pt} de={de} it={it}
                 last={index === section.rows.length - 1}
                 onPress={pressFor(row)}
               />
@@ -338,7 +339,9 @@ export default function PremiumUsageScreen({ navigation }) {
       ))}
 
       <Text allowFontScaling={false} style={[st.footnote, { color: C.muted }]}>
-        {tr ? `Oyun ve CineSwipe hakları gece yarısı (yerel saat) yenilenir. AI mesajları UTC 00:00'da, yani senin saatinle ${utcResetLocal}'da yenilenir; aylık hak her ayın başında sıfırlanır.\n\nLimit dolsa bile mevcut verilerin silinmez; yalnızca yeni ekleme durur.` : es ? `Los límites de juegos y CineSwipe se restablecen a medianoche (hora local). Los mensajes de IA se restablecen a las 00:00 UTC, que para ti son las ${utcResetLocal}; el límite mensual se restablece al empezar cada mes.\n\nAlcanzar un límite nunca borra lo que ya tienes; solo impide añadir cosas nuevas.` : pt ? `Os limites de jogos e do CineSwipe são redefinidos à meia-noite (horário local). As mensagens de IA são redefinidas às 00:00 UTC, que para você são ${utcResetLocal}; o limite mensal é redefinido no início de cada mês.\n\nAtingir um limite nunca apaga o que você já tem; apenas impede de adicionar coisas novas.` : de ? `Die Limits für Spiele und CineSwipe werden um Mitternacht (Ortszeit) zurückgesetzt. KI-Nachrichten werden um 00:00 UTC zurückgesetzt, das ist für dich ${utcResetLocal}; das Monatslimit wird zu Monatsbeginn zurückgesetzt.\n\nDas Erreichen eines Limits löscht nie, was du schon hast; es verhindert nur neue Ergänzungen.` : `Game and CineSwipe limits reset at midnight (local time). AI messages reset at 00:00 UTC, which is ${utcResetLocal} for you; the monthly limit resets at the start of each month.\n\nHitting a limit never deletes what you already have; it only stops new additions.`}
+        {tr ? `Oyun ve CineSwipe hakları gece yarısı (yerel saat) yenilenir. AI mesajları UTC 00:00'da, yani senin saatinle ${utcResetLocal}'da yenilenir; aylık hak her ayın başında sıfırlanır.\n\nLimit dolsa bile mevcut verilerin silinmez; yalnızca yeni ekleme durur.` : es ? `Los límites de juegos y CineSwipe se restablecen a medianoche (hora local). Los mensajes de IA se restablecen a las 00:00 UTC, que para ti son las ${utcResetLocal}; el límite mensual se restablece al empezar cada mes.\n\nAlcanzar un límite nunca borra lo que ya tienes; solo impide añadir cosas nuevas.` : pt ? `Os limites de jogos e do CineSwipe são redefinidos à meia-noite (horário local). As mensagens de IA são redefinidas às 00:00 UTC, que para você são ${utcResetLocal}; o limite mensal é redefinido no início de cada mês.\n\nAtingir um limite nunca apaga o que você já tem; apenas impede de adicionar coisas novas.` : de ? `Die Limits für Spiele und CineSwipe werden um Mitternacht (Ortszeit) zurückgesetzt. KI-Nachrichten werden um 00:00 UTC zurückgesetzt, das ist für dich ${utcResetLocal}; das Monatslimit wird zu Monatsbeginn zurückgesetzt.\n\nDas Erreichen eines Limits löscht nie, was du schon hast; es verhindert nur neue Ergänzungen.` : language === "it" ? `I limiti di gioco e CineSwipe vengono reimpostati a mezzanotte (ora locale). I messaggi AI vengono ripristinati alle 00:00 UTC, che per te è ${utcResetLocal}; il limite mensile viene reimpostato all'inizio di ogni mese.
+
+Raggiungere un limite non cancella mai ciò che già hai; blocca solo le nuove aggiunte.` : `Game and CineSwipe limits reset at midnight (local time). AI messages reset at 00:00 UTC, which is ${utcResetLocal} for you; the monthly limit resets at the start of each month.\n\nHitting a limit never deletes what you already have; it only stops new additions.`}
       </Text>
     </SettingsSubScreen>
   );

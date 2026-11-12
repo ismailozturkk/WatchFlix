@@ -42,8 +42,8 @@ export function showStreakCelebration({ celebrate, patch } = {}, language) {
         c.tierMessage(state.weeks, state.protection.shields),
       );
     } else {
-      const spark = copy.sparks[state.look.spark?.shape] || copy.sparks.ember;
-      toast.success(c.weekTitle(state.weeks), c.weekMessage(spark));
+      // Yeni renk yalnız 16. haftaya kadar; sonrası Efsane'de "yanmaya devam".
+      toast.success(c.weekTitle(state.weeks), c.weekMessage());
     }
   } else if (patch) {
     if (patch.tur === "telafi") toast.success(c.repairTitle, c.repairMessage(patch.state.weeks));

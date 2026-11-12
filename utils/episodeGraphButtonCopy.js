@@ -55,7 +55,16 @@ export const EPISODE_GRAPH_BUTTON_COPY = {
     high: "Hoch",
     open: "Diagramm öffnen",
   },
-};
+
+  it: {
+  title: "Grafico delle valutazioni degli episodi",
+  subtitle: "Visualizza la valutazione di ogni episodio in una griglia colorata, stagione per stagione",
+  summary: (seasons, episodes, fmt = String) => `${fmt(seasons)} ${seasons === 1 ? "stagione" : "stagioni"} · ${fmt(episodes)} ${episodes === 1 ? "episodio" : "episodi"}`,
+  seasonShort: "S",
+  low: "Bassa",
+  high: "Alta",
+  open: "Apri grafico"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getEpisodeGraphButtonCopy = (language) =>

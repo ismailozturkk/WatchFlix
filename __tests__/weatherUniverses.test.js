@@ -1,5 +1,6 @@
 import {
   KIND,
+  OVERLAY,
   SPRITE,
   SPRITE_COUNT,
   buildParticles,
@@ -28,15 +29,38 @@ describe("evren eşlemesi (detay ekranı)", () => {
     expect(universeFor({ type: "tv", id: 31911 })).toBe("fma");
     // film kimliği dizi olarak sorulursa eşleşmez (TMDB kimlik uzayları ayrı)
     expect(universeFor({ type: "tv", id: 841 })).toBeNull();
+    // 12 Kas eklenenler (TMDB'den doğrulandı)
+    expect(universeFor({ type: "movie", id: 157336 })).toBe("interstellar");
+    expect(universeFor({ type: "movie", id: 335984 })).toBe("bladeRunner");
+    expect(universeFor({ type: "movie", id: 78, collectionId: 422837 })).toBe("bladeRunner");
+    expect(universeFor({ type: "tv", id: 66732 })).toBe("strangerThings");
+    expect(universeFor({ type: "tv", id: 100088 })).toBe("lastOfUs");
+    expect(universeFor({ type: "tv", id: 85937 })).toBe("demonSlayer");
+    expect(universeFor({ type: "movie", id: 635302 })).toBe("demonSlayer");
+    expect(universeFor({ type: "movie", id: 129 })).toBe("ghibli");
+    expect(universeFor({ type: "movie", id: 8392 })).toBe("ghibli");
+    // 12 Kas ikinci paket (TMDB sayfalarından doğrulandı)
+    expect(universeFor({ type: "movie", id: 329, collectionId: 328 })).toBe("jurassicPark");
+    expect(universeFor({ type: "movie", id: 19995, collectionId: 87096 })).toBe("avatar");
+    expect(universeFor({ type: "movie", id: 76341, collectionId: 8945 })).toBe("madMax");
+    expect(universeFor({ type: "movie", id: 22, collectionId: 295 })).toBe("pirates");
+    expect(universeFor({ type: "movie", id: 27205 })).toBe("inception");
+    expect(universeFor({ type: "movie", id: 597 })).toBe("titanic");
+    expect(universeFor({ type: "tv", id: 70523 })).toBe("dark");
+    expect(universeFor({ type: "tv", id: 93405 })).toBe("squidGame");
+    expect(universeFor({ type: "tv", id: 46298 })).toBe("hunterXHunter");
+    expect(universeFor({ type: "tv", id: 95479 })).toBe("jujutsuKaisen");
+    expect(universeFor({ type: "movie", id: 810693 })).toBe("jujutsuKaisen");
     expect(universeFor({ type: "movie", id: 1399 })).toBeNull();
     expect(universeFor({ type: "movie", id: 550 })).toBeNull();
     expect(universeFor(null)).toBeNull();
     expect(universeFor({ type: "movie" })).toBeNull();
   });
 
-  it("19 evren, 3 grup (7 + 6 + 6); hepsi seçicide", () => {
-    expect(UNIVERSE_IDS).toHaveLength(19);
-    expect(UNIVERSE_GROUPS.map((g) => g.effects.length)).toEqual([7, 6, 6]);
+  it("34 evren, 3 grup (15 + 9 + 10); hepsi seçicide (Sopranos 12 Kas'ta kaldırıldı)", () => {
+    expect(UNIVERSE_IDS).toHaveLength(34);
+    expect(UNIVERSE_IDS).not.toContain("sopranos");
+    expect(UNIVERSE_GROUPS.map((g) => g.effects.length)).toEqual([15, 9, 10]);
     for (const id of UNIVERSE_IDS) expect(WEATHER_EFFECTS).toContain(id);
   });
 
@@ -73,29 +97,17 @@ describe("evren sahneleri", () => {
     }
   });
 
-  it("GoT: ejderha ateşi yalnız havada durduğu pencerede, döngü sonunda ejderha görünmez", () => {
+  it("GoT: ejderha artık atlas sprite'ı değil (vektör sahne), duvar katmanı olay saatiyle kurulur", () => {
     const ps = buildParticles("got", { count: 105, seed: 3 });
-    const dragon = ps.find((p) => p.kind === KIND.track && p.sprite === SPRITE.dragonOpen);
-    expect(dragon).toBeTruthy();
-    const fire = ps.filter((p) => p.kind === KIND.emit && p.kf === dragon.kf && p.w0 * dragon.rest > 0.3 && p.w0 * dragon.rest < 0.4);
-    expect(fire.length).toBeGreaterThanOrEqual(16);
-    let seen = 0;
-    for (let t = 0; t < dragon.period; t += 0.05) {
-      const u = wrap(t / dragon.period + dragon.y0 - dragon.tlag) * dragon.rest;
-      for (const f of fire) {
-        if (particleAlpha(f, t, H) > 0.001) {
-          seen += 1;
-          expect(u).toBeGreaterThanOrEqual(0.33);
-          expect(u).toBeLessThanOrEqual(0.48 + f.life * dragon.rest + 0.01);
-        }
-      }
-      if (u > 0.75) expect(particleAlpha(dragon, t, H)).toBe(0);
-    }
-    expect(seen).toBeGreaterThan(0);
+    expect(ps.some((p) => p.kind === KIND.track && p.sprite === SPRITE.dragonOpen)).toBe(false);
+    const wall = ps.find((p) => p.kind === KIND.overlay && p.part === OVERLAY.iceWall);
+    expect(wall.period).toBe(75);
+    expect(wall.rest).toBe(2.5);
   });
-
-  it("ipler: ağ ve ODM halatı yalnız kendi penceresinde, saat zinciri sürekli", () => {
-    for (const id of ["spiderMan", "aot", "fma"]) {
+  // Spider-Man ağ ipi artık vektör sahnede (components/decor/spiderScene.js)
+  // FMA cep saati zinciri artık vektör sahnede (components/decor/fmaScene.js)
+  it("ipler: ODM halatı yalnız kendi penceresinde", () => {
+    for (const id of ["aot"]) {
       const ps = buildParticles(id, { count: 60, seed: 5 });
       const tethers = ps.filter((p) => p.kind === KIND.overlay && p.part === 29);
       expect(tethers.length).toBeGreaterThan(0);
@@ -110,8 +122,7 @@ describe("evren sahneleri", () => {
           } else off += 1;
         }
         expect(on).toBeGreaterThan(0);
-        if (id === "fma") expect(off).toBe(0);
-        else expect(off).toBeGreaterThan(0);
+        expect(off).toBeGreaterThan(0);
       }
     }
   });

@@ -8,6 +8,7 @@ import {
 import de from "./de.json";
 import en from "./en.json";
 import es from "./es.json";
+import it from "./it.json";
 import pt from "./pt.json";
 import tr from "./tr.json";
 
@@ -44,6 +45,7 @@ const resources = {
   de: { translation: de },
   en: { translation: en },
   es: { translation: es },
+  it: { translation: it },
   pt: { translation: pt },
   tr: { translation: tr },
 };
@@ -55,7 +57,7 @@ i18n
     resources,
     // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es/pt/de için). tr/en eskisi
     // gibi Türkçe'ye düşer — paketleri tam eşit olduğundan bu yalnız güvenlik ağı.
-    fallbackLng: { es: ["en", "tr"], pt: ["en", "tr"], de: ["en", "tr"], default: ["tr"] },
+    fallbackLng: { es: ["en", "tr"], pt: ["en", "tr"], de: ["en", "tr"], it: ["en", "tr"], default: ["tr"] },
     compatibilityJSON: "v3", // React Native Android için gereklidir
     interpolation: {
       escapeValue: false, // React XSS'e karşı kendi korumasına sahip

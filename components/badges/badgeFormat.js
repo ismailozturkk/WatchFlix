@@ -16,16 +16,16 @@
 import { copyLanguage } from "../../utils/appLanguages";
 
 export const NADIRLIK_AD = Object.freeze({
-  common: { tr: "Yaygın", en: "Common", es: "Común", pt: "Comum", de: "Gewöhnlich" },
-  uncommon: { tr: "Az Bulunur", en: "Uncommon", es: "Poco común", pt: "Incomum", de: "Ungewöhnlich" },
-  rare: { tr: "Nadir", en: "Rare", es: "Rara", pt: "Rara", de: "Selten" },
-  epic: { tr: "Destansı", en: "Epic", es: "Épica", pt: "Épica", de: "Episch" },
-  legendary: { tr: "Efsanevi", en: "Legendary", es: "Legendaria", pt: "Lendária", de: "Legendär" },
+  common: { tr: "Yaygın", en: "Common", es: "Común", pt: "Comum", de: "Gewöhnlich" , it: "Comune"},
+  uncommon: { tr: "Az Bulunur", en: "Uncommon", es: "Poco común", pt: "Incomum", de: "Ungewöhnlich" , it: "Non comune"},
+  rare: { tr: "Nadir", en: "Rare", es: "Rara", pt: "Rara", de: "Selten" , it: "Raro"},
+  epic: { tr: "Destansı", en: "Epic", es: "Épica", pt: "Épica", de: "Episch" , it: "Epico"},
+  legendary: { tr: "Efsanevi", en: "Legendary", es: "Legendaria", pt: "Lendária", de: "Legendär" , it: "Leggendari"},
 });
 
 /** Bilinmeyen nadirlikte anahtarın kendisini döndürür (boş etiket çizmez). */
 export const nadirlikAdi = (rarity, lang = "tr") =>
-  NADIRLIK_AD[rarity]?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de"])] || String(rarity || "");
+  NADIRLIK_AD[rarity]?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"])] || String(rarity || "");
 
 const AYLAR = Object.freeze({
   tr: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"],
@@ -33,6 +33,7 @@ const AYLAR = Object.freeze({
   es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
   pt: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
   de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+  it: ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"],
 });
 
 /**
@@ -46,12 +47,13 @@ export function formatTarih(gunAnahtari, lang = "tr") {
   const ay = Number(m[2]);
   const gun = Number(m[3]);
   if (ay < 1 || ay > 12 || gun < 1 || gun > 31) return null;
-  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de"]);
+  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"]);
   if (code === "en") return `${AYLAR.en[ay - 1]} ${gun}, ${yil}`;
   if (code === "es") return `${gun} de ${AYLAR.es[ay - 1]} de ${yil}`;
-  // pt/de eskiden Türkçe ay adına düşüyordu ("26 Ekim 2026", T3 B17).
+  // pt/de/it eskiden Türkçe ay adına düşüyordu ("26 Ekim 2026", T3 B17; it 12 Kas).
   if (code === "pt") return `${gun} de ${AYLAR.pt[ay - 1]} de ${yil}`;
   if (code === "de") return `${gun}. ${AYLAR.de[ay - 1]} ${yil}`;
+  if (code === "it") return `${gun} ${AYLAR.it[ay - 1]} ${yil}`;
   return `${gun} ${AYLAR.tr[ay - 1]} ${yil}`;
 }
 
@@ -69,4 +71,4 @@ export function yuzde(oran) {
 
 /** Yüzde işareti dile göre: Türkçe "%47", diğerleri "47%". */
 export const yuzdeMetni = (oran, lang = "tr") =>
-  copyLanguage(lang, ["tr", "en", "es", "pt", "de"]) === "tr" ? `%${yuzde(oran)}` : `${yuzde(oran)}%`;
+  copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"]) === "tr" ? `%${yuzde(oran)}` : `${yuzde(oran)}%`;

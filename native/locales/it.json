@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Consenti all'app di salvare nella libreria foto l'immagine della storia che hai creato.",
+    "NSPhotoLibraryAddUsageDescription": "Consenti all'app di salvare nella libreria foto l'immagine della storia che hai creato.",
+    "NSCalendarsUsageDescription": "Consenti l'accesso al calendario per aggiungere e rimuovere promemoria di film, serie TV e note.",
+    "NSCalendarsFullAccessUsageDescription": "Consenti l'accesso al calendario per aggiungere e rimuovere promemoria di film, serie TV e note.",
+    "NSFaceIDUsageDescription": "Consenti a Seelogd di usare Face ID per l'autenticazione."
+  }
+}

@@ -844,8 +844,181 @@ const DE = {
     mediaTv: "Nur Serien",
   },
 };
+const IT = {
+  moment: {
+    morning: "Un buon inizio di giornata",
+    afternoon: "Pausa pomeridiana",
+    evening: "Vigilia serale",
+    lateNight: "Scelta notturna",
+    weekend: "Visioni del fine settimana"
+  },
+  vibe: {
+    title: "Trova per umore",
+    subtitle: "Tre tocchi per una scelta su misura",
+    moodLabel: "Il tuo umore",
+    lengthLabel: "Durata",
+    companyLabel: "Guardare con",
+    mood: {
+      cozy: "Cozy",
+      thrilling: "Thrilling",
+      funny: "Divertente",
+      emotional: "Emozionante",
+      mindbending: "Stupefacente",
+      adventurous: "Avventuroso"
+    },
+    length: {
+      short: "Breve",
+      medium: "Media",
+      long: "Lungo"
+    },
+    company: {
+      solo: "Solo io",
+      partner: "Partner",
+      friends: "Amici",
+      family: "Famiglia"
+    },
+    cta: "Suggeriscimi",
+    pickOne: "Scegli almeno una",
+    clear: "Scelte chiare",
+    surprise: "🎲 Sorprendimi",
+    surprisePrompt: "Sorprendimi con un'ottima scelta che probabilmente non ho ancora visto.",
+    surpriseHint: "Un'ottima scelta che probabilmente non hai ancora visto"
+  },
+  welcome: {
+    count: "{n} suggerimenti pronti",
+    ask: "Chiedi"
+  },
+  quota: {
+    perDay: "{n} al giorno",
+    left: "{n} rimasti oggi",
+    leftOne: "L'ultimo oggi",
+    empty: "Nessun messaggio rimasto oggi",
+    upgrade: "Vedi piani per altri"
+  },
+  thinking: ["Verifica i tuoi gusti…", "Ricerca titoli…", "Recupero poster…", "Tocchi finali…"],
+  actions: {
+    watchlist: "Da vedere",
+    inWatchlist: "Nella lista",
+    favorite: "Preferiti",
+    detail: "Dettagli",
+    addAll: "Aggiungi tutti alla mia lista di titoli ({n})",
+    addedAll: "{n} titoli aggiunti alla tua lista di titoli",
+    allAlreadyIn: "Tutti già nella tua lista di titoli",
+    adding: "Aggiunta…",
+    share: "Condividi",
+    sendToChat: "Invia alla chat",
+    signIn: "Accedi per aggiungere titoli a una lista",
+    matchLabel: "Abbinamento di gusti",
+    regenerate: "Riprova",
+    followUps: "E dopo?",
+    costHint: "Ogni follow-up utilizza un messaggio AI",
+    minutes: "min",
+    titles: "titoli"
+  },
+  notes: {
+    filtered: "{n} scelte nascoste perché non corrispondevano ai tuoi filtri",
+    relaxed: "Niente corrispondeva esattamente ai tuoi filtri; mostrando le scelte più vicine",
+    seen: "{n} titoli che hai già guardato sono stati rimossi",
+    truncated: "La risposta è stata abbreviata perché era lunga",
+    runtimeMovies: "{time} · {n} film",
+    runtimeSeries: "+ {n} serie"
+  },
+  history: {
+    title: "Chat",
+    search: "Cerca nelle chat",
+    noResults: "Nessuna chat corrispondente",
+    clearAll: "Elimina tutto",
+    clearAllTitle: "Elimina tutte le chat?",
+    clearAllMessage: "Vengono eliminate anche dal backup del tuo account. Questa operazione non può essere annullata.",
+    cloudNote: "Le tue chat vengono salvate sul tuo account e ti seguono su un nuovo telefono.",
+    loading: "Caricamento delle chat dal tuo account…",
+    waiting: "Connettiti a Internet per caricare le chat.",
+    cancel: "Annulla",
+    delete: "Elimina",
+    buckets: {
+      today: "Oggi",
+      yesterday: "Ieri",
+      week: "Questa settimana",
+      earlier: "In precedenza"
+    }
+  },
+  panel: {
+    styleTitle: "Stile di risposta",
+    style: {
+      concise: "Breve",
+      balanced: "Bilanciato",
+      detailed: "Dettagliato"
+    },
+    spoilerTitle: "Spoiler",
+    spoiler: {
+      none: "Nessuno",
+      light: "Chiaro"
+    },
+    countTitle: "Numero di scelte",
+    allSettings: "Tutte le impostazioni AI"
+  },
+  settings: {
+    title: "Assistente AI",
+    rowTitle: "Assistente AI (CineMatch)",
+    rowSubtitle: "Stile di risposta, filtri, personalizzazione e cronologia",
+    rowBadge: "{n} impostazioni personalizzate",
+    heroTitle: "CineMatch",
+    heroText: "Il tuo assistente per film e TV. Modifica queste preferenze qui o dalla chat.",
+    usage: "Visualizza utilizzo",
+    sectionPersonal: "Personalizzazione",
+    sectionFilters: "Filtri di rilevamento",
+    sectionStyle: "Stile di risposta",
+    sectionHistory: "Cronologia chat",
+    sectionReset: "Ripristina",
+    useLists: "Utilizza le mie liste",
+    useListsHint: "Personalizza le scelte utilizzando la tua lista Da vedere, i preferiti e i titoli guardati (utilizza più token). Quando è attivo, un breve riepilogo dei tuoi elenchi e dei tuoi quattro preferiti viene inviato a Google Gemini per generare risposte; quando è disattivato, non viene inviato nulla del genere.",
+    lists: {
+      watchList: "Da vedere",
+      favorites: "Preferiti",
+      custom: "Elenchi personalizzati",
+      watched: "Guardati (riepilogo)"
+    },
+    timeContext: "Utilizza l'ora del giorno",
+    timeContextHint: "Per le richieste “stasera” o “questo fine settimana”, abbina la durata e il tono al momento.",
+    avoidRepeats: "Evita ripetizioni",
+    avoidRepeatsHint: "Non suggerirà i titoli già suggeriti nella stessa chat.",
+    matchScore: "Badge corrispondenza gusto",
+    matchScoreHint: "Mostra una percentuale di corrispondenza sulle scelte in base ai tuoi generi preferiti.",
+    followUps: "Suggerimenti per il passaggio successivo",
+    followUpsHint: "Offre domande di follow-up con un solo tocco sotto ogni risposta.",
+    mediaType: "Tipo di contenuto",
+    platforms: "Piattaforme",
+    platformsHint: "Lascia vuoto per cercare in ogni piattaforma.",
+    genres: "Generi",
+    genresHint: "Puoi scegliere più di un genere.",
+    clearFilters: "Cancella filtri",
+    styleLength: "Lunghezza della risposta",
+    styleLengthHint: "Controlla quanto è lunga la nota sotto ciascuna scelta.",
+    spoilerHint: "Leggero: descrive solo la configurazione; non rivela mai colpi di scena, finali o morti.",
+    itemCount: "Numero di scelte",
+    itemCountHint: "Il maggior numero di titoli suggeriti in un'unica risposta.",
+    historyLimit: "Chat da conservare",
+    historyLimitHint: "Anche le tue chat vengono salvate sul tuo account. I più vecchi verranno eliminati da questo dispositivo e dal tuo account una volta superato il limite.",
+    historyCount: "{n} chat salvate",
+    clearHistory: "Cancella la cronologia della chat",
+    clearHistoryMessage: "Tutte le chat CineMatch salvate verranno eliminate da questo dispositivo e dal tuo account. Questa operazione non può essere annullata.",
+    resetAll: "Ripristina le impostazioni predefinite",
+    resetAllHint: "Riporta ogni impostazione dell'IA al suo valore originale. Le chat non vengono toccate.",
+    resetConfirmTitle: "Ripristinare le impostazioni?",
+    resetConfirmMessage: "Le impostazioni dell'IA tornano ai valori predefiniti.",
+    reset: "Ripristina",
+    cancel: "Annulla",
+    deleteAction: "Elimina",
+    footnote: "Ogni messaggio AI conta ai fini della tua indennità giornaliera e mensile. La modifica di queste impostazioni, l'aggiunta agli elenchi e la condivisione non lo fanno.",
+    all: "Tutti",
+    mediaAll: "Film + TV",
+    mediaMovie: "Solo film",
+    mediaTv: "Solo serie TV"
+  }
+};
 
-export const AI_COPY = Object.freeze({ tr: TR, en: EN, es: ES, pt: PT, de: DE });
+export const AI_COPY = Object.freeze({ tr: TR, en: EN, es: ES, pt: PT, de: DE ,
+  it: IT});
 
 /** Dile uygun metin paketi (tr / en / es); bilinmeyen dil İngilizce. */
 export const getAiCopy = (language) => AI_COPY[copyLanguage(language, Object.keys(AI_COPY))];

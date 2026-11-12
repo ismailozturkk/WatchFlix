@@ -5,18 +5,24 @@
 //
 // Bu hafta henüz kazanılmadıysa alev solar ve yanında bir durum simgesi çıkar:
 // ⌛ risk (bu hafta x/2 gün), 🩹 telafi (geçen hafta kaçtı, bu hafta 4 günle kurtar),
-// 🛡 kalkan (geçen hafta kaçtı, kalkan koruyacak), ⏸ mola (gri alev). Telafi/kalkan
+// 🛡 kalkan (geçen hafta kaçtı, kalkan koruyacak). Telafi/kalkan
 // beklerken sayı KURTARILACAK seridir. Alttaki ince çubuk bu haftanın ilerlemesidir.
 //
 // Dokununca ayrıntı sayfası (StreakFlameSheet) açılır. Sayfa açıkken rozetin
 // saati durur: aynı anda iki alev çizmeye gerek yok, rozet bulanık perdenin
 // arkasında kalıyor.
 //
+// İKİ GÖRÜNÜM (`variant`):
+//   "pill" (varsayılan) — küçük hap: "12 🔥" + durum simgesi (Geliştirici Laboratuvarı).
+//   "hero" (11 Kas, profil) — kompakt, ZEMİNSİZ: büyük alev, yanında seri sayısı,
+//     sayının altında haftanın 7 günü (Pzt–Paz) için 7 nokta; izlenen günler alevin
+//     renginde dolu. Amaç alevin öne çıkması — kart, çerçeve, etiket yok.
+//
 // KADEME ATLAYINCA "PATLAR": yeni hafta ya da ay kademesinde hap bir kez büyüyüp
 // yerine oturur. Ölçeğin dinlenme değeri 1 (görünür) — bkz. StreakFlame.js başı.
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import AppIcon from "@components/AppIcon";
 import { alpha } from "@theme/colors";
@@ -31,12 +37,15 @@ import useStreakActions from "../../hooks/useStreakActions";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Durum simgesi: risk ⌛, telafi 🩹, kalkan 🛡, mola ⏸. Yandıysa simge yok.
+// Durum simgesi: risk ⌛, telafi 🩹, kalkan 🛡. Yandıysa simge yok.
 const STATUS_ICON = Object.freeze({
-  risk: "hourglass", repair: "bandage", shield: "shield-checkmark", paused: "pause-circle",
+  risk: "hourglass", repair: "bandage", shield: "shield-checkmark",
 });
 
-function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
+// Profil (hero) görünümünde alevin yüksekliği (pt).
+const HERO_FLAME = 46;
+
+function StreakFlameBadge({ seriler, theme, language, size = 20, variant = "pill", readOnly = false }) {
   const state = useMemo(() => streakFlameState(seriler), [seriler]);
   // Profil sekmesi arka planda bağlı kalır: odakta değilken alev döngüsü durur.
   const focused = useScreenFocused();
@@ -72,6 +81,67 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
   // Bu haftanın ilerlemesi: kazanılana kadar x/2, sonra ihtişam x/7.
   const milestoneRatio = state.week.won ? state.week.days / 7 : state.week.days / state.week.need;
   const repairing = state.status === "repair" || state.status === "shield";
+  const hero = variant === "hero";
+
+
+  const sheet = readOnly ? null : (
+    <StreakFlameSheet
+      visible={sheetOpen}
+      onClose={close}
+      state={state}
+      theme={theme}
+      language={language}
+      animated={motion}
+      reminderOn={actions.reminderOn}
+      onToggleReminder={actions.toggleReminder}
+    />
+  );
+
+  if (hero) {
+    const dotOn = quiet ? alpha(palette.glow, 0.55) : palette.glow;
+    const dotOff = alpha(theme.text.muted, 0.28);
+    return (
+      <>
+        {state.visible ? (
+          <AnimatedPressable
+            testID="profile-streak-flame"
+            accessibilityRole={readOnly ? "text" : "button"}
+            accessibilityLabel={readOnly ? `${state.weeks} ${copy.weekStreak}` : copy.a11y[state.status](state.weeks)}
+            accessibilityState={readOnly ? undefined : { expanded: sheetOpen }}
+            hitSlop={readOnly ? undefined : 6}
+            onPress={readOnly ? undefined : open}
+            style={[styles.hero, popStyle]}
+          >
+            <StreakFlame
+              look={state.look}
+              size={HERO_FLAME}
+              animated={motion && !sheetOpen}
+              dimmed={quiet}
+            />
+            <Animated.View style={styles.heroText}>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.heroCount, { color: quiet ? theme.text.secondary : palette.text }]}
+              >
+                {count}
+              </Text>
+              {/* Bu haftanın günleri (Pzt → Paz): izlenen gün dolu nokta. */}
+              <Animated.View testID="streak-week-dots" style={styles.heroDots}>
+                {state.week.boxes.map((on, i) => (
+                  <Animated.View
+                    key={i}
+                    style={[styles.heroDot, { backgroundColor: on ? dotOn : dotOff }]}
+                  />
+                ))}
+              </Animated.View>
+            </Animated.View>
+          </AnimatedPressable>
+        ) : null}
+        {sheet}
+      </>
+    );
+  }
 
   return (
     <>
@@ -136,18 +206,7 @@ function StreakFlameBadge({ seriler, theme, language, size = 20 }) {
           </Animated.View>
         </AnimatedPressable>
       ) : null}
-      <StreakFlameSheet
-        visible={sheetOpen}
-        onClose={close}
-        state={state}
-        theme={theme}
-        language={language}
-        animated={motion}
-        onTakeBreak={actions.takeBreak}
-        breakBusy={actions.breakBusy}
-        reminderOn={actions.reminderOn}
-        onToggleReminder={actions.toggleReminder}
-      />
+      {sheet}
     </>
   );
 }
@@ -179,6 +238,24 @@ const styles = StyleSheet.create({
   },
   milestoneTrack: { position: "absolute", left: 7, right: 6, bottom: 1, height: 2, borderRadius: 1, overflow: "hidden", backgroundColor: "rgba(127,127,127,0.18)" },
   milestoneFill: { height: "100%", borderRadius: 1 },
+
+  // ── Kompakt profil görünümü (zeminsiz) ──
+  hero: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+  },
+  heroText: { gap: 4 },
+  heroCount: {
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.6,
+  },
+  heroDots: { flexDirection: "row", gap: 3.5 },
+  heroDot: { width: 7, height: 7, borderRadius: 3.5 },
 });
 
 export default memo(StreakFlameBadge);

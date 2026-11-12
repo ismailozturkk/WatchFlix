@@ -39,10 +39,11 @@ import { Keys, set as setStored, useStored } from "@services/storage";
 import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import {
-  kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerChange, subscribeLedgerReset,
+  kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerReset,
 } from "@utils/watchBadgeLedger";
 import { ayniSeriler } from "@utils/watchActivity";
 import { seriDurumu, seriGunu } from "@utils/streakState";
+import { streakFlameState } from "@utils/streakFlame";
 import useAppActive from "@hooks/useAppActive";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
 import useKesifSignals from "@hooks/useKesifSignals";
@@ -164,17 +165,6 @@ export default function useWatchProgress() {
     return () => { iptal = true; };
   }, [uid, sifirlamaNo]);
 
-  // Defter mutabakat DIŞINDA değişti (mola verildi): seriyi hemen yenile.
-  useEffect(() => {
-    if (!uid) return undefined;
-    return subscribeLedgerChange((degisenUid, l) => {
-      if (degisenUid !== uid || !l) return;
-      setDefter(l);
-      const s = seriDurumu(l.aktiflik);
-      setSeriler((o) => (ayniSeriler(o, s) ? o : s));
-    });
-  }, [uid]);
-
   // ── SERİ GÜNÜ DÖNÜMÜ ───────────────────────────────────────────────────────
   // Mutabakat yalnız izleme verisi değişince koşar. Uygulama geceyi arka planda
   // geçirip sabah öne gelince hiçbir şey değişmemiştir ama seri durumu değişmiştir
@@ -276,6 +266,9 @@ export default function useWatchProgress() {
       perde: perde.perde, oyunSeviye, hesapYili,
       rekorHaftaSerisi: seriler?.rekorHafta || 0,
       rekorGunSerisi: seriler?.rekorGun || 0,
+      // Seri alevi rozetleri (alev_*): alevin kendi rekoru (haftada 2 gün + telafi +
+      // kalkan kuralıyla). Kalkan/telafi beklerken kurtarılacak seri de sayılır.
+      alevRekoru: seriler ? streakFlameState(seriler).record : 0,
       // Sinema Bingosu rozeti: yalnız aylık TAM kartlar sayılır. MMKV aboneliği
       // kullanıldığı için yeni Firestore dinleyicisi açılmaz; Bingo kartı dolduğu
       // anda aynı rozet defteri/kutlama hattına girer.
@@ -316,7 +309,7 @@ export default function useWatchProgress() {
 
   // ── Defter mutabakatı ──────────────────────────────────────────────────────
   // Yalnızca açık rozet kümesi ya da Perde gerçekten değiştiğinde çalışır;
-  // imza karşılaştırması her render'da AsyncStorage'a gitmeyi önler.
+  // imza karşılaştırması her render'da depoya (MMKV) gitmeyi önler.
   useEffect(() => {
     if (!uid || !sonuc) return;
     // Defter üç yeni ödül türünü de normal rozet gibi taşır — kalıcılık
@@ -472,7 +465,7 @@ export default function useWatchProgress() {
 
     // İPTAL EDİLEN MUTABAKAT TEKRAR DENENMELİ. İmza, işlem başlamadan önce
     // "yapıldı" diye yazılıyor (eşzamanlı ikinci bir çağrıyı engellemek için).
-    // AsyncStorage I/O sürerken listener yeni bir dizi referansı üretirse effect
+    // Depo (MMKV) yazımı sürerken listener yeni bir dizi referansı üretirse effect
     // temizlenir ve `.then` gövdesi atlanır — ama defter DİSKE ZATEN YAZILMIŞTIR.
     // İmzayı sıfırlamazsak bir sonraki çalışmada "aynı imza" deyip erken döner
     // ve perdeFloor/kazanilmis/defter state'i kalıcı olarak boş kalır: o turda

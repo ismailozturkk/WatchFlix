@@ -192,7 +192,56 @@ export const WATCH_PICKER_COPY = {
       longRun: "Eine langlaufende Serie: {n} Staffeln",
     },
   },
-};
+
+  it: {
+  entry: {
+    title: "Cosa guardare?",
+    movie: "Film",
+    tv: "Mostra",
+    empty: "Aggiungi prima qualcosa alla tua lista",
+    filteredNote: "Scelte dal tuo elenco filtrato",
+    a11yRandom: "Cosa guardare? Scegli un titolo a caso dalla tua lista di titoli",
+    a11yMovie: "Scegli un film a caso dalla tua lista di titoli",
+    a11yTv: "Scegli un programma a caso dalla tua lista di titoli"
+  },
+  sheet: {
+    title: "Cosa dovrei guardare?",
+    pool: "Di {n} titoli",
+    poolFiltered: "Dal tuo elenco filtrato · {n} titoli",
+    shuffling: "Mischia...",
+    reroll: "Un altro",
+    open: "Vai ai dettagli",
+    history: "Appena lanciato",
+    cycled: "Li hai visti tutti, quindi li abbiamo rimescolati",
+    emptyType: "Nessun titolo di questo tipo nella tua lista",
+    unreleased: "Non ancora uscito. Vuoi sceglierne un altro?",
+    close: "Chiudi",
+    types: {
+      mixed: "Misto",
+      movie: "Film",
+      tv: "Serie TV"
+    },
+    kind: {
+      movie: "Film",
+      tv: "Mostra"
+    },
+    units: {
+      hour: "h",
+      minute: "min",
+      season: "stagioni",
+      episode: "episodi"
+    }
+  },
+  reasons: {
+    waitingMonths: "In attesa nella tua lista per {n} mesi",
+    waitingDays: "In attesa nella tua lista per {n} giorni",
+    fresh: "Appena aggiunto",
+    shortFilm: "Breve: finito in {n} minuti",
+    longFilm: "Un film da serata lunga",
+    oneSeason: "Una stagione, in poco tempo",
+    longRun: "Una serie di lunga durata: {n} stagioni"
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getWatchPickerCopy = (language) =>

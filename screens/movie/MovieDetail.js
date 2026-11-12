@@ -36,6 +36,7 @@ import { remindersActions, remindersDomain } from "../../services/userData";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import MediaNoteSheet from "@components/detail/MediaNoteSheet";
+import TasteFitButton from "@components/detail/TasteFitButton";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
@@ -1150,12 +1151,14 @@ export default function MovieDetails({ navigation, route }) {
 
           <DetailActionCluster
             theme={theme}
-            review={{
-              title: i18nText("autoI18n.inceleme", "İnceleme"),
-              subtitle: i18nText("autoI18n.hubda_paylas", "Hub'da paylaş"),
-              icon: "create-outline",
-              onPress: openReviewComposer,
-            }}
+            featured={
+              <TasteFitButton
+                theme={theme}
+                type="movie"
+                details={details}
+                similar={details.recommendations?.results}
+              />
+            }
             ai={{
               title: i18nText("autoI18n.yapay_zeka", "Yapay Zeka"),
               subtitle: i18nText("autoI18n.ai_action_subtitle", "Bilgi / Öneri"),
@@ -1194,6 +1197,12 @@ export default function MovieDetails({ navigation, route }) {
               onPress: () => {
                 if (checkCanCreateMediaNote("movie", id)) setNoteSheetVisible(true);
               },
+            }}
+            review={{
+              title: i18nText("autoI18n.inceleme", "İnceleme"),
+              subtitle: i18nText("autoI18n.hubda_paylas", "Hub'da paylaş"),
+              icon: "create-outline",
+              onPress: openReviewComposer,
             }}
             renderCommentRow={(row) => (
               <SwipeCard

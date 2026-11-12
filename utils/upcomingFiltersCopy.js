@@ -266,8 +266,76 @@ const de = {
     shortDateYear: "{d}. {m} {y}",
   },
 };
+const it = {
+  ui: {
+    filters: "Filtri",
+    filtersCount: "Filtri · {n}",
+    sheetTitle: "Filtra i film in uscita",
+    reset: "Ripristina",
+    apply: "Mostra risultati",
+    when: "Quando?",
+    quickHint: "A partire da domani",
+    pickMonth: "Scegli un mese",
+    customRange: "Intervallo personalizzato",
+    customHint: "Tocca inizio o fine per scegliere dal calendario",
+    from: "Inizio",
+    to: "Fine",
+    noEnd: "Nessun limite",
+    pickDate: "Scegli le date",
+    pickFromTitle: "Data di inizio",
+    pickToTitle: "Data di fine",
+    pickConfirm: "Scegli la data",
+    minFromError: "Prossimo inizio domani",
+    minToError: "La fine non può essere prima dell'inizio",
+    maxError: "Puoi ritirare fino a {n} anni prima",
+    scope: "Rilascia",
+    scopeHint: "Nei cinema e in formato digitale date di uscita per la tua regione ({region}).",
+    genre: "Genere",
+    genreHint: "Vengono elencati i film di qualsiasi genere selezionato",
+    language: "Lingua originale",
+    sort: "Ordina",
+    sortHint: "L'ordinamento per data utilizza le date di rilascio nella tua regione; scegliendolo si passa da Rilascia a Nei cinema.",
+    emptyTitle: "Nessun film in uscita corrisponde a questi filtri",
+    emptyText: "Prova ad ampliare l'intervallo di date o a reimpostare i filtri.",
+    emptyAction: "Reimposta filtri",
+    customChip: "{from} – {to}",
+    moreGenres: "+{n}"
+  },
+  ranges: {
+    "7d": "1 settimana",
+    "1m": "1 mese",
+    "3m": "3 mesi",
+    "6m": "6 mesi",
+    "1y": "1 anno",
+    all: "Tutti"
+  },
+  scopes: {
+    all: "In tutto il mondo",
+    cinema: "Al cinema",
+    digital: "Digitale"
+  },
+  sorts: {
+    popular: "Popolare",
+    soonest: "Per data"
+  },
+  regions: {
+    TR: "Türkiye",
+    US: "Stati Uniti",
+    ES: "Spagna",
+    BR: "Brasile",
+    DE: "Germania"
+  },
+  months: ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"],
+  monthsShort: ["gen", "febbraio", "mar", "apr", "Maggio", "giu", "lug", "Agosto", "Settembre", "ottobre", "novembre", "dicembre"],
+  formats: {
+    monthYear: "{m} {y}",
+    shortDate: "{m} {d}",
+    shortDateYear: "{m} {d}, {y}"
+  }
+};
 
-export const UPCOMING_FILTERS_COPY = Object.freeze({ tr, en, es, pt, de });
+export const UPCOMING_FILTERS_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getUpcomingFiltersCopy = (language) =>

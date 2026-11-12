@@ -4,12 +4,12 @@
 //   • büyük canlı alev + başarılı hafta sayısı + renk · kıvılcım biçimi
 //   • HAFTA · BU HAFTA · KALKAN sütunları
 //   • bu haftanın ihtişamı (1..7: tek alev → yıldızlar)
-//   • durum: kazanıldı / risk (x/2) / telafi (x/4) / kalkan koruyacak / mola
-//   • sonraki renk kademesine kalan hafta, rekor
-//   • seri koruması: esnek hafta, kalkanlar (n/3), MOLA düğmesi, hatırlatıcı anahtarı
-//   • 13 basamaklı renk merdiveni (yatay kaydırılır), "nasıl çalışır"
+//   • durum: kazanıldı / risk (x/2) / telafi (x/4) / kalkan koruyacak
+//   • sonraki hafta açılacak renk + 16 haftalık maceradaki ilerleme, rekor
+//   • seri koruması: esnek hafta, kalkanlar (n/3), hatırlatıcı anahtarı
+//   • 16 haftalık macera merdiveni (her hafta bir renk; yatay kaydırılır), "nasıl çalışır"
 //
-// Merdivendeki küçük alevler DURGUN çizilir (animated=false): on üç alevin ayrı
+// Merdivendeki küçük alevler DURGUN çizilir (animated=false): on altı alevin ayrı
 // saati sayfayı ağırlaştırırdı, hareket tek büyük alevde.
 //
 // ÇIKIŞ PENCERESİ: `visible` düştükten sonra sayfa ≈260 ms daha çizilir
@@ -31,6 +31,7 @@ import BetaBadge from "@components/common/BetaBadge";
 import { isBetaFeature } from "@utils/betaFeatures";
 import {
   DAYS_PER_WEEK,
+  JOURNEY_WEEKS,
   STREAK_MONTHS,
   WEEKS_PER_TIER,
   streakLook,
@@ -54,20 +55,20 @@ const STATUS_ICON = Object.freeze({
   risk: "hourglass",
   repair: "bandage",
   shield: "shield-checkmark",
-  paused: "pause-circle",
 });
 
 // Basamak alevleri yalnız paletle çizilir: efektsiz, üç katman, tam boy.
 const LADDER_LOOKS = STREAK_MONTHS.map((palette) => ({ palette, layers: 3, effects: [], heat: 1, growth: 1 }));
 
-function Pips({ total, filled, color, track, marks }) {
+function Pips({ total, filled, color, track, marks, small = false }) {
   return (
-    <View style={styles.pips}>
+    <View style={[styles.pips, small && styles.pipsSmall]}>
       {Array.from({ length: total }, (_, i) => (
         <View
           key={i}
           style={[
             styles.pip,
+            small && styles.pipSmall,
             { backgroundColor: (marks ? marks[i] : i < filled) ? color : track },
           ]}
         />
@@ -115,8 +116,6 @@ function StreakFlameSheet({
   theme,
   language,
   animated = true,
-  onTakeBreak,
-  breakBusy = false,
   reminderOn = true,
   onToggleReminder,
 }) {
@@ -137,18 +136,9 @@ function StreakFlameSheet({
     ? copy.status[state.status](protection.repairHave, protection.repairNeed)
     : state.status === "risk"
       ? copy.status.risk(week.days, week.need)
-      : state.status === "lit"
-        ? copy.status.lit(week.days)
-        : copy.status.paused;
+      : copy.status.lit(week.days);
   const nextLook = next.nextPalette ? streakLook(next.tierAt, DAYS_PER_WEEK) : null;
   const sparkName = copy.sparks[look.spark?.shape] || copy.sparks.ember;
-  // Mola: geçen hafta karar bekliyorsa geriye dönük, değilse bu hafta.
-  const breakLabel = protection.breakThisWeek
-    ? copy.breakActive
-    : !protection.breakAvailable
-      ? copy.breakUsed
-      : repairing ? copy.breakButtonLast : copy.breakButton;
-  const canBreak = Boolean(onTakeBreak) && protection.canBreak && !breakBusy;
 
   // Her açılışta ayrıntı metni kapalı başlar; böylece ana kademe özeti kompakt kalır.
   useEffect(() => {
@@ -251,17 +241,13 @@ function StreakFlameSheet({
                 <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.shieldTitle}: </Text>
                 {copy.shieldHint}
               </Text>
-              <Text allowFontScaling={false} style={[styles.infoDetail, { color: theme.text.muted }]}>
-                <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.breakTitle}: </Text>
-                {copy.breakHint}
-              </Text>
             </View>
           ) : null}
 
           {/* HAFTA · BU HAFTA · KALKAN */}
           <View style={[styles.levelRow, { borderColor: alpha(theme.text.muted, 0.16) }]}>
             <LevelColumn label={copy.columns.weeks} value={state.weeks} theme={theme}>
-              <Pips total={WEEKS_PER_TIER} filled={level.weekInTier} color={palette.glow} track={track} />
+              <Pips total={JOURNEY_WEEKS} filled={Math.min(JOURNEY_WEEKS, state.weeks)} color={palette.glow} track={track} small />
             </LevelColumn>
             <View style={[styles.levelDivider, { backgroundColor: alpha(theme.text.muted, 0.16) }]} />
             <LevelColumn label={copy.columns.thisWeek} value={`${week.days}/${DAYS_PER_WEEK}`} theme={theme}>
@@ -317,7 +303,7 @@ function StreakFlameSheet({
                     colors={[palette.glow, nextLook.palette.glow]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={[styles.fill, { width: `${Math.max(4, Math.round(state.tierProgress * 100))}%` }]}
+                    style={[styles.fill, { width: `${Math.max(4, Math.round(state.journeyProgress * 100))}%` }]}
                   />
                 </View>
               </>
@@ -356,30 +342,6 @@ function StreakFlameSheet({
               theme={theme}
             />
             <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
-            <ProtectionItem
-              icon="pause-circle"
-              title={copy.breakTitle}
-              value={breakLabel}
-              valueColor={protection.breakThisWeek || canBreak ? palette.text : theme.text.muted}
-              accent={palette.text}
-              theme={theme}
-            />
-            {canBreak ? (
-              <GlassTouchable
-                testID="streak-break-button"
-                style={[styles.breakBtn, { borderColor: alpha(palette.glow, 0.5), backgroundColor: alpha(palette.glow, 0.12) }]}
-                onPress={onTakeBreak}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityHint={copy.breakHint}
-              >
-                <AppIcon family="Ionicons" name="pause" size={14} color={palette.text} />
-                <Text allowFontScaling={false} style={[styles.breakText, { color: palette.text }]}>
-                  {repairing ? copy.breakButtonLast : copy.breakButton}
-                </Text>
-              </GlassTouchable>
-            ) : null}
-            <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
             <View style={styles.reminderRow}>
               <View style={[styles.protIcon, { backgroundColor: alpha(palette.text, 0.14) }]}>
                 <AppIcon
@@ -414,7 +376,7 @@ function StreakFlameSheet({
           >
             {LADDER_LOOKS.map((item, tier) => {
               const reached = state.weeks >= 1 && level.tier >= tier;
-              const current = tier === level.tier && !state.paused;
+              const current = tier === level.tier;
               return (
                 <View
                   key={item.palette.id}
@@ -438,7 +400,7 @@ function StreakFlameSheet({
                       current && { color: item.palette.text },
                     ]}
                   >
-                    {copy.ladderStep(tier * WEEKS_PER_TIER + 1)}
+                    {copy.ladderStep((tier + 1) * WEEKS_PER_TIER)}
                   </Text>
                 </View>
               );
@@ -551,22 +513,12 @@ const styles = StyleSheet.create({
   stageSteps: { flexDirection: "row", gap: 4 },
   stageStep: { flex: 1, height: 6, borderRadius: 3 },
   stageName: { fontSize: 12.5, fontWeight: "900" },
-  breakBtn: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 38,
-    marginTop: 4,
-    marginBottom: 2,
-    borderRadius: 11,
-    borderWidth: 1,
-  },
-  breakText: { fontSize: 13, fontWeight: "800" },
   reminderRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 2, paddingVertical: 4 },
   pips: { flexDirection: "row", gap: 3, marginTop: 4 },
   pip: { width: 6, height: 6, borderRadius: 3 },
+  // 16 haftalık macera: dar sütuna sığsın (16×4 + 15×2 = 94 pt).
+  pipsSmall: { gap: 2 },
+  pipSmall: { width: 4, height: 4, borderRadius: 2 },
   status: {
     alignSelf: "stretch",
     flexDirection: "row",

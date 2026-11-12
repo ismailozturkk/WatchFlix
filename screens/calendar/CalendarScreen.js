@@ -109,6 +109,20 @@ LocaleConfig.locales.de = {
   today: "Heute",
 };
 
+LocaleConfig.locales.it = {
+  monthNames: [
+    "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+    "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+  ],
+  monthNamesShort: [
+    "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
+    "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
+  ],
+  dayNames: ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"],
+  dayNamesShort: ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"],
+  today: "Oggi",
+};
+
 // "" = kütüphanenin varsayılanı (İngilizce). YENİ DİL: yukarıya LocaleConfig.locales.<kod> ekle.
 const applyCalendarLocale = (language) => {
   const code = normalizeAppLanguage(language);
@@ -818,7 +832,7 @@ export default function CalendarScreen({ navigation }) {
           fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" })}
+          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" , it: "Aggiorna calendario"})}
         >
           {isLoadingEvents ? <LensLoader size="small" color={theme.accent} /> : null}
         </GlassIconButton>

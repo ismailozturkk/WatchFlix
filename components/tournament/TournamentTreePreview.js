@@ -50,7 +50,7 @@ const shortRound = (key, lang) =>
   : key === "r16" ? "16"
   : key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : lang === "pt" ? "QF" : lang === "de" ? "VF" : "QF")
   : key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : lang === "pt" ? "SF" : lang === "de" ? "HF" : "SF")
-  : (lang === "tr" ? "FİNAL" : lang === "es" ? "FINAL" : lang === "pt" ? "FINAL" : lang === "de" ? "FINALE" : "FINAL");
+  : (lang === "tr" ? "FİNAL" : lang === "es" ? "FINAL" : lang === "pt" ? "FINAL" : lang === "de" ? "FINALE" : lang === "it" ? "FINALE" : "FINAL");
 
 // Aktif turun nabzı — StageTimeline'daki onaylı desenin aynısı.
 const Pulse = memo(({ style }) => {
@@ -208,12 +208,12 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
 
   // Başlık rozeti — her fazda DOĞRUYU söyler (sabit "SON 32" yok).
   const chip = !rounds
-    ? { text: lang === "tr" ? "HAZIRLANIYOR" : lang === "es" ? "PREPARANDO" : lang === "pt" ? "PREPARANDO" : lang === "de" ? "IN VORBEREITUNG" : "PREPARING", dot: "rgba(255,255,255,0.55)", gold: false }
+    ? { text: lang === "tr" ? "HAZIRLANIYOR" : lang === "es" ? "PREPARANDO" : lang === "pt" ? "PREPARANDO" : lang === "de" ? "IN VORBEREITUNG" : lang === "it" ? "PREPARAZIONE" : "PREPARING", dot: "rgba(255,255,255,0.55)", gold: false }
     : champion
-      ? { text: lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : lang === "de" ? "CHAMPION" : "CHAMPION", dot: GOLD, gold: true }
+      ? { text: lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : lang === "de" ? "CHAMPION" : lang === "it" ? "Campione" : "CHAMPION", dot: GOLD, gold: true }
       : phase === "voting" && ROUNDS[activeRound]
         ? { text: upperLocale(roundLabel(ROUNDS[activeRound], lang), lang), dot: "#EF4444", gold: false, live: true }
-        : { text: lang === "tr" ? "PROJEKSİYON" : lang === "es" ? "PROYECCIÓN" : lang === "pt" ? "PROJEÇÃO" : lang === "de" ? "PROGNOSE" : "PROJECTED", dot: "rgba(255,255,255,0.55)", gold: false };
+        : { text: lang === "tr" ? "PROJEKSİYON" : lang === "es" ? "PROYECCIÓN" : lang === "pt" ? "PROJEÇÃO" : lang === "de" ? "PROGNOSE" : lang === "it" ? "PROGETTATO" : "PROJECTED", dot: "rgba(255,255,255,0.55)", gold: false };
 
   return (
     // İlerleme bilgisi kartın KENDİ accessibilityLabel'ında duyurulur; burada
@@ -222,7 +222,7 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
       <View style={styles.treeHeader}>
         <AppIcon family="Ionicons" name="git-network-outline" size={11} color="rgba(255,255,255,0.80)" />
         <Text allowFontScaling={false} style={styles.treeHeaderText}>
-          {lang === "tr" ? "ELEME AĞACI" : lang === "es" ? "CUADRO" : lang === "pt" ? "CHAVE" : lang === "de" ? "TURNIERBAUM" : "BRACKET"}
+          {lang === "tr" ? "ELEME AĞACI" : lang === "es" ? "CUADRO" : lang === "pt" ? "CHAVE" : lang === "de" ? "TURNIERBAUM" : lang === "it" ? "TABELLONE" : "BRACKET"}
         </Text>
         <View style={styles.treeHeaderSpacer} />
         {!!rounds && (
@@ -358,7 +358,7 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
               ]}
             >
               {champion
-                ? (lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : lang === "de" ? "CHAMPION" : "CHAMPION")
+                ? (lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : lang === "de" ? "CHAMPION" : lang === "it" ? "Campione" : "CHAMPION")
                 : shortRound("final", lang)}
             </Text>
           </>

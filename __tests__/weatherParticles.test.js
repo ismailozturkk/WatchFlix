@@ -1,6 +1,7 @@
 import {
   BURST_SIZE,
   ORBIT_RADII,
+  SOLAR_PHASES,
   orbitScale,
   COLORED_SPRITES,
   FIREWORK_SPARKS,
@@ -16,6 +17,8 @@ import {
   KIND,
   OVERLAY,
   OVERLAY_FRONT,
+  OVERLAY_UNDER,
+  EFFECT_SCENE,
   equalizerLevel,
   hazeLine,
   overlayFrame,
@@ -80,11 +83,11 @@ const local = (pose, u, v) => ({
 });
 
 describe("weatherParticles — katalog", () => {
-  it("7 grup (4 + film/dizi/anime), 37 efekt + auto; grup başına en çok 7, her seçim tek grupta, her efektin kendi tanımı var", () => {
+  it("7 grup (4 + film/dizi/anime), 53 efekt + auto; grup başına en çok 15, her seçim tek grupta, her efektin kendi tanımı var", () => {
     expect(WEATHER_GROUPS.map((g) => g.id)).toEqual(["seasons", "sky", "nature", "festive", "films", "series", "anime"]);
     for (const g of WEATHER_GROUPS) expect(g.effects.length).toBeLessThanOrEqual(WEATHER_GROUP_MAX);
     expect(WEATHER_CHOICES[0]).toBe("auto");
-    expect(WEATHER_EFFECTS).toHaveLength(38);
+    expect(WEATHER_EFFECTS).toHaveLength(53);
     expect(new Set(WEATHER_CHOICES).size).toBe(WEATHER_CHOICES.length);
     for (const e of ALL) {
       expect(getWeatherSpec(e)).toBeTruthy();
@@ -205,59 +208,30 @@ describe("weatherParticles — seçim çözümü", () => {
     expect(specialDayOf(d(5, 10))).toBeNull();
   });
 
-  it("Noel: kar + hediye/şeker/top + kardan adam ve ağaç (tabanda) + Noel Baba kızağı geçer, aralarda gizli", () => {
+  it("Noel: vektör köy sahnesi (OVERLAY.xmasVillage) + önünde kar; kızak sahnenin olayında", () => {
     expect(weatherGroupOf("christmas")).toBe("festive");
-    const x = buildParticles("christmas", { count: 75, seed: 4 });
-    const has = (sp) => x.some((p) => p.sprite === sp);
-    for (const sp of [SPRITE.flake, SPRITE.snowman, SPRITE.xmasTree, SPRITE.sleigh]) expect(has(sp)).toBe(true);
-    expect(x.some((p) => [SPRITE.gift, SPRITE.candyCane, SPRITE.ornament].includes(p.sprite))).toBe(true);
-    const sleigh = x.filter((p) => p.kind === KIND.glide);
-    expect(sleigh).toHaveLength(1);
-    const sl = sleigh[0];
-    let shown = 0;
-    let hidden = 0;
-    let sawLeft = false;
-    let sawRight = false;
-    for (let t = 0; t < sl.period * 6; t += 0.1) {
-      if (particleAlpha(sl, t, H) > 0) {
-        shown += 1;
-        const pose = particlePose(sl, t, W, H);
-        expect(pose.y).toBeLessThan(H * 0.5); // üst yarıda geçer
-        if (pose.x < 0) sawLeft = true;
-        if (pose.x > W) sawRight = true;
-      } else hidden += 1;
-    }
-    expect(shown).toBeGreaterThan(0);
-    expect(hidden).toBeGreaterThan(shown); // "arada" geçer
-    expect(sawLeft && sawRight).toBe(true); // soldan girer, sağdan çıkar
-    expect(needsAnimatedAlpha(x)).toBe(true);
+    const x = buildParticles("christmas", { count: 52, seed: 4 });
+    const scene = x.filter((p) => p.kind === KIND.overlay);
+    expect(scene.map((p) => p.part)).toEqual([OVERLAY.xmasVillage]);
+    expect(x.filter((p) => p.kind !== KIND.overlay)).toHaveLength(51); // kalan her şey kar
+    expect(x.some((p) => p.sprite === SPRITE.flake)).toBe(true);
+    expect(x.some((p) => p.kind === KIND.glide)).toBe(false); // eski kızak parçacığı yok
+    const p = scene[0];
+    expect(p.y0).toBe(0);
+    expect(p.period / p.rest).toBeGreaterThan(20); // kızak geçişi ~26 sn
+    expect(p.period / p.rest).toBeLessThan(30);
   });
 
-  it("Cadılar Bayramı: yarasa/balkabağı + uçan hayalet + mezar taşı + sarkan örümcek (ip + gövde)", () => {
-    const x = buildParticles("halloween", { count: 36, seed: 6 });
-    const has = (sp) => x.some((p) => p.sprite === sp);
-    for (const sp of [SPRITE.batOpen, SPRITE.ghost, SPRITE.tombstone, SPRITE.spider, SPRITE.thread]) expect(has(sp)).toBe(true);
-    expect(x.filter((p) => p.sprite === SPRITE.tombstone)).toHaveLength(3);
-    const thread = x.filter((p) => p.sprite === SPRITE.thread);
-    const body = x.filter((p) => p.sprite === SPRITE.spider);
-    expect(thread).toHaveLength(3);
-    expect(body).toHaveLength(3);
-    for (let i = 0; i < 3; i += 1) {
-      expect(thread[i].x0).toBe(body[i].x0);
-      expect([thread[i].r, thread[i].g, thread[i].b]).toEqual([body[i].r, body[i].g, body[i].b]);
-      for (const t of [0, 3, 11, 40]) {
-        const a = particlePose(thread[i], t, W, H);
-        const b = particlePose(body[i], t, W, H);
-        expect(a.y).toBeGreaterThan(0); // ip tavandan başlar, gövde ucunda
-        expect(b.y).toBeGreaterThan(a.y);
-        expect(b.y).toBeLessThan(thread[i].stemLen + body[i].size);
-      }
-    }
-    // mezar taşı tabana oturur
-    for (const g of x.filter((p) => p.sprite === SPRITE.tombstone)) {
-      const pose = particlePose(g, 5, W, H);
-      expect(pose.y).toBeGreaterThan(H - g.size);
-      expect(pose.y).toBeLessThan(H + 4);
+  it("Cadılar Bayramı: vektör perili köşk sahnesi (OVERLAY.haunted) + önünde yarasalar", () => {
+    const x = buildParticles("halloween", { count: 14, seed: 6 });
+    const scene = x.filter((p) => p.kind === KIND.overlay);
+    expect(scene.map((p) => p.part)).toEqual([OVERLAY.haunted]);
+    const rest = x.filter((p) => p.kind !== KIND.overlay);
+    expect(rest.length).toBe(13);
+    expect(rest.every((p) => p.sprite === SPRITE.batOpen || p.sprite === SPRITE.batClosed)).toBe(true);
+    // eski mezar / örümcek / hayalet parçacıkları sahnede vektör
+    for (const sp of [SPRITE.tombstone, SPRITE.spider, SPRITE.thread, SPRITE.ghost]) {
+      expect(x.some((p) => p.sprite === sp)).toBe(false);
     }
   });
 
@@ -270,7 +244,9 @@ describe("weatherParticles — seçim çözümü", () => {
   it("renkli şekiller beyaza boyanır (doku renkleri korunur), diğerleri paletle", () => {
     expect(COLORED_SPRITES).toContain(SPRITE.sleigh);
     for (const light of [false, true]) {
-      const x = buildParticles("christmas", { count: 75, seed: 4, lightSurface: light });
+      const x = ["xmasGoodies", "xmasScene", "sleigh"].flatMap((e) =>
+        buildParticles(e, { count: 12, seed: 4, lightSurface: light }),
+      );
       for (const q of x) {
         const white = q.r === 1 && q.g === 1 && q.b === 1;
         if (COLORED_SPRITES.includes(q.sprite)) expect(white).toBe(true);
@@ -279,57 +255,30 @@ describe("weatherParticles — seçim çözümü", () => {
     }
   });
 
-  it("Güneş sistemi: Güneş + 8 gezegen + Ay + Uzay İstasyonu, kuşak, kara delik, pulsar, kuyruklu yıldız, yörünge çizgileri", () => {
+  it("Güneş sistemi: yıldız parçacıkları + tek vektör sahne (Güneş, gezegenler, kuşak, kara delik, pulsar, kuyruklu yıldız)", () => {
     expect(weatherGroupOf("solarSystem")).toBe("sky");
     const x = buildParticles("solarSystem", { count: 75, seed: 3 });
-    const bodies = x.filter((q) => q.kind === KIND.orbit && q.sprite !== SPRITE.speck && q.sprite !== SPRITE.dot);
-    const names = ["sun", "mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune", "moon", "iss"];
-    expect(bodies.map((q) => q.sprite)).toEqual(names.map((n) => SPRITE[n]));
-    for (const sp of [SPRITE.pulsar, SPRITE.blackHole, SPRITE.trail]) expect(x.some((q) => q.sprite === sp)).toBe(true);
-    expect(x.some((q) => q.kind === KIND.overlay && q.part === OVERLAY.orbits)).toBe(true);
-    expect(x.filter((q) => q.kind === KIND.orbit && (q.sprite === SPRITE.speck || q.sprite === SPRITE.dot)).length).toBeGreaterThan(5);
-    // renkli şekiller beyaza boyanır
-    for (const q of bodies) expect([q.r, q.g, q.b]).toEqual([1, 1, 1]);
+    const scene = x.filter((q) => q.kind === KIND.overlay && q.part === OVERLAY.orbits);
+    expect(scene).toHaveLength(1);
+    // sahne Atlas'ın önünde: yıldızlar Güneş'in ve gezegenlerin arkasında kalır
+    expect(OVERLAY_FRONT).toContain(OVERLAY.orbits);
+    // 75 sn döngü, 30 sn olay (kuyruklu yıldız + Güneş patlaması), faz 0
+    expect(scene[0].period).toBe(75);
+    expect(scene[0].rest).toBe(2.5);
+    expect(scene[0].y0).toBe(0);
+    // eski sprite cisimler yok; geri kalan hepsi yıldız
+    expect(x.some((q) => q.kind === KIND.orbit)).toBe(false);
+    for (const sp of [SPRITE.sun, SPRITE.earth, SPRITE.pulsar, SPRITE.blackHole, SPRITE.trail]) expect(x.some((q) => q.sprite === sp)).toBe(false);
+    expect(x.filter((q) => q.kind !== KIND.overlay).every((q) => q.sprite === SPRITE.star || q.sprite === SPRITE.dot)).toBe(true);
   });
 
-  it("gezegenler yörüngede: yarıçap sırası, elips (dikey yarı), Ay Dünya'nın çevresinde, kuşak Mars–Jüpiter arasında", () => {
-    const x = buildParticles("solarSystem", { count: 75, seed: 3 });
-    const by = (sp) => x.find((q) => q.sprite === sp);
-    const cx = W / 2;
-    const cy = H * 0.45;
-    const k = orbitScale(W);
-    const order = ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"];
-    let lastR = 0;
-    for (const [i, n] of order.entries()) {
-      const q = by(SPRITE[n]);
-      expect(q.orbitR).toBe(ORBIT_RADII[i]);
-      expect(q.orbitR).toBeGreaterThan(lastR);
-      lastR = q.orbitR;
-      for (const t of [0, 7, 31, 200]) {
-        const pose = particlePose(q, t, W, H);
-        const dx = (pose.x - cx) / (q.orbitR * k);
-        const dy = (pose.y - cy) / (q.orbitR * k * 0.5);
-        expect(dx * dx + dy * dy).toBeCloseTo(1, 5); // elips üzerinde
-      }
-    }
-    // en dış yörünge ekran genişliğinin içinde
-    expect(ORBIT_RADII[7] * k).toBeLessThan(W / 2);
-    // iç gezegen dış gezegenden hızlı döner
-    expect(by(SPRITE.mercury).orbitW).toBeGreaterThan(by(SPRITE.neptune).orbitW);
-    // Ay ve istasyon Dünya'ya yakın kalır
-    const earth = by(SPRITE.earth);
-    for (const sp of [SPRITE.moon, SPRITE.iss]) {
-      const q = by(sp);
-      for (const t of [0, 3, 19, 77]) {
-        const e = particlePose(earth, t, W, H);
-        const m = particlePose(q, t, W, H);
-        expect(Math.hypot(m.x - e.x, m.y - e.y)).toBeLessThan(q.orbitR * k * 1.01 + 1);
-      }
-    }
-    // asteroit kuşağı Mars ile Jüpiter arasında
-    for (const q of x.filter((q) => q.kind === KIND.orbit && q.orbitR > 100 && q.orbitR < 130)) {
-      expect(q.orbitR).toBeGreaterThan(ORBIT_RADII[3]);
-      expect(q.orbitR).toBeLessThan(ORBIT_RADII[4]);
+  it("yörüngeler: yarıçap sırası artar ve en dış yörünge ekrana sığar; başlangıç açıları sabit", () => {
+    for (let i = 1; i < ORBIT_RADII.length; i += 1) expect(ORBIT_RADII[i]).toBeGreaterThan(ORBIT_RADII[i - 1]);
+    for (const w of [320, 390, 430, 820]) expect(ORBIT_RADII[7] * orbitScale(w)).toBeLessThan(w / 2);
+    expect(SOLAR_PHASES).toHaveLength(11);
+    for (const a of SOLAR_PHASES) {
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(a).toBeLessThan(Math.PI * 2);
     }
   });
 
@@ -489,10 +438,15 @@ describe("weatherParticles — türe göre", () => {
   });
 
   it("plan: tek efekt tam sayı, karışımda her efekt payını alır", () => {
-    const single = resolvePlan(["embers"], "medium", "full");
-    expect(single).toEqual([["embers", resolveParticleCount("embers", "medium", "full")]]);
+    const single = resolvePlan(["dandelion"], "medium", "full");
+    expect(single).toEqual([["dandelion", resolveParticleCount("dandelion", "medium", "full")]]);
+    // tek başına seçilen temel efekt sahnesiyle (arkada, ilk sırada); karışımda sahne yok
+    expect(resolvePlan(["embers"], "medium", "full")).toEqual([
+      ["campfireScene", 1],
+      ["embers", resolveParticleCount("embers", "medium", "full")],
+    ]);
     const mix = resolvePlan(["embers", "dandelion", "stardust"], "medium", "full");
-    expect(mix.map(([e]) => e)).toEqual(["embers", "dandelion", "stardust"]);
+    expect(mix.map(([e]) => e)).toEqual(["embers", "dandelion", "stardust"]); // sahne yok
     mix.forEach(([e, c]) => {
       expect(c).toBeLessThan(resolveParticleCount(e, "medium", "full"));
       expect(c).toBeGreaterThan(0);
@@ -580,34 +534,34 @@ describe("weatherParticles — üretim", () => {
   it("fırtına = yağmur + bir şimşek (aydınlık + çizgi, aynı zamanlama); düz yağmurda şimşek yok", () => {
     const storm = buildParticles("storm", { count: 92, seed: 3 });
     expect(storm).toHaveLength(92);
+    // + fırtına sahnesi (bulutlar, şehir, ıslak sokak, şemsiyeli yaya)
+    expect(storm.filter((p) => p.kind === KIND.overlay).map((p) => p.part)).toEqual([OVERLAY.storm]);
     const flash = storm.filter((p) => p.kind === KIND.screenFlash);
     const bolt = storm.filter((p) => p.kind === KIND.bolt);
     expect(flash).toHaveLength(1);
     expect(bolt).toHaveLength(1);
     for (const key of ["period", "y0", "salt", "duty"]) expect(bolt[0][key]).toBe(flash[0][key]);
-    expect(storm.filter((p) => p.sprite === SPRITE.streak)).toHaveLength(90);
+    expect(storm.filter((p) => p.sprite === SPRITE.streak)).toHaveLength(89);
     expect(buildParticles("rain", { count: 90 }).some((p) => p.kind === KIND.screenFlash)).toBe(false);
   });
 
-  it("bahar bahçesi: çim + çiftli çiçek (sap/baş) + sakura + kelebek", () => {
-    const g = buildParticles("springGarden", { count: 52, seed: 2 });
-    const kinds = new Set(g.map((p) => p.kind));
-    expect(kinds.has(KIND.anchor)).toBe(true);
-    expect(kinds.has(KIND.grow)).toBe(true);
+  it("bahar bahçesi: vektör çayır sahnesi + sakura + karahindiba + kelebek (çim/çiçek parçacığı yok)", () => {
+    const g = buildParticles("springGarden", { count: 24, seed: 2 });
+    expect(g).toHaveLength(24);
+    expect(g.filter((p) => p.kind === KIND.overlay).map((p) => p.part)).toEqual([OVERLAY.spring]);
+    expect(g.some((p) => p.kind === KIND.anchor || p.kind === KIND.grow)).toBe(false);
     expect(g.some((p) => p.sprite === SPRITE.petal)).toBe(true);
+    expect(g.some((p) => p.sprite === SPRITE.dandelion)).toBe(true);
     expect(g.some((p) => p.sprite === SPRITE.butterflyOpen)).toBe(true);
-    const flowers = g.filter((p) => p.kind === KIND.grow);
-    expect(flowers.length % 2).toBe(0);
-    for (let i = 0; i < flowers.length; i += 2) {
-      expect(flowers[i].part).toBe(0);
-      expect(flowers[i + 1].part).toBe(1);
-      for (const key of ["period", "y0", "salt", "swayPhase"]) expect(flowers[i + 1][key]).toBe(flowers[i][key]);
-    }
   });
 
   it("yaz kıyısı: 3 katman dalga + kum döşemesi + parıltı + martı", () => {
     const s = buildParticles("summerShore", { count: 44, seed: 2 });
     expect(s).toHaveLength(44);
+    // gök + ufuk denizi kıyının ALTINDA, palmiye/şemsiye kıyının önünde
+    const scenes = s.filter((p) => p.kind === KIND.overlay).map((p) => p.part);
+    expect(scenes).toEqual([OVERLAY.summerSky, OVERLAY.summerBeach]);
+    expect(OVERLAY_UNDER).toEqual([OVERLAY.summerSky, OVERLAY.opSky]);
     const shore = s.filter((p) => p.kind === KIND.tile);
     expect(shore.map((p) => p.part).sort()).toEqual([0, 1, 2, 3]); // 3 dalga katmanı + kum
     expect(shore.every(isVectorParticle)).toBe(true);
@@ -615,10 +569,41 @@ describe("weatherParticles — üretim", () => {
     expect(s.some((p) => p.sprite === SPRITE.star)).toBe(true);
   });
 
-  it("aurora: geniş şeritler + sönük yıldızlar", () => {
+  it("aurora: vektör perde sahnesi (ÖNDE) + sönük yıldızlar", () => {
     const a = buildParticles("aurora", { count: 36, seed: 2 });
-    expect(a.filter((p) => p.kind === KIND.band)).toHaveLength(4);
-    expect(a.filter((p) => p.kind === KIND.float).length).toBe(32);
+    expect(a.filter((p) => p.kind === KIND.band)).toHaveLength(0);
+    expect(a.filter((p) => p.kind === KIND.overlay).map((p) => p.part)).toEqual([OVERLAY.aurora]);
+    expect(a.filter((p) => p.kind === KIND.float).length).toBe(35);
+    expect(OVERLAY_FRONT).toEqual(expect.arrayContaining([OVERLAY.aurora, OVERLAY.stars]));
+  });
+
+  it("mevsim / gökyüzü sahneleri: seçilen temel efekt kendi sahnesiyle, olay saati restU", () => {
+    expect(EFFECT_SCENE).toEqual({
+      snow: "winterScene", leaves: "autumnScene", rain: "rainScene", stardust: "starScene", embers: "campfireScene",
+      fireworks: "fireworksScene",
+    });
+    const parts = {
+      winterScene: OVERLAY.winter, autumnScene: OVERLAY.autumn, rainScene: OVERLAY.rain, starScene: OVERLAY.stars,
+      campfireScene: OVERLAY.campfire, fireworksScene: OVERLAY.fwCity,
+    };
+    for (const [effect, scene] of Object.entries(EFFECT_SCENE)) {
+      const plan = resolvePlan([effect], "medium", "full");
+      expect(plan[0]).toEqual([scene, 1]);
+      // havai fişek tek başına yalnız sahne (vektör fişekler); diğerleri sahne + parçacık
+      expect(plan).toHaveLength(effect === "fireworks" ? 1 : 2);
+      const list = buildPlanParticles(plan, { seed: 4 });
+      const overlays = list.filter((p) => p.kind === KIND.overlay);
+      expect(overlays.map((p) => p.part)).toEqual([parts[scene]]);
+      const p = overlays[0];
+      expect(p.y0).toBe(0);
+      expect(p.period).toBeGreaterThanOrEqual(50);
+      expect(p.rest).toBeGreaterThan(2);
+      // olay süresi 20–30 sn
+      expect(p.period / p.rest).toBeGreaterThan(20);
+      expect(p.period / p.rest).toBeLessThan(30);
+      // tür karışımında / bileşik içinde sahne yok
+      expect(buildParticles(effect, { count: 20 }).some((q) => q.kind === KIND.overlay)).toBe(false);
+    }
   });
 
   it("statik tampon bayrakları: kar şekil/opaklık sabit, kelebek ve ateş böceği değil", () => {
@@ -782,13 +767,18 @@ describe("weatherParticles — kare hesabı", () => {
     const m = shoreMetrics(W, H);
     const glints = shore.filter((p) => p.seaBand);
     expect(glints.length).toBeGreaterThan(5);
+    // kıyı sekme çubuğunun üstüne kalkık: ışıltılar da aynı payla yukarıda
+    const kalk = (p) => p.lift * m.k;
     for (const p of glints) {
+      expect(p.lift).toBeGreaterThan(0);
       for (const t of TIMES) {
         const { y } = particlePose(p, t, W, H);
-        expect(y).toBeGreaterThan(m.seaTop - 3);
-        expect(y).toBeLessThan(m.sandTop + 3);
+        expect(y).toBeGreaterThan(m.seaTop - kalk(p) - 3);
+        expect(y).toBeLessThan(m.sandTop - kalk(p) + 3);
       }
     }
+    // dalga + kum döşemeleri de kalkık (ParticleField altını kumla doldurur)
+    expect(shore.filter((p) => p.kind === KIND.tile).every((p) => p.lift > 0)).toBe(true);
     for (const p of shore.filter(isVectorParticle)) expect(particlePose(p, 1, W, H).x).toBeLessThan(-1000);
   });
 
@@ -866,7 +856,8 @@ describe("weatherParticles — kare hesabı", () => {
     const W = 390;
     const H = 760;
     const types = new Set();
-    for (const effect of [...GENRE_FAMILIES.map((f) => f.effect), "solarSystem", ...UNIVERSE_IDS]) {
+    const seasonScenes = ["storm", "springGarden", "summerShore", "aurora", "halloween", "christmas", ...Object.values(EFFECT_SCENE)];
+    for (const effect of [...GENRE_FAMILIES.map((f) => f.effect), "solarSystem", ...seasonScenes, ...UNIVERSE_IDS]) {
       for (const lightSurface of [false, true]) {
         const list = buildParticles(effect, { count: 40, seed: 9, lightSurface }).filter((p) => p.kind === KIND.overlay);
         for (const p of list) {
@@ -877,7 +868,7 @@ describe("weatherParticles — kare hesabı", () => {
           expect(tone.colors.length).toBeGreaterThan(0);
           expect(tone.alpha).toBeGreaterThan(0);
           // ışık katmanları sönük; evren silüetleri koyu tonda (titan duvarı onu örtecek kadar dolu)
-          expect(tone.alpha).toBeLessThanOrEqual(p.part < OVERLAY.iceWall ? 0.7 : 0.95);
+          expect(tone.alpha).toBeLessThanOrEqual(p.part < OVERLAY.iceWall && p.part !== OVERLAY.orbits ? 0.7 : 0.95);
           for (let t = 0; t < 40; t += 0.37) {
             const fr = overlayFrame(p, t, W, H);
             for (const v of [fr.a, fr.x, fr.y, fr.r]) expect(Number.isFinite(v)).toBe(true);

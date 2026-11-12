@@ -15,6 +15,7 @@ import {
   syncStatsWidget,
 } from "../services/statsWidgetService";
 import { i18nText } from "../utils/i18nText";
+import { profileAvatarProgress } from "../utils/profileAvatarProgress";
 import { cacheKeys } from "../utils/cacheKeys";
 import { publish, seed } from "../services/snapshotCache";
 import {
@@ -109,51 +110,10 @@ const groupByDateFlatTv = (items) => {
     .map(([date, data]) => ({ title: date, data }));
 };
 
-// Avatar halkasını, hero gradyanını ve istatistik ekranlarının accent'ini
-// besleyen türetilmiş renk. `step` = 10.080 dakikalık (1 hafta) izleme adımı.
-//
-// ETİKET DEĞİŞTİ: eskiden "Rank 7" yazıyordu ve bu, profildeki asıl ilerleme
-// göstergesi olan **Perde** ile (components/profile/WatchLevelCard.js) aynı
-// anlama gelen ikinci bir "seviye" gibi okunuyordu — uygulamada üç ayrı
-// ilerleme sayısı görünüyordu (Rank, Perde, oyun Seviyesi). Artık ölçtüğü şeyi
-// söylüyor: "7 hafta" (docs §10.3).
-//
-// RENK ÜRETİMİ: eskiden `hue = step*35` ile sabit %80/%90 doygunlukta 360°'yi
-// dönen ham bir HSL rotasyonuydu — bazı adımlarda neon/göz yoran tonlar
-// çıkıyordu ve "seviyeye göre değer artıyor" hissi vermiyordu (her adım aynı
-// doygunluk/parlaklıkta, sadece rastgele farklı bir renkti). Yerine elle
-// seçilmiş, birbiriyle çakışmayan RANK_COLOR_PALETTE (aşağıda) geldi: ilk tur
-// bu paleti sırayla kullanır, palet bitince bir SONRAKİ tur aynı tonları hafif
-// kaydırıp koyulaştırıp/doygunlaştırarak tekrar kullanır — böylece üst
-// seviyeler tükenmeden yeni, "değerli" hissettiren tonlar almaya devam eder.
-const RANK_COLOR_PALETTE = [
-  { hue: 210, sat: 68, light: 56 }, // Gök mavisi
-  { hue: 152, sat: 55, light: 45 }, // Zümrüt
-  { hue: 265, sat: 60, light: 60 }, // Ametist
-  { hue: 188, sat: 62, light: 45 }, // Turkuaz
-  { hue: 340, sat: 65, light: 58 }, // Yakut
-  { hue: 32, sat: 82, light: 55 }, // Amber
-  { hue: 48, sat: 86, light: 52 }, // Altın
-  { hue: 285, sat: 52, light: 55 }, // Orkide
-  { hue: 168, sat: 58, light: 40 }, // Yeşim
-  { hue: 8, sat: 68, light: 55 }, // Mercan
-  { hue: 225, sat: 58, light: 52 }, // Safir
-  { hue: 130, sat: 42, light: 42 }, // Koyu yeşil
-];
-
+// Avatar halkasının rengi iki profil başlığında da aynı hesaptan gelir.
 const getRankTierForMinutes = (totalMinutes) => {
-  const step = Math.floor(totalMinutes / 10080);
-  const paletteLength = RANK_COLOR_PALETTE.length;
-  const cycle = Math.floor(step / paletteLength);
-  const base = RANK_COLOR_PALETTE[((step % paletteLength) + paletteLength) % paletteLength];
-  const hue = (base.hue + cycle * 11 + 360) % 360;
-  const sat = Math.min(92, base.sat + cycle * 3);
-  const light = Math.max(30, base.light - cycle * 4);
-  const borderColor = `hsl(${hue}, ${sat}%, ${light}%)`;
-  const borderColor2 = `hsl(${hue}, ${Math.min(96, sat + 14)}%, ${Math.min(72, light + 16)}%)`;
-  const shadowColor = `hsla(${hue}, ${Math.max(35, sat - 10)}%, ${Math.max(22, light - 18)}%, 0.9)`;
-  const rankName = i18nText("autoI18n.hafta_sayisi", `${step} hafta`, { count: step });
-  return { borderColor, borderColor2, shadowColor, rankLevel: step, rankName };
+  const { progress, ...tier } = profileAvatarProgress(totalMinutes);
+  return tier;
 };
 
 // Film/dizi ayrımına göre `Movie`/`Tv` son ekli alan adları üretir — mevcut

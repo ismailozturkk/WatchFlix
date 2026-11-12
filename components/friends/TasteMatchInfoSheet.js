@@ -27,6 +27,12 @@ const CORE = [
   { id: "overlap", icon: "checkmark-done-outline" },
   { id: "ratings", icon: "star-half-outline" },
 ];
+// Derin analiz bileşenleri: yeterli veri varsa göreli ağırlıkla hesaba katılır (yoksa düşer).
+const DEEP = [
+  { id: "genreRatings", icon: "bar-chart-outline" },
+  { id: "ratingTrend", icon: "trending-up-outline" },
+  { id: "format", icon: "film-outline" },
+];
 
 function Badge({ text, color }) {
   return (
@@ -120,6 +126,16 @@ function TasteMatchInfoSheet({ visible, onClose, copy }) {
               badge={info.bonus}
               theme={theme}
             />
+            {DEEP.map((part) => (
+              <PartRow
+                key={part.id}
+                icon={part.icon}
+                title={copy.parts[part.id]}
+                desc={info.partsDesc[part.id]}
+                badge={info.bonus}
+                theme={theme}
+              />
+            ))}
           </View>
         </Section>
 

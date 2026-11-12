@@ -119,8 +119,30 @@ const de = {
     account: "Dein Konto wird geschlossen",
   },
 };
+const it = {
+  title: "Eliminazione del tuo account",
+  hint: "L'operazione può richiedere alcuni minuti. Tieni l'app aperta.",
+  step: "Step {n} of {total}",
+  hold: "Tenere premuto per eliminare",
+  holdActive: "Continua a tenere premuto per eliminare…",
+  holdHint: "Tenere premuto il pulsante per {seconds} secondi per confermare.",
+  stages: {
+    verify: "Verifica della tua identità",
+    local: "Cancellazione dei dati su questo dispositivo",
+    social: "Rimozione di amicizie, follower e notifiche",
+    comments: "Rimozione dei tuoi commenti",
+    content: "Rimozione di post, Mi piace e valutazioni",
+    chats: "Rimozione di chat, gruppi ed elenchi condivisi",
+    games: "Rimozione di punteggi di gioco, voti dei tornei e stanze",
+    records: "Rimozione di feedback e record di inviti",
+    profile: "Rimozione del tuo profilo e dati personali",
+    fallback: "Verifica e rimozione dei dati rimanenti",
+    account: "Chiusura del tuo account"
+  }
+};
 
-export const DELETE_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de });
+export const DELETE_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getDeleteAccountCopy = (language) =>

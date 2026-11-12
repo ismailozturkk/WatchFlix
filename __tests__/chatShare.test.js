@@ -630,7 +630,7 @@ describe("buildTasteMatchShare", () => {
     ...over,
   });
 
-  it("puan, kademe, sayılar, ortak türler ve afişleri taşır; tavanlara uyar", () => {
+  it("puan, kademe, sayılar ve ortak türleri taşır; içgörü gitmez, afişten yalnız alıntı küçük resmi", () => {
     const share = buildTasteMatchShare(match(), { host: "Ali", friend: "Ada" });
     expect(share).toMatchObject({
       v: 1,
@@ -643,11 +643,11 @@ describe("buildTasteMatchShare", () => {
       favorites: 2,
       agreement: 83,
       pairs: 4,
-      genres: ["Dram", "Komedi", "Gerilim"],
-      loved: ["Film 1"],
+      genres: ["Dram", "Komedi", "Gerilim", "Korku"],
       parts: [{ id: "genres", value: 80 }, { id: "overlap", value: 55 }],
     });
-    expect(share.items).toHaveLength(4);
+    expect(share.loved).toBeUndefined();
+    expect(share.items).toHaveLength(1);
     expect(share.items[0]).toEqual({ id: 1, media_type: "movie", title: "Film 1", poster_path: "/p1.jpg" });
   });
 
@@ -658,6 +658,23 @@ describe("buildTasteMatchShare", () => {
     expect(one.movie).toBe(80);
     expect(one.tv).toBeUndefined();
     expect(buildTasteMatchShare(match(), {}).movie).toBeUndefined(); // eski biçim: kırılım yok
+  });
+
+  it("Film / Dizi kutusu bilgisi (paylaşılıyor mu · ortak sayısı), kapsam ve az veri taşınır", () => {
+    const share = buildTasteMatchShare(
+      match({ state: "limited", lowData: true, scope: "movies", byType: { movie: { shared: true, score: 80, overlap: 3 }, tv: { shared: false, score: null, overlap: 0 } } }),
+      {},
+    );
+    expect(share.types).toEqual({ movie: { shared: true, score: 80, overlap: 3 }, tv: { shared: false } });
+    expect(share).toMatchObject({ scope: "movies", limited: true, lowData: true });
+    const plain = buildTasteMatchShare(match(), {});
+    expect(plain.types).toBeUndefined();
+    expect(plain.scope).toBeUndefined();
+    expect(plain.limited).toBeUndefined();
+    expect(sanitizeShare({ type: "tasteMatch", score: 50, scope: "evil", types: { movie: { shared: true, score: 999 } } })).toMatchObject({
+      types: { movie: { shared: true, score: 100 } },
+    });
+    expect(sanitizeShare({ type: "tasteMatch", score: 50, scope: "evil" }).scope).toBeUndefined();
   });
 
   it("tür eğilimi ve ayrışılan başlık mesaja GİTMEZ", () => {

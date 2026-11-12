@@ -50,6 +50,7 @@ import { detailRailItemWidth } from "../../utils/posterSizes";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import MediaNoteSheet from "@components/detail/MediaNoteSheet";
+import TasteFitButton from "@components/detail/TasteFitButton";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
@@ -967,12 +968,14 @@ export default function TvShowsDetails({ route, navigation }) {
 
           <DetailActionCluster
             theme={theme}
-            review={{
-              title: i18nText("autoI18n.inceleme", "İnceleme"),
-              subtitle: i18nText("autoI18n.hubda_paylas", "Hub'da paylaş"),
-              icon: "create-outline",
-              onPress: openReviewComposer,
-            }}
+            featured={
+              <TasteFitButton
+                theme={theme}
+                type="tv"
+                details={details}
+                similar={details.recommendations?.results}
+              />
+            }
             ai={{
               title: i18nText("autoI18n.yapay_zeka", "Yapay Zeka"),
               subtitle: i18nText("autoI18n.ai_action_subtitle", "Bilgi / Öneri"),
@@ -1018,6 +1021,12 @@ export default function TvShowsDetails({ route, navigation }) {
               onPress: () => {
                 if (checkCanCreateMediaNote("tv", id)) setNoteSheetVisible(true);
               },
+            }}
+            review={{
+              title: i18nText("autoI18n.inceleme", "İnceleme"),
+              subtitle: i18nText("autoI18n.hubda_paylas", "Hub'da paylaş"),
+              icon: "create-outline",
+              onPress: openReviewComposer,
             }}
           />
 

@@ -39,10 +39,10 @@ export const ILK_DONEM = "2026-yaz";
 // Kuzey yarımküre mevsimleri. Aralık, TAKİP EDEN yılın kışına sayılır — yoksa
 // tek bir kış iki ayrı mühre bölünür ve ikisi de eşiğe ulaşamaz.
 const DONEM_TANIM = [
-  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno", pt: "Inverno", de: "Winter" },
-  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera", pt: "Primavera", de: "Frühling" },
-  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano", pt: "Verão", de: "Sommer" },
-  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño", pt: "Outono", de: "Herbst" },
+  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno", pt: "Inverno", de: "Winter" , it: "Inverno"},
+  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera", pt: "Primavera", de: "Frühling" , it: "Primavera"},
+  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano", pt: "Verão", de: "Sommer" , it: "Estate"},
+  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño", pt: "Outono", de: "Herbst" , it: "Autunno"},
 ];
 
 const DONEM_BY_AY = (() => {
@@ -142,7 +142,11 @@ const ACIKLAMA = {
   es: ({ baslik, n }) => `Registra visionados en ${n} días distintos durante ${baslik}`,
   pt: ({ baslik, n }) => `Registre sessões em ${n} dias diferentes durante ${baslik}`,
   de: ({ adi, yil, n }) => `Markiere an ${n} verschiedenen Tagen etwas als gesehen – im ${adi} ${yil}`,
-};
+
+  it: ({
+  baslik,
+  n
+}) => `Accedi ${n} giorni separati durante ${baslik}`};
 
 /**
  * Kartın TÜM dil alanları (tr/en/es/pt/de … + descTr/descEn/…). Yalnız tr/en yazılırsa ES/PT/DE kullanıcısı

@@ -14,7 +14,7 @@ jest.mock("react-native", () => {
     ActivityIndicator: "ActivityIndicator",
     FlatList: "FlatList",
     // Bölümlerin satırlarını doğrudan çizer.
-    SectionList: ({ sections, renderItem }) =>
+    SectionList: ({ sections, renderItem, ListFooterComponent }) =>
       React.createElement(
         "SectionList",
         null,
@@ -23,6 +23,7 @@ jest.mock("react-native", () => {
             React.createElement(React.Fragment, { key: item.uid }, renderItem({ item, section })),
           ),
         ),
+        ListFooterComponent || null,
       ),
     StyleSheet: { create: (styles) => styles, hairlineWidth: 1, absoluteFill: {} },
     Text: "Text",
@@ -60,9 +61,13 @@ jest.mock("@components/chat/GroupAvatar", () => ({ __esModule: true, default: "G
 jest.mock("@components/chat/GroupAvatarGrid", () => ({ __esModule: true, default: "GroupAvatarGrid" }));
 jest.mock("../components/common/GlassTouchable", () => ({ __esModule: true, default: "GlassTouchable" }));
 jest.mock("@components/SwitchToggle", () => ({ __esModule: true, default: "SwitchToggle" }));
+jest.mock("@components/common/HoldToConfirmButton", () => ({
+  __esModule: true,
+  default: "HoldToConfirmButton",
+}));
 jest.mock("@components/AppAlert", () => ({ appAlert: jest.fn() }));
 jest.mock("@components/AppToast", () => ({
-  toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn() },
+  toast: { success: jest.fn(), error: jest.fn(), warning: jest.fn(), info: jest.fn() },
 }));
 jest.mock("@context/ThemeContext", () => ({
   useTheme: () => ({
@@ -84,6 +89,7 @@ jest.mock("@utils/i18nText", () => ({
 }));
 jest.mock("@services/groupsService", () => ({
   addGroupMember: jest.fn(),
+  deleteGroup: jest.fn(() => Promise.resolve()),
   removeGroupMember: jest.fn(() => Promise.resolve()),
   setGroupAdminRole: jest.fn(() => Promise.resolve()),
   setGroupAdminsOnlyMessages: jest.fn(() => Promise.resolve()),
@@ -102,7 +108,7 @@ const GROUP = {
   memberInfo: { ali: { name: "Ali", username: "ali" } },
 };
 
-function render(onClose = jest.fn(), { group = GROUP, uid = "me" } = {}) {
+function render(onClose = jest.fn(), { group = GROUP, uid = "me", onDeleted } = {}) {
   let tree;
   act(() => {
     tree = create(
@@ -112,6 +118,7 @@ function render(onClose = jest.fn(), { group = GROUP, uid = "me" } = {}) {
         groupId="g1"
         groupData={group}
         currentUid={uid}
+        onDeleted={onDeleted}
       />,
     );
   });
@@ -201,5 +208,30 @@ describe("Yalnız yöneticiler mesaj gönderebilir", () => {
     const locked = render(jest.fn(), { uid: "ali", group: { ...GROUP, adminsOnlyMessages: true } });
     expect(policyRow(locked)).toBeDefined();
     expect(locked.root.findAllByType("SwitchToggle")).toHaveLength(0);
+  });
+});
+
+describe("Grubu sil (yalnız kurucu, basılı tut)", () => {
+  const deleteButton = (tree) => tree.root.findAllByType("HoldToConfirmButton")[0];
+
+  test("kurucu düğmeyi görür; basılı tutma tamamlanınca grup silinir", async () => {
+    const onDeleted = jest.fn();
+    const tree = render(jest.fn(), { onDeleted });
+    const btn = deleteButton(tree);
+    expect(btn).toBeDefined();
+    expect(btn.props.label).toBe("Grubu sil");
+    await act(async () => {
+      btn.props.onConfirm();
+    });
+    expect(groupsService.deleteGroup).toHaveBeenCalledWith("g1", "me");
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(appAlert).not.toHaveBeenCalled();
+  });
+
+  test("yönetici de üye de düğmeyi görmez", () => {
+    const asAdmin = render(jest.fn(), { uid: "ali", group: { ...GROUP, admins: ["ali"] } });
+    expect(deleteButton(asAdmin)).toBeUndefined();
+    const asMember = render(jest.fn(), { uid: "ali" });
+    expect(deleteButton(asMember)).toBeUndefined();
   });
 });

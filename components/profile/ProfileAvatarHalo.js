@@ -113,6 +113,8 @@ function GlowLayer({ ringColor, ringColor2, ids }) {
 
 const ProfileAvatarHalo = ({
   source,
+  avatarIndex,
+  photoURL,
   isCustomPhoto,
   loading,
   progress,
@@ -369,6 +371,8 @@ const ProfileAvatarHalo = ({
           >
             <UserAvatar
               source={source}
+              avatarIndex={avatarIndex}
+              photoURL={photoURL}
               fallbackSource={require("../../assets/avatar/3.png")}
               isCustomPhoto={isCustomPhoto}
               size={HALO_AVATAR_SIZE}

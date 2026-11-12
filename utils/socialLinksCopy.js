@@ -52,7 +52,16 @@ export const SOCIAL_COPY = {
     openFailed: "Link konnte nicht geöffnet werden",
     strip: "Social-Media-Konten",
   },
-};
+
+  it: {
+  title: "I tuoi account social",
+  hint: "Le persone che vedono il tuo profilo possono toccarli per visitarli. Digita un nome utente o incolla il collegamento al profilo; tutto ciò che rimane vuoto rimane nascosto.",
+  placeholder: "nome utente",
+  invalid: platform => `Nome utente ${platform} non valido`,
+  openLabel: platform => `Apri profilo ${platform}`,
+  openFailed: "Impossibile aprire il collegamento",
+  strip: "Account social"
+}};
 
 /** Platform görünen adları (marka yazımı; dile göre değişmez). */
 export const SOCIAL_NAMES = Object.freeze({

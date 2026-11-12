@@ -352,10 +352,10 @@ Aynı iş paketinde üç şey yapıldı (2026-10-20): (a) dil denetimi bulgular�
 5. Testlerdeki "desteklenmeyen dil" örneği artık `"fr"` (önceden `"de"`; Almanca gerçek dil oldu). Yeni dil eklenince bu örnek bir daha kaymasın diye `COMING_SOON_LANGUAGES`'tan seçilir.
 
 ### 12.4 "Yakında" diller (seçilemez)
-- `utils/appLanguages.js` → **`COMING_SOON_LANGUAGES`** (dondurulmuş, `APP_LANGUAGES`'ten AYRI): fr Français, ja 日本語, ko 한국어, it Italiano, id Bahasa Indonesia, hi हिन्दी, ar العربية, zh 中文
-  (bayrak ISO'ları: fr, jp, kr, it, id, in, sa, cn). Bu dillerin kodu `SUPPORTED_LANGUAGE_CODES`'ta YOK → seçilemez, cihaz dili bunlardan biriyse İngilizce açılır.
+- `utils/appLanguages.js` → **`COMING_SOON_LANGUAGES`** (`APP_LANGUAGES`'ten AYRI): fr Français, ja 日本語, ko 한국어, id Bahasa Indonesia, hi हिन्दी, ar العربية, zh 中文.
+  Bu dillerin kodu `SUPPORTED_LANGUAGE_CODES`'ta YOK → seçilemez, cihaz dili bunlardan biriyse İngilizce açılır. İtalyanca 2026-11-12'de desteklenen dillere taşındı.
 - `screens/tabs/SettingsScreen.js`: dil sayfası = desteklenenler + `__soon__` başlığı (`autoI18n.language_coming_soon`, `language_more_soon_hint`) + düz `View` satırlar
-  (`onPress` yok, `accessibilityState.disabled`, "Yakında" hapı, %62 saydamlık). Bekçi: `appLanguages.test.js` "Yakında" bloğu (sekiz kod, dondurulmuş, karışmaz, SettingsScreen'de `onPress` yok).
+  (`onPress` yok, `accessibilityState.disabled`, "Yakında" hapı, %62 saydamlık). Bekçi: `appLanguages.test.js` "Yakında" bloğu (desteklenenlerle karışmaz, SettingsScreen'de `onPress` yok).
 - **Bir "Yakında" dili gerçek dile çevirme:** `COMING_SOON_LANGUAGES`'tan satırı SİL, aynı alanlarla `APP_LANGUAGES`'e ekle, sonra bölüm 9 listesini uygula; onboarding zinciri ve
   testlerdeki "desteklenmeyen dil" örneği (`fr`) başka bir Yakında koduna taşınır.
 
@@ -391,6 +391,12 @@ node scratchpad/scan4.js        # (oturum betiği; yoksa rg -n "tr: \"" ile elle
 ```
 
 Windows/Bash notu: `node -e` içinde `\n`/`\` bozuluyor → betik dosyası kullan (`windows-edit-tooling-gotchas`).
+
+## Durum (2026-11-12, İtalyanca)
+
+- `it` desteklenen dillerde; `translations/it.json` İngilizce şablonla aynı anahtar ve yer tutuculara sahip. Yerel kopya tabloları, tür adları, takvim ve tarih seçici İtalyanca içeriyor. Onboarding dil zinciri artık tr → en → es → pt → de → it → tr.
+- Expo izin metinleri, Android/iOS widget kaynakları ve Cloud Functions bildirim metinleri kodda eklendi. Sunucu metinleri için dağıtım, widget ve izin metinleri için yeni native build gerekiyor.
+- İlk metin taslağı otomatik çeviriyle oluşturuldu ve belirgin terim hataları düzeltildi. Yayına çıkmadan önce ana dili İtalyanca olan biriyle ekranların dil ve taşma kontrolü yapılmalı.
 
 ## Durum (2026-10-16, İspanyolca çalışmasının sonu)
 

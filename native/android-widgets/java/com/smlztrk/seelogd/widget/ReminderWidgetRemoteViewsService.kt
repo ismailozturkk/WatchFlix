@@ -110,9 +110,9 @@ private class ReminderRemoteViewsFactory(
     rv.setTextColor(R.id.reminder_widget_item_title, appearance.text)
 
     val typeLabel = if (isMovie) {
-      WidgetLanguage.pick(lang, "Film", "Movie", "Película", "Filme", "Film")
+      WidgetLanguage.pick(lang, "Film", "Movie", "Película", "Filme", "Film", "Film")
     } else {
-      WidgetLanguage.pick(lang, "Dizi", "TV", "Serie", "Série", "Serie")
+      WidgetLanguage.pick(lang, "Dizi", "TV", "Serie", "Série", "Serie", "Serie TV")
     }
     val meta = listOf(typeLabel, item.subtitle).filter { it.isNotBlank() }.joinToString("  •  ")
     rv.setTextViewText(R.id.reminder_widget_item_meta, meta)
@@ -211,9 +211,9 @@ private class ReminderRemoteViewsFactory(
   private fun countdown(epoch: Long): String {
     val diff = daysUntil(epoch)
     return when (diff) {
-      0L -> WidgetLanguage.pick(lang, "Bugün", "Today", "Hoy", "Hoje", "Heute")
-      1L -> WidgetLanguage.pick(lang, "Yarın", "Tomorrow", "Mañana", "Amanhã", "Morgen")
-      else -> WidgetLanguage.pick(lang, "$diff gün", "$diff days", "$diff días", "$diff dias", "$diff Tage")
+      0L -> WidgetLanguage.pick(lang, "Bugün", "Today", "Hoy", "Hoje", "Heute", "Oggi")
+      1L -> WidgetLanguage.pick(lang, "Yarın", "Tomorrow", "Mañana", "Amanhã", "Morgen", "Domani")
+      else -> WidgetLanguage.pick(lang, "$diff gün", "$diff days", "$diff días", "$diff dias", "$diff Tage", "$diff giorni")
     }
   }
 

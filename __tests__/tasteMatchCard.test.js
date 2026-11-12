@@ -94,6 +94,9 @@ const texts = () => renderer.root.findAllByType("Text").map((n) => flat(n.props.
 const byLabel = (label) => renderer.root.findAll((n) => n.props.accessibilityLabel === label);
 const pressable = (label) => renderer.root.findAllByType("Pressable").find((b) => b.props.accessibilityLabel === label);
 const inviteButton = () => pressable(copy.together.action("Ada"));
+// Katlanır bölümler (Derin analiz / İçgörüler / Ortak izlenenler) varsayılan kapalı; içeriği sınayan testler açar.
+const sectionToggles = () => renderer.root.findAllByType("Pressable").filter((b) => b.props.accessibilityState?.expanded !== undefined);
+const expandAll = () => sectionToggles().filter((b) => !b.props.accessibilityState.expanded).forEach((b) => act(() => b.props.onPress()));
 
 it("yüzdeyi, kademeyi ve sayı kutularını gösterir (uzun cümle yok)", () => {
   mount();
@@ -246,6 +249,7 @@ it("içgörüler: birlikte sevilen, ayrışılan ve tür eğilimi satırları", 
       genres: { similarity: 0.9, shared: ["Drama"], comparable: true, lean: { mine: "Korku", theirs: "Komedi" } },
     }),
   });
+  expandAll();
   const t = texts();
   expect(t).toContain(copy.insights.loved("Film 1, Film 2"));
   expect(t).toContain(copy.insights.split("Film 3", 2, 9, "Ada"));
@@ -254,6 +258,7 @@ it("içgörüler: birlikte sevilen, ayrışılan ve tür eğilimi satırları", 
 
 it("tür eğilimi tek yönlüyse tek cümle; içgörü yoksa kutu yok", () => {
   mount({ match: match({ genres: { similarity: 0.9, shared: ["Drama"], comparable: true, lean: { mine: null, theirs: "Komedi" } } }) });
+  expandAll();
   expect(texts()).toContain(copy.insights.leanTheirs("Komedi", "Ada"));
   act(() => renderer.unmount());
   mount();
@@ -269,6 +274,9 @@ it("ortak izlenen şeridi: afişler, iki tarafın puanı çipte; yalnız biri pu
       ],
     }),
   });
+  expect(texts()).toContain(copy.sharedTitle);
+  expect(texts()).not.toContain("9 · 8"); // kapalıyken afişler çizilmez
+  expandAll();
   const t = texts();
   expect(t).toContain(copy.sharedTitle);
   expect(t).toContain("9 · 8");
@@ -399,11 +407,126 @@ it("türler arayüz diline çevrilir (Türkçe eklenmiş türler İngilizce aray
   mockLang = "en";
   try {
     mount({ match: match({ genres: { similarity: 0.9, shared: ["Dram", "Bilim-Kurgu"], comparable: true, lean: { mine: "Suç", theirs: "Macera" } } }) });
+    expandAll();
     const t = texts();
     expect(t).toContain("Drama");
     expect(t).toContain("Sci-Fi");
     expect(t).toContain(TASTE_MATCH_COPY.en.insights.lean("Crime", "Adventure", "Ada"));
   } finally {
     mockLang = "tr";
+  }
+});
+
+describe("derin analiz + az veri", () => {
+  it("az veride uyarı gösterir; bol veride göstermez", () => {
+    mount({ match: match({ lowData: true, confidence: "low" }) });
+    expect(texts()).toContain(copy.lowData);
+    expect(texts()).toContain(copy.confidence.low);
+    act(() => renderer.unmount());
+    renderer = null;
+    mount({ match: match({ lowData: false, confidence: "high" }) });
+    expect(texts()).not.toContain(copy.lowData);
+    expect(texts()).toContain(copy.confidence.high);
+  });
+
+  it("veri yokken (no-data) az veri uyarısı çizilmez", () => {
+    mount({ match: match({ state: "no-data", score: null, tier: null, lowData: true }) });
+    expect(texts()).not.toContain(copy.lowData);
+  });
+
+  it("derin bileşen çubukları ve içgörüleri dökümden/deep alanından gelir", () => {
+    mount({
+      match: match({
+        confidence: "medium",
+        breakdown: [
+          { id: "genreRatings", value: 64, weight: WEIGHTS.genreRatings },
+          { id: "ratingTrend", value: 81, weight: WEIGHTS.ratingTrend },
+        ],
+        deep: {
+          genreSplit: { genre: "Korku", mine: 8.5, theirs: 4 },
+          genreAgree: { genre: "Drama", mine: 8.4, theirs: 8.1 },
+          correlation: 0.7,
+          generous: { who: "theirs", gap: 1.4 },
+          ratedMine: 20,
+          ratedTheirs: 18,
+        },
+      }),
+    });
+    expect(texts()).toContain(copy.deepTitle);
+    expect(texts()).not.toContain(copy.parts.genreRatings); // kapalıyken gövde yok
+    expandAll();
+    const t = texts();
+    expect(t).toContain(copy.deepTitle);
+    expect(t).toContain(copy.parts.genreRatings);
+    expect(t).toContain("%64");
+    expect(t).toContain(copy.parts.ratingTrend);
+    expect(t).toContain(copy.insights.genreSplit("Korku", 8.5, 4, "Ada"));
+    expect(t).toContain(copy.insights.genreAgree("Dram")); // arayüz dilinde
+    expect(t).toContain(copy.insights.trendHigh());
+    expect(t).toContain(copy.insights.generousTheirs(1.4, "Ada"));
+    expect(t.some((x) => x.includes("watchlist"))).toBe(false);
+    expect(t).toContain(copy.basis(3, 4));
+  });
+});
+
+it("tür karşılaştırma tablosu: her tür için iki tarafın payı ve ortalaması, arayüz dilinde", () => {
+  mount({
+    match: match({
+      confidence: "medium",
+      genres: {
+        similarity: 0.8, shared: ["Drama"], comparable: true, lean: { mine: null, theirs: null },
+        table: [
+          { genre: "Drama", mine: 40, theirs: 25, mineCount: 12, theirCount: 8, mineAvg: 8.1, theirAvg: 7.4 },
+          { genre: "Komedi", mine: 20, theirs: 30, mineCount: 6, theirCount: 9, mineAvg: null, theirAvg: 6 },
+          { genre: "Korku", mine: 15, theirs: 5, mineCount: 4, theirCount: 2, mineAvg: 6.5, theirAvg: null },
+          { genre: "Aksiyon", mine: 10, theirs: 20, mineCount: 3, theirCount: 6, mineAvg: null, theirAvg: null },
+          { genre: "Gerilim", mine: 5, theirs: 10, mineCount: 2, theirCount: 3, mineAvg: null, theirAvg: null },
+        ],
+      },
+    }),
+  });
+  expandAll();
+  const t = texts();
+  expect(t).toContain(copy.genreTableTitle);
+  expect(t).toContain("Dram"); // "Drama" kaydı Türkçe arayüzde
+  expect(t).toContain("Gerilim");
+  expect(t).toContain("%40 · 8.1");
+  expect(t).toContain("%30 · 6");
+  expect(t).toContain("%10");
+  expect(byLabel("Dram: Sen %40 · 8.1, Ada %25 · 7.4")).not.toHaveLength(0);
+});
+
+it("katlanır bölümler: varsayılan kapalı, başlıkta özet; dokununca açılır ve tekrar kapanır", () => {
+  mount({
+    match: match({
+      confidence: "high",
+      breakdown: [{ id: "genreRatings", value: 64, weight: WEIGHTS.genreRatings }],
+      loved: [{ name: "Film 1", mine: 10, theirs: 9 }],
+      split: { name: "Film 3", mine: 2, theirs: 9 },
+      highlights: [{ key: "movie_1", id: 1, type: "movie", name: "Film 1", imagePath: "/m1.jpg", mine: 9, theirs: 8 }],
+    }),
+  });
+  const titles = sectionToggles().map((b) => b.props.accessibilityLabel);
+  expect(titles).toEqual([copy.deepTitle, copy.insightsTitle, copy.sharedTitle]);
+  expect(sectionToggles().every((b) => b.props.accessibilityState.expanded === false)).toBe(true);
+  let t = texts();
+  expect(t).toContain(copy.confidence.high); // derin analiz özeti
+  expect(t).toContain("2"); // içgörü satır sayısı
+  expect(t).not.toContain(copy.insights.loved("Film 1"));
+  const insights = () => sectionToggles().find((b) => b.props.accessibilityLabel === copy.insightsTitle);
+  act(() => insights().props.onPress());
+  expect(insights().props.accessibilityState.expanded).toBe(true);
+  t = texts();
+  expect(t).toContain(copy.insights.loved("Film 1"));
+  expect(t).not.toContain(copy.parts.genreRatings); // diğer bölümler bağımsız, hâlâ kapalı
+  act(() => insights().props.onPress());
+  expect(texts()).not.toContain(copy.insights.loved("Film 1"));
+});
+
+it("her dilde bölüm başlığı ve aç/kapat metni var", () => {
+  for (const lang of Object.keys(TASTE_MATCH_COPY)) {
+    const c = TASTE_MATCH_COPY[lang];
+    expect(typeof c.insightsTitle).toBe("string");
+    expect(c.sectionToggle.expand && c.sectionToggle.collapse).toBeTruthy();
   }
 });

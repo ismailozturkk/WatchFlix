@@ -1,7 +1,7 @@
 // hooks/useStreakReminder.js
 //
 // Haftalık seri HATIRLATMASI: seri her değiştiğinde tek bir yerel bildirim yeniden
-// planlanır (aynı kimlik — eski plan iptal edilir). Hafta kazanılınca, mola verilince
+// planlanır (aynı kimlik — eski plan iptal edilir). Hafta kazanılınca
 // ya da kullanıcı alevin sayfasından hatırlatıcıyı kapatınca bildirim iptal olur.
 // Ne zaman gideceği utils/streakReminder.js'te (saf); zamanlama köprü üzerinden
 // (utils/streakBridge → services/streakRuntime). OS izni yoksa hiçbir şey olmaz;

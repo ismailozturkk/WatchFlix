@@ -1,13 +1,13 @@
 // screens/tabs/settings/DecorScopesScreen.js
 //
-// Ayarlar > Kişiselleştirme > Ekran bazında. Kar, ikon deseni ve ambiyans
+// Ayarlar > Atmosfer > Ekran bazında. Atmosfer, ikon deseni ve ambiyans
 // efektlerinin HANGİ EKRAN GRUPLARINDA görüneceğini seçtirir (ör. ana
-// ekranlarda kar, sohbette ikon, liste/detayda ambiyans).
+// ekranlarda atmosfer, sohbette ikon, liste/detayda ambiyans).
 //
-// Üç kapıdan biri: efektin kendi genel anahtarı Kişiselleştirme'de, bu ekran
+// Üç kapıdan biri: efektin kendi genel anahtarı Atmosfer ekranında, bu ekran
 // onun ÜSTÜNDE bir süzgeç. Genel anahtarı kapalı bir efekti burada açmak onu
 // görünür kılmaz — bu yüzden altta bir not var. Free'de kilitli efektlerin
-// (kar, ikon) kutuları yükseltme sayfasına gider, tıpkı ana ekrandaki anahtar
+// (atmosfer, ikon) kutuları yükseltme sayfasına gider, tıpkı ana ekrandaki anahtar
 // gibi.
 //
 // Mantık utils/decorScopes.js'te (saf, testli); burada yalnız çizim.
@@ -45,7 +45,7 @@ import GlassBox from "../../../components/common/GlassBox";
 function buildCopy() {
   return {
     effects: {
-      snow: i18nText("autoI18n.dekor_efekt_kar", "Kar"),
+      snow: i18nText("autoI18n.dekor_efekt_kar", "Atmosfer"),
       icon: i18nText("autoI18n.dekor_efekt_ikon", "İkon"),
       ambient: i18nText("autoI18n.dekor_efekt_ambiyans", "Ambiyans"),
     },
@@ -83,7 +83,7 @@ function buildCopy() {
         i18nText("autoI18n.dekor_grup_conversation", "Sohbet içi"),
         i18nText(
           "autoI18n.dekor_grup_conversation_alt",
-          "Birebir ve grup sohbet ekranları (kar yok)",
+          "Birebir ve grup sohbet ekranları",
         ),
       ],
       social: [
@@ -116,9 +116,9 @@ function buildCopy() {
   };
 }
 
-// Efekt başına simge: Personalization satırlarıyla AYNI (kar / ikon / ambiyans).
+// Efekt başına simge: Atmosfer satırlarıyla aynı (atmosfer / ikon / ambiyans).
 const EFFECT_ICONS = {
-  snow: { off: "snow-outline", on: "snow" },
+  snow: { off: "sparkles-outline", on: "sparkles" },
   icon: { off: "image-outline", on: "image" },
   ambient: { off: "prism-outline", on: "prism" },
 };
@@ -128,7 +128,7 @@ const EFFECT_ICONS = {
  * "mixed" (yalnız "Tüm ekranlar" satırında: bazı gruplarda açık, bazılarında
  * kapalı).
  */
-function EffectChip({ effect, label, state, color, dimmed, locked, onPress, a11yLabel, C }) {
+function EffectChip({ effect, state, color, dimmed, locked, onPress, a11yLabel, accessibilityHint, C }) {
   const on = state === "on";
   const mixed = state === "mixed";
   const lit = on || mixed;
@@ -136,6 +136,7 @@ function EffectChip({ effect, label, state, color, dimmed, locked, onPress, a11y
     <GlassTouchable
       accessibilityRole="switch"
       accessibilityLabel={a11yLabel}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ checked: mixed ? "mixed" : on }}
       activeOpacity={0.7}
       onPress={onPress}
@@ -150,25 +151,15 @@ function EffectChip({ effect, label, state, color, dimmed, locked, onPress, a11y
     >
       <AppIcon
         name={lit ? EFFECT_ICONS[effect].on : EFFECT_ICONS[effect].off}
-        size={14}
+        size={17}
         color={lit ? color : C.muted}
       />
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[
-          s.chipLabel,
-          { color: lit ? C.text : C.muted, fontWeight: on ? "700" : "500" },
-        ]}
-      >
-        {label}
-      </Text>
       {locked ? (
-        <AppIcon name="lock-closed" size={10} color={C.muted} />
+        <View style={s.chipMark}><AppIcon name="lock-closed" size={9} color={C.muted} /></View>
       ) : mixed ? (
-        <AppIcon name="remove" size={12} color={color} />
+        <View style={s.chipMark}><AppIcon name="remove" size={10} color={color} /></View>
       ) : on ? (
-        <AppIcon name="checkmark" size={12} color={color} />
+        <View style={s.chipMark}><AppIcon name="checkmark" size={10} color={color} /></View>
       ) : null}
     </GlassTouchable>
   );
@@ -246,13 +237,24 @@ export default function DecorScopesScreen() {
       <Text allowFontScaling={false} style={[s.intro, { color: C.muted }]}>
         {i18nText(
           "autoI18n.dekor_kapsam_aciklama",
-          "Her efekti hangi ekran gruplarında görmek istediğini seç. Bir gruptaki kutuya dokunarak o efekti orada aç ya da kapat.",
+          "Efektlerin hangi ekranlarda görüneceğini seç.",
         )}
       </Text>
 
+      <View style={s.legend}>
+        {DECOR_EFFECTS.map((effect) => (
+          <View key={effect} style={s.legendItem}>
+            <AppIcon name={EFFECT_ICONS[effect].on} size={14} color={effectInfo[effect].color} />
+            <Text allowFontScaling={false} numberOfLines={1} style={[s.legendText, { color: C.muted }]}>
+              {copy.effects[effect]}
+            </Text>
+          </View>
+        ))}
+      </View>
+
       <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {/* Tüm ekranlar: sütun toplu anahtarı */}
-        <View style={[s.block, { borderBottomColor: C.borderMuted }]}>
+        <View style={[s.block, s.allBlock, { borderBottomColor: C.borderMuted, backgroundColor: C.cardAlt }]}>
           <View style={s.head}>
             <View style={[s.iconWrap, { backgroundColor: C.iconTeal }]}>
               <AppIcon name="apps-outline" size={16} color={C.teal} />
@@ -260,12 +262,6 @@ export default function DecorScopesScreen() {
             <View style={s.headTexts}>
               <Text allowFontScaling={false} style={[s.title, { color: C.text }]}>
                 {i18nText("autoI18n.dekor_tum_ekranlar", "Tüm ekranlar")}
-              </Text>
-              <Text allowFontScaling={false} style={[s.sub, { color: C.muted }]}>
-                {i18nText(
-                  "autoI18n.dekor_tum_ekranlar_alt",
-                  "Bir efekti tüm gruplarda tek dokunuşla aç ya da kapat",
-                )}
               </Text>
             </View>
           </View>
@@ -275,12 +271,12 @@ export default function DecorScopesScreen() {
                 key={effect}
                 C={C}
                 effect={effect}
-                label={copy.effects[effect]}
                 state={allState(effect)}
                 color={effectInfo[effect].color}
                 dimmed={!effectInfo[effect].enabled && !effectInfo[effect].locked}
                 locked={effectInfo[effect].locked}
                 a11yLabel={`${copy.effects[effect]}, ${i18nText("autoI18n.dekor_tum_ekranlar", "Tüm ekranlar")}`}
+                accessibilityHint={i18nText("autoI18n.dekor_tum_ekranlar_alt", "Bu efekti tüm ekranlarda aç veya kapat")}
                 onPress={() => toggleAll(effect)}
               />
             ))}
@@ -300,22 +296,16 @@ export default function DecorScopesScreen() {
               ]}
             >
               <View style={s.head}>
-                <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
-                  <AppIcon name={scope.icon} size={16} color={C.blue} />
-                </View>
                 <View style={s.headTexts}>
-                  <Text allowFontScaling={false} style={[s.title, { color: C.text }]}>
+                  <Text allowFontScaling={false} numberOfLines={3} style={[s.title, { color: C.text }]}>
                     {name}
-                  </Text>
-                  <Text allowFontScaling={false} style={[s.sub, { color: C.muted }]}>
-                    {hint}
                   </Text>
                 </View>
               </View>
               <View style={s.chipRow}>
                 {DECOR_EFFECTS.map((effect) => {
                   const info = effectInfo[effect];
-                  // Grup bu efekti hiç çizmiyorsa (ör. Sohbet içi + kar) kutu
+                  // Grup bu efekti hiç çizmiyorsa kutu
                   // yerine soluk bir yer tutucu: sütunlar hizalı kalsın, kullanıcı
                   // "kapalı" ile "desteklenmiyor"u karıştırmasın.
                   if (!decorScopeSupports(scope.id, effect)) {
@@ -336,12 +326,12 @@ export default function DecorScopesScreen() {
                       key={effect}
                       C={C}
                       effect={effect}
-                      label={copy.effects[effect]}
                       state={visible ? "on" : "off"}
                       color={info.color}
                       dimmed={!info.enabled && !info.locked}
                       locked={info.locked}
                       a11yLabel={`${copy.effects[effect]}, ${name}`}
+                      accessibilityHint={hint}
                       onPress={() => toggleScope(effect, scope.id)}
                     />
                   );
@@ -356,7 +346,7 @@ export default function DecorScopesScreen() {
         <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
           {i18nText(
             "autoI18n.dekor_genel_kapali_not",
-            "Kişiselleştirme'de genel olarak kapalı olan efekt, burada açık olsa da hiçbir ekranda görünmez.",
+            "Atmosfer ayarlarında kapalı olan efekt burada açık olsa da görünmez.",
           )}
         </Text>
       ) : null}
@@ -392,40 +382,43 @@ export default function DecorScopesScreen() {
 }
 
 const s = StyleSheet.create({
-  intro: { fontSize: 12, lineHeight: 17, marginTop: 6, marginBottom: 12, marginHorizontal: 4 },
+  intro: { fontSize: 12, lineHeight: 17, marginTop: 4, marginBottom: 10, marginHorizontal: 4 },
+  legend: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginBottom: 10, paddingHorizontal: 4 },
+  legendItem: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, minWidth: 0 },
+  legendText: { fontSize: 11, fontWeight: "600", flexShrink: 1 },
   card: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
   block: {
-    paddingHorizontal: 14,
-    paddingTop: 13,
-    paddingBottom: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
   },
-  head: { flexDirection: "row", alignItems: "center", gap: 12 },
-  headTexts: { flex: 1 },
+  allBlock: { paddingVertical: 9 },
+  head: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  headTexts: { flex: 1, minWidth: 0 },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
-  title: { fontSize: 14, fontWeight: "500" },
+  title: { fontSize: 12.5, lineHeight: 16, fontWeight: "600" },
   sub: { fontSize: 11, marginTop: 2, lineHeight: 15 },
-  chipRow: { flexDirection: "row", gap: 8, marginTop: 11 },
+  chipRow: { width: 144, flexDirection: "row", gap: 5 },
   chip: {
     flex: 1,
-    minHeight: 40,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    minHeight: 42,
+    borderRadius: 11,
     borderWidth: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
   },
+  chipMark: { position: "absolute", right: 3, bottom: 3 },
   chipUnsupported: { borderStyle: "dashed", opacity: 0.4 },
-  chipLabel: { fontSize: 12, flexShrink: 1 },
   note: { fontSize: 11, lineHeight: 15, marginTop: 10, marginHorizontal: 4 },
   reset: {
     marginTop: 12,

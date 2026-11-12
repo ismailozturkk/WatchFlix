@@ -28,7 +28,9 @@
 
 .lm-list {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 80;
-  min-width: 196px; margin: 0; padding: 6px; list-style: none;
+  min-width: 210px; max-height: min(70vh, 430px); margin: 0; padding: 6px; list-style: none;
+  overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .22) transparent;
   background: var(--lm-bg);
   border: 1px solid var(--lm-line); border-radius: 16px;
   box-shadow: 0 24px 60px -12px rgba(0, 0, 0, .7), 0 0 0 1px rgba(0, 0, 0, .4);
@@ -38,6 +40,7 @@
   display: flex; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: 10px;
   font-size: 15px; color: var(--lm-ink); cursor: pointer; outline: none;
+  white-space: nowrap;
 }
 .lm-list li:hover, .lm-list li:focus-visible { background: rgba(255, 255, 255, .07); }
 .lm-list li:focus-visible { box-shadow: inset 0 0 0 2px var(--lm-accent); }

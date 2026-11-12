@@ -116,8 +116,63 @@ const de = {
   },
   actions: { like: "Likes", bookmark: "Gespeichert" },
 };
+const it = {
+  search: "Cerca in questa scheda…",
+  filter: "Filtro",
+  all: "Tutti",
+  noMatch: "Niente corrisponde alla tua ricerca o ai tuoi filtri",
+  clear: "Cancella filtri",
+  sections: {
+    kind: "TYPE",
+    score: "SCORE",
+    date: "DATA",
+    postType: "TIPO POST",
+    action: "INTERAZIONE"
+  },
+  sorts: {
+    date: "Data",
+    score: "Punteggio",
+    name: "Nome",
+    likes: "Mi piace",
+    comments: "Commenti"
+  },
+  kinds: {
+    movie: "Film",
+    tv: "Serie",
+    post: "Post",
+    list: "Elenco",
+    story: "Storia"
+  },
+  scores: {
+    10: "10",
+    9: "9",
+    8: "8",
+    7: "7",
+    6: "6",
+    "5-": "5 e precedenti"
+  },
+  dates: {
+    week: "Ultimi 7 giorni",
+    month: "Ultimi 30 giorni",
+    year: "L'anno scorso",
+    older: "Più vecchi"
+  },
+  postTypes: {
+    review: "Recensione",
+    list: "Elenco",
+    text: "Discussioni",
+    poll: "Sondaggio",
+    tierlist: "Elenco livelli",
+    tvgraph: "Grafico episodi"
+  },
+  actions: {
+    like: "Mi piace",
+    bookmark: "Salvato"
+  }
+};
 
-export const ACTIVITY_FILTER_COPY = { tr, en, es, pt, de };
+export const ACTIVITY_FILTER_COPY = { tr, en, es, pt, de ,
+  it: it};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getActivityFilterCopy = (language) =>

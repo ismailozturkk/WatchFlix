@@ -20,7 +20,7 @@ export const LanguageProvider = ({ children }) => {
   }, [selectedLanguage, i18n]);
 
   const toggleLanguage = useCallback((newLanguage) => {
-    changeLanguage(newLanguage);      // writes to AsyncStorage via AppSettings
+    changeLanguage(newLanguage);      // AppSettings üzerinden MMKV'ye (services/storage) yazar
     i18n.changeLanguage(newLanguage); // immediate UI update
   }, [changeLanguage, i18n]);
 

@@ -1,7 +1,7 @@
 // utils/watchLedgerCore.js
 //
 // İzleme rozeti defterinin SAF çekirdeği — depolama yok, React yok.
-// AsyncStorage sarmalayıcısı utils/watchBadgeLedger.js'te; ayrı durmasının
+// Depolama (MMKV, services/storage) sarmalayıcısı utils/watchBadgeLedger.js'te; ayrı durmasının
 // sebebi jest.config.js'in belgelenmiş kısıtı: bu repoda yalnızca RN/Firebase
 // importu olmayan saf modüller test edilebiliyor. Mantık burada olduğu için
 // geri alınamazlık sözleşmesi gerçekten test ediliyor.
@@ -392,7 +392,7 @@ export function birlestir(ledger, { badgeIds = [], tumIds = null, perde = 1, mak
     yeniPerde: yeniPerdeFloor,
     oncekiMakara,
     yeniMakara: yeniMakaraFloor,
-    // Defter değişmediyse çağıran diske yazmaz (gereksiz AsyncStorage I/O yok).
+    // Defter değişmediyse çağıran diske yazmaz (gereksiz depo yazımı yok).
     // `knownDegisti` şart: katalog genişlemesi tek başına hiçbir rozet ya da
     // Perde değiştirmeyebilir, ama diske yazılmazsa her açılışta aynı id'ler
     // "ilk kez görüldü" sayılır ve emilim mekanizması hiç kalıcı olmaz.

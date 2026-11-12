@@ -51,6 +51,7 @@ export function memberBarTitle(language) {
   if (language === "es") return "Gestionar suscripción";
   if (language === "pt") return "Gerenciar assinatura";
   if (language === "de") return "Abo verwalten";
+  if (language === "it") return "Gestisci abbonamento";
   return "Manage subscription";
 }
 
@@ -64,6 +65,6 @@ export function memberBarAccessibilityLabel(plan, language) {
       ? "plan, kullanım ve limitler"
       : language === "es"
         ? "plan, uso y límites"
-        : language === "pt" ? "plano, uso e limites" : language === "de" ? "Plan, Nutzung und Limits" : "plan, usage and limits";
+        : language === "pt" ? "plano, uso e limites" : language === "de" ? "Plan, Nutzung und Limits" : language === "it" ? "piano, utilizzo e limiti" : "plan, usage and limits";
   return `${name}, ${memberBarTitle(language)}, ${tail}`;
 }

@@ -224,7 +224,50 @@ export const FOLLOWED_PEOPLE_COPY = {
       close: "Schließen",
     },
   },
-};
+
+  it: {
+  button: {
+    follow: "Segui",
+    following: "Successivo",
+    followHint: "Vedrai i loro prossimi progetti nella scheda Film e programmi",
+    unfollowHint: "Tocca per smettere di seguire",
+    followLabel: name => `Segui ${name}`,
+    unfollowLabel: name => `Smetti di seguire ${name}`
+  },
+  toast: {
+    followed: name => `Segui ${name}`,
+    followedHint: "I loro prossimi lavori verranno visualizzati nella scheda Film e programmi",
+    unfollowed: name => `Non seguiti ${name}`,
+    limit: max => `Puoi seguire fino a ${max} persone`,
+    limitHint: "Smetti di seguire qualcuno per fare spazio"
+  },
+  rail: {
+    title: "Prossimi dalle persone che segui",
+    more: count => `+${count}`,
+    manage: "Persone che seguo",
+    addToCalendar: title => `Aggiungi ${title} giorno di uscita al calendario del tuo telefono`,
+    removeFromCalendar: title => `Rimuovi ${title} giorno di uscita dal calendario del tuo telefono`,
+    addAll: "Aggiungi tutte le imminenti al calendario del tuo telefono",
+    quietTitle: "Niente in arrivo dalle persone che segui",
+    quietBody: count => count === 1 ? "Segui 1 persona" : `Segui ${count} persone`
+  },
+  sheet: {
+    title: "Persone che seguo",
+    count: (count, max) => `${count}/${max}`,
+    empty: "Non stai ancora seguendo nessuno",
+    emptyHint: "Tocca \"Segui\" sulla pagina di un attore o regista e i suoi nuovi progetti verranno raccolti qui.",
+    unfollowLabel: name => `Smetti di seguire ${name}`,
+    open: name => `Apri la pagina di ${name}`,
+    departments: {
+      Acting: "Attore",
+      Directing: "Direttore",
+      Writing: "Scrittore",
+      Production: "Produttore",
+      other: "Persona"
+    },
+    close: "Chiudi"
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getFollowedPeopleCopy = (language) =>

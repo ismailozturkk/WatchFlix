@@ -1,0 +1,28 @@
+<!-- Stringhe dei widget in italiano; i nomi seguono la lingua di sistema. -->
+<resources>
+  <string name="reminder_widget_name">Seelogd In arrivo</string>
+  <string name="reminder_widget_description">Mostra i film e gli episodi in arrivo</string>
+  <string name="reminder_widget_preview_title">In arrivo</string>
+  <string name="reminder_widget_preview_count">0 promemoria</string>
+  <string name="reminder_widget_empty">Nessun film o episodio in arrivo</string>
+  <string name="reminder_widget_more">+0 altri</string>
+  <string name="lists_widget_name">Seelogd Le mie liste</string>
+  <string name="lists_widget_description">Mostra le locandine delle tue liste in una griglia</string>
+  <string name="lists_widget_preview_title">Preferiti</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">Questa lista è ancora vuota</string>
+  <string name="lists_widget_prev">Lista precedente</string>
+  <string name="lists_widget_next">Lista successiva</string>
+  <string name="stats_widget_name">Seelogd Statistiche</string>
+  <string name="stats_widget_description">Mostra le tue statistiche di visione nella schermata Home</string>
+  <string name="stats_widget_preview_title">Statistiche</string>
+  <string name="stats_widget_preview_total">Tempo totale</string>
+  <string name="stats_widget_preview_movies">Film</string>
+  <string name="stats_widget_preview_shows">Serie TV</string>
+  <string name="stats_widget_preview_episodes">Episodi</string>
+  <string name="stats_widget_preview_years">Anni</string>
+  <string name="stats_widget_preview_months">Mesi</string>
+  <string name="stats_widget_preview_days">Giorni</string>
+  <string name="stats_widget_preview_hours">Ore</string>
+  <string name="stats_widget_preview_minutes">Minuti</string>
+</resources>

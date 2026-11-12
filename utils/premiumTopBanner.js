@@ -129,6 +129,9 @@ export function premiumTopBannerCopy(language) {
   if (language === "de") {
     return { title: "Premium holen", subtitle: "Ohne Limits", cta: "Upgrade" };
   }
+  if (language === "it") {
+    return { title: "Passa a Premium", subtitle: "Senza limiti", cta: "Scopri i piani" };
+  }
   return { title: "Go Premium", subtitle: "Remove the limits", cta: "Upgrade" };
 }
 
@@ -144,6 +147,8 @@ export function premiumTopBannerAccessibilityLabel(language) {
           ? "ver planos"
           : language === "de"
             ? "Pläne ansehen"
+            : language === "it"
+              ? "vedi i piani"
             : "see plans";
   return `${copy.title}, ${copy.subtitle}, ${tail}`;
 }

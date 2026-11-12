@@ -8,7 +8,8 @@ import React, {
   useRef,
   useSyncExternalStore,
 } from "react";
-import { AppState, InteractionManager } from "react-native";
+import { AppState } from "react-native";
+import { runAfterInteractions } from "../utils/afterInteractions";
 import { Keys, get, set, has } from "../services/storage";
 import Toast from "@components/AppToast";
 import { useAuth } from "./AuthContext";
@@ -266,7 +267,7 @@ export const ProfileUiProvider = ({ children }) => {
       return undefined;
     }
     refreshLinkedPhotos();
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       fetchFreshProviderPhotos().catch(() => {});
     });
     const sub = AppState.addEventListener("change", (next) => {

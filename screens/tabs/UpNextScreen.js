@@ -168,7 +168,32 @@ const UP_NEXT_COPY = {
     loadError: "Einige Serien konnten nicht aktualisiert werden.",
     retry: "Erneut versuchen",
   },
-};
+
+  it: {
+  title: "Prossimo",
+  subtitle: "Continua ogni programma dall'episodio giusto.",
+  recentOrder: "Ordinato in base ai programmi guardati più di recente",
+  minuteShort: "min",
+  episodesWatched: "episodi guardati",
+  upcoming: "Presto disponibile",
+  watchedNow: "Guardato ora",
+  chooseDate: "Scegli la data",
+  dateSubtitle: "Quando hai guardato questo episodio?",
+  manage: "Gestisci",
+  manageTitle: "Scegli programmi in corso",
+  manageSubtitle: "Gli serie TV nascosti rimangono nella cronologia e nelle statistiche.",
+  showAll: "Mostra tutto",
+  visible: "Visualizzati",
+  hidden: "Distintivo",
+  done: "Fatto",
+  emptyTitle: "Non c'è ancora niente in attesa",
+  emptyText: "Segna un episodio come guardato e il suo prossimo episodio apparirà qui.",
+  emptyHiddenTitle: "Nessuno serie TV in corso è selezionato",
+  emptyHiddenText: "Scegli quali programmi devono apparire in Prossimo.",
+  discover: "Scopri programmi",
+  loadError: "Alcuni programmi non possono essere aggiornati.",
+  retry: "Riprova"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 const copyFor = (language) => pickByLanguage(language, UP_NEXT_COPY);

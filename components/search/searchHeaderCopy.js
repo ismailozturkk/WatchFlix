@@ -93,8 +93,33 @@ const de = {
   gridView: "Zur Rasteransicht",
   listView: "Zur Listenansicht",
 };
+const it = {
+  tabs: {
+    movie: "Film",
+    tv: "Serie TV",
+    actor: "Attori"
+  },
+  placeholder: {
+    movie: "Cerca film…",
+    tv: "Cerca programmi TV…",
+    actor: "Cerca attori…"
+  },
+  typeLabel: "Tipo di ricerca",
+  categoryLabel: "Scopri",
+  categories: {
+    popular: "Popolare",
+    upcoming: "Prossimi",
+    onAir: "In onda",
+    topRated: "Più votati",
+    trending: "Tendenze"
+  },
+  clear: "Cancella ricerca",
+  gridView: "Passa alla visualizzazione griglia",
+  listView: "Passa alla visualizzazione elenco"
+};
 
-export const SEARCH_HEADER_COPY = Object.freeze({ tr, en, es, pt, de });
+export const SEARCH_HEADER_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSearchHeaderCopy = (language) =>

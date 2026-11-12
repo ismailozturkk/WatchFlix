@@ -22,6 +22,8 @@ const {
   DetailJournalPanel,
 } = require("../components/detail/DetailContentSections");
 
+const { View } = require("react-native");
+
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 const theme = {
@@ -102,6 +104,52 @@ test("bilgi şeridi ile yorum ve not alanı veriyi ve eylemleri korur", () => {
   });
 });
 
+test("üst yuvaya hazır öğe konabilir; Notum ile İnceleme yorumun altında yan yana durur", () => {
+  const onNote = jest.fn();
+  const onReview = jest.fn();
+  let clusterTree;
+  let journalTree;
+  act(() => {
+    clusterTree = create(
+      <DetailActionCluster
+        theme={theme}
+        featured={<View testID="taste-fit" />}
+        ai={{ title: "Yapay Zeka", subtitle: "Bilgi / Öneri", icon: "sparkles-outline", onPress: jest.fn() }}
+        send={{ title: "Gönder", subtitle: "Sohbete gönder", icon: "paper-plane-outline", onPress: jest.fn() }}
+      />,
+    );
+    journalTree = create(
+      <DetailJournalPanel
+        theme={theme}
+        comment={{ title: "Yorumlar", subtitle: "Tüm yorumları gör", icon: "chatbubble-ellipses-outline", onPress: jest.fn() }}
+        note={{ title: "Notum", subtitle: "Bir not ekle", icon: "document-text-outline", onPress: onNote }}
+        review={{ title: "İnceleme", subtitle: "Hub'da paylaş", icon: "create-outline", onPress: onReview }}
+      />,
+    );
+  });
+  expect(clusterTree.root.findAllByProps({ testID: "taste-fit" })).toHaveLength(1);
+  expect(clusterTree.root.findAllByType("GlassTouchable")).toHaveLength(2);
+
+  const rows = journalTree.root.findAllByType("GlassTouchable");
+  expect(rows.map((item) => item.props.accessibilityLabel)).toEqual([
+    "Yorumlar. Tüm yorumları gör",
+    "Notum. Bir not ekle",
+    "İnceleme. Hub'da paylaş",
+  ]);
+  // Notum ve İnceleme aynı yatay satırda kardeş.
+  // (GlassTouchable → JournalTile → ortak satır View)
+  expect(rows[1].parent.parent === rows[2].parent.parent).toBe(true);
+  expect(rows[0].parent.parent === rows[1].parent.parent).toBe(false);
+  rows[1].props.onPress();
+  rows[2].props.onPress();
+  expect(onNote).toHaveBeenCalledTimes(1);
+  expect(onReview).toHaveBeenCalledTimes(1);
+  act(() => {
+    clusterTree.unmount();
+    journalTree.unmount();
+  });
+});
+
 test("film ve dizi ekranları ortak yeni bölümleri kullanır; dizi ilerleme çubuğu yerinde kalır", () => {
   const movie = fs.readFileSync(path.join(__dirname, "..", "screens", "movie", "MovieDetail.js"), "utf8");
   const tv = fs.readFileSync(path.join(__dirname, "..", "screens", "tv", "TvShowsDetails.js"), "utf8");
@@ -112,6 +160,8 @@ test("film ve dizi ekranları ortak yeni bölümleri kullanır; dizi ilerleme ç
     expect(source).toMatch(/<DetailJournalPanel\b/);
     expect(source).toMatch(/<DetailOverviewSection\b/);
     expect(source).toMatch(/<DetailProviderRail\b/);
+    expect(source).toMatch(/featured=\{\s*<TasteFitButton\b/);
+    expect(source).toMatch(/<DetailJournalPanel[\s\S]*?review=\{\{[\s\S]*?openReviewComposer/);
   }
   expect(tv).toMatch(/<WatchProgressBar[\s\S]*?style=\{styles\.showProgressTrack\}/);
 });

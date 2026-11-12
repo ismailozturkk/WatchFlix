@@ -16,10 +16,10 @@
 .am {
   --bg: #121123; --card: #1C1B37; --btw: #17162D; --bd: #2C2A50; --tab: #151429;
   --t1: #F4F4F6; --t2: #CDCDD6; --tb: #A0A0B1; --t3: #7C7B8E; --ac: #545DF8; --bold: #232DF6;
-  --fh: "Denk One", "Nova Square", system-ui, sans-serif;
-  --fb: "Nova Square", system-ui, sans-serif;
+  --fh: "Denk One", "Nova Square", system-ui, -apple-system, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans Devanagari", sans-serif;
+  --fb: "Nova Square", system-ui, -apple-system, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans Devanagari", sans-serif;
   --fn: "Audiowide", "Nova Square", system-ui, sans-serif;
-  --fs: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --fs: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans Devanagari", sans-serif;
   /* Türetilen tonlar: koyu temada açık vurgu metni, açık temada koyu (t1'e doğru karışım). */
   --acl: color-mix(in srgb, var(--ac) 58%, var(--t1));
   --act: color-mix(in srgb, var(--ac) 16%, transparent);

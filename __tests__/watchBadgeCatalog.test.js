@@ -18,21 +18,23 @@ const sayimlar = () => WATCH_BADGES.reduce((acc, b) => {
 }, {});
 
 describe("katalog butunlugu", () => {
-  test("158 rozet ve benzersiz id", () => {
+  test("162 rozet ve benzersiz id", () => {
     // v1: 81 rozet. v2 (KATALOG_SURUMU 2): +60 — hedef "100'un uzerinde, her asamada
     // elinin altinda bir sonraki rozet". v3: +13 Kesif (izleme disi ozellikler).
-    expect(WATCH_BADGES).toHaveLength(158);
-    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(158);
-    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(158);
+    // v4: +4 Bingo. v5: +4 Seri Alevi.
+    expect(WATCH_BADGES).toHaveLength(162);
+    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(162);
+    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(162);
   });
 
   test("katalog surumleri: ilk 81 rozet v1, 60 rozet v2, 13 Kesif rozeti v3 (v1 ids degismedi)", () => {
     const { KATALOG_SURUMU } = require("../components/badges/watchBadgeCatalog");
-    expect(KATALOG_SURUMU).toBe(4);
+    expect(KATALOG_SURUMU).toBe(5);
     expect(WATCH_BADGES.filter((b) => b.since === 1)).toHaveLength(81);
     expect(WATCH_BADGES.filter((b) => b.since === 2)).toHaveLength(60);
     expect(WATCH_BADGES.filter((b) => b.since === 3)).toHaveLength(13);
     expect(WATCH_BADGES.filter((b) => b.since === 4)).toHaveLength(4);
+    expect(WATCH_BADGES.filter((b) => b.since === 5)).toHaveLength(4);
     // v1'deki HER id katalogda durmali: kullanicinin defterindeki kazanilmis rozet
     // katalogda karsiliksiz kalirsa ekrandan SILINIR (watchLedgerCore).
     const v1 = [
@@ -80,7 +82,7 @@ describe("katalog butunlugu", () => {
       if (b.family) (acc[b.family] = acc[b.family] || []).push(b.tier);
       return acc;
     }, {});
-    expect(Object.keys(aileler)).toHaveLength(21);
+    expect(Object.keys(aileler)).toHaveLength(22);
     for (const [ad, tierler] of Object.entries(aileler)) {
       const sirali = [...tierler].sort((a, b) => a - b);
       expect([ad, sirali.length]).toEqual([ad, expect.any(Number)]);
@@ -100,6 +102,7 @@ describe("katalog butunlugu", () => {
     // Yil ici ay sayisi 12'de doyar.
     expect(uzunluk("ay")).toBe(4);
     expect(uzunluk("bingo")).toBe(4);
+    expect(uzunluk("alev")).toBe(4);
     // v2 aileleri: dort kademe (sezon, eser, gunluk seri, hafta sonu, tekrar, sadakat).
     for (const fam of ["sezon", "eser", "ardisik", "haftaSonu", "tekrar", "sadik"]) {
       expect([fam, uzunluk(fam)]).toEqual([fam, 4]);
@@ -149,13 +152,14 @@ describe("katalog butunlugu", () => {
 });
 
 describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
-  test("dagilim 35 common / 60 uncommon / 46 rare / 10 epic / 3 legendary", () => {
+  test("dagilim 37 common / 63 uncommon / 49 rare / 10 epic / 3 legendary", () => {
     // v1: 12/31/27/8/3. v2 +60 rozet: 13 common, 26 uncommon, 18 rare, 3 epic
     // (eser_3000, uzun_metraj_200, gizli_altin_koleksiyon) ve uzun_metraj_100
     // epic'ten rare'e indi (aile 5. kademeye uzadi). v3 +13 Kesif: 10 common, 3
     // uncommon, hic rare/epic. LEGENDARY KOTASI DEGISMEDI.
+    // v5 +4 Seri Alevi: 1 common, 1 uncommon, 2 rare (tarih tavanı).
     // Medyan uncommon KALDI — profil mor duvara donmuyor (asagidaki test kilitliyor).
-    expect(sayimlar()).toEqual({ common: 36, uncommon: 62, rare: 47, epic: 10, legendary: 3 });
+    expect(sayimlar()).toEqual({ common: 37, uncommon: 63, rare: 49, epic: 10, legendary: 3 });
   });
 
   test("nadir rozet ORANI buyumedi (rare+ payi v1'den fazla degil)", () => {
@@ -256,6 +260,23 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
     expect(bingo.map((b) => b.since)).toEqual([4, 4, 4, 4]);
     for (const b of bingo) expect(b.getProgress({ bingoFullCards: 5 })).toBe(5);
     expect(bingo[bingo.length - 1].rarity).toBe("rare");
+  });
+
+  test("SERI ALEVI ailesi 4-8-12-16: her 4 haftada bir kademe, alevin kendi rekorundan", () => {
+    const alev = WATCH_BADGES.filter((b) => b.family === "alev").sort((a, b) => a.tier - b.tier);
+    expect(alev.map((b) => b.id)).toEqual(["alev_4", "alev_8", "alev_12", "alev_16"]);
+    expect(alev.map((b) => b.target)).toEqual([4, 8, 12, 16]);
+    expect(alev.map((b) => b.since)).toEqual([5, 5, 5, 5]);
+    expect(alev.map((b) => b.section)).toEqual(["ritim", "ritim", "ritim", "ritim"]);
+    expect(alev.map((b) => b.rarity)).toEqual(["common", "uncommon", "rare", "rare"]);
+    // Simgeler alevin kıvılcım bölümlerini izler: kor → yıldız → elmas → Efsane.
+    expect(alev.map((b) => b.iconSolid)).toEqual(["flame", "star", "diamond", "sparkles"]);
+    // Eski haftalık seri (`rekorHaftaSerisi`) bu aileyi ilerletmez.
+    for (const b of alev) {
+      expect(b.getProgress({ alevRekoru: 9, rekorHaftaSerisi: 40 })).toBe(9);
+    }
+    const acik = alev.filter((b) => b.isUnlocked({ alevRekoru: 12 })).map((b) => b.id);
+    expect(acik).toEqual(["alev_4", "alev_8", "alev_12"]);
   });
 
   test("MARATON ve TEK OTURUS aileleri tek gunun icinde kalir", () => {
@@ -531,7 +552,7 @@ describe("kesisim rozetleri: TEK sayac buyuterek alinamaz", () => {
 describe("kademeli aileler tek karta iner", () => {
   const grupla = (stats) => gruplaAileler(evaluateWatchBadges({ turSayaci: new Map(), ...stats }, []));
 
-  test("21 aile karti + 65 ailesiz rozet = 86 kart", () => {
+  test("22 aile karti + 65 ailesiz rozet = 87 kart", () => {
     const kartlar = grupla({});
     expect(kartlar.length).toBeLessThan(WATCH_BADGES.length);
     // 21 aile 93 üyeyi 21 karta indirir. v2'de 60 rozet eklendi ama ekran 37 kart
@@ -539,9 +560,9 @@ describe("kademeli aileler tek karta iner", () => {
     // rozeti tekil: ekran 13 kart uzar (72 → 85).
     const uye = WATCH_BADGES.filter((b) => b.family).length;
     const aile = new Set(WATCH_BADGES.filter((b) => b.family).map((b) => b.family)).size;
-    expect([uye, aile]).toEqual([93, 21]);
+    expect([uye, aile]).toEqual([97, 22]);
     expect(kartlar.length).toBe(WATCH_BADGES.length - uye + aile);
-    expect(kartlar.length).toBe(86);
+    expect(kartlar.length).toBe(87);
   });
 
   test("kidem ailesi de tek karta iner ve sonraki hedefi tasir", () => {

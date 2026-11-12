@@ -70,7 +70,7 @@ function yapraklar(nesne, onek = "", toplam = {}) {
 }
 
 // tr dışındaki her dil (en, es, pt …) tr ile karşılaştırılır. Yeni dil: buraya ekle.
-const KARSILASTIRILAN = ["en", "es", "pt", "de"];
+const KARSILASTIRILAN = ["en", "es", "pt", "de", "it"];
 
 function karsilastir(tablolar) {
   const yap = Object.fromEntries(
@@ -89,7 +89,7 @@ function karsilastir(tablolar) {
     }
   }
   // En dışındaki yabancı dillerde değer kontrolü (en eski davranışı korur: yalnız anahtar kümesi).
-  for (const dil of ["es", "pt", "de"]) {
+  for (const dil of ["es", "pt", "de", "it"]) {
     const tablo = yap[dil];
     if (!tablo) continue;
     for (const anahtar of Object.keys(tablo)) {
@@ -166,14 +166,15 @@ const TABLOLAR = {
     es: getWrappedStrings("es"),
     pt: getWrappedStrings("pt"),
     de: getWrappedStrings("de"),
+    it: getWrappedStrings("it"),
   }),
 };
 
-describe("yerel metin tablolarında tr / en / es / pt / de dengesi", () => {
+describe("yerel metin tablolarında altı dil dengesi", () => {
   for (const [ad, al] of Object.entries(TABLOLAR)) {
-    it(`${ad}: beş dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
+    it(`${ad}: altı dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
       const tablo = al();
-      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es", "pt", "de"]));
+      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es", "pt", "de", "it"]));
       expect(karsilastir(tablo)).toEqual([]);
     });
   }

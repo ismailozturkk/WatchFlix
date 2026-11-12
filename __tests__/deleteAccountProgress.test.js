@@ -50,8 +50,8 @@ describe("silme aşamaları", () => {
 describe("ilerleme metinleri", () => {
   const languages = Object.keys(DELETE_ACCOUNT_COPY);
 
-  it("beş dil de var", () => {
-    expect(languages.sort()).toEqual(["de", "en", "es", "pt", "tr"]);
+  it("altı dil de var", () => {
+    expect(languages.sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
   });
 
   it.each(languages)("%s: her aşamanın (yedek dahil) etiketi dolu", (language) => {

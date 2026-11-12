@@ -22,7 +22,7 @@ import { alpha } from "@theme/colors";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 import { EFFECT_ICONS, effectLabel } from "./AtmosphereControls";
 
-const LANGS = ["tr", "en", "es", "pt", "de"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it"];
 
 // Yalnız dizide olan (bileşik) TMDB türlerinin özgün adları → yerel ad.
 const TV_ONLY_NAMES = {

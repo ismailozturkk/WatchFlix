@@ -137,7 +137,33 @@ export const EXTERNAL_RATINGS_COPY = {
     },
     source: "Die Bewertungen stammen von OMDb. Nicht jeder Titel hat alle drei; besonders bei Serien fehlen oft Rotten Tomatoes und Metascore.",
   },
-};
+
+  it: {
+  title: "Valutazioni",
+  close: "Chiudi",
+  open: summary => `Valutazioni esterne: ${summary}. Tocca per i dettagli`,
+  imdb: {
+    sub: votes => votes ? `${votes} voti` : "Valutazione utente",
+    scale: "su 10"
+  },
+  rt: {
+    sub: "Tasso di approvazione della critica",
+    fresh: "Fresco",
+    rotten: "Marcio"
+  },
+  meta: {
+    sub: "Media della critica",
+    scale: "su 100",
+    verdicts: {
+      universalAcclaim: "Consensi universali",
+      favorable: "Generalmente favorevole",
+      mixed: "Mista o nella media",
+      unfavorable: "Generalmente sfavorevole",
+      overwhelmingDislike: "Antipatia schiacciante"
+    }
+  },
+  source: "Le valutazioni provengono da OMDb. Non tutti i titoli li hanno tutti e tre; i programmi in particolare spesso mancano di Rotten Tomatoes e Metascore."
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getExternalRatingsCopy = (language) =>

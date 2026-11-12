@@ -627,6 +627,7 @@ export function buildCineRoomShare({ code, host, count, async } = {}) {
 // ─── Zevk uyumu ──────────────────────────────────────────────────────────────
 
 export const MAX_TASTE_SHARE_ITEMS = 4;
+export const MAX_TASTE_SHARE_GENRES = 6;
 const TASTE_PART_IDS = ["genres", "overlap", "ratings", "favorites"];
 const percentInt = (value) => (Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null);
 const countInt = (value) => (Number.isFinite(value) && value >= 0 ? Math.min(99999, Math.round(value)) : null);
@@ -654,12 +655,34 @@ function sanitizeTasteMatchShare(raw) {
   }
 
   // Film / dizi ayrı uyum (paylaşılmayan ya da verisi az kategori yoktur: uydurma puan gitmez).
+  // `movie` / `tv` düz sayıları eski sürümler için kalır; yeni kart `types`tan (paylaşılıyor mu · ortak sayısı) çizer.
   const movie = percentInt(raw.movie);
   if (movie !== null) share.movie = movie;
   const tv = percentInt(raw.tv);
   if (tv !== null) share.tv = tv;
+  if (isObject(raw.types)) {
+    const types = {};
+    ["movie", "tv"].forEach((key) => {
+      const entry = raw.types[key];
+      if (!isObject(entry)) return;
+      if (entry.shared === false) {
+        types[key] = { shared: false };
+        return;
+      }
+      const t = { shared: true };
+      const score = percentInt(entry.score);
+      if (score !== null) t.score = score;
+      const common = countInt(entry.overlap);
+      if (common !== null) t.overlap = common;
+      types[key] = t;
+    });
+    if (Object.keys(types).length) share.types = types;
+  }
+  if (raw.scope === "movies" || raw.scope === "shows") share.scope = raw.scope;
+  if (raw.limited === true) share.limited = true;
+  if (raw.lowData === true) share.lowData = true;
 
-  const genres = (Array.isArray(raw.genres) ? raw.genres : []).map((g) => clip(g, 30)).filter(Boolean).slice(0, 3);
+  const genres = (Array.isArray(raw.genres) ? raw.genres : []).map((g) => clip(g, 30)).filter(Boolean).slice(0, MAX_TASTE_SHARE_GENRES);
   if (genres.length) share.genres = genres;
   const loved = (Array.isArray(raw.loved) ? raw.loved : []).map((n) => clip(n, MAX_TITLE)).filter(Boolean).slice(0, 3);
   if (loved.length) share.loved = loved;
@@ -693,12 +716,19 @@ function sanitizeTasteMatchShare(raw) {
 
 /**
  * `computeTasteMatch` çıktısı → sohbet gövdesi. Puan yoksa (veri yetersiz) null.
- * Yalnız İKİ tarafın da bildiği veriler gider: ortak izlenen / ortak puanlanan başlıklar,
- * ortak türler ve sayılar (tür eğilimi ve ayrışılan başlık bilerek GİTMEZ).
+ * Kart, profildeki zevk uyumu kartının TÜRLER dahil üst kısmını çizer: halka + kademe + ısı çubuğu,
+ * Film / Dizi kutuları, sayı şeridi (ortak izlenen · favori · puan uyumu) ve ortak tür çipleri.
+ * Yalnız İKİ tarafın da bildiği veriler gider (tür eğilimi, ayrışılan başlık ve içgörüler bilerek GİTMEZ).
  */
 export function buildTasteMatchShare(match, { host, friend } = {}) {
   if (!isObject(match) || match.score == null) return null;
+  const typeOf = (info) =>
+    isObject(info) ? (info.shared === false ? { shared: false } : { shared: true, score: info.score ?? undefined, overlap: info.overlap }) : undefined;
   return sanitizeTasteMatchShare({
+    types: isObject(match.byType) ? { movie: typeOf(match.byType.movie), tv: typeOf(match.byType.tv) } : undefined,
+    scope: match.scope,
+    limited: match.state === "limited",
+    lowData: match.lowData === true,
     score: match.score,
     host,
     friend,
@@ -709,9 +739,9 @@ export function buildTasteMatchShare(match, { host, friend } = {}) {
     movie: match.byType?.movie?.score ?? undefined,
     tv: match.byType?.tv?.score ?? undefined,
     genres: match.genres?.shared,
-    loved: (match.loved || []).map((entry) => entry.name),
     parts: match.breakdown,
-    items: (match.highlights || []).map((h) => ({ id: h.id, type: h.type, name: h.name, imagePath: h.imagePath })),
+    // Afişler kartta çizilmez (kart türlerde biter); yalnız alıntı küçük resmi için ilk ortak izlenen gider.
+    items: (match.highlights || []).slice(0, 1).map((h) => ({ id: h.id, type: h.type, name: h.name, imagePath: h.imagePath })),
   });
 }
 

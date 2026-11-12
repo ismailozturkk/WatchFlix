@@ -15,9 +15,8 @@
 //       4 yükselen kıvılcımlar · 5 uçuşan minik kıvılcımlar (girdap gibi dönüp
 //       yükselen, göz kırpan parçacıklar) · 6 taç (arkada büyük,
 //       yarı saydam ikinci alev + ışınlar) · 7 çevrede parlayan yıldızlar
-//   • Kıvılcım biçimi HER HAFTA değişir: kor · yıldız · elmas · kar tanesi.
-//   • 52+ hafta: alev etrafında dönen gökkuşağı halkası ve renk kayması.
-//   • Mola: gri rampa, efektsiz, yavaş.
+//   • Kıvılcım biçimi 4 haftada bir değişir: kor · yıldız · elmas · kar tanesi.
+//   • Efsane (16. hafta, `spectrum`): gövde dönen tayf, hale ve her parçacık ayrı renk.
 //
 // Çıktı ÖNÇARPIMLI (premultiplied) ve saydam arka planlıdır: açık ve koyu temada
 // aynı alev, arkasındaki yüzeyin üstüne çizilir.
@@ -35,10 +34,10 @@ uniform float shape;
 uniform float energy;
 uniform float growth;
 uniform float effects;
-uniform float rainbow;
 uniform float sparkCount;
 uniform float dim;
 uniform float detail;
+uniform float spectrum;
 uniform float3 c0;
 uniform float3 c1;
 uniform float3 c2;
@@ -71,6 +70,11 @@ float fbm(float2 p) {
   return v;
 }
 
+// Ton (0..1) → doygun renk. Rengarenk (Efsane) alevde gövde ve parçacıklar için.
+float3 hue(float h) {
+  return clamp(abs(fract(h + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+}
+
 float3 ramp(float x) {
   x = clamp(x, 0.0, 1.0);
   if (x < 0.25) return mix(c0, c1, x / 0.25);
@@ -79,9 +83,6 @@ float3 ramp(float x) {
   return mix(c3, c4, (x - 0.75) / 0.25);
 }
 
-float3 hue(float h) {
-  return clamp(abs(mod(h * 6.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-}
 
 // Alev dili yoğunluğu (0..1). h: boy, w: dipteki yarı genişlik, sp: akış hızı.
 // Gövde: yuvarlak dip, ~%25 boyda en geniş, uca doğru sivrilen damla. İki kat gürültü
@@ -140,10 +141,13 @@ half4 main(float2 pos) {
   else if (s < 3.0) temp = min(temp, 0.7);
   temp = clamp(temp * flick, 0.0, 1.0);
   float3 col = ramp(0.14 + temp * 0.86);
-  if (rainbow > 0.5) {
-    float3 rb = hue(fract(p.y * 0.55 - t * 0.12 + p.x * 0.3));
-    col = mix(col, rb, 0.38 * (1.0 - smoothstep(0.35, 0.7, temp)));
-  }
+  // RENGARENK (Efsane): gövde yukarı akan, yavaşça dönen bir tayf; sıcak çekirdek
+  // beyaza açılır, kenarlar koyulaşır (alev hissi korunur).
+  float3 rb = hue(fract(p.y * 0.75 + p.x * 0.35 - t * 0.16));
+  float3 sc = mix(rb * (0.5 + 0.5 * temp), float3(1.0), smoothstep(0.8, 1.0, temp) * 0.65);
+  col = mix(col, sc, spectrum);
+  // Hale rengi de tayfta döner.
+  float3 gC = mix(glowC, hue(fract(t * 0.08)), spectrum);
   // Kenarlar yarı saydam (gerçek alevin "is"siz yumuşak sınırı); uç daha da incelir.
   float alpha = smoothstep(0.0, 0.3, outer) * (1.0 - 0.2 * smoothstep(0.6, 1.15, p.y));
   float3 rgb = col * alpha;
@@ -155,26 +159,19 @@ half4 main(float2 pos) {
   float r = length(float2(dc.x, dc.y * 0.92));
   if (effects > 0.5) {
     float pulse = 0.85 + 0.15 * sin(t * 2.6);
-    fx += glowC * exp(-r * r * 9.0) * 0.32 * pulse * (0.55 + 0.08 * s) * dim;
+    fx += gC * exp(-r * r * 9.0) * 0.32 * pulse * (0.55 + 0.08 * s) * dim;
 
     // taç: arkada büyük, yarı saydam ikinci alev + dönen yumuşak ışınlar
     if (s >= 6.0) {
       float back = tongue(float2(p.x / 1.3, (p.y - 0.03) / 1.32), t * 0.8, 0.98, 0.3, 0.9, 11.0);
-      fx += glowC * smoothstep(0.0, 0.6, back) * (1.0 - alpha) * 0.24 * dim;
+      fx += gC * smoothstep(0.0, 0.6, back) * (1.0 - alpha) * 0.24 * dim;
       float a = atan(dc.x, dc.y);
       float rays = pow(max(0.0, cos(a * 11.0 + t * 0.7 + vnoise(float2(a * 3.0, t)) * 1.5)), 14.0) + 0.6 * pow(max(0.0, cos(a * 7.0 - t * 0.5)), 26.0);
-      fx += mix(glowC, emberC, 0.5) * rays * smoothstep(0.62, 0.36, r) * smoothstep(0.18, 0.34, r)
+      fx += mix(gC, emberC, 0.5) * rays * smoothstep(0.62, 0.36, r) * smoothstep(0.18, 0.34, r)
             * smoothstep(-0.55, 0.15, dc.y) * (0.12 + 0.08 * vnoise(float2(t * 3.0, 4.0))) * dim * detail;
     }
 
-    // gökkuşağı halkası (52+ hafta)
-    if (rainbow > 0.5) {
-      float a2 = atan(dc.y, dc.x) / 6.28318 + t * 0.08;
-      float e3 = (r - 0.6) * 42.0;
-      fx += hue(fract(a2)) * exp(-e3 * e3) * 0.85 * dim;
-    }
-
-    // Arka efektler (ışık, taç, gökkuşağı halkası) alevin ARKASINDA: gövde onları örter.
+    // Arka efektler (ışık, taç) alevin ARKASINDA: gövde onları örter.
     fx *= 1.0 - alpha;
 
     // kıvılcımlar: alevden kopup yükselir, salınır, küçülerek söner
@@ -193,7 +190,8 @@ half4 main(float2 pos) {
         float k2 = sparkDist(d);
         float fade = smoothstep(0.0, 0.1, life) * (1.0 - life);
         float spark = smoothstep(rad, rad * 0.3, k2) + exp(-dot(d, d) / (rad * rad * 7.0)) * 0.55;
-        fx += emberC * spark * fade * on * 1.8 * dim;
+        float3 pc = mix(emberC, hue(fract(hs + t * 0.2)), spectrum);
+        fx += pc * spark * fade * on * 1.8 * dim;
       }
     }
 
@@ -217,7 +215,8 @@ half4 main(float2 pos) {
         float fade = smoothstep(0.0, 0.12, life) * (1.0 - life);
         float dd = dot(d, d);
         float pt = exp(-dd / (sz * sz)) + exp(-dd / (sz * sz * 14.0)) * 0.3;
-        fx += mix(emberC, float3(1.0, 0.96, 0.85), 0.45) * pt * fade * tw * 2.2 * dim;
+        float3 fc = mix(mix(emberC, float3(1.0, 0.96, 0.85), 0.45), hue(fract(h1 + t * 0.25)), spectrum);
+        fx += fc * pt * fade * tw * 2.2 * dim;
       }
     }
 
@@ -232,7 +231,8 @@ half4 main(float2 pos) {
         float st = exp(-abs(d.x) * 120.0) * exp(-abs(d.y) * 16.0)
                  + exp(-abs(d.y) * 120.0) * exp(-abs(d.x) * 16.0)
                  + exp(-dot(d, d) * 900.0) * 0.6;
-        fx += mix(float3(1.0), emberC, 0.35) * st * tw * 1.2 * dim;
+        float3 stc = mix(mix(float3(1.0), emberC, 0.35), mix(float3(1.0), hue(fract(fj / 7.0 + t * 0.1)), 0.7), spectrum);
+        fx += stc * st * tw * 1.2 * dim;
       }
     }
   }
@@ -286,8 +286,6 @@ export function flameRamp(palette) {
 export function flameUniforms(look, { width, height, pixelRatio = 1, dimmed = false } = {}) {
   const l = look || {};
   const stage = Math.max(1, Math.min(7, Math.floor(Number(l.stage) || Number(l.layers) || 3)));
-  const paused = Boolean(l.paused);
-  const effects = Array.isArray(l.effects) ? l.effects : [];
   const canvas = flameCanvasBox(width, height);
   const [c0, c1, c2, c3, c4] = flameRamp(l.palette);
   const heat = Number.isFinite(l.heat) ? l.heat : 1;
@@ -296,10 +294,11 @@ export function flameUniforms(look, { width, height, pixelRatio = 1, dimmed = fa
     box: [Number(width) * pixelRatio, Number(height) * pixelRatio],
     stage,
     shape: SHAPE_INDEX[l.spark?.shape] ?? 0,
-    energy: Math.round((dimmed && !paused ? 0.5 : 1) * heat * 1000) / 1000,
+    energy: Math.round((dimmed ? 0.5 : 1) * heat * 1000) / 1000,
     growth: Number.isFinite(l.growth) ? l.growth : 1,
-    effects: paused ? 0 : 1,
-    rainbow: !paused && effects.includes("rainbow") ? 1 : 0,
+    effects: 1,
+    // Efsane: gövde + parçacıklar rengarenk.
+    spectrum: l.palette?.spectrum ? 1 : 0,
     sparkCount: Math.max(0, Math.min(8, Math.floor(Number(l.spark?.count) || 3))),
     dim: dimmed ? 0.45 : 1,
     // Küçük boyda (profil satırı) taç ışınları hafif: alevin kendisi okunmalı.
@@ -310,5 +309,5 @@ export function flameUniforms(look, { width, height, pixelRatio = 1, dimmed = fa
   };
 }
 
-/** Mola alevi yavaş akar; risk/telafi daha durgun. Saniye başına shader zamanı. */
-export const flameTimeScale = ({ paused = false, dimmed = false } = {}) => (paused ? 0.35 : dimmed ? 0.6 : 1);
+/** Risk/telafi alevi daha durgun akar. Saniye başına shader zamanı. */
+export const flameTimeScale = ({ dimmed = false } = {}) => (dimmed ? 0.6 : 1);

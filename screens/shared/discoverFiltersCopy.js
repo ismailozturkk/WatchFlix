@@ -564,8 +564,132 @@ const de = {
     family: ["With family", "Family genre, rated 6+"],
   },
 };
+const it = {
+  ui: {
+    title: "Cosa guardare?",
+    surprise: "Sorprendimi",
+    surpriseBusy: "Sto cercando...",
+    surpriseNone: "Non sono riuscito a trovare nulla da suggerire in questo momento. Prova ad allentare i filtri.",
+    surpriseFailed: "Impossibile ottenere un suggerimento. Controlla la connessione e riprova.",
+    filters: "Filtri",
+    filtersCount: "Filtri · {n}",
+    removeFilter: "Remove the {name} filter",
+    save: "Salva",
+    saved: "Filtro salvato",
+    savedRemoved: "Filtro salvato eliminato",
+    quickTitle: "Filtri rapidi",
+    savedTitle: "I miei filtri salvati",
+    savedRemove: "Elimina filtro salvato",
+    sheetTitle: "Filtri",
+    reset: "Ripristina",
+    apply: "Mostra risultati",
+    saveCurrent: "Salva questi filtri",
+    genre: "Genere",
+    genreHint: "Fino a {n} generi; vengono elencati i titoli che corrispondono a tutti i criteri",
+    era: "Periodo",
+    rating: "Valutazione minima",
+    runtime: "Durata",
+    runtimeTvHint: "Durata dell'episodio per la serie",
+    language: "Lingua originale",
+    sort: "Ordina per",
+    options: "Opzioni",
+    onMyPlatforms: "Sui miei servizi",
+    onMyPlatformsSub: "Solo ciò che puoi riprodurre in streaming sui servizi a cui sei abbonato",
+    onMyPlatformsNone: "Scegli prima i tuoi servizi in Impostazioni > I miei abbonamenti",
+    hideWatched: "Nascondi ciò che ho guardato",
+    hideWatchedSub: "I titoli contrassegnati come guardati nella tua raccolta sono stati esclusi",
+    platformsMissing: "“Sui miei servizi” è attivo ma non hai scelto alcun servizio, quindi non è applicato.",
+    emptyTitle: "Nessun risultato per questi filtri",
+    emptyText: "Prova ad allentare alcuni filtri o a reimpostarli.",
+    emptyAction: "Reimposta filtri",
+    errorTitle: "Impossibile caricare i risultati",
+    errorText: "Controlla la connessione e riprova.",
+    retry: "Riprova",
+    ratingChip: "★ {n}+",
+    ratingOption: "{n}+",
+    any: "Qualsiasi",
+    typeTv: "Serie",
+    typeMovie: "Film"
+  },
+  eras: {
+    any: "Qualsiasi",
+    last1: "L'anno scorso",
+    last5: "Ultimi 5 anni",
+    d2020: "2020",
+    d2010: "2010",
+    d2000: "2000",
+    d1990: "1990",
+    classic: "Classici"
+  },
+  runtimes: {
+    movie: {
+      any: "Qualsiasi",
+      short: "Fino a 90 minuti",
+      medium: "Fino a 2 ore",
+      long: "2,5 ore o più"
+    },
+    tv: {
+      any: "Qualsiasi",
+      short: "Fino a 30 minuti",
+      medium: "Fino a 45 minuti",
+      long: "1 ora o più"
+    }
+  },
+  languages: {
+    any: "Qualsiasi",
+    tr: "turco",
+    en: "inglese",
+    es: "spagnolo",
+    pt: "portoghese",
+    fr: "francese",
+    de: "tedesco",
+    it: "Italiano",
+    ko: "Coreano",
+    ja: "Giapponese",
+    hi: "Hindi"
+  },
+  sorts: {
+    popular: "Popolare",
+    rating: "Più votati",
+    newest: "Più recente"
+  },
+  genres: {
+    28: "Azione",
+    12: "Avventura",
+    16: "Animazione",
+    35: "Commedia",
+    80: "Crimine",
+    99: "Documentario",
+    18: "Drammatico",
+    10751: "Famiglia",
+    14: "Fantasy",
+    36: "Storia",
+    27: "Orrore",
+    10402: "Musica",
+    9648: "Mistero",
+    10749: "Romantico",
+    878: "Fantascienza",
+    53: "Thriller",
+    10752: "Guerra",
+    37: "Western",
+    10759: "Azione e avventura",
+    10762: "Bambini",
+    10764: "Realtà",
+    10765: "Fantascienza e fantasy",
+    10768: "Guerra e politica"
+  },
+  presets: {
+    tonight: ["Stasera", "Adatto a una serata, valutato 7+"],
+    topRated: ["Più votati", "Votato 7+, il migliore primo"],
+    fresh: ["Nuovo e buono", "Votato 7+ dell'ultimo anno"],
+    quick: ["Guarda velocemente", "Breve e valutato 6+"],
+    classics: ["Classici", "Il migliore prima del 1990"],
+    family: ["Con famiglia", "Genere familiare, valutato 6+"]
+  }
+};
 
-export const DISCOVER_FILTERS_COPY = Object.freeze({ tr, en, es, pt, de });
+export const DISCOVER_FILTERS_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getDiscoverFiltersCopy = (language) =>

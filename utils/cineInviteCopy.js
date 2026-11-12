@@ -93,7 +93,24 @@ export const CINE_INVITE_COPY = {
     noMatches: "Keine gemeinsamen Treffer",
     expired: "Diese Einladung ist abgelaufen",
   },
-};
+
+  it: {
+  decline: "Rifiuta",
+  declineA11y: "Rifiuta l'invito alla stanza",
+  rejoin: "Torna alla stanza",
+  statusWaiting: "In attesa di risposta",
+  statusAccepted: "Accettato",
+  statusYouAccepted: "Hai accettato",
+  statusDeclined: "Rifiutato",
+  statusYouDeclined: "Hai rifiutato",
+  statusDone: "Stagione",
+  statusExpired: "Scaduto",
+  acceptedBy: n => n === 1 ? "1 persona accettata" : `${n} persone accettate`,
+  declinedBy: n => n === 1 ? "1 persona ha rifiutato" : `${n} persone hanno rifiutato`,
+  matches: n => n === 1 ? "1 corrispondenza in comune" : `${n} partite in comune`,
+  noMatches: "Nessuna corrispondenza in comune",
+  expired: "Questo invito è scaduto"
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getCineInviteCopy = (language) => CINE_INVITE_COPY[copyLanguage(language, Object.keys(CINE_INVITE_COPY))];

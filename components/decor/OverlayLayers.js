@@ -25,15 +25,46 @@ import {
   vec,
 } from "@shopify/react-native-skia";
 import {
-  ORBIT_RADII,
   OVERLAY,
   equalizerLevel,
   hazeLine,
   overlayFrame,
   overlaySlot,
-  orbitScale,
   overlayStyle,
 } from "../../utils/weatherParticles";
+import SolarScene from "./solarScene";
+import WinterScene from "./winterScene";
+import SpringScene from "./springScene";
+import { SummerBeach, SummerSky } from "./summerScene";
+import AutumnScene from "./autumnScene";
+import RainScene from "./rainScene";
+import AuroraScene from "./auroraScene";
+import StarScene from "./starScene";
+import CampfireScene from "./campfireScene";
+import FireworksScene from "./fireworksScene";
+import HalloweenScene from "./halloweenScene";
+import ChristmasScene from "./christmasScene";
+import SherlockScene from "./sherlockScene";
+import DeathNoteScene from "./deathNoteScene";
+import OnePieceScene from "./onePieceScene";
+import NarutoScene from "./narutoScene";
+import FmaScene from "./fmaScene";
+import JujutsuScene from "./jujutsuScene";
+import HunterScene from "./hunterScene";
+import SquidGameScene from "./squidGameScene";
+import DarkScene from "./darkScene";
+import TitanicScene from "./titanicScene";
+import InceptionScene from "./inceptionScene";
+import PiratesScene from "./piratesScene";
+import MadMaxScene from "./madMaxScene";
+import AvatarScene from "./avatarScene";
+import JurassicScene from "./jurassicScene";
+import LastOfUsScene from "./lastOfUsScene";
+import GhibliScene from "./ghibliScene";
+import BladeRunnerScene from "./bladeRunnerScene";
+import DemonSlayerScene from "./demonSlayerScene";
+import StrangerScene from "./strangerScene";
+import InterstellarScene from "./interstellarScene";
 import { UNIVERSE_LAYERS } from "./universeOverlays";
 
 function rgba(hex, a) {
@@ -411,25 +442,42 @@ function FarFlashes({ p, clock, width, height, tone }) {
   );
 }
 
-// ── 16 · Güneş sistemi: gezegen yörünge elipsleri (sabit, ince) ─────────────
-// Geometri weatherParticles.particlePose (kind 16) ile aynı: merkez (W/2, 0,45·H),
-// ölçek orbitScale(W), dikey oran 0,5.
-function Orbits({ width, height, tone }) {
-  const k = orbitScale(width);
-  const cx = width * 0.5;
-  const cy = height * 0.45;
-  const color = rgba(tone.colors[0], 1);
-  return (
-    <Group opacity={tone.alpha}>
-      {ORBIT_RADII.map((r) => (
-        <Oval key={r} x={cx - r * k} y={cy - r * k * 0.5} width={2 * r * k} height={r * k} style="stroke" strokeWidth={0.9} color={color} />
-      ))}
-    </Group>
-  );
-}
-
 const LAYERS = {
-  [OVERLAY.orbits]: Orbits,
+  [OVERLAY.orbits]: SolarScene,
+  [OVERLAY.winter]: WinterScene,
+  [OVERLAY.spring]: SpringScene,
+  [OVERLAY.summerSky]: SummerSky,
+  [OVERLAY.summerBeach]: SummerBeach,
+  [OVERLAY.autumn]: AutumnScene,
+  [OVERLAY.rain]: RainScene,
+  [OVERLAY.storm]: RainScene,
+  [OVERLAY.aurora]: AuroraScene,
+  [OVERLAY.stars]: StarScene,
+  [OVERLAY.campfire]: CampfireScene,
+  [OVERLAY.fwCity]: FireworksScene,
+  [OVERLAY.haunted]: HalloweenScene,
+  [OVERLAY.xmasVillage]: ChristmasScene,
+  [OVERLAY.sherVec]: SherlockScene,
+  [OVERLAY.dnVec]: DeathNoteScene,
+  [OVERLAY.opSky]: OnePieceScene,
+  [OVERLAY.narVec]: NarutoScene,
+  [OVERLAY.fmaVec]: FmaScene,
+  [OVERLAY.jjVec]: JujutsuScene,
+  [OVERLAY.hxVec]: HunterScene,
+  [OVERLAY.sqVec]: SquidGameScene,
+  [OVERLAY.dkVec]: DarkScene,
+  [OVERLAY.tiVec]: TitanicScene,
+  [OVERLAY.inVec]: InceptionScene,
+  [OVERLAY.pcVec]: PiratesScene,
+  [OVERLAY.mmVec]: MadMaxScene,
+  [OVERLAY.avVec]: AvatarScene,
+  [OVERLAY.jpVec]: JurassicScene,
+  [OVERLAY.tlVec]: LastOfUsScene,
+  [OVERLAY.ghVec]: GhibliScene,
+  [OVERLAY.brVec]: BladeRunnerScene,
+  [OVERLAY.dsVec]: DemonSlayerScene,
+  [OVERLAY.stVec]: StrangerScene,
+  [OVERLAY.isVec]: InterstellarScene,
   [OVERLAY.flare]: Flare,
   [OVERLAY.planet]: Planet,
   [OVERLAY.heartbeat]: Heartbeat,
@@ -459,7 +507,7 @@ export function OverlayLayers({ overlays, clock, width, height, lightSurface }) 
         if (!Layer) return null;
         const tone = overlayStyle(p.part, lightSurface);
         // eslint-disable-next-line react/no-array-index-key
-        return <Layer key={`${p.part}-${p.salt}-${i}`} p={p} clock={clock} width={width} height={height} tone={tone} />;
+        return <Layer key={`${p.part}-${p.salt}-${i}`} p={p} clock={clock} width={width} height={height} tone={tone} lightSurface={lightSurface} />;
       })}
     </Group>
   );

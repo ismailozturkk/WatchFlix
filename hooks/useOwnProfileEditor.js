@@ -27,6 +27,7 @@ import {
   isValidUsername,
   normalizeUsername,
   setListVisibility,
+  UserProfileErrorCode,
 } from "@services/userService";
 import { saveSocialLinks } from "@services/socialLinksService";
 import { propagateProfileChange } from "@services/profilePropagation";
@@ -89,7 +90,9 @@ function usernameHintFor(status, username, language) {
                   ? "O nome de usuário não pode ser só números ou sublinhados (deve conter pelo menos uma letra)."
                   : lang === "de"
                     ? "Der Benutzername darf nicht nur aus Zahlen oder Unterstrichen bestehen (mindestens ein Buchstabe ist nötig)."
-                    : "Username cannot be only numbers or underscores (must contain at least one letter).",
+                    : lang === "it"
+                      ? "Il nome utente non può contenere solo numeri o trattini bassi (serve almeno una lettera)."
+                      : "Username cannot be only numbers or underscores (must contain at least one letter).",
         };
       }
       return {
@@ -300,7 +303,9 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
                 ? "O nome de usuário não pode ser só números (deve conter pelo menos uma letra)."
                 : lang === "de"
                   ? "Der Benutzername darf nicht nur aus Zahlen bestehen (mindestens ein Buchstabe ist nötig)."
-                  : "Username cannot consist only of numbers (must contain at least one letter)."
+                  : lang === "it"
+                    ? "Il nome utente non può contenere solo numeri (serve almeno una lettera)."
+                    : "Username cannot consist only of numbers (must contain at least one letter)."
           : i18nText(
               "autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9",
               "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)",
@@ -321,7 +326,9 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
                   ? "Verificando a disponibilidade do nome de usuário, aguarde um instante…"
                   : lang === "de"
                     ? "Verfügbarkeit des Benutzernamens wird geprüft, bitte warten…"
-                    : "Checking username availability, please wait…",
+                    : lang === "it"
+                      ? "Verifica della disponibilità del nome utente, attendi…"
+                      : "Checking username availability, please wait…",
         });
         return false;
       }
@@ -403,7 +410,13 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
       cancel();
       return true;
     } catch (e) {
-      Toast.show({ type: "error", text1: e?.message || i18nText("autoI18n.guncellenemedi", "Güncellenemedi") });
+      // Servis metinleri Türkçe; kullanıcıya koddan seçilen çevrili metin gider.
+      // Yarışta (kontrolden sonra başkası aldıysa) kullanıcı adı burada düşer.
+      const text1 =
+        e?.code === UserProfileErrorCode.USERNAME_TAKEN
+          ? i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış")
+          : i18nText("autoI18n.guncellenemedi", "Güncellenemedi");
+      Toast.show({ type: "error", text1 });
       return false;
     } finally {
       savingRef.current = false;

@@ -7,7 +7,7 @@ import { __resetAllMMKV } from "react-native-mmkv";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const {
-  alevIlerlet, alevHesapla, molaVer, alevBirlestir, alevOku,
+  alevIlerlet, alevHesapla, alevBirlestir, alevOku,
   HAFTA_ESIGI, TELAFI_GUN_ESIGI, KALKAN_HAFTA, KALKAN_TAVANI_HAFTA,
 } = require("../utils/streakWeekly");
 const {
@@ -19,7 +19,7 @@ const { streakBridgeKaydet, streakBridgeSifirla } = require("../utils/streakBrid
 const { __resetStoreCaches } = require("../services/storage/store");
 const { __resetStores } = require("../services/storage/instances");
 const {
-  loadLedger, reconcileLedger, saveLedger, bulutuBirlestir, bulutVerisi, molaVerDefter, resetWatchLedger,
+  loadLedger, reconcileLedger, saveLedger, bulutuBirlestir, bulutVerisi, resetWatchLedger,
 } = require("../utils/watchBadgeLedger");
 
 // 2026-11-09 Pazartesi. Hafta indeksi H0 = o hafta.
@@ -99,49 +99,24 @@ describe("esnek hafta (telafi) ve kalkan", () => {
   });
 });
 
-describe("mola", () => {
-  const harita = { [H0 - 2]: 2, [H0 - 1]: 2 };
-
-  test("bu haftaya mola: gri, seri donar; hafta boş biterse seri kopmaz ve artmaz", () => {
-    const gunler = gunlerOf(harita);
-    const r = molaVer({ gunler }, g(H0, 1));
-    expect(r).toMatchObject({ ok: true, hedef: "bu" });
-    const d = alevHesapla({ gunler, alev: r.alev }, g(H0, 1));
-    expect(d.mola).toMatchObject({ aktif: true, buHafta: true, hakVar: false });
-    // Hafta boş bitti, sonraki hafta 2 gün.
-    const sonra = [...gunler, g(H0 + 1, 0), g(H0 + 1, 1)];
-    expect(alevHesapla({ gunler: sonra, alev: r.alev }, g(H0 + 1, 1)).seri).toBe(3);
-  });
-
-  test("molada yeni işaretleme → renk döner (aktif değil), hafta yine korunur", () => {
-    const gunler = gunlerOf(harita);
-    const r = molaVer({ gunler }, g(H0, 1));
-    const d = alevHesapla({ gunler: [...gunler, g(H0, 3)], alev: r.alev }, g(H0, 3));
-    expect(d.mola).toMatchObject({ aktif: false, buHafta: true });
-  });
-
-  test("ayda bir; seri yoksa verilemez", () => {
-    const gunler = gunlerOf(harita);
-    const r = molaVer({ gunler }, g(H0, 1));
-    expect(molaVer({ gunler, alev: r.alev }, g(H0 + 1, 0))).toMatchObject({ ok: false });
-    expect(molaVer({ gunler: [] }, g(H0, 1))).toMatchObject({ ok: false, sebep: "seri" });
-  });
-
-  test("geçen hafta karar bekliyorsa mola geriye dönük o haftaya verilir", () => {
-    const h2 = { [H0 - 3]: 2, [H0 - 2]: 2 };
-    const ilk = alevIlerlet({ gunler: gunlerOf(h2), alev: undefined }, g(H0 - 2, 6)).alev;
-    const r = molaVer({ gunler: gunlerOf(h2), alev: ilk }, g(H0, 0));
-    expect(r).toMatchObject({ ok: true, hedef: "gecen" });
-    expect(alevHesapla({ gunler: gunlerOf(h2), alev: r.alev }, g(H0, 0))).toMatchObject({ seri: 2, bekleyen: null });
+describe("mola kaldırıldı", () => {
+  test("eski kayıttaki molalar okunurken atılır; boş hafta seriyi dondurmaz", () => {
+    const harita = { [H0 - 3]: 2, [H0 - 2]: 2 };
+    const eski = { islenen: H0 - 2, kalkan: 0, sayac: 2, yamalar: {}, molalar: { "2026-11": { hafta: H0 - 1, gun: null, kazanim: 0 } }, rekor: 2 };
+    expect(alevOku(eski).molalar).toBeUndefined();
+    // H0-1 boş bitti, H0'da 4 gün yok ve karar bekliyor: mola sayılmaz, telafi bekler.
+    const d = alevHesapla({ gunler: gunlerOf(harita), alev: eski }, g(H0, 0));
+    expect(d.mola).toBeUndefined();
+    expect(d.bekleyen).toMatchObject({ hafta: H0 - 1, korunanSeri: 2 });
   });
 });
 
 describe("cihaz birleştirme", () => {
-  test("ileri işlenmiş kazanır; eşitse kalkan ihtiyatla küçük; molalar ve rekor birleşir", () => {
-    const a = { islenen: 10, kalkan: 2, sayac: 1, yamalar: { 9: "kalkan" }, molalar: { "2026-10": { hafta: 8, gun: null, kazanim: 0 } }, rekor: 5 };
-    const b = { islenen: 12, kalkan: 1, sayac: 3, yamalar: { 11: "telafi" }, molalar: {}, rekor: 9 };
+  test("ileri işlenmiş kazanır; eşitse kalkan ihtiyatla küçük; rekor birleşir", () => {
+    const a = { islenen: 10, kalkan: 2, sayac: 1, yamalar: { 9: "kalkan" }, rekor: 5 };
+    const b = { islenen: 12, kalkan: 1, sayac: 3, yamalar: { 11: "telafi" }, rekor: 9 };
     expect(alevBirlestir(a, b)).toMatchObject({ islenen: 12, kalkan: 1, sayac: 3, rekor: 9 });
-    expect(Object.keys(alevBirlestir(a, b).molalar)).toEqual(["2026-10"]);
+    expect(alevBirlestir(a, b).molalar).toBeUndefined();
     expect(alevBirlestir({ ...a, islenen: 12 }, b).kalkan).toBe(1);
     expect(alevOku("çöp")).toMatchObject({ islenen: null, kalkan: 0 });
   });
@@ -171,7 +146,7 @@ describe("saat dilimi", () => {
 
 describe("hatırlatma planı", () => {
   const copy = getStreakFlameCopy("tr");
-  const seriler = (ek) => ({ alev: { seri: 3, buHaftaGun: 0, buHaftaBasarili: false, bugunAktif: false, esik: 2, mola: {}, ...ek } });
+  const seriler = (ek) => ({ alev: { seri: 3, buHaftaGun: 0, buHaftaBasarili: false, bugunAktif: false, esik: 2, ...ek } });
   const ms = (gun, saat) => gunIndexi(gun) * 86400000 + saat * 3600000;
 
   test("0/2 → Cumartesi 19:00; 1/2 (bugün yapıldı) → Pazar 19:00", () => {
@@ -182,10 +157,9 @@ describe("hatırlatma planı", () => {
     expect(p2.body).toContain("1/2");
   });
 
-  test("kazanılmış hafta, mola, kalkan ya da yetişmeyen hafta → bildirim yok", () => {
+  test("kazanılmış hafta, kalkan ya da yetişmeyen hafta → bildirim yok", () => {
     const base = { bugun: g(H0, 0), dilim: 0, simdi: ms(g(H0, 0), 10), copy };
     expect(planStreakReminder({ ...base, seriler: seriler({ buHaftaGun: 2, buHaftaBasarili: true }) })).toBeNull();
-    expect(planStreakReminder({ ...base, seriler: seriler({ mola: { aktif: true } }) })).toBeNull();
     expect(planStreakReminder({ ...base, seriler: seriler({ seri: 0, bekleyen: { korunanSeri: 3, kalkan: true, gerekli: 4, mevcut: 0 } }) })).toBeNull();
     const pazar = { ...base, bugun: g(H0, 6), simdi: ms(g(H0, 6), 10) };
     expect(planStreakReminder({ ...pazar, seriler: seriler() })).toBeNull(); // 0/2, tek gün kaldı
@@ -254,14 +228,4 @@ describe("defter mutabakatı (sunucu saati + bulut)", () => {
     expect(r2.ledger.aktiflik.gunler).toEqual(["2026-11-11"]);
   });
 
-  test("mola defterden verilir ve buluta yazılır", async () => {
-    await mutabakat(5);
-    const l = await loadLedger(UID);
-    l.aktiflik.gunler = ["2026-11-02", "2026-11-03"];
-    await saveLedger(UID, l);
-    const r = await molaVerDefter(UID);
-    expect(r).toMatchObject({ ok: true, hedef: "bu" });
-    expect(r.seriler.alev.mola.aktif).toBe(true);
-    expect(yazilan[yazilan.length - 1].alev.molalar["2026-11"]).toBeDefined();
-  });
 });

@@ -4,7 +4,7 @@
 // kaybedilmek üzereyken gider: kalan günlerin HER BİRİNDE işaretleme gerektiği ilk
 // gün, akşam 19:00'da (ev saat diliminde). Örnek: bu hafta 0/2 → Cumartesi 19:00;
 // 1/2 → Pazar 19:00; telafi 1/4 → Cuma 19:00.
-//   • hafta zaten kazanıldıysa, mola varsa ya da kalkan geçen haftayı koruyacaksa: yok
+//   • hafta zaten kazanıldıysa ya da kalkan geçen haftayı koruyacaksa: yok
 //   • artık yetişmesi imkânsızsa: yok (boşuna dürtmeyiz)
 //   • o günün 19:00'ı geçtiyse: yok (gece rahatsız etmeyiz)
 // Zamanlama cihaz saatiyle yapıldığı için sunucu ↔ cihaz farkı düzeltilir.
@@ -42,7 +42,7 @@ export function planStreakReminder({ seriler, bugun, dilim = 0, simdi, cihazFark
     need = state.protection.repairNeed;
     metin = copy.reminder.repair;
   } else {
-    return null; // lit / shield / paused
+    return null; // lit / shield
   }
   const eksik = need - have;
   if (eksik <= 0) return null;

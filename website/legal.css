@@ -21,8 +21,8 @@
   --teal: #2ee6d6;
   --violet: #8b7cf6;
   /* Başlıklar da gövde yazı tipiyle (landing ile aynı aile); ağırlık/aralık kurallarda. */
-  --font-display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Schibsted Grotesk", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans Devanagari", sans-serif;
+  --font-body: "Schibsted Grotesk", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans Devanagari", sans-serif;
   --measure: 74ch;
   color-scheme: dark;
 }

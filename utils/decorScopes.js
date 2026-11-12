@@ -4,8 +4,8 @@
 // importu YOK (jest yalnız saf modülleri test edebiliyor, bkz. jest.config.js).
 //
 // KAVRAMLAR
-//   efekt  : üç arka plan dekoru — kar, ikon deseni, ambiyans.
-//   grup   : ekranların kümesi (ör. "chat" = mesajlar + gruplar + sohbet ekranı).
+//   efekt  : üç arka plan dekoru — atmosfer, ikon deseni, ambiyans.
+//   grup   : ekranların kümesi (ör. "chat" = mesajlar + gruplar).
 //            Her ekran <ScreenDecor scope="chat" /> ile bir gruba bağlanır.
 //   gizli  : kullanıcının kapattığı (efekt, grup) çiftleri.
 //
@@ -13,7 +13,7 @@
 // yerde görünmesi (bugünkü davranış) ve yarın yeni bir grup eklenirse, eski
 // kayıtlı tercihin onu SESSİZCE kapalı bırakmaması. Boş kayıt = her yerde.
 //
-// Genel anahtar (Kişiselleştirme'deki kar/ikon/ambiyans düğmesi) bunun ÜSTÜNDE:
+// Genel anahtar (Atmosfer ekranındaki efekt/ikon/ambiyans düğmesi) bunun ÜSTÜNDE:
 // efekt orada kapalıysa gruplar açık olsa da hiçbir yerde görünmez. Bu modül
 // yalnız grup bazını bilir.
 
@@ -27,9 +27,7 @@ export const DECOR_EFFECTS = Object.freeze(["snow", "icon", "ambient"]);
  *
  * `effects` (isteğe bağlı): grubun DESTEKLEDİĞİ efektler; yoksa üçü de. Bir
  * grup bir efekti hiç çizemiyorsa burada belirtilir — ayar ekranı o kutuyu
- * soluk çizer, süzgeç de o efekti asla göstermez. Şu an tek örnek "conversation":
- * kar yok (okuma alanında dikkat dağıtır; ayrıca sürekli Lottie, mesaj
- * alanındaki Android blur hedefinin içinde oynardı).
+ * soluk çizer, süzgeç de o efekti asla göstermez.
  *
  * YENİ GRUP: buraya ekle + ayar ekranına metnini ekle. Bir ekrana
  * `<ScreenDecor scope="…" />` verirken buradaki kimliklerden birini kullan
@@ -42,11 +40,7 @@ export const DECOR_SCOPES = Object.freeze(
     { id: "details", icon: "film-outline" },
     { id: "lists", icon: "albums-outline" },
     { id: "chat", icon: "chatbubbles-outline" },
-    {
-      id: "conversation",
-      icon: "chatbubble-ellipses-outline",
-      effects: ["icon", "ambient"],
-    },
+    { id: "conversation", icon: "chatbubble-ellipses-outline" },
     { id: "social", icon: "share-social-outline" },
     { id: "profile", icon: "people-outline" },
     { id: "settings", icon: "settings-outline" },
@@ -82,7 +76,7 @@ const emptyHidden = () => ({ snow: [], icon: [], ambient: [] });
 /**
  * Depodan okunan ham değeri güvenli biçime çevirir. Bozuk/eksik/eski kayıt asla
  * hata vermez: bilinmeyen efekt ve grup kimlikleri atılır, grubun desteklemediği
- * efekt çiftleri (ör. conversation + snow) atılır, tekrarlar silinir, sıra
+ * desteklenmeyen efekt çiftleri atılır, tekrarlar silinir, sıra
  * kanonik hale gelir (aynı küme = aynı JSON → gereksiz yazım olmaz).
  *
  * @returns {{snow: string[], icon: string[], ambient: string[]}}
@@ -130,7 +124,7 @@ export function decorVisibility(hidden, scope, effects) {
 
 /**
  * Tek bir (efekt, grup) çiftini açar/kapatır. Yeni, normalize nesne döner.
- * Grubun desteklemediği çift (ör. conversation + snow) yok sayılır.
+ * Grubun desteklemediği çift yok sayılır.
  */
 export function setDecorVisible(hidden, effect, scope, visible) {
   const next = normalizeDecorScopes(hidden);

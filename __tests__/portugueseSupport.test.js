@@ -86,7 +86,7 @@ describe("Portekizce kopya gerçekten Portekizce", () => {
 describe("Portekizce: dil listeleri olan kaynak dosyaları", () => {
   it("sunucu bildirim dili listesi pt'yi içeriyor ve metinleri var", () => {
     const sunucu = oku("functions/index.js");
-    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de"\]/);
+    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it"\]/);
     expect(sunucu).toMatch(/\n  pt: \{\n    someone: "Alguém"/);
     expect(sunucu).toMatch(/\n  pt: \{\n    single: \(p\) =>/);
   });

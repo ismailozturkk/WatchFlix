@@ -28,7 +28,7 @@
 // senkron tohumdan gelmeli (snapshotCache/MMKV) ya da hiç kapılanmamalı
 // (ListStatusContext ve PremiumContext bilerek kapısız).
 import { useEffect, useState } from "react";
-import { InteractionManager } from "react-native";
+import { runAfterInteractions } from "../utils/afterInteractions";
 
 export default function useStartupGate(delayMs = 0) {
   const [ready, setReady] = useState(false);
@@ -36,7 +36,7 @@ export default function useStartupGate(delayMs = 0) {
   useEffect(() => {
     if (ready) return undefined;
     let timer = null;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       timer = setTimeout(() => setReady(true), delayMs);
     });
     return () => {

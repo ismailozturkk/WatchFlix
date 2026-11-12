@@ -66,7 +66,7 @@ const frameHeightOf = (width, widgetId, family) =>
 
 function ReminderRow({ item, isTr, es, pt, de, lang, showIcon, showDate, metrics: m, p }) {
   const isMovie = item.type === "movie";
-  const typeLabel = isMovie ? (isTr ? "Film" : es ? "Película" : pt ? "Filme" : de ? "Film" : "Movie") : isTr ? "Dizi" : es ? "Serie" : pt ? "Série" : de ? "TV" : "TV";
+  const typeLabel = isMovie ? (isTr ? "Film" : es ? "Película" : pt ? "Filme" : de ? "Film" : lang === "it" ? "Film" : "Movie") : isTr ? "Dizi" : es ? "Serie" : pt ? "Série" : de ? "TV" : lang === "it" ? "Serie" : "TV";
   const meta = [
     typeLabel,
     item.sub,
@@ -214,14 +214,14 @@ function ReminderPreview({ settings, family, width }) {
                   },
                 ]}
               >
-                {isTr ? "Yaklaşanlar" : es ? "Próximos" : pt ? "Próximos" : de ? "Demnächst" : "Coming Up"}
+                {isTr ? "Yaklaşanlar" : es ? "Próximos" : pt ? "Próximos" : de ? "Demnächst" : language === "it" ? "Promemoria" : "Coming Up"}
               </Text>
               <Text
                 numberOfLines={1}
                 allowFontScaling={false}
                 style={[styles.remCount, { color: p.accent }]}
               >
-                {isTr ? `${filtered.length} hatırlatma` : es ? `${filtered.length} recordatorios` : pt ? `${filtered.length} lembretes` : de ? `${filtered.length} Erinnerungen` : `${filtered.length} reminders`}
+                {isTr ? `${filtered.length} hatırlatma` : es ? `${filtered.length} recordatorios` : pt ? `${filtered.length} lembretes` : de ? `${filtered.length} Erinnerungen` : language === "it" ? `${filtered.length} promemoria` : `${filtered.length} reminders`}
               </Text>
             </View>
             {m.divider && <View style={styles.divider} />}
@@ -234,7 +234,7 @@ function ReminderPreview({ settings, family, width }) {
               allowFontScaling={false}
               style={[styles.emptyText, { color: p.muted }]}
             >
-              {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : pt ? "Nenhum filme ou episódio próximo" : de ? "Keine bevorstehenden Filme oder Folgen" : "No upcoming movies or episodes"}
+              {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : pt ? "Nenhum filme ou episódio próximo" : de ? "Keine bevorstehenden Filme oder Folgen" : language === "it" ? "Nessun film o episodio in uscita" : "No upcoming movies or episodes"}
             </Text>
           </View>
         ) : (
@@ -258,7 +258,7 @@ function ReminderPreview({ settings, family, width }) {
                 allowFontScaling={false}
                 style={[styles.overflow, { color: p.accent }]}
               >
-                {isTr ? `+${overflow} daha` : es ? `+${overflow} más` : pt ? `+${overflow} mais` : de ? `+${overflow} weitere` : `+${overflow} more`}
+                {isTr ? `+${overflow} daha` : es ? `+${overflow} más` : pt ? `+${overflow} mais` : de ? `+${overflow} weitere` : language === "it" ? `+${overflow} altro` : `+${overflow} more`}
               </Text>
             )}
           </>
@@ -377,7 +377,7 @@ function ListsPreview({ settings, family, width }) {
                 },
               ]}
             >
-              {isTr ? "Listelerim" : es ? "Mis listas" : pt ? "Minhas listas" : de ? "Meine Listen" : "My Lists"}
+              {isTr ? "Listelerim" : es ? "Mis listas" : pt ? "Minhas listas" : de ? "Meine Listen" : language === "it" ? "Le mie liste" : "My Lists"}
             </Text>
           </View>
         )}
@@ -536,13 +536,13 @@ function StatsPreview({ settings, family, width }) {
   const scale = large ? IOS_STATS_SCALE.large : IOS_STATS_SCALE.medium;
   const frameHeight = frameHeightOf(width, "stats", family);
   const ps = t?.profileScreen || {};
-  const hours = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : pt ? "Horas" : de ? "Stunden" : "Hours");
+  const hours = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : pt ? "Horas" : de ? "Stunden" : language === "it" ? "Ore" : "Hours");
   const units = [
-    etiket(ps.years, isTr ? "Yıl" : es ? "Años" : pt ? "Anos" : de ? "Jahre" : "Years"),
-    etiket(ps.months, isTr ? "Ay" : es ? "Meses" : pt ? "Meses" : de ? "Monate" : "Months"),
-    etiket(ps.days, isTr ? "Gün" : es ? "Días" : pt ? "Dias" : de ? "Tage" : "Days"),
+    etiket(ps.years, isTr ? "Yıl" : es ? "Años" : pt ? "Anos" : de ? "Jahre" : language === "it" ? "Anni" : "Years"),
+    etiket(ps.months, isTr ? "Ay" : es ? "Meses" : pt ? "Meses" : de ? "Monate" : language === "it" ? "Mesi" : "Months"),
+    etiket(ps.days, isTr ? "Gün" : es ? "Días" : pt ? "Dias" : de ? "Tage" : language === "it" ? "Giorni" : "Days"),
     hours,
-    etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : pt ? "Minutos" : de ? "Minuten" : "Minutes"),
+    etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : pt ? "Minutos" : de ? "Minuten" : language === "it" ? "Minuti" : "Minutes"),
   ];
   // Kenar boşluğu: iOS 17+ sistem boşluğu (statsCompact yalnız iOS < 17'de dolguyu değiştirir).
   const inset = IOS_SYSTEM_MARGIN;
@@ -561,7 +561,7 @@ function StatsPreview({ settings, family, width }) {
     <View style={styles.timeRow}>
       <StatBlock
         value="184"
-        label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : pt ? "Filmes assistidos" : de ? "Gesehene Filme" : "Movies Watched")}
+        label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : pt ? "Filmes assistidos" : de ? "Gesehene Filme" : language === "it" ? "Film guardati" : "Movies Watched")}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
         p={p}
@@ -572,7 +572,7 @@ function StatsPreview({ settings, family, width }) {
     <View style={styles.timeRow}>
       <StatBlock
         value="37"
-        label={etiket(ps.tvShowCount, isTr ? "Dizi Sayısı" : es ? "Series" : pt ? "Séries" : de ? "Serien" : "Shows")}
+        label={etiket(ps.tvShowCount, isTr ? "Dizi Sayısı" : es ? "Series" : pt ? "Séries" : de ? "Serien" : language === "it" ? "Serie TV" : "Shows")}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
         p={p}
@@ -581,7 +581,7 @@ function StatsPreview({ settings, family, width }) {
         value="912"
         label={etiket(
           ps.tvShowEpisodetotalCount,
-          isTr ? "Bölüm Sayısı" : es ? "Episodios" : pt ? "Episódios" : de ? "Folgen" : "Episodes",
+          isTr ? "Bölüm Sayısı" : es ? "Episodios" : pt ? "Episódios" : de ? "Folgen" : language === "it" ? "Episodi" : "Episodes",
         )}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
@@ -602,7 +602,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="time-outline"
         value={`1.284 ${hours}`}
-        label={etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : pt ? "Duração total" : de ? "Gesamtdauer" : "Total Duration")}
+        label={etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : pt ? "Duração total" : de ? "Gesamtdauer" : language === "it" ? "Durata totale" : "Total Duration")}
         tint={p.accent}
         scale={scale}
         p={p}
@@ -610,7 +610,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="film-outline"
         value={`356 ${hours}`}
-        label={etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : pt ? "Filmes" : de ? "Filme" : "Movies")}
+        label={etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : pt ? "Filmes" : de ? "Filme" : language === "it" ? "Film" : "Movies")}
         tint={p.accent}
         scale={scale}
         p={p}
@@ -618,7 +618,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="tv-outline"
         value={`928 ${hours}`}
-        label={etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : pt ? "Séries" : de ? "Serien" : "TV Shows")}
+        label={etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : pt ? "Séries" : de ? "Serien" : language === "it" ? "Serie TV" : "TV Shows")}
         tint={p.bold}
         scale={scale}
         p={p}
@@ -661,7 +661,7 @@ function StatsPreview({ settings, family, width }) {
           },
         ]}
       >
-        {isTr ? "İstatistikler" : es ? "Estadísticas" : pt ? "Estatísticas" : de ? "Statistik" : "Statistics"}
+        {isTr ? "İstatistikler" : es ? "Estadísticas" : pt ? "Estatísticas" : de ? "Statistik" : language === "it" ? "Statistiche" : "Statistics"}
       </Text>
     </View>
   );

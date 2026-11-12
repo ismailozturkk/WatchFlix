@@ -97,7 +97,34 @@ export const LIST_SORT_FILTER_COPY = {
     radius: { 2: "Eckig", 6: "Leicht", 10: "Normal", 15: "Weich", 20: "Rund" },
     columnsOption: { 3: "3 nebeneinander", 4: "4 nebeneinander" },
   },
-};
+
+  it: {
+  title: "Ordina e filtra",
+  results: "{n} risultati",
+  showResults: "Mostra {n} risultati",
+  reset: "Ripristina",
+  close: "Chiudi",
+  sort: "ORDINA PER",
+  asc: "Crescente",
+  desc: "Discendente",
+  view: "Visualizza",
+  columns: "COLONNE",
+  corners: "ANGOLI",
+  posterInfo: "MOSTRA SU POSTER",
+  moreChips: "+{n} altro",
+  lessChips: "Mostra meno",
+  radius: {
+    2: "Quadrato",
+    6: "Sottile",
+    10: "Normale",
+    15: "Soft",
+    20: "Rotondo"
+  },
+  columnsOption: {
+    3: "3 across",
+    4: "4 across"
+  }
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getListSortFilterCopy = (language) =>

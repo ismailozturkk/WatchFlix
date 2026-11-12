@@ -14,7 +14,7 @@ const tr = {
     "Listelerin, izleme geçmişin, rozetlerin, Etkinliklerim (puanlar, yorumlar, gönderiler, beğeniler, taslaklar), notların, hatırlatıcıların ve oyun istatistiklerin silinir. Hesabın, profilin ve arkadaşların kalır.",
   sheetTitle: "Hesabı sıfırla",
   sheetDescription:
-    "Tüm kütüphanen, izleme geçmişin, rozetlerin ve Etkinliklerim silinir; hesabın, profilin ve arkadaşların kalır. Bu işlem geri alınamaz.",
+    "Aşağıdakiler kalıcı olarak silinir; hesabın, profilin ve arkadaşların kalır. Bu işlem geri alınamaz.",
   needPassword: "Devam etmek için şifreni gir.",
   needGoogle: "Devam etmek için Google hesabınla doğrula.",
   needApple: "Devam etmek için Apple hesabınla doğrula.",
@@ -34,6 +34,25 @@ const tr = {
     games: "Oyun skorların ve istatistiklerin siliniyor",
     local: "Rozetler, taslaklar ve cihazdaki veriler temizleniyor",
   },
+  scope: {
+    removeTitle: "Silinecekler",
+    keepTitle: "Kalacaklar",
+    movies: "İzlediğin filmler",
+    shows: "İzlediğin diziler ve bölümler",
+    time: "İzleme süresi ve istatistiklerin",
+    lists: "Listelerin, favorilerin ve İzleyeceklerim",
+    activity: "Puanların, yorumların, gönderilerin, beğenilerin",
+    badges: "Rozetlerin, seriler ve yıllık hedefin",
+    notes: "Notların ve hatırlatıcıların",
+    games: "Oyun skorları, tier listeler, meydan okumalar, takip ettiğin kişiler",
+    ai: "Yapay zeka sohbetlerin ve taslakların",
+    keep: "Hesabın, profilin, arkadaşların ve sohbetlerin",
+    countMovies: "{n} film",
+    countShows: "{n} dizi · {e} bölüm",
+    countHours: "{n} saat",
+    countItems: "{n} öğe",
+    countNotes: "{n} not · {r} hatırlatıcı",
+  },
 };
 
 const en = {
@@ -42,7 +61,7 @@ const en = {
     "Your lists, watch history, badges, My Activity (ratings, comments, posts, likes, drafts), notes, reminders and game stats are erased. Your account, profile and friends stay.",
   sheetTitle: "Reset account",
   sheetDescription:
-    "Your whole library, watch history, badges and My Activity are erased; your account, profile and friends stay. This cannot be undone.",
+    "Everything below is erased for good; your account, profile and friends stay. This cannot be undone.",
   needPassword: "Enter your password to continue.",
   needGoogle: "Verify with your Google account to continue.",
   needApple: "Verify with your Apple account to continue.",
@@ -62,6 +81,25 @@ const en = {
     games: "Erasing your game scores and stats",
     local: "Clearing badges, drafts and data on this device",
   },
+  scope: {
+    removeTitle: "Will be erased",
+    keepTitle: "Will stay",
+    movies: "Movies you watched",
+    shows: "Shows and episodes you watched",
+    time: "Watch time and stats",
+    lists: "Your lists, favorites and watchlist",
+    activity: "Your ratings, comments, posts, likes",
+    badges: "Your badges, streaks and yearly goal",
+    notes: "Your notes and reminders",
+    games: "Game scores, tier lists, challenges, people you follow",
+    ai: "Your AI chats and drafts",
+    keep: "Your account, profile, friends and chats",
+    countMovies: "{n} movies",
+    countShows: "{n} shows · {e} episodes",
+    countHours: "{n} h",
+    countItems: "{n} items",
+    countNotes: "{n} notes · {r} reminders",
+  },
 };
 
 const es = {
@@ -70,7 +108,7 @@ const es = {
     "Se borran tus listas, historial, insignias, Mi actividad (valoraciones, comentarios, publicaciones, me gusta, borradores), notas, recordatorios y estadísticas de juegos. Tu cuenta, perfil y amigos se mantienen.",
   sheetTitle: "Restablecer cuenta",
   sheetDescription:
-    "Se borra toda tu biblioteca, tu historial, tus insignias y Mi actividad; tu cuenta, perfil y amigos se mantienen. No se puede deshacer.",
+    "Todo lo de abajo se borra para siempre; tu cuenta, perfil y amigos se mantienen. No se puede deshacer.",
   needPassword: "Introduce tu contraseña para continuar.",
   needGoogle: "Verifica con tu cuenta de Google para continuar.",
   needApple: "Verifica con tu cuenta de Apple para continuar.",
@@ -90,6 +128,25 @@ const es = {
     games: "Borrando tus puntuaciones y estadísticas de juegos",
     local: "Borrando insignias, borradores y datos de este dispositivo",
   },
+  scope: {
+    removeTitle: "Se borrará",
+    keepTitle: "Se mantiene",
+    movies: "Películas que viste",
+    shows: "Series y episodios que viste",
+    time: "Tiempo visto y estadísticas",
+    lists: "Tus listas, favoritos y pendientes",
+    activity: "Tus valoraciones, comentarios, publicaciones, me gusta",
+    badges: "Tus insignias, rachas y meta anual",
+    notes: "Tus notas y recordatorios",
+    games: "Puntuaciones de juegos, tier lists, retos, personas que sigues",
+    ai: "Tus chats de IA y borradores",
+    keep: "Tu cuenta, perfil, amigos y chats",
+    countMovies: "{n} películas",
+    countShows: "{n} series · {e} episodios",
+    countHours: "{n} h",
+    countItems: "{n} elementos",
+    countNotes: "{n} notas · {r} recordatorios",
+  },
 };
 
 const pt = {
@@ -98,7 +155,7 @@ const pt = {
     "Suas listas, histórico, emblemas, Minhas atividades (avaliações, comentários, publicações, curtidas, rascunhos), notas, lembretes e estatísticas de jogos são apagados. Sua conta, perfil e amigos permanecem.",
   sheetTitle: "Redefinir conta",
   sheetDescription:
-    "Toda a sua biblioteca, o seu histórico, seus emblemas e Minhas atividades são apagados; sua conta, perfil e amigos permanecem. Isso não pode ser desfeito.",
+    "Tudo abaixo é apagado para sempre; sua conta, perfil e amigos permanecem. Isso não pode ser desfeito.",
   needPassword: "Digite sua senha para continuar.",
   needGoogle: "Verifique com sua conta do Google para continuar.",
   needApple: "Verifique com sua conta da Apple para continuar.",
@@ -118,6 +175,25 @@ const pt = {
     games: "Apagando suas pontuações e estatísticas de jogos",
     local: "Limpando emblemas, rascunhos e dados deste dispositivo",
   },
+  scope: {
+    removeTitle: "Será apagado",
+    keepTitle: "Permanece",
+    movies: "Filmes que você assistiu",
+    shows: "Séries e episódios que você assistiu",
+    time: "Tempo assistido e estatísticas",
+    lists: "Suas listas, favoritos e Quero ver",
+    activity: "Suas avaliações, comentários, publicações, curtidas",
+    badges: "Seus emblemas, sequências e meta anual",
+    notes: "Suas notas e lembretes",
+    games: "Pontuações de jogos, tier lists, desafios, pessoas que você segue",
+    ai: "Suas conversas de IA e rascunhos",
+    keep: "Sua conta, perfil, amigos e conversas",
+    countMovies: "{n} filmes",
+    countShows: "{n} séries · {e} episódios",
+    countHours: "{n} h",
+    countItems: "{n} itens",
+    countNotes: "{n} notas · {r} lembretes",
+  },
 };
 
 const de = {
@@ -126,7 +202,7 @@ const de = {
     "Deine Listen, dein Verlauf, Markierungen, Meine Aktivität (Bewertungen, Kommentare, Beiträge, Likes, Entwürfe), Notizen, Erinnerungen und Spielstatistiken werden gelöscht. Dein Konto, dein Profil und deine Freunde bleiben.",
   sheetTitle: "Konto zurücksetzen",
   sheetDescription:
-    "Deine gesamte Bibliothek, dein Verlauf, deine Markierungen und Meine Aktivität werden gelöscht; Konto, Profil und Freunde bleiben. Das kann nicht rückgängig gemacht werden.",
+    "Alles unten wird endgültig gelöscht; Konto, Profil und Freunde bleiben. Das kann nicht rückgängig gemacht werden.",
   needPassword: "Gib dein Passwort ein, um fortzufahren.",
   needGoogle: "Bestätige mit deinem Google-Konto, um fortzufahren.",
   needApple: "Bestätige mit deinem Apple-Konto, um fortzufahren.",
@@ -146,9 +222,73 @@ const de = {
     games: "Deine Spielstände und Statistiken werden gelöscht",
     local: "Markierungen, Entwürfe und Daten auf diesem Gerät werden gelöscht",
   },
+  scope: {
+    removeTitle: "Wird gelöscht",
+    keepTitle: "Bleibt",
+    movies: "Gesehene Filme",
+    shows: "Gesehene Serien und Folgen",
+    time: "Sehzeit und Statistiken",
+    lists: "Deine Listen, Favoriten und Merkliste",
+    activity: "Deine Bewertungen, Kommentare, Beiträge, Likes",
+    badges: "Deine Markierungen, Serien und Jahresziel",
+    notes: "Deine Notizen und Erinnerungen",
+    games: "Spielstände, Tier-Listen, Challenges, Personen, denen du folgst",
+    ai: "Deine KI-Chats und Entwürfe",
+    keep: "Dein Konto, Profil, Freunde und Chats",
+    countMovies: "{n} Filme",
+    countShows: "{n} Serien · {e} Folgen",
+    countHours: "{n} Std.",
+    countItems: "{n} Einträge",
+    countNotes: "{n} Notizen · {r} Erinnerungen",
+  },
+};
+const it = {
+  rowTitle: "Reimposta account",
+  rowDescription: "I tuoi elenchi, cronologia visualizzazioni, badge, Le mie attività (votazioni, commenti, post, Mi piace, bozze), note, promemoria e statistiche di gioco vengono cancellati. Il tuo account, il tuo profilo e i tuoi amici rimangono.",
+  sheetTitle: "Ripristina account",
+  sheetDescription: "Tutto ciò che segue viene cancellato per sempre; il tuo account, profilo e amici rimangono. Questa operazione non può essere annullata.",
+  needPassword: "Inserisci la tua password per continuare.",
+  needGoogle: "Verifica con il tuo account Google per continuare.",
+  needApple: "Verifica con il tuo account Apple per continuare.",
+  hold: "Tenere premuto per reimpostare",
+  holdActive: "Tenere premuto per reimpostare…",
+  holdHint: "Tenere premuto il pulsante per {seconds} secondi per confermare.",
+  done: "Il tuo account è stato reimpostato",
+  incomplete: "Non è stato possibile reimpostare alcuni dati. Controlla la connessione e riprova.",
+  title: "Reimpostazione del tuo account",
+  hint: "L'operazione può richiedere alcuni minuti. Tieni l'app aperta.",
+  step: "Step {n} of {total}",
+  stages: {
+    verify: "Verifica della tua identità",
+    library: "Cancellazione degli elenchi e della cronologia delle visualizzazioni",
+    activity: "Cancellazione di commenti, post, valutazioni e Mi piace",
+    notes: "Cancellazione di note, promemoria e chat AI",
+    games: "Cancellazione dei punteggi e delle statistiche del gioco",
+    local: "Cancellazione di badge, bozze e dati su questo dispositivo"
+  },
+  scope: {
+    removeTitle: "Verrà cancellato",
+    keepTitle: "Rimarrà",
+    movies: "Film che hai guardato",
+    shows: "Programmi ed episodi che hai guardato",
+    time: "Tempo di visualizzazione e statistiche",
+    lists: "I tuoi elenchi, preferiti e watchlist",
+    activity: "Le tue valutazioni, commenti, post, Mi piace",
+    badges: "I tuoi badge, serie di vittorie e obiettivo annuale",
+    notes: "Le tue note e promemoria",
+    games: "Punteggi di gioco, elenchi di livelli, sfide, persone che segui",
+    ai: "Le tue chat e bozze IA",
+    keep: "Il tuo account, profilo, amici e chat",
+    countMovies: "{n} film",
+    countShows: "{n} programmi · {e} episodi",
+    countHours: "{n} h",
+    countItems: "{n} elementi",
+    countNotes: "{n} note · {r} promemoria"
+  }
 };
 
-export const RESET_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de });
+export const RESET_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getResetAccountCopy = (language) =>

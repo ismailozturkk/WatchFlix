@@ -68,11 +68,10 @@ export function detailPosterRadius(railRadius) {
   return Math.round((Number.isFinite(n) ? n : 15) * DETAIL_RADIUS_RATIO);
 }
 
-// Göreli alanlar (Eğlence, Kütüphane): her yüzeyin kendi köşesi var (40 pt'lik küçük
-// afişte 4, 200 pt'lik oyun afişinde 18…). Tek bir sayı hepsine uymaz; kayıtlı değer
-// grid ölçeğindedir ve ÇARPAN olarak okunur: Normal (10) = ×1 → her yüzey bugünkü
-// köşesinde kalır; Köşeli ×0.2 … Yuvarlak ×2. Hook: hooks/usePosterCorner.js.
-export const RELATIVE_POSTER_AREAS = Object.freeze(["fun", "library"]);
+// Göreli alanlar (Eğlence "fun", Kütüphane "library"): her yüzeyin kendi köşesi var
+// (40 pt'lik küçük afişte 4, 200 pt'lik oyun afişinde 18…). Tek bir sayı hepsine
+// uymaz; kayıtlı değer grid ölçeğindedir ve ÇARPAN olarak okunur: Normal (10) = ×1 →
+// her yüzey bugünkü köşesinde kalır; Köşeli ×0.2 … Yuvarlak ×2. Hook: hooks/usePosterCorner.js.
 
 /** Kayıtlı değer (2/6/10/15/20) → çarpan (0.2 … 2); geçersizse ×1. */
 export function posterCornerFactor(value) {

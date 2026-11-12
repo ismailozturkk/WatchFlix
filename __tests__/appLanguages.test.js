@@ -83,7 +83,7 @@ describe("normalizeAppLanguage", () => {
   });
 
   it("bilinmeyen / bozuk değer İngilizceye düşer, Türkçeye DEĞİL", () => {
-    for (const girdi of ["fr", "it", "zz", "", null, undefined, 42, {}]) {
+    for (const girdi of ["fr", "zz", "", null, undefined, 42, {}]) {
       expect(normalizeAppLanguage(girdi)).toBe("en");
     }
   });
@@ -147,6 +147,15 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbImageLanguageOrderOf("de")).toBe("de,en,null");
   });
 
+  it("İtalyanca: TMDB, Intl ve yapay zeka bağları", () => {
+    expect(tmdbLanguageOf("it")).toBe("it-IT");
+    expect(tmdbRegionOf("it")).toBe("IT");
+    expect(intlLocaleOf("it")).toBe("it-IT");
+    expect(aiPromptLanguageOf("it")).toBe("Italian (it)");
+    expect(legalLanguageOf("it")).toBe("en");
+    expect(tmdbImageLanguageOrderOf("it")).toBe("it,en,null");
+  });
+
   it("Türkçe ve İngilizce bağları değişmedi", () => {
     expect(tmdbLanguageOf("tr")).toBe("tr-TR");
     expect(tmdbRegionOf("tr")).toBe("TR");
@@ -179,6 +188,7 @@ describe("dil döngüsü ve eski bayrak göçü", () => {
     expect(legacyFlagToLanguage("es")).toBe("es");
     expect(legacyFlagToLanguage("pt")).toBe("pt");
     expect(legacyFlagToLanguage("de")).toBe("de");
+    expect(legacyFlagToLanguage("it")).toBe("it");
     expect(legacyFlagToLanguage("xx")).toBe("en");
   });
 
@@ -186,14 +196,15 @@ describe("dil döngüsü ve eski bayrak göçü", () => {
     expect(isSupportedAppLanguage("es")).toBe(true);
     expect(isSupportedAppLanguage("pt")).toBe(true);
     expect(isSupportedAppLanguage("de")).toBe(true);
+    expect(isSupportedAppLanguage("it")).toBe(true);
     expect(isSupportedAppLanguage("fr")).toBe(false);
   });
 });
 
 describe("\"Yakında\" diller (henüz desteklenmeyen)", () => {
-  const BEKLENEN = ["fr", "ja", "ko", "it", "id", "hi", "ar", "zh"];
+  const BEKLENEN = ["fr", "ja", "ko", "id", "hi", "ar", "zh"];
 
-  it("istenen sekiz dil listede, başka dil yok", () => {
+  it("desteklenmeyen yedi dil listede, İtalyanca seçilebilir", () => {
     expect(COMING_SOON_LANGUAGES.map((l) => l.code)).toEqual(BEKLENEN);
   });
 

@@ -86,8 +86,22 @@ const de = {
   note:
     "Die Erkennung nutzt TMDB-Schlagwörter, Genres und Beschreibungen; manche Titel können durchrutschen. Deine eigenen Listen und direkt geöffnete Seiten sind nicht betroffen.",
 };
+const it = {
+  title: "Contenuti sensibili",
+  rowAllHidden: "Tutto nascosto",
+  rowSomeShown: "{n} categorie mostrate",
+  intro: "Le categorie attivate vengono visualizzate nella scoperta, nella ricerca, nei consigli e nelle guide. Quelli spenti sono nascosti. Sono tutti disattivati ​​per impostazione predefinita.",
+  categories: {
+    adult: ["Contenuti per adulti (18+)", "Contenuti e titoli di natura sessuale contrassegnati come 18+"],
+    drugs: ["Droghe e uso di sostanze", "Titoli su droga, dipendenze e cartelli"],
+    gore: ["Sangue e brutalità", "Titoli con immagini esplicite di sangue, tortura e brutalità"],
+    war: ["Guerra", "Film e programmi di genere bellico"]
+  },
+  note: "La corrispondenza utilizza parole chiave, generi e descrizioni TMDB, quindi alcuni titoli potrebbero sfuggire. I tuoi elenchi e le pagine che apri direttamente non sono interessati."
+};
 
-export const SENSITIVE_CONTENT_COPY = Object.freeze({ tr, en, es, pt, de });
+export const SENSITIVE_CONTENT_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSensitiveContentCopy = (language) =>

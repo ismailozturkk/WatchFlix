@@ -77,7 +77,21 @@ export const POLL_COPY = {
     optionA11y: (text) => `${text}, abstimmen`,
     resultA11y: (text, percent) => `${text}, ${percent} Prozent`,
   },
-};
+
+  it: {
+  eyebrow: "DOMANDA DEL GIORNO",
+  hint: "Toccane uno e guarda cosa hanno detto tutti",
+  votes: n => n === 1 ? "1 voto" : `${n} voti`,
+  youPicked: "La tua scelta",
+  fewVotes: "I risultati appaiono man mano che arrivano i voti",
+  firstVoter: "Sei tra i primi a votare",
+  waiting: "Salvataggio del tuo voto…",
+  pendingSync: "Il tuo voto viene salvato su questo dispositivo e conterà una volta che sarai online",
+  streak: n => `${n} giorni consecutivi`,
+  nextQuestion: "Una nuova domanda domani",
+  optionA11y: text => `${text}, vota`,
+  resultA11y: (text, percent) => `${text}, ${percent} percentuale`
+}};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getPollCopy = (language) => POLL_COPY[copyLanguage(language, Object.keys(POLL_COPY))];

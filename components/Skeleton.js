@@ -18,9 +18,9 @@ const { width } = Dimensions.get("window");
 // ── Paylaşılan nabız (yol haritası Y18) ─────────────────────────────────────
 // Eskiden her iskelet parçası KENDİ sonsuz döngüsünü kuruyordu (bir sayfa
 // iskeletinde 20–40 döngü). Artık tek değer, tek döngü: görünen (odakta)
-// iskelet sayısı 0'a inince döngü durur. `isInteraction: false`: döngü
-// InteractionManager'ı tutmasın (runAfterInteractions bekleyen işler —
-// atmosfer kurulumu gibi — iskelet görünürken ertelenmesin).
+// iskelet sayısı 0'a inince döngü durur. `isInteraction: false` eski
+// InteractionManager içindi (RN 0.86'da o API koçan, bayrak etkisiz); zararsız,
+// eski RN'e dönülürse döngü bekleyen işleri tutmasın diye duruyor.
 const sharedPulse = new Animated.Value(0);
 let pulseUsers = 0;
 let pulseLoop = null;

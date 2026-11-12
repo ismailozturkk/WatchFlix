@@ -830,9 +830,9 @@ const VotePreviewCard = memo(function VotePreviewCard({ content, theme, ambient,
  * Satır yüksekliği de elle verilir: özel yazı tiplerinin doğal satır yüksekliği
  * etiket ve kart ölçülerini kaydırmasın.
  */
-const TierCard = memo(function TierCard({ tier, theme, tr, es, pt, de, color, ambient, delay, typo }) {
+const TierCard = memo(function TierCard({ tier, theme, tr, es, pt, de, it, color, ambient, delay, typo }) {
   const target = tier.isTarget;
-  const flag = target ? (tr ? "Önerilen" : es ? "La mejor opción" : pt ? "A melhor escolha" : de ? "Beste Wahl" : "Best pick") : tier.isCurrent ? (tr ? "Şu an" : es ? "Ahora" : pt ? "Agora" : de ? "Jetzt" : "Now") : null;
+  const flag = target ? (tr ? "Önerilen" : es ? "La mejor opción" : pt ? "A melhor escolha" : de ? "Beste Wahl" : it ? "Scelta migliore" : "Best pick") : tier.isCurrent ? (tr ? "Şu an" : es ? "Ahora" : pt ? "Agora" : de ? "Jetzt" : it ? "Ora" : "Now") : null;
   const figure = typo.mode === "figure";
 
   // Hale yalnız opaklıkla nefes alır: ölçekleyen halenin kenarı komşu karta ve
@@ -1002,13 +1002,13 @@ const TierCard = memo(function TierCard({ tier, theme, tr, es, pt, de, color, am
 // ── Kazanç satırları ─────────────────────────────────────────────────────────
 
 /** "Premium ile ayrıca": gerçek kapılardan kazanç satırları, sağdan kayarak girer. */
-const PerksCard = memo(function PerksCard({ content, theme, tr, es, pt, de, delay }) {
+const PerksCard = memo(function PerksCard({ content, theme, tr, es, pt, de, it, delay }) {
   return (
     <Rise delay={delay} dy={18} style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <View style={styles.perksHead}>
         <MaterialCommunityIcons name="star-four-points" size={12} color={GOLD} />
         <Text allowFontScaling={false} style={[styles.perksHeading, { color: theme.text.muted }]}>
-          {tr ? `${content.targetName} ile ayrıca` : es ? `También con ${content.targetName}` : pt ? `Também com ${content.targetName}` : de ? `Auch mit ${content.targetName}` : `Also with ${content.targetName}`}
+          {tr ? `${content.targetName} ile ayrıca` : es ? `También con ${content.targetName}` : pt ? `Também com ${content.targetName}` : de ? `Auch mit ${content.targetName}` : it ? `Anche con ${content.targetName}` : `Also with ${content.targetName}`}
         </Text>
       </View>
       {content.perks.map((perk, index) => (
@@ -1138,6 +1138,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const it = language === "it";
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const { width: windowWidth } = useWindowDimensions();
@@ -1245,7 +1246,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
                 theme={theme}
                 tr={tr}
                 es={es}
-                pt={pt} de={de}
+                pt={pt} de={de} it={it}
                 color={color}
                 ambient={ambient}
                 delay={tiersDelay}
@@ -1256,7 +1257,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
         ) : null}
 
         {content.perks.length > 0 ? (
-          <PerksCard content={content} theme={theme} tr={tr} es={es} pt={pt} de={de} delay={perksDelay} />
+          <PerksCard content={content} theme={theme} tr={tr} es={es} pt={pt} de={de} it={it} delay={perksDelay} />
         ) : null}
 
         {content.note ? (

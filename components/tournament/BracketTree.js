@@ -66,7 +66,22 @@ const COPY = {
   es: { title: "CUADRO", live: "En vivo", done: "Terminado", mine: "Tu voto", path: "Camino del ganador", champion: "CAMPEÓN", tbd: "¿CAMPEÓN?", hint: "Toca un duelo", matches: "duelos", expand: "Pantalla completa", close: "Cerrar", zoomOut: "Alejar", zoom: "Acercar" },
   pt: { title: "CHAVE", live: "Ao vivo", done: "Concluído", mine: "Seu voto", path: "Caminho do vencedor", champion: "CAMPEÃO", tbd: "CAMPEÃO?", hint: "Toque num duelo", matches: "duelos", expand: "Tela cheia", close: "Fechar", zoomOut: "Reduzir", zoom: "Ampliar" },
   de: { title: "TURNIERBAUM", live: "Live", done: "Fertig", mine: "Deine Stimme", path: "Siegerweg", champion: "CHAMPION", tbd: "CHAMPION?", hint: "Duell antippen", matches: "Duelle", expand: "Vollbild", close: "Schließen", zoomOut: "Verkleinern", zoom: "Vergrößern" },
-};
+
+  it: {
+  title: "BRACKET",
+  live: "Live",
+  done: "Fatto",
+  mine: "Il tuo voto",
+  path: "Percorso del vincitore",
+  champion: "Campione",
+  tbd: "CAMPIONE ?",
+  hint: "Tocca una partita",
+  matches: "partite",
+  expand: "Schermo intero",
+  close: "Chiudi",
+  zoomOut: "Riduci lo zoom",
+  zoom: "Ingrandisci"
+}};
 
 // Türkçe-güvenli BÜYÜK harf: JS'in toUpperCase'i 'i' → 'I' yapar ("FINAL"),
 // doğrusu 'İ'dir (eski sürüm textTransform ile "ÇEYREK FINAL" yazıyordu).

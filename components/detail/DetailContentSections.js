@@ -58,16 +58,17 @@ function ActionButton({ action, theme, featured = false }) {
   );
 }
 
-export function DetailActionCluster({ theme, review, ai, send }) {
+// `featured`: üst yuvaya hazır bir öğe (ör. TasteFitButton) konur; verilmezse `review` eylemi öne çıkar.
+export function DetailActionCluster({ theme, featured, review, ai, send }) {
   const actions = [
-    { ...review, color: theme.colors?.blue || FALLBACK_COLORS.blue },
+    review ? { ...review, color: theme.colors?.blue || FALLBACK_COLORS.blue } : null,
     { ...ai, color: theme.colors?.purple || FALLBACK_COLORS.purple },
     { ...send, color: theme.colors?.green || FALLBACK_COLORS.green },
   ];
 
   return (
     <View style={styles.actionCluster}>
-      <ActionButton action={actions[0]} theme={theme} featured />
+      {featured || (actions[0] ? <ActionButton action={actions[0]} theme={theme} featured /> : null)}
       <View style={styles.quickActions}>
         <ActionButton action={actions[1]} theme={theme} />
         <ActionButton action={actions[2]} theme={theme} />
@@ -141,7 +142,36 @@ function JournalRow({ item, theme }) {
   );
 }
 
-export function DetailJournalPanel({ theme, comment, note, renderCommentRow }) {
+/** Yarım genişlik kutucuk: Notum | İnceleme yan yana. */
+function JournalTile({ item, theme }) {
+  const tone = item.color || theme.accent;
+  return (
+    <GlassTouchable
+      activeOpacity={0.86}
+      onPress={item.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={item.subtitle ? `${item.title}. ${item.subtitle}` : item.title}
+      style={styles.journalTile}
+    >
+      <View style={[styles.journalTileIcon, { backgroundColor: alpha(tone, 0.14) }]}>
+        <Ionicons name={item.icon} size={17} color={tone} />
+      </View>
+      <View style={styles.journalCopy}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.journalTileTitle, { color: theme.text.primary }]}>
+          {item.title}
+        </Text>
+        {item.subtitle ? (
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.journalSubtitle, { color: theme.text.muted }]}>
+            {item.subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </GlassTouchable>
+  );
+}
+
+// `review` verilirse Notum ile İnceleme yorum satırının altında yan yana iki kutucuk olur.
+export function DetailJournalPanel({ theme, comment, note, review, renderCommentRow }) {
   const commentRow = <JournalRow item={comment} theme={theme} />;
   return (
     <View
@@ -151,8 +181,16 @@ export function DetailJournalPanel({ theme, comment, note, renderCommentRow }) {
       ]}
     >
       {renderCommentRow ? renderCommentRow(commentRow) : commentRow}
-      <View style={[styles.journalDivider, { backgroundColor: theme.border }]} />
-      <JournalRow item={note} theme={theme} />
+      <View style={[styles.journalDivider, review ? styles.journalDividerFull : null, { backgroundColor: theme.border }]} />
+      {review ? (
+        <View style={styles.journalSplit}>
+          <JournalTile item={note} theme={theme} />
+          <View style={[styles.journalSplitDivider, { backgroundColor: theme.border }]} />
+          <JournalTile item={{ ...review, color: review.color || theme.colors?.blue || FALLBACK_COLORS.blue }} theme={theme} />
+        </View>
+      ) : (
+        <JournalRow item={note} theme={theme} />
+      )}
     </View>
   );
 }
@@ -309,6 +347,12 @@ const styles = StyleSheet.create({
   journalTitle: { fontSize: 14, fontWeight: "800" },
   journalSubtitle: { fontSize: 11, fontWeight: "500", marginTop: 2 },
   journalDivider: { height: StyleSheet.hairlineWidth, marginLeft: 60, opacity: 0.9 },
+  journalDividerFull: { marginLeft: 0 },
+  journalSplit: { flexDirection: "row", alignItems: "stretch" },
+  journalSplitDivider: { width: StyleSheet.hairlineWidth, marginVertical: 10, opacity: 0.9 },
+  journalTile: { flex: 1, minWidth: 0, minHeight: 60, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11, paddingVertical: 10 },
+  journalTileIcon: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  journalTileTitle: { fontSize: 13.5, fontWeight: "800" },
   editorialSection: { marginBottom: 26 },
   editorialHeader: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 10 },
   editorialEyebrow: { width: 31, height: 31, borderRadius: 11, alignItems: "center", justifyContent: "center" },

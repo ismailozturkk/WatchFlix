@@ -27,6 +27,19 @@ jest.mock("../components/AppToast", () => {
 });
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 jest.mock("../components/ScreenDecor", () => ({ __esModule: true, default: "Decor" }));
+jest.mock("../components/profile/AccountEmailCard", () => ({ __esModule: true, default: "AccountEmailCard" }));
+jest.mock("../components/profile/ResetScopeList", () => ({
+  __esModule: true,
+  default: "ResetScopeList",
+  buildResetScopeRows: () => [],
+}));
+jest.mock("../context/ProfileStatsContext", () => ({ useProfileStats: () => ({}) }));
+jest.mock("../context/ProfileNotesContext", () => ({ useProfileNotes: () => ({}) }));
+jest.mock("../context/ProfileRemindersContext", () => ({ useProfileReminders: () => ({}) }));
+jest.mock("../hooks/useEmailVerification", () => ({
+  __esModule: true,
+  default: () => ({ verified: true, sending: false, cooldown: 0, resend: () => {}, resendLabel: "Tekrar gönder" }),
+}));
 jest.mock("../components/auth/BirthDateField", () => ({ __esModule: true, default: "BirthDateField" }));
 jest.mock("../components/profile/ProfileAvatarPickerModal", () => ({ __esModule: true, default: "AvatarSheet" }));
 jest.mock("../components/favorites/FavoritesEditor", () => ({ __esModule: true, default: "FavoritesEditor" }));

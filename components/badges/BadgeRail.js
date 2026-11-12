@@ -75,7 +75,7 @@ export function BadgeRail({ baslik, altBaslik, children }) {
 export const HedefKarti = memo(function HedefKarti({ kart, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
   const uye = hedefUyesi(kart);
   if (!uye) return null;
 
@@ -125,7 +125,7 @@ export const HedefKarti = memo(function HedefKarti({ kart, onPress }) {
 export const SonKarti = memo(function SonKarti({ kart, onPress, simdi }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
 
   const sekil = kademeSekli(kart.tier, kart.aileToplam);
   const kadRenk = kademeRengi(sekil.kademe, theme);
@@ -174,7 +174,7 @@ export const SonKarti = memo(function SonKarti({ kart, onPress, simdi }) {
 export const FirsatKarti = memo(function FirsatKarti({ firsat, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
   const { kart, tur, gunKaldi, eksikGun } = firsat;
 
   const sekil = kademeSekli(kart.tier, kart.aileToplam);

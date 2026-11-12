@@ -32,7 +32,8 @@ export const SCENE_GAME_MODES = [
     endsOnWrong: false,
     leaderboardEligible: true,
     available: true,
-  },
+
+  it: "Modalità classica"},
   {
     id: MODE_TIME_ATTACK,
     icon: "timer-outline",
@@ -49,7 +50,8 @@ export const SCENE_GAME_MODES = [
     endsOnWrong: false,
     leaderboardEligible: false,
     available: true,
-  },
+
+  it: "Time Attack"},
   {
     id: MODE_SURVIVAL,
     icon: "heart-half-outline",
@@ -67,7 +69,8 @@ export const SCENE_GAME_MODES = [
     endsOnWrong: false,
     leaderboardEligible: false,
     available: true,
-  },
+
+  it: "Sopravvivenza"},
   {
     // Gunluk Meydan Okuma: herkese ayni 10 sahne, gunde tek deneme. Kurulum
     // ekraninda SECILMEZ (selectable:false); yalniz Hub/Oyun Merkezi'ndeki
@@ -88,7 +91,8 @@ export const SCENE_GAME_MODES = [
     available: true,
     selectable: false,
     daily: true,
-  },
+
+  it: "Sfida quotidiana"},
 ];
 
 /* Kurulum ekraninda secilebilen modlar (gunluk mod haric). */
@@ -109,7 +113,8 @@ export const SCENE_GAME_DIFFICULTIES = [
     optionCount: 3,
     scoreMultiplier: 1.0,
     color: "#2ECC71",
-  },
+
+  it: "Facile"},
   {
     id: "normal",
     icon: "speedometer-outline",
@@ -121,7 +126,8 @@ export const SCENE_GAME_DIFFICULTIES = [
     optionCount: 4,
     scoreMultiplier: 1.25,
     color: "#56CCF2",
-  },
+
+  it: "Normale"},
   {
     id: "hard",
     icon: "flame-outline",
@@ -133,23 +139,24 @@ export const SCENE_GAME_DIFFICULTIES = [
     optionCount: 4,
     scoreMultiplier: 1.5,
     color: "#FF6B6B",
-  },
+
+  it: "Difficile"},
 ];
 
 /* ── Source definitions ─────────────────────────────────────────────────── */
 export const SCENE_GAME_SOURCES = [
-  { id: "popular", icon: "flame-outline", labelKey: "autoI18n.populer", tr: "Popüler", en: "Popular", es: "Populares", pt: "Populares", de: "Beliebt", group: "discover" },
-  { id: "top_rated_movie", icon: "star-outline", labelKey: "autoI18n.en_iyi_filmler", tr: "En İyi Filmler", en: "Top Rated Movies", es: "Películas mejor valoradas", pt: "Filmes mais bem avaliados", de: "Bestbewertete Filme", group: "discover" },
-  { id: "top_rated_tv", icon: "tv-outline", labelKey: "autoI18n.en_iyi_diziler", tr: "En İyi Diziler", en: "Top Rated Series", es: "Series mejor valoradas", pt: "Séries mais bem avaliadas", de: "Bestbewertete Serien", group: "discover" },
-  { id: "popular_movie", icon: "film-outline", labelKey: "autoI18n.populer_filmler", tr: "Popüler Filmler", en: "Popular Movies", es: "Películas populares", pt: "Filmes populares", de: "Beliebte Filme", group: "discover" },
-  { id: "popular_tv", icon: "radio-outline", labelKey: "autoI18n.populer_diziler", tr: "Popüler Diziler", en: "Popular Series", es: "Series populares", pt: "Séries populares", de: "Beliebte Serien", group: "discover" },
-  { id: "watchlist", icon: "bookmark-outline", labelKey: "autoI18n.izleme_listem", tr: "İzleme Listem", en: "My Watchlist", es: "Mi lista de seguimiento", pt: "Minha lista para assistir", de: "Meine Merkliste", personal: true, listKey: "watchList", group: "personal" },
-  { id: "favorites", icon: "heart-outline", labelKey: "autoI18n.favoriler", tr: "Favoriler", en: "Favorites", es: "Favoritos", pt: "Favoritos", de: "Favoriten", personal: true, listKey: "favorites", group: "personal" },
-  { id: "watchedMovies", icon: "checkmark-circle-outline", labelKey: "autoI18n.izlenen_filmler", tr: "İzlenen Filmler", en: "Watched Movies", es: "Películas vistas", pt: "Filmes assistidos", de: "Gesehene Filme", personal: true, listKey: "watchedMovies", group: "personal" },
-  { id: "watchedTv", icon: "checkmark-done-outline", labelKey: "autoI18n.izlenen_diziler", tr: "İzlenen Diziler", en: "Watched Series", es: "Series vistas", pt: "Séries assistidas", de: "Gesehene Serien", personal: true, listKey: "watchedTv", group: "personal" },
+  { id: "popular", icon: "flame-outline", labelKey: "autoI18n.populer", tr: "Popüler", en: "Popular", es: "Populares", pt: "Populares", de: "Beliebt", group: "discover" , it: "Popolare"},
+  { id: "top_rated_movie", icon: "star-outline", labelKey: "autoI18n.en_iyi_filmler", tr: "En İyi Filmler", en: "Top Rated Movies", es: "Películas mejor valoradas", pt: "Filmes mais bem avaliados", de: "Bestbewertete Filme", group: "discover" , it: "Film più votati"},
+  { id: "top_rated_tv", icon: "tv-outline", labelKey: "autoI18n.en_iyi_diziler", tr: "En İyi Diziler", en: "Top Rated Series", es: "Series mejor valoradas", pt: "Séries mais bem avaliadas", de: "Bestbewertete Serien", group: "discover" , it: "Serie più votate"},
+  { id: "popular_movie", icon: "film-outline", labelKey: "autoI18n.populer_filmler", tr: "Popüler Filmler", en: "Popular Movies", es: "Películas populares", pt: "Filmes populares", de: "Beliebte Filme", group: "discover" , it: "Film popolari"},
+  { id: "popular_tv", icon: "radio-outline", labelKey: "autoI18n.populer_diziler", tr: "Popüler Diziler", en: "Popular Series", es: "Series populares", pt: "Séries populares", de: "Beliebte Serien", group: "discover" , it: "Serie popolari"},
+  { id: "watchlist", icon: "bookmark-outline", labelKey: "autoI18n.izleme_listem", tr: "İzleme Listem", en: "My Watchlist", es: "Mi lista de seguimiento", pt: "Minha lista para assistir", de: "Meine Merkliste", personal: true, listKey: "watchList", group: "personal" , it: "La mia lista di titoli"},
+  { id: "favorites", icon: "heart-outline", labelKey: "autoI18n.favoriler", tr: "Favoriler", en: "Favorites", es: "Favoritos", pt: "Favoritos", de: "Favoriten", personal: true, listKey: "favorites", group: "personal" , it: "Preferiti"},
+  { id: "watchedMovies", icon: "checkmark-circle-outline", labelKey: "autoI18n.izlenen_filmler", tr: "İzlenen Filmler", en: "Watched Movies", es: "Películas vistas", pt: "Filmes assistidos", de: "Gesehene Filme", personal: true, listKey: "watchedMovies", group: "personal" , it: "Film guardati"},
+  { id: "watchedTv", icon: "checkmark-done-outline", labelKey: "autoI18n.izlenen_diziler", tr: "İzlenen Diziler", en: "Watched Series", es: "Series vistas", pt: "Séries assistidas", de: "Gesehene Serien", personal: true, listKey: "watchedTv", group: "personal" , it: "Serie guardate"},
   // Gunluk meydan okumanin sabit havuzu. Kurulum listesinde gorunmez
   // (group:"daily"); sonuc/istatistik ekranlari etiketi buradan okur.
-  { id: "daily", icon: "sunny-outline", labelKey: "autoI18n.gunluk_meydan_okuma", tr: "Günlük Meydan Okuma", en: "Daily Challenge", es: "Reto diario", pt: "Desafio diário", de: "Tägliche Challenge", group: "daily" },
+  { id: "daily", icon: "sunny-outline", labelKey: "autoI18n.gunluk_meydan_okuma", tr: "Günlük Meydan Okuma", en: "Daily Challenge", es: "Reto diario", pt: "Desafio diário", de: "Tägliche Challenge", group: "daily" , it: "Sfida quotidiana"},
 ];
 
 /* ── Lookups ────────────────────────────────────────────────────────────── */
@@ -170,7 +177,7 @@ export const isDailyMode = (modeId) => modeId === MODE_DAILY;
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı); `es` alanı olmayan öğe İngilizceye düşer.
 export const getLocalizedGameLabel = (item, language) =>
-  item[copyLanguage(language, ["tr", "en", "es", "pt", "de"])] ?? item.en;
+  item[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"])] ?? item.en;
 
 /**
  * `bestScoresByMode` anahtarını ("classic_normal", "poster_classic_normal",

@@ -59,7 +59,8 @@ export const ProfileNotesProvider = ({ children }) => {
           es: "Crear recordatorios es una ventaja Premium",
           pt: "Criar lembretes é um benefício Premium",
           de: "Erinnerungen zu setzen ist ein Premium-Vorteil",
-        }),
+
+  it: "L'impostazione dei promemoria è un vantaggio Premium"}),
       });
       return false;
     }
@@ -292,14 +293,16 @@ export const ProfileNotesProvider = ({ children }) => {
                 es: "Has alcanzado tu límite de tareas",
                 pt: "Você atingiu seu limite de tarefas",
                 de: "Du hast dein Aufgaben-Limit erreicht",
-              }
+
+  it: "Hai raggiunto il limite di cose da fare"}
             : {
                 tr: "Not limitin doldu",
                 en: "You've reached your notes limit",
                 es: "Has alcanzado tu límite de notas",
                 pt: "Você atingiu seu limite de notas",
                 de: "Du hast dein Notizen-Limit erreicht",
-              },
+
+  it: "Hai raggiunto il limite di note"},
         ),
       });
       return false;

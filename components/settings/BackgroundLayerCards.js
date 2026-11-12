@@ -498,7 +498,7 @@ export function DecorScopesCard({ colors }) {
           title={i18nText("autoI18n.dekor_kapsam_satir_baslik", "Ekran bazında ayarla")}
           subtitle={i18nText(
             "autoI18n.dekor_kapsam_satir_alt",
-            "Kar, ikon ve ambiyans hangi ekranlarda görünsün",
+            "Atmosfer, ikon ve ambiyans hangi ekranlarda görünsün",
           )}
           right={
             <View style={s.right}>

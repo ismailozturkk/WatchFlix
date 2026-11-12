@@ -97,7 +97,6 @@ const tr = {
       wrapped: ["Yılın Rakamları", "Yıllık izleme özetin (Wrapped) ve arşiv"],
     },
     profile: {
-      banner: ["Arka plan afişi", "Profilinin üstündeki kapak görseli. Yalnız sende gizlenir, arkadaşların görmeye devam eder"],
       goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
       streak: ["Seri alevi", "Haftada en az 2 farklı gün izledikçe adının yanında yanan haftalık seri alevi"],
       socialLinks: ["Hesap bağlantıları", "Adının altındaki sosyal hesap bağlantıların. Yalnız sende gizlenir; kimin göreceği Gizlilik ayarlarında"],
@@ -195,7 +194,6 @@ const en = {
       wrapped: ["Year in Numbers", "Your yearly watching recap (Wrapped) and the archive"],
     },
     profile: {
-      banner: ["Background poster", "The cover image at the top of your profile. Hidden only for you, friends still see it"],
       goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
       streak: ["Streak flame", "Your weekly streak flame next to your name, kept alive by watching on at least 2 different days a week"],
       socialLinks: ["Account links", "Your social account links under your name. Hidden only for you; who can see them is set in Privacy"],
@@ -293,7 +291,6 @@ const es = {
       wrapped: ["El año en cifras", "Tu resumen anual de visionado (Wrapped) y el archivo"],
     },
     profile: {
-      banner: ["Póster de fondo", "La imagen de portada arriba de tu perfil. Solo se oculta para ti, tus amigos la siguen viendo"],
       goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
       streak: ["Llama de racha", "La llama de tu racha semanal junto a tu nombre; sigue encendida si ves algo al menos 2 días distintos por semana"],
       socialLinks: ["Enlaces de cuentas", "Los enlaces a tus redes bajo tu nombre. Solo se ocultan para ti; quién los ve se elige en Privacidad"],
@@ -391,7 +388,6 @@ const pt = {
       wrapped: ["O ano em números", "Seu resumo anual de visualização (Wrapped) e o arquivo"],
     },
     profile: {
-      banner: ["Pôster de fundo", "A imagem de capa no topo do seu perfil. Só fica oculta para você, seus amigos continuam vendo"],
       goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
       streak: ["Chama da sequência", "A chama da sua sequência semanal ao lado do seu nome; continua acesa se você assistir em pelo menos 2 dias diferentes por semana"],
       socialLinks: ["Links de contas", "Os links das suas redes abaixo do seu nome. Só ficam ocultos para você; quem vê é definido em Privacidade"],
@@ -489,7 +485,6 @@ const de = {
       wrapped: ["Das Jahr in Zahlen", "Dein jährlicher Seh-Rückblick (Wrapped) und das Archiv"],
     },
     profile: {
-      banner: ["Hintergrundposter", "Das Titelbild oben in deinem Profil. Nur für dich ausgeblendet, Freunde sehen es weiterhin"],
       goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
       streak: ["Serienflamme", "Die Flamme deiner Wochenserie neben deinem Namen; sie brennt weiter, wenn du an mindestens 2 verschiedenen Tagen pro Woche schaust"],
       socialLinks: ["Kontoverknüpfungen", "Deine Social-Media-Links unter deinem Namen. Nur für dich ausgeblendet; wer sie sieht, legst du unter Datenschutz fest"],
@@ -501,8 +496,117 @@ const de = {
     },
   },
 };
+const it = {
+  ui: {
+    title: "Sezioni schermo",
+    rowSub: "Scegli quali sezioni mostrare su film, TV, Divertimento, Libreria e profilo",
+    badgeAll: "Tutto avanti",
+    badgeHidden: "{n} nascosto",
+    intro: "Scegli quali sezioni visualizzare nelle schermate Film, Programmi TV, Divertimento, Libreria e Profilo. Una sezione nascosta scompare dallo schermo; puoi riattivarlo qui in qualsiasi momento.",
+    visibleCount: "{shown} of {total} sections visible",
+    showAll: "Mostra tutto",
+    hideAll: "Nascondi tutto",
+    linkedTag: "Impostazione condivisa",
+    conditionalNote: "Alcuni scaffali, come \"Grazie ai tuoi preferiti\" e \"Preferiti servizio\", vengono visualizzati solo quando sono presenti dati o impostazioni correlati; averli qui non significa che vengano sempre visualizzati.",
+    reset: "Ripristina impostazioni predefinite",
+    resetSub: "Mostra ogni sezione su ogni schermo",
+    saveFailed: "Impossibile salvare l'impostazione",
+    confirmTitle: "Nascondere la barra degli amici?",
+    confirmMessage: "La ricerca degli amici, l'elenco dei tuoi amici, i messaggi e le richieste si aprono solo da questa barra. Se lo nascondi non potrai raggiungerli da qui; puoi riattivarlo da questa pagina in qualsiasi momento.",
+    confirmHide: "Nascondi",
+    confirmCancel: "Annulla",
+    emptyTitle: "Nessuna sezione da mostrare qui",
+    emptyText: "Hai nascosto ogni sezione di questa schermata. Puoi riattivarli in Impostazioni.",
+    emptyAction: "Modifica sezioni"
+  },
+  screens: {
+    tv: {
+      name: "Serie TV",
+      hint: "Scaffali dei programmi TV di casa"
+    },
+    movie: {
+      name: "Film",
+      hint: "Scaffali dei film a casa"
+    },
+    hub: {
+      name: "Divertimento",
+      hint: "Carte nella scheda Divertimento"
+    },
+    library: {
+      name: "La mia libreria",
+      hint: "Sezioni nella scheda Libreria"
+    },
+    profile: {
+      name: "Profilo",
+      hint: "Sezioni nella scheda Profilo"
+    }
+  },
+  sections: {
+    tv: {
+      trends: ["Serie sulle tendenze", "Cosa è di tendenza, con categorie settimanali e giornaliere"],
+      best: ["Serie TV più votati", "Gli serie TV più votati e più popolari"],
+      followedPeople: ["Prossime dalle persone che segui", "Nuovi lavori degli attori e dei registi che segui; viene visualizzato quando segui qualcuno"],
+      fromFavorites: ["In base ai tuoi preferiti", "Suggerimenti basati sui tuoi quattro preferiti; appare dopo che ne hai aggiunto qualcuno"],
+      subscriptions: ["Preferiti dei servizi", "Titoli sui servizi scelti; programmi una volta selezionati i servizi"],
+      topGenres: ["Generi preferiti", "In base a ciò che guardi o scelto all'inizio"],
+      recentFavorites: ["Preferiti recenti", "Programmi recenti con ottimi punteggi di pubblico"],
+      worldTour: ["Tour mondiale", "Programmi da altre lingue; scopri per paese con patatine coreane, giapponesi, turche..."],
+      emmy: ["Programmi TV vincitori di Emmy", "Vincitori Emmy per anno"],
+      providers: ["Fornitori", "Sfoglia programmi per servizio di streaming"],
+      genres: ["Generi", "Sfoglia programmi per genere"],
+      onTheAir: ["In onda", "Programmi con un nuovo episodio oggi o questa settimana"],
+      upcoming: ["Prossimi programmi", "Nuovi programmi in anteprima a breve"]
+    },
+    movie: {
+      trends: ["Film di tendenza", "Cosa è di tendenza, con categorie settimanali e giornaliere"],
+      bests: ["Film più votati", "Film più votati e più popolari"],
+      followedPeople: ["Prossime dalle persone che segui", "Nuovi lavori degli attori e dei registi che segui; viene visualizzato quando segui qualcuno"],
+      fromFavorites: ["In base ai tuoi preferiti", "Suggerimenti basati sui tuoi quattro preferiti; appare dopo che ne hai aggiunto qualcuno"],
+      subscriptions: ["Preferiti dei servizi", "Titoli sui servizi scelti; programmi una volta selezionati i servizi"],
+      topGenres: ["Generi preferiti", "In base a ciò che guardi o scelto all'inizio"],
+      recentFavorites: ["Preferiti recenti", "Film recenti con ottimi punteggi di pubblico"],
+      worldTour: ["Tour mondiale", "Film in altre lingue; scopri per paese con patatine coreane, giapponesi, turche..."],
+      nowPlaying: ["Film al cinema", "Cosa proiettano adesso nei cinema"],
+      oscar: ["Film vincitori di Oscar", "Vincitori Oscar per anno"],
+      collection: ["Raccolte di film", "Serie di film e raccolte"],
+      providers: ["Fornitori", "Sfoglia film per servizio di streaming"],
+      genres: ["Generi", "Sfoglia film per genere"],
+      upcoming: ["Film in uscita", "Film in arrivo nei cinema a breve"]
+    },
+    hub: {
+      league: ["Weekly League", "Il tuo gruppo settimanale di 30 persone: classifica, XP e tempo rimasto"],
+      feed: ["Social", "La scheda Post: apri il feed e pubblica rapidamente"],
+      cineswipe: ["Cosa dovremmo guardare?", "Decidi con CineSwipe, da solo o con un amico"],
+      bingo: ["Cinema Bingo", "Una scheda mensile e piccoli obiettivi settimanali che si aggiornano mentre guardi"],
+      poll: ["Domanda del giorno", "Una domanda a due opzioni ogni giorno; vedere cosa hanno detto tutti"],
+      top100: ["Seelogd Top 100", "Classifica della community di film e programmi; vota e salva la lista"],
+      challenges: ["Sfide", "52 film in 52 settimane, un film per ogni decennio, filmografie di registi"],
+      tierlist: ["Elenco livelli", "Ordina i tuoi film e programmi in livelli, condividili come immagine"],
+      tournament: ["Elementi", "Il torneo cinematografico mensile e i suoi risultati"],
+      games: ["Giochi", "Il gioco in primo piano e le tue statistiche"]
+    },
+    library: {
+      nextUp: ["Prossimo", "L'episodio successivo degli serie TV che stai guardando. La stessa impostazione di \"Mostra programmi in corso\" in Impostazioni"],
+      lists: ["Elenchi", "Preferiti, watchlist, guardati e i tuoi elenchi"],
+      reminders: ["Promemoria", "I tuoi promemoria sui prossimi film ed episodi"],
+      notes: ["Note", "Le ​​tue note su film e programmi"],
+      wrapped: ["L'anno in numeri", "Il tuo riepilogo annuale di visione (racchiuso) e l'archivio"]
+    },
+    profile: {
+      goal: ["Obiettivo di visualizzazione annuale", "Il pulsante dell'anello dell'obiettivo nell'intestazione del profilo (accanto a Modifica e condividi)"],
+      streak: ["Fiamma della serie", "La tua fiamma della serie settimanale accanto al tuo nome, mantenuta viva guardando almeno 2 giorni diversi a settimana"],
+      socialLinks: ["Collegamenti all'account", "I collegamenti al tuo account social sotto il tuo nome. Nascosto solo per te; chi può vederli è impostato in Privacy"],
+      badges: ["Distintivi", "Il tuo punteggio delle visioni, il livello Perde e la striscia badge"],
+      friends: ["Amici", "Ricerca, amici, messaggi e richieste. Se lo nascondi non potrai raggiungerli da qui"],
+      stats: ["Statistiche", "Quanti film e programmi hai guardato e il tempo totale"],
+      activity: ["La mia attività", "Le tue valutazioni, commenti, post e bozze"],
+      ratings: ["Distribuzione della valutazione", "Un grafico delle tue valutazioni da ½ a 5 stelle"]
+    }
+  }
+};
 
-export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de });
+export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de ,
+  it: it});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSectionVisibilityCopy = (language) =>

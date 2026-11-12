@@ -24,7 +24,7 @@
   --r-lg: 28px;
   --r-md: 20px;
   --r-sm: 14px;
-  --font: "Schibsted Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font: "Schibsted Grotesk", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Hiragino Sans", "Yu Gothic UI", "Malgun Gothic", "Noto Sans JP", "Noto Sans SC", "Noto Sans KR", "Noto Sans Devanagari", sans-serif;
   --wrap: 1160px;
   --ease: cubic-bezier(.22, 1, .36, 1);
   color-scheme: dark;
@@ -783,3 +783,16 @@ body.is-live #beta, body.is-live .nav-beta { display: none; }
 @media (forced-colors: active) {
   .mt, .reel-phone, .peek-in, .join-tab[aria-selected="true"] { border: 1px solid CanvasText; }
 }
+/* Devanagari (Hintçe) üst/alt ünlü işaretlerinin kesilmemesi ve CJK başlık satır kırılımı */
+:lang(hi) .hero-copy h1,
+:lang(hi) .sec-title,
+:lang(hi) .cta-card h2 { line-height: 1.24; }
+:lang(ko) .hero-copy h1,
+:lang(ko) .sec-title,
+:lang(ko) .cta-card h2,
+:lang(ja) .hero-copy h1,
+:lang(ja) .sec-title,
+:lang(ja) .cta-card h2 { word-break: keep-all; overflow-wrap: break-word; line-height: 1.16; }
+:lang(zh) .hero-copy h1,
+:lang(zh) .sec-title,
+:lang(zh) .cta-card h2 { line-height: 1.16; }

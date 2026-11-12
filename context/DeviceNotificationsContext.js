@@ -329,7 +329,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   }, [uid, settings.enabled, permissionStatus]);
 
   // ── 2b. Tür-bazlı ayarları Firestore'a yansıt (backend push bunlara saygı duysun) ──
-  // Cihazdaki sosyal bildirim ayarları AsyncStorage'da → Cloud Function göremez.
+  // Sosyal bildirim ayarları cihazda (MMKV) duruyor → Cloud Function göremez.
   // İlgili sosyal anahtarları + master 'enabled'ı Users/{uid}.notificationSettings'e
   // yazıyoruz; backend bir tür kapalıysa o push'u atmasın. Debounce'lu.
   const settingsMirrorTimerRef = useRef(null);

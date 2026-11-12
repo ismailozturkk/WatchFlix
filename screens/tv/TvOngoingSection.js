@@ -19,9 +19,9 @@ import {
   View,
   FlatList,
   StyleSheet,
-  InteractionManager,
   useWindowDimensions,
 } from "react-native";
+import { runAfterInteractions } from "../../utils/afterInteractions";
 
 import SectionHeader, { SectionBadge } from "../../components/home/SectionHeader";
 import UpNextRailCard from "../../components/tv/UpNextRailCard";
@@ -60,7 +60,7 @@ export default function TvOngoingSection({ navigation, surface = "rail" }) {
   const [resolveReady, setResolveReady] = useState(false);
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() =>
+    const task = runAfterInteractions(() =>
       setResolveReady(true)
     );
     // Emniyet supabı: ekranda sürekli dönen bir Animated animasyonu varsa
