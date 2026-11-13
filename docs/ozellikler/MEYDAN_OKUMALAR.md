@@ -36,6 +36,9 @@ Kaynak: `docs/planlama/OZELLIK_ADAYLARI_2026-10-30.md` → **E4**. 30 Ekim 2026'
 | Dizi | `episodes100` · `episodes30_7` | 100 / 30 farklı bölüm | 30 / 7 gün |
 | | `binge10` | tek günde 10 farklı bölüm (`episodeDay`) | 30 gün |
 | | `shows5` | 5 farklı dizi (`shows`) | 60 gün |
+| Puan | `rate10_7` · `rate25_30` · `rate50_90` | katıldıktan sonra YENİ puanlanan 10 / 25 / 50 yapım (`rated`) | 7 / 30 / 90 gün |
+| | `rateShows5` | yeni puanlanan 5 dizi (`rated`, `lane: "tv"`) | 30 gün |
+| | `rateRange5` | yeni puanlarda 5 farklı yıldız kademesi (`ratingRange`) | 30 gün |
 | Yönetmenler | `director_<kişiId>` | yönettiği filmlerin tamamı (`person`) | süresiz, tüm geçmiş |
 | Oyuncular | `actor_<kişiId>` | başrolde olduğu filmler (`person`) | süresiz, tüm geçmiş |
 
@@ -70,11 +73,19 @@ varsa "N hazır" çubuğu) → kişi grupları: Tümü · Türk sineması · Dü
    (Geçmiş). Biten kayıt dondurulur — sonradan izleme silinse de madalya geri alınmaz.
 8. **Bırak** iki adımlı onay (sayfa içinde; iOS'ta açık Modal üstüne uyarı sunulamaz). Bırakılan görev kayıttan SİLİNİR.
 9. Kişi (yönetmen / oyuncu) görevi bir kez bitince yeniden katılınmaz; diğerleri yeniden katılınabilir.
-10. Seri / tek gün görevlerinde (`streak`, `sameDay`, `episodeDay`) tempo satırı yok: doğrusal ilerlemezler.
+10. Seri / tek gün görevlerinde (`streak`, `sameDay`, `episodeDay`, `ratingRange`) tempo satırı yok: doğrusal ilerlemezler.
+11. **Puan görevleri** (13 Kas; Zevk Çemberleri eşleşme gücünü besler): puanın TARİHİ tutulmuyor
+    (`Lists/{uid}.activityIndex.ratings` yalnız anahtar → 0-10). Katılırken o anki puanlı anahtarlar kayda `baseline`
+    yazılır; ilerleme = şimdi puanlı olup başlangıçta OLMAYAN yapımlar. Eski puanı değiştirmek sayılmaz; puanı silip
+    yeniden vermek de (başlangıçta var). Liste yüklenmeden katılınmaz (`join` → "loading"). Önizleme 0 gösterir.
+    Bilinen sınır: pencere bittikten sonra, uygulama açılmadan verilen puanlar sonuçlandırmada sayılabilir.
+    `ratingRange` kademeyi `Math.round` (yarım yıldız = 1) ile alır. Ad/afiş açık listelerden eşlenir (bulunamazsa
+    simge). Yeni Firestore okuması yok.
 
 ## Kayıt
 
-`Keys.watchChallenges` = `{ runs: [{ id, joinedAt: "YYYY-AA-GG", status: "active"|"done"|"expired", endedAt?, count?, target? }] }`.
+`Keys.watchChallenges` = `{ runs: [{ id, joinedAt: "YYYY-AA-GG", status: "active"|"done"|"expired", endedAt?, count?, target?, baseline? }] }`.
+`baseline` yalnız ETKİN puan görevinde (en çok 20000 anahtar); başlangıcı olmayan etkin puan kaydı okumada düşer.
 Kullanıcı kapsamlı, çıkışta silinmez, bulut kopyası yok. Bitmiş kayıt en çok 60 (önce en eski süresi dolanlar düşer).
 Hesabı Sıfırla bu anahtarı siler (`services/accountResetService.js` yerel ilerleme listesi).
 

@@ -81,7 +81,7 @@ function DailyFrameCard({ onPlay, locked = false }) {
             </Text>
           </View>
           <View style={styles.topRight}>
-            {isBetaFeature("daily_frame") ? <BetaBadge tone="onDark" compact /> : null}
+            {isBetaFeature("daily_frame") ? <BetaBadge tone="onDark" compact featureId="daily_frame" /> : null}
             <View style={styles.numberBadge}>
               <Text style={styles.numberText} allowFontScaling={false}>{`#${summary.number}`}</Text>
             </View>

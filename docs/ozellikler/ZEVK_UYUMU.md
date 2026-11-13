@@ -17,7 +17,21 @@ Arkadaşın bir listesi yalnız **o listeyi bize açmışsa** (`Users/{uid}.list
 - Yeterli veri yoksa **yüzde çizilmez**, nedeni yazılır ("… izleme listelerini paylaşmıyor" / "biraz daha izleme kaydı olmalı").
 - Kendi profilinde kart yok.
 
-## Puan nasıl hesaplanıyor (heuristik — bilimsel ölçü değil)
+## 13 Kas: yüzde artık v3 çekirdeğinden
+
+Karttaki **yüzde, kademe ve Film / Dizi yüzdeleri** `utils/tasteMatchV3.js` (algoritma:
+`docs/ozellikler/ZEVK_ESLESMESI_ALGORITMA.md`) üzerinden `computeTasteMatch` → `computeTasteV3` ile
+hesaplanır: görüş uyumu 0.45 + seçim benzerliği (şansa göre) 0.25 + içerik profili 0.30, deneyim /
+kanıt / görüş kapısı / olgunluk tavanlarıyla. Kademeler **85 / 65 / 40** (eski 75 / 55 / 35).
+İstemci bağlamı `{}` (nüfus yok, K3 lite). Arkadaşın gizli kategorisi benim tarafımda da kapanır.
+
+Aşağıdaki eski formül (`computeTasteInsights`) yalnız **içgörüler** (ortak sevilen, ayrışılan, tür
+tablosu, puan eğilimi, cömertlik, sayı şeridi) ve geliştirici karşılaştırması (`legacy.score`) için
+durur; skora girmez. "Derin analiz" çubukları artık görüş / seçim / içerik parçalarıdır.
+Gerçek ilk ölçüm (kullanıcının 4 arkadaşı): eski 85 / 84 / 88 / 73 → yeni 94 / 70 / 61 / 36; kullanıcı
+en yakın arkadaşının yeni hesapta en üstte olduğunu doğruladı.
+
+## (Eski) Puan nasıl hesaplanıyor (heuristik — bilimsel ölçü değil)
 
 Dört bileşenin ağırlıklı ortalaması; verisi yetersiz bileşen düşer, ağırlıklar kalanlara göre yeniden normalleşir; hiçbiri yoksa puan yoktur.
 **Ortak favori isteğe bağlı bonustur** (iki favori listesi de görünür ve ≥ 3 ise girer): yokluğu puanı değiştirmez, `state: "ok"` için çekirdek üçlü (tür·ortak·puan) yeter.

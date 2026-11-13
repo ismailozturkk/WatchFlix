@@ -71,6 +71,7 @@ const { createSocialPush } = require("./socialPush");
 const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
 const betaAccess = require("./betaAccess");
+const betaFeatureVotes = require("./betaFeatureVotes");
 const userSearch = require("./userSearch");
 const publicBoards = require("./publicBoards");
 const siteStats = require("./siteStats");
@@ -2894,6 +2895,15 @@ const league = require("./league");
 const { normalizeIdentity } = require("./profileIdentity");
 const { SOURCE_IDS: LEAGUE_SOURCES, prevWeekId: leaguePrevWeek, weekIdOf: leagueWeekOf } = require("./leagueRules");
 
+exports.voteBetaFeature = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const { featureId, choice } = request.data || {};
+  if (!betaFeatureVotes.isValidFeature(featureId) || !betaFeatureVotes.isValidChoice(choice)) {
+    throw new HttpsError("invalid-argument", "Invalid beta vote");
+  }
+  return betaFeatureVotes.castVote(db, request.auth.uid, featureId, choice);
+});
+
 exports.awardLeagueXp = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   const uid = request.auth.uid;
@@ -2919,3 +2929,60 @@ exports.settleLeagueWeek = onSchedule(
     console.log(`[lig] ${week} sonuçlandı — grup: ${groups}, oyuncu: ${players}.`);
   },
 );
+
+// ───────────────────────────────────────────────────────────────────────────
+// ZEVK ÇEMBERLERİ (Faz 5 sunucu hattı) — gerekçe ve koleksiyonlar: matchServer.js, kararlar: matchPipeline.js
+// Bayrak `AppConfig/match.enabled` kapalıyken gece işi ve selam hiçbir şey yapmaz; tetikleyici yine de
+// AYRILMAYI işler (ayrılan kullanıcının verisi bayraktan bağımsız silinir).
+// ───────────────────────────────────────────────────────────────────────────
+const matchServer = require("./matchServer");
+
+const matchError = (error) => {
+  if (error instanceof matchServer.MatchError) throw new HttpsError(error.code, error.message);
+  throw error;
+};
+
+// Katılım belgesi (Users/{uid}/private/match) yazıldı/silindi → üyelik + profil ya da tam temizlik.
+exports.onMatchOptInWritten = onDocumentWritten(
+  { ...CAPACITY.trigger, document: "Users/{uid}/private/match" },
+  async (event) => {
+    const after = event.data?.after;
+    await matchServer.syncMember(db, event.params.uid, after?.exists ? after.data() : null);
+  },
+);
+
+// Gecelik eşleşme: profiller, yapım özellikleri (TMDB), ikili skorlar, öneriler, çemberler.
+exports.matchNightly = onSchedule(
+  {
+    ...CAPACITY.singleton,
+    schedule: "30 4 * * *", // her gün 04:30
+    timeZone: "Europe/Istanbul",
+    secrets: [TMDB_API_KEY],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async () => {
+    const apiKey = TMDB_API_KEY.value();
+    await matchServer.runNightly(db, {
+      fetchTitle: apiKey ? matchServer.tmdbFetcher(apiKey) : null,
+      log: (line) => console.log(line),
+    });
+  },
+);
+
+// Opak aday kimliğiyle selam; karşılıklıysa arkadaşlık. Günlük sınır sunucuda (matchPipeline.nextHelloQuota),
+// ek olarak örnek içi patlama freni.
+const matchHelloAllow = externalRatings.createRateLimiter({ limit: 20, windowMs: 60 * 1000 });
+exports.matchHello = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  if (!matchHelloAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
+  return matchServer.sendHello(db, request.auth.uid, { cid: request.data?.cid }).catch(matchError);
+});
+
+// Arkadaş kartı için sunucu skoru (iki arkadaş da havuzdaysa). Yapım anahtarı dönmez.
+const pairScoreAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 60 * 1000 });
+exports.getMatchPairScore = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  if (!pairScoreAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
+  return matchServer.pairScore(db, request.auth.uid, request.data?.friendUid).catch(matchError);
+});

@@ -82,8 +82,8 @@ function GameCard({ tile, best, copy, onOpen, style }) {
         </View>
 
         {isBetaFeature(tile.id) ? (
-          <View pointerEvents="none" style={styles.betaCorner}>
-            <BetaBadge tone="onDark" compact />
+          <View style={styles.betaCorner}>
+            <BetaBadge tone="onDark" compact featureId={tile.id} />
           </View>
         ) : null}
 

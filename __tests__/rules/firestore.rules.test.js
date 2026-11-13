@@ -78,6 +78,32 @@ beforeEach(async () => {
 /** Kuralları atlayarak başlangıç verisi yaz (test kurulumu). */
 const seed = (fn) => testEnv.withSecurityRulesDisabled((ctx) => fn(ctx.firestore()));
 
+describe("beta feature vote privacy", () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "siteAdmins", CAROL), { note: "admin" });
+      await setDoc(doc(db, "betaFeatureVotes", "atmosphere"), { likes: 1, dislikes: 0 });
+      await setDoc(doc(db, "betaFeatureVotes", "atmosphere", "votes", ALICE), { choice: "like" });
+    });
+  });
+
+  test("user sees only their own choice; totals and other votes stay private", async () => {
+    await assertSucceeds(getDoc(doc(alice, "betaFeatureVotes", "atmosphere", "votes", ALICE)));
+    await assertFails(getDoc(doc(alice, "betaFeatureVotes", "atmosphere", "votes", BOB)));
+    await assertFails(getDoc(doc(alice, "betaFeatureVotes", "atmosphere")));
+    await assertFails(getDocs(collection(alice, "betaFeatureVotes")));
+    await assertFails(getDocs(collection(alice, "betaFeatureVotes", "atmosphere", "votes")));
+  });
+
+  test("only server writes votes; site admin reads totals", async () => {
+    await assertFails(setDoc(doc(alice, "betaFeatureVotes", "atmosphere", "votes", ALICE), { choice: "dislike" }));
+    await assertFails(setDoc(doc(alice, "betaFeatureVotes", "atmosphere"), { likes: 999 }));
+    await assertSucceeds(getDoc(doc(carol, "betaFeatureVotes", "atmosphere")));
+    await assertSucceeds(getDocs(collection(carol, "betaFeatureVotes")));
+    await assertSucceeds(getDocs(collection(carol, "betaFeatureVotes", "atmosphere", "votes")));
+  });
+});
+
 describe("important invitation responses", () => {
   beforeEach(async () => {
     await seed(async (db) => {

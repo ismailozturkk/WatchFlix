@@ -39,6 +39,9 @@ const section = (id, icon, tint, extra = {}) => Object.freeze({ id, icon, tint, 
  *                 boolean ayarda (yukarıdaki not)
  *   confirmHide : gizlemeden önce onay iste — bölüm başka hiçbir yerden
  *                 erişilemeyen bir giriş noktası
+ *   gate        : bölüm yalnız bu kapı açıkken VAR sayılır (ör. "match": Zevk Çemberleri bayrağı +
+ *                 18+). Kapı kapalıyken ayar ekranında satırı ve sayımı yoktur; özelliğin varlığı
+ *                 sızmasın. Gizli kaydı yine normalize edilir (kapı açılınca tercih korunur).
  */
 export const SECTION_SCREENS = Object.freeze(
   [
@@ -90,6 +93,8 @@ export const SECTION_SCREENS = Object.freeze(
         section("feed", "chatbubbles-outline", "blue"),
         section("tournament", "trophy-outline", "amber"),
         section("cineswipe", "heart-half-outline", "purple"),
+        // Zevk Çemberleri: yalnız useMatchFeature().available iken (bayrak + 18+).
+        section("match", "people-circle-outline", "purple", { gate: "match" }),
         section("bingo", "grid-outline", "teal"),
         section("poll", "help-circle-outline", "purple"),
         section("top100", "podium-outline", "amber"),
@@ -154,6 +159,9 @@ export const sectionsOf = (screen) => SCREEN_BY_ID.get(screen)?.sections ?? [];
 export const storedSectionsOf = (screen) => sectionsOf(screen).filter((item) => !item.legacy);
 
 export const getSection = (screen, id) => sectionsOf(screen).find((item) => item.id === id) ?? null;
+
+/** Ayar ekranında listelenecek bölümler: kapısı (`gate`) kapalı olanlar çıkarılır. */
+export const gatedSectionsOf = (screen, gates = {}) => sectionsOf(screen).filter((item) => !item.gate || gates?.[item.gate] === true);
 
 const emptyHidden = () => Object.fromEntries(SECTION_SCREEN_IDS.map((screen) => [screen, []]));
 
@@ -276,9 +284,9 @@ export function toStoredSectionVisibility(hidden) {
  * Ayar ekranı özeti: bölüm sayısı ve görünür olanlar. Eski tek anahtarlı bölümlerin
  * durumu `legacyValues`tan okunur ({ [depoAnahtarı]: boolean }); verilmeyen açık sayılır.
  */
-export function summarizeScreen(hidden, screen, legacyValues = {}) {
+export function summarizeScreen(hidden, screen, legacyValues = {}, gates = {}) {
   const normalized = normalizeSectionVisibility(hidden);
-  const all = sectionsOf(screen);
+  const all = gatedSectionsOf(screen, gates);
   const shown = all.filter((item) =>
     item.legacy ? legacyValues[item.legacy] !== false : isSectionVisible(normalized, screen, item.id),
   ).length;

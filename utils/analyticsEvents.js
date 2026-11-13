@@ -168,6 +168,13 @@ export const ANALYTICS_EVENTS = {
   TOGETHER_ROOM_INVITED: "together_room_invited",
   // Zevk uyumu kartı arkadaşın sohbetine gönderildi (TasteMatchCard "sohbette gönder"). `score` 0–100; kimlik YOK.
   TASTE_MATCH_SHARED: "taste_match_shared",
+  // Zevk Çemberleri (Faz 4). Kimlik / liste / skor YOK. `lanes` "movie,tv" gibi kulvar listesi.
+  MATCH_OPT_IN: "match_opt_in",
+  MATCH_OPT_OUT: "match_opt_out",
+  // Hub kartı görüldü: `lane`, `tier` (güç kademesi "low|mid|ready"), `eligible` 0/1. Oturum başına bir kez.
+  MATCH_STRENGTH_VIEWED: "match_strength_viewed",
+  // Kartın tek sonraki adımı tamamlandı (önceki görülen adım artık eksik değil): `lane`, `step`.
+  MATCH_STEP_DONE: "match_step_done",
   // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
   // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
   FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",

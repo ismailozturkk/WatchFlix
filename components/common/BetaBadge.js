@@ -11,10 +11,13 @@
 // Renkler temadan bağımsız ki anlamları her temada aynı okunsun.
 // `tone="onDark"`: gradyan/koyu kart zemini. `compact`: ikon yok, daha küçük.
 
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
 import { i18nText } from "@utils/i18nText";
+import { useAuth } from "@context/AuthContext";
+import { castBetaVote, listenMyBetaVote } from "@services/betaFeatureVotes";
+import { showToast } from "@components/AppToast";
 
 export const BETA_COLOR = "#F59E0B";
 export const DEV_COLOR = "#8B5CF6";
@@ -47,8 +50,8 @@ function StatusPill({ label, a11yLabel, icon, color, tone, compact, style }) {
   );
 }
 
-export default function BetaBadge({ tone, compact = false, style }) {
-  return (
+export default function BetaBadge({ tone, compact = false, style, featureId }) {
+  const badge = (
     <StatusPill
       label={i18nText("autoI18n.beta_rozet", "Beta").toUpperCase()}
       a11yLabel={i18nText("autoI18n.beta_rozet_aciklama", "Bu özellik hâlâ geliştiriliyor (beta)")}
@@ -58,6 +61,60 @@ export default function BetaBadge({ tone, compact = false, style }) {
       compact={compact}
       style={style}
     />
+  );
+  return featureId ? <BetaVoteControl featureId={featureId} tone={tone} compact={compact} badge={badge} /> : badge;
+}
+
+function BetaVoteControl({ featureId, tone, compact, badge }) {
+  const { user } = useAuth();
+  const [choice, setChoice] = useState(null);
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    setChoice(null);
+    if (!user?.uid) return undefined;
+    return listenMyBetaVote(featureId, user.uid, setChoice, () => {});
+  }, [featureId, user?.uid]);
+
+  const vote = async (event, next) => {
+    event?.stopPropagation?.();
+    if (pending || next === choice) return;
+    if (!user?.uid) {
+      showToast({ kind: "info", title: i18nText("autoI18n.beta_oy_giris", "Oy vermek için giriş yap") });
+      return;
+    }
+    setPending(true);
+    try {
+      await castBetaVote(featureId, next);
+      setChoice(next);
+    } catch {
+      showToast({ kind: "error", title: i18nText("autoI18n.beta_oy_hata", "Oyun kaydedilemedi. Tekrar dene.") });
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const onDark = tone === "onDark";
+  return (
+    <View style={styles.voteRow}>
+      {badge}
+      {[["like", "thumbs-up-outline", "thumbs-up", "beta_oy_begen", "Beğen"], ["dislike", "thumbs-down-outline", "thumbs-down", "beta_oy_begenme", "Beğenme"]].map(([value, outline, filled, key, fallback]) => (
+        <Pressable
+          key={value}
+          accessibilityRole="button"
+          accessibilityLabel={i18nText(`autoI18n.${key}`, fallback)}
+          accessibilityState={{ selected: choice === value, disabled: pending }}
+          hitSlop={compact ? 5 : 7}
+          disabled={pending}
+          onPress={(event) => vote(event, value)}
+          style={[styles.voteButton, compact && styles.voteButtonCompact, {
+            backgroundColor: choice === value ? (onDark ? "rgba(255,255,255,0.26)" : "rgba(245,158,11,0.23)") : (onDark ? "rgba(0,0,0,0.38)" : "rgba(245,158,11,0.08)"),
+            borderColor: choice === value ? BETA_COLOR : (onDark ? "rgba(255,255,255,0.35)" : "rgba(245,158,11,0.35)"),
+          }]}
+        >
+          <AppIcon family="Ionicons" name={choice === value ? filled : outline} size={compact ? 12 : 14} color={onDark ? "#FFFFFF" : BETA_COLOR} />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -83,6 +140,9 @@ function hexAlpha(hex, a) {
 }
 
 const styles = StyleSheet.create({
+  voteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  voteButton: { width: 25, height: 25, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  voteButtonCompact: { width: 22, height: 22, borderRadius: 8 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

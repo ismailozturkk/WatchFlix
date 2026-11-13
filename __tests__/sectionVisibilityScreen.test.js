@@ -44,6 +44,8 @@ jest.mock("../context/AppSettingsContext", () => ({
   useOngoingTvShowsSettings: () => ({ showOngoingTvShows: mockOngoing, changeShowOngoingTvShows: mockChangeOngoing }),
 }));
 jest.mock("../hooks/useReduceMotion", () => ({ __esModule: true, default: () => true }));
+// Zevk Çemberleri kapısı: kapalı (kapılı "match" bölümü listelenmez).
+jest.mock("../hooks/useMatchFeature", () => ({ __esModule: true, default: () => ({ available: false }) }));
 jest.mock("../services/hapticsService", () => ({ selectionAsync: (...args) => mockSelection(...args) }));
 jest.mock("../screens/tabs/settings/settingsUi", () => ({
   SettingsSubScreen: "Screen",

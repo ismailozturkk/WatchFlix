@@ -118,7 +118,8 @@ describe("useScreenSections", () => {
     mount("hub");
     act(() => { setScreenSectionsShown("hub", false); });
     expect(seen.hub.allHidden).toBe(true);
-    expect(seen.hub.hiddenCount).toBe(10);
+    // 10 bölüm + kapılı Zevk Çemberleri ("match"; kapalıyken ayar ekranında görünmez ama "tümünü gizle" onu da yazar).
+    expect(seen.hub.hiddenCount).toBe(11);
     act(() => { setSectionShown("hub", "games", true); });
     expect(seen.hub.allHidden).toBe(false);
     act(() => { setScreenSectionsShown("hub", true); });

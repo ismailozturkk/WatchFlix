@@ -26,6 +26,7 @@ export function GameScreenShell({
   footer,
   glow = true,
   beta = false,
+  betaFeatureId,
 }) {
   const { theme } = useTheme();
   // scroll=false durumunda icerik tum alani kaplar; boylece icerideki bir
@@ -42,7 +43,7 @@ export function GameScreenShell({
             <Text style={[styles.title, styles.titleText, { color: theme.text.primary }]} numberOfLines={1}>
               {title}
             </Text>
-            {beta ? <BetaBadge /> : null}
+            {beta ? <BetaBadge featureId={betaFeatureId} /> : null}
           </View>
           {subtitle ? (
             <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>

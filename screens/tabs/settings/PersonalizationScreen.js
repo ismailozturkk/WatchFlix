@@ -271,7 +271,7 @@ export default function PersonalizationScreen() {
           background={showSnow ? null : <SnowPreview />}
           right={
             <View style={ps.rowRightGroup}>
-              {isBetaFeature("atmosphere") ? <BetaBadge /> : null}
+              {isBetaFeature("atmosphere") ? <BetaBadge featureId="atmosphere" /> : null}
               {snowAllowed ? null : <PremiumPill />}
               <Chevron color={C.muted} />
             </View>

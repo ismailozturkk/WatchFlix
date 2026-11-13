@@ -273,7 +273,7 @@ export default function ProfileBannerPickerSheet({ visible, current, favorites, 
             <Text numberOfLines={1} style={[styles.headerTitle, styles.headerTitleText, { color: theme.text.primary }]}>
               {title ? title.title : copy.title}
             </Text>
-            {!title && isBetaFeature("profile_banner") ? <BetaBadge /> : null}
+            {!title && isBetaFeature("profile_banner") ? <BetaBadge featureId="profile_banner" /> : null}
           </View>
           <Text numberOfLines={1} style={[styles.headerSub, { color: theme.text.muted }]}>
             {title

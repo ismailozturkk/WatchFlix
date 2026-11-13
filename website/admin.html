@@ -81,6 +81,7 @@
       <button role="tab" id="tab-overview" aria-controls="pane-overview" type="button" class="tab" data-tab="overview" aria-selected="true">Genel bakış</button>
       <button role="tab" id="tab-stats" aria-controls="pane-stats" type="button" class="tab" data-tab="stats" aria-selected="false">Ziyaret analizi</button>
       <button role="tab" id="tab-beta" aria-controls="pane-beta" type="button" class="tab" data-tab="beta" aria-selected="false">Beta testçileri <b id="betaBadge"></b></button>
+      <button role="tab" id="tab-votes" aria-controls="pane-votes" type="button" class="tab" data-tab="votes" aria-selected="false">Özellik oyları</button>
       <button role="tab" id="tab-wait" aria-controls="pane-wait" type="button" class="tab" data-tab="wait" aria-selected="false">Bekleme listesi <b id="waitBadge"></b></button>
     </nav>
 
@@ -163,6 +164,14 @@
       <div class="table-wrap"><table class="table" id="betaTable"><thead><tr><th>E-posta</th><th>Platform</th><th>Dil</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
       <div class="pager"><button class="btn ghost sm" type="button" id="betaPrev">← Önceki</button><span id="betaPage"></span><button class="btn ghost sm" type="button" id="betaNext">Sonraki →</button></div>
       <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console'daki kapalı test kullanıcı listesine, iOS e-postalarını App Store Connect'teki TestFlight harici test kullanıcılarına ekle. Platform filtresi ve arama, kopyalama ile CSV çıktısına da uygulanır. Davetler bu panelden gönderilmez.</p></details>
+    </div>
+
+    <!-- Beta özellik oyları: toplamlar Firestore kurallarıyla yalnız siteAdmins hesabına açık. -->
+    <div class="pane" id="pane-votes" role="tabpanel" aria-labelledby="tab-votes" hidden>
+      <div class="section-heading"><div><p class="eyebrow">ÜRÜN GERİ BİLDİRİMİ</p><h2>Beta özellik oyları</h2><p>Her hesap, her özelliğe yalnız bir oy verir; seçimini değiştirirse toplamlar güncellenir.</p></div></div>
+      <div class="kpis small" id="voteKpis"></div>
+      <div class="table-wrap"><table class="table" id="votesTable"><thead><tr><th>Özellik</th><th>Beğeni</th><th>Beğenmeme</th><th>Toplam</th><th>Beğeni oranı</th></tr></thead><tbody></tbody></table></div>
+      <p class="note">Bu sayılar yalnız yönetici hesabına görünür. Oy verenlerin kimliği bu tabloda gösterilmez.</p>
     </div>
 
     <!-- Bekleme listesi -->

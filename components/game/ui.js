@@ -90,7 +90,7 @@ export function StatPill({ icon, iconColor, value, label, theme, tone = "surface
 }
 
 /** Bölüm başlığı + (isteğe bağlı) sağ aksiyon. */
-export function SectionHeader({ title, action, onAction, theme, style, beta = false }) {
+export function SectionHeader({ title, action, onAction, theme, style, beta = false, betaFeatureId }) {
   const titleNode = (
     <Text style={[styles.sectionTitle, { color: theme.text.muted }]} allowFontScaling={false}>
       {title}
@@ -101,7 +101,7 @@ export function SectionHeader({ title, action, onAction, theme, style, beta = fa
       {beta ? (
         <View style={styles.sectionTitleRow}>
           {titleNode}
-          <BetaBadge />
+          <BetaBadge featureId={betaFeatureId} />
         </View>
       ) : (
         titleNode

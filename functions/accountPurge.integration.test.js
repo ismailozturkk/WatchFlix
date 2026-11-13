@@ -168,6 +168,18 @@ async function seed() {
   // Geri bildirim / şikayet / davet / promosyon
   await set(`Feedback/f1`, { uid: ME, text: "hi" });
   await set(`Feedback/f2`, { uid: OTHER, text: "keep" });
+  await set(`betaFeatureVotes/atmosphere`, { likes: 1, dislikes: 1 });
+  await set(`betaFeatureVotes/atmosphere/votes/${ME}`, { choice: "like" });
+  await set(`betaFeatureVotes/atmosphere/votes/${OTHER}`, { choice: "dislike" });
+  // Zevk Çemberleri: kendi kayıtlarım + başkasının öneri belgesinde ben
+  await set(`MatchMembers/${ME}`, { lanes: ["movie"] });
+  await set(`MatchProfiles/${ME}`, { v: 1 });
+  await set(`MatchProfiles/${ME}/built/movie`, { json: "{}" });
+  await set(`MatchSuggestions/${ME}`, { lanes: {} });
+  await set(`MatchPairs/${ME}`, { map: {}, uids: [] });
+  await set(`MatchHellos/${ME}_${OTHER}`, { uids: [ME, OTHER], from: { [ME]: 1 }, createdAt: 1 });
+  await set(`MatchPairs/${OTHER}`, { map: { cidMe: { uid: ME, lane: "movie" }, cidX: { uid: "x", lane: "movie" } }, uids: [ME, "x"] });
+  await set(`MatchSuggestions/${OTHER}`, { lanes: { movie: { items: [{ cid: "cidMe" }, { cid: "cidX" }] } } });
   await set(`PostReports/r1`, { reporterId: ME, postId: "p_other" });
   await set(`ContentReports/cr1`, { reporterId: ME, targetUserId: OTHER });
   await set(`ContentReports/cr2`, { reporterId: OTHER, targetUserId: ME });
@@ -317,6 +329,15 @@ test("sunucu silmesi tüm izleri götürür, başkalarının verisini ve sayaçl
 
   // Geri bildirim, şikayet, davet, promosyon
   assert.deepEqual(await listIds(`Feedback`), ["f2"]);
+  assert.deepEqual(await listIds(`betaFeatureVotes/atmosphere/votes`), [OTHER]);
+  for (const path of [`MatchMembers/${ME}`, `MatchProfiles/${ME}`, `MatchProfiles/${ME}/built/movie`, `MatchSuggestions/${ME}`, `MatchPairs/${ME}`, `MatchHellos/${ME}_${OTHER}`]) {
+    assert.equal(await exists(path), false, path);
+  }
+  assert.deepEqual(Object.keys((await db.doc(`MatchPairs/${OTHER}`).get()).data().map), ["cidX"]);
+  assert.deepEqual((await db.doc(`MatchSuggestions/${OTHER}`).get()).data().lanes.movie.items, [{ cid: "cidX" }]);
+  const betaTotals = (await db.doc(`betaFeatureVotes/atmosphere`).get()).data();
+  assert.equal(betaTotals.likes, 0);
+  assert.equal(betaTotals.dislikes, 1);
   assert.equal((await db.doc(`PostReports/r1`).get()).data().reporterId, "deleted-user");
   assert.equal((await db.doc(`ContentReports/cr1`).get()).data().reporterId, "deleted-user");
   assert.equal(await exists(`ContentReports/cr2`), false);

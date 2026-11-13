@@ -150,7 +150,7 @@ export default function AppIconSection({ colors: C }) {
             <Text allowFontScaling={false} style={[styles.title, styles.titleText, { color: C.text }]}>
               {i18nText("autoI18n.uygulama_simgesi_baslik", "Uygulama simgesi")}
             </Text>
-            {isBetaFeature("app_icon") ? <BetaBadge /> : null}
+            {isBetaFeature("app_icon") ? <BetaBadge featureId="app_icon" /> : null}
           </View>
           <Text allowFontScaling={false} style={[styles.sub, { color: C.muted }]}>
             {iconLocked

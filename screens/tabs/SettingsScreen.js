@@ -66,6 +66,8 @@ import {
 import ImportDataModal from "../../components/import/ImportDataModal";
 import { getSettingsShareCopy } from "../../utils/settingsShareCopy";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
+import useMatchFeature from "../../hooks/useMatchFeature";
+import { getMatchCopy } from "../../utils/matchCopy";
 import { getFeedbackCopy } from "./settings/feedbackCopy";
 import { getImportCopy } from "../../components/import/importCopy";
 import useAppLogo from "@hooks/useAppLogo";
@@ -373,6 +375,9 @@ export default function SettingsScreen() {
 
   const { t, language, toggleLanguage } = useLanguage();
   const copyExport = getLibraryExportCopy(language);
+  // Zevk Çemberleri: satır yalnız bayrak açık + 18+ kanıtlıyken (hooks/useMatchFeature).
+  const matchFeature = useMatchFeature();
+  const matchCopy = getMatchCopy(language);
   const copyImport = getImportCopy(language);
   const feedbackCopy = useMemo(() => getFeedbackCopy(language), [language]);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
@@ -721,6 +726,18 @@ export default function SettingsScreen() {
             onPress={() => navigation.navigate("PrivacySettingsScreen")}
             right={<Chevron color={C.muted} />}
           />
+          {matchFeature.available ? (
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName="people-circle-outline"
+              title={matchCopy.title}
+              subtitle={matchCopy.rowSub}
+              onPress={() => navigation.navigate("MatchSettingsScreen")}
+              right={<Chevron color={C.muted} />}
+            />
+          ) : null}
           {/* Arkadaş daveti: plan bağımsız bir hesap/sosyal eylemidir. */}
           <SettingRow
             colors={C}
@@ -780,7 +797,7 @@ export default function SettingsScreen() {
             right={
               isBetaFeature("atmosphere") ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <BetaBadge />
+                  <BetaBadge featureId="atmosphere" />
                   <Chevron color={C.muted} />
                 </View>
               ) : (

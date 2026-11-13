@@ -4,7 +4,8 @@
 // verisinden türeyen ilerleme. Karar mantığı utils/watchChallenges.js'te (saf, testli); burada yalnız depoya,
 // veriye ve film ayrıntısına (services/watchChallengeMeta.js) bağlama.
 //
-// YENİ FIRESTORE LISTENER AÇMAZ (hooks/useYearlyGoal.js ile aynı sözleşme).
+// YENİ FIRESTORE LISTENER AÇMAZ (hooks/useYearlyGoal.js ile aynı sözleşme). Puan görevleri ListStatusContext'in
+// zaten okunan activityIndex.ratings haritasını kullanır; yapım adı/afişi açık listelerden eşlenir.
 //
 // SONUÇLANDIRMA: veri hazır olunca etkin görevler bugüne göre tamamlanır / süresi dolar ve kayda yazılır. Kanca
 // birden çok yerde (Eğlence kartı, ekran, profil satırı) açık olabilir; yazım SON KAYITTAN okur (depo senkron), bu
@@ -32,6 +33,7 @@ import {
   daysLeftOf,
   finishedRuns,
   getChallenge,
+  isRatingChallenge,
   joinBlocker,
   joinChallenge,
   leaveChallenge,
@@ -73,7 +75,16 @@ export default function useWatchChallenges() {
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { movieHistoryItems, flatEpisodesTv } = useProfileStats() || {};
-  const { loading: listsLoading, watchedTvLoaded } = useListStatusContext() || {};
+  const {
+    loading: listsLoading,
+    watchedTvLoaded,
+    activityIndex,
+    watchedMoviesItems,
+    watchedTvMap,
+    favoritesItems,
+    watchListItems,
+  } = useListStatusContext() || {};
+  const ratings = activityIndex?.ratings || null;
   const loading = !!listsLoading || !watchedTvLoaded;
 
   const raw = useStored(Keys.watchChallenges, { uid });
@@ -82,12 +93,37 @@ export default function useWatchChallenges() {
 
   // ── Film ayrıntısı (yalnız on yıl / ülke görevlerinde, yalnız penceredeki filmler) ──
   const [meta, setMeta] = useState({});
+  // Puan görevlerinin afiş/ad eşlemesi (anahtar → { name, imagePath }); yalnız puan görevi varken kurulur.
+  const wantsTitles = useMemo(() => active.some((run) => isRatingChallenge(getChallenge(run.id))), [active]);
+  const titles = useMemo(() => {
+    if (!wantsTitles) return {};
+    const out = {};
+    const add = (item, fallbackType) => {
+      if (item?.id == null) return;
+      const type = item.type === "tv" || item.mediaType === "tv" ? "tv" : item.type === "movie" ? "movie" : fallbackType;
+      if (!type) return;
+      const key = `${type}_${item.id}`;
+      if (out[key]) return;
+      out[key] = {
+        name: item.name || item.title || "",
+        imagePath: item.imagePath || item.posterPath || item.poster_path || null,
+      };
+    };
+    for (const item of watchedMoviesItems || []) add(item, "movie");
+    for (const item of Object.values(watchedTvMap || {})) add(item, "tv");
+    for (const item of favoritesItems || []) add(item, null);
+    for (const item of watchListItems || []) add(item, null);
+    return out;
+  }, [wantsTitles, watchedMoviesItems, watchedTvMap, favoritesItems, watchListItems]);
   const data = useMemo(
-    () => ({ movies: movieHistoryItems || [], episodes: flatEpisodesTv || [], meta }),
-    [movieHistoryItems, flatEpisodesTv, meta],
+    () => ({ movies: movieHistoryItems || [], episodes: flatEpisodesTv || [], meta, ratings, titles }),
+    [movieHistoryItems, flatEpisodesTv, meta, ratings, titles],
   );
 
-  const progressOf = useCallback((challenge, joinedAt) => challengeProgress(challenge, joinedAt, data), [data]);
+  const progressOf = useCallback(
+    (challenge, joinedAt, run = null) => challengeProgress(challenge, joinedAt, data, run),
+    [data],
+  );
 
   const missingMeta = useMemo(() => {
     const ids = new Set();
@@ -141,7 +177,7 @@ export default function useWatchChallenges() {
     () =>
       active.map((run) => {
         const challenge = getChallenge(run.id);
-        const progress = progressOf(challenge, run.joinedAt);
+        const progress = progressOf(challenge, run.joinedAt, run);
         return {
           run,
           challenge,
@@ -158,10 +194,12 @@ export default function useWatchChallenges() {
       if (!uid) return "unknown";
       const blocker = joinBlocker(normalizeChallengeState(get(Keys.watchChallenges, { uid })), id, today);
       if (blocker !== "ok") return blocker;
-      write(uid, (current) => joinChallenge(current, id, today));
+      // Puan görevi başlangıcı: katılış anındaki puanlar (liste henüz yüklenmediyse katılma ertelenir).
+      if (isRatingChallenge(getChallenge(id)) && loading) return "loading";
+      write(uid, (current) => joinChallenge(current, id, today, { ratings: ratings || {} }));
       return "ok";
     },
-    [uid, today],
+    [uid, today, loading, ratings],
   );
   const leave = useCallback((id) => uid && write(uid, (current) => leaveChallenge(current, id)), [uid]);
 

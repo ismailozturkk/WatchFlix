@@ -13,6 +13,13 @@
 //   decades · countries · country · era · recent · gems — film ayrıntısı ister (yıl / ülke / TMDB puanı)
 //   episodes · shows · episodeDay             — farklı bölüm · farklı dizi · tek günde en çok bölüm
 //   person                                    — yönetmen / oyuncu filmografisi (süresiz, tüm geçmiş)
+//   rated · ratingRange                       — YENİ puanlanan farklı yapım · yeni puanlarda farklı puan değeri
+//
+// PUAN GÖREVLERİ (Zevk Çemberleri eşleşme gücünü besler; utils/matchStrength.js): puanların TARİHİ tutulmuyor
+// (Lists/{uid}.activityIndex.ratings yalnız anahtar → puan). Bu yüzden katılırken o anki puanlı yapımlar kayda
+// `baseline` olarak yazılır; ilerleme = şu an puanlı olup başlangıçta OLMAYAN yapımlar. Eski bir puanı değiştirmek
+// sayılmaz (yeni yapım değil). Bilinen sınır: pencere bittikten sonra, uygulama açılmadan verilen puanlar da
+// sayılabilir (sonuçlandırma uygulama açılınca yapılır). Bitmiş kayıtta `baseline` tutulmaz.
 //
 // PENCERE (ne sayılır):
 //   • rolling — katıldığın GÜN başlar, `days` gün sürer. Katılmadan önceki izlemeler sayılmaz: "52 haftada 52 film"e
@@ -49,6 +56,7 @@ export const CHALLENGE_GROUPS = Object.freeze([
   "world",
   "explore",
   "series",
+  "ratings",
   "directors",
   "actors",
 ]);
@@ -174,6 +182,18 @@ const BASE_CHALLENGES = [
     rule: { kind: "episodeDay" }, window: rolling(30) }),
   def({ id: "shows5", group: "series", icon: "albums-outline", colors: ["#84CC16", "#365314"], target: 5,
     rule: { kind: "shows" }, window: rolling(60) }),
+  // ── Puan: katıldıktan sonra YENİ puanlanan yapımlar (bkz. dosya başı) ──
+  def({ id: "rate10_7", group: "ratings", icon: "star-outline", colors: ["#FBBF24", "#92400E"], target: 10,
+    rule: { kind: "rated" }, window: rolling(7) }),
+  def({ id: "rate25_30", group: "ratings", icon: "star-half-outline", colors: ["#F59E0B", "#78350F"], target: 25,
+    rule: { kind: "rated" }, window: rolling(30) }),
+  def({ id: "rate50_90", group: "ratings", icon: "ribbon-outline", colors: ["#EAB308", "#713F12"], target: 50,
+    rule: { kind: "rated" }, window: rolling(90) }),
+  def({ id: "rateShows5", group: "ratings", icon: "tv-outline", colors: ["#FB7185", "#881337"], target: 5,
+    rule: { kind: "rated", lane: "tv" }, window: rolling(30) }),
+  // Eşleşme gücündeki puan çeşitliliği kapısı (≥ 4 farklı değer): ölçeğin tamamını kullan.
+  def({ id: "rateRange5", group: "ratings", icon: "stats-chart-outline", colors: ["#A3E635", "#3F6212"], target: 5,
+    rule: { kind: "ratingRange" }, window: rolling(30) }),
 ];
 
 const PERSON_STYLE = {
@@ -216,6 +236,18 @@ export const getChallenge = (id) => BY_ID.get(id) || null;
 const META_KINDS = new Set(["decades", "countries", "country", "era", "recent", "gems"]);
 /** Film ayrıntısı (yıl / ülke / puan) gerektiren kural mı? */
 export const needsMeta = (challenge) => META_KINDS.has(challenge?.rule?.kind);
+
+const RATING_KINDS = new Set(["rated", "ratingRange"]);
+/** Katılırken puan başlangıcı (`baseline`) isteyen görev mi? */
+export const isRatingChallenge = (challenge) => RATING_KINDS.has(challenge?.rule?.kind);
+const RATED_KEY_RE = /^(movie|tv)_(\d+)$/;
+/** Puan haritasından geçerli, puanı > 0 anahtarlar (sıralı). */
+export function ratedKeysOf(ratings) {
+  if (!ratings || typeof ratings !== "object") return [];
+  return Object.keys(ratings)
+    .filter((key) => RATED_KEY_RE.test(key) && Number(ratings[key]) > 0)
+    .sort();
+}
 
 // ── Takvim ──────────────────────────────────────────────────────────────────
 
@@ -370,7 +402,7 @@ function longestStreakOf(films) {
  * @returns {{ count: number, target: number, ratio: number, matches: Array, pending: Array<number|string>,
  *             window: {start,end}, slots?: Array }}
  */
-export function challengeProgress(challenge, joinedAt, { movies = [], episodes = [], meta = {} } = {}) {
+export function challengeProgress(challenge, joinedAt, { movies = [], episodes = [], meta = {}, ratings = null, titles = {} } = {}, run = null) {
   const target = Math.max(1, challenge?.target || 1);
   const window = windowOf(challenge, joinedAt);
   const rule = challenge?.rule || {};
@@ -379,7 +411,31 @@ export function challengeProgress(challenge, joinedAt, { movies = [], episodes =
   let count = 0;
   let slots;
 
-  if (rule.kind === "episodes" || rule.kind === "shows" || rule.kind === "episodeDay") {
+  if (RATING_KINDS.has(rule.kind)) {
+    // Başlangıçta puanlı olmayan, şimdi puanlı yapımlar. Önizlemede (run yok) başlangıç = bugünkü puanlar → 0.
+    const current = ratedKeysOf(ratings);
+    const base = new Set(Array.isArray(run?.baseline) ? run.baseline : current);
+    const fresh = current
+      .filter((key) => !base.has(key))
+      .filter((key) => !rule.lane || key.startsWith(`${rule.lane}_`))
+      .map((key) => {
+        const [, type, id] = RATED_KEY_RE.exec(key);
+        const title = titles?.[key] || {};
+        return { key, type, id: Number(id), name: title.name || "", imagePath: title.imagePath || null, day: null, rating: Number(ratings[key]) };
+      });
+    if (rule.kind === "ratingRange") {
+      // Her farklı kademenin (0-10 ölçeği, yarım yıldız = 1) ilk yapımı (anahtar sırasıyla, belirlenimli).
+      const byStep = new Map();
+      for (const item of fresh) {
+        const step = Math.min(10, Math.max(1, Math.round(item.rating)));
+        if (!byStep.has(step)) byStep.set(step, { ...item, rating: step });
+      }
+      matches = [...byStep.values()].sort((a, b) => a.rating - b.rating);
+    } else {
+      matches = fresh;
+    }
+    count = matches.length;
+  } else if (rule.kind === "episodes" || rule.kind === "shows" || rule.kind === "episodeDay") {
     // Farklı bölümler (pencerede İLK izlendiği gün) → dizi özetleri.
     const firstDay = new Map();
     const meta = new Map();
@@ -492,7 +548,7 @@ export function challengeProgress(challenge, joinedAt, { movies = [], episodes =
   return { count, target, ratio: Math.min(1, count / target), matches, pending, window, ...(slots ? { slots } : {}) };
 }
 
-const NO_PACE_KINDS = new Set(["sameDay", "streak", "episodeDay"]);
+const NO_PACE_KINDS = new Set(["sameDay", "streak", "episodeDay", "ratingRange"]);
 
 /**
  * Tempo: süreli görevde beklenen ilerlemeye göre durum. Açık görevde ya da ilk 3 günde null.
@@ -520,11 +576,18 @@ export function daysLeftOf(challenge, joinedAt, today) {
 // ── Kayıt ───────────────────────────────────────────────────────────────────
 
 const STATUSES = new Set(Object.values(RUN_STATUS));
+/** Puan başlangıcı en çok bu kadar anahtar (kayıt şişmesin; daha fazlası pratikte yok). */
+const MAX_BASELINE = 20000;
 
 function normalizeRun(run) {
   if (!run || typeof run !== "object" || !getChallenge(run.id) || !isDayKey(run.joinedAt)) return null;
   const status = STATUSES.has(run.status) ? run.status : RUN_STATUS.ACTIVE;
   const out = { id: run.id, joinedAt: run.joinedAt, status };
+  if (status === RUN_STATUS.ACTIVE && isRatingChallenge(getChallenge(run.id))) {
+    // Başlangıcı olmayan puan görevi her eski puanı sayardı → kayıt geçersiz.
+    if (!Array.isArray(run.baseline)) return null;
+    out.baseline = run.baseline.filter((key) => typeof key === "string" && RATED_KEY_RE.test(key)).slice(0, MAX_BASELINE);
+  }
   if (status !== RUN_STATUS.ACTIVE) {
     if (isDayKey(run.endedAt)) out.endedAt = run.endedAt;
     if (Number.isFinite(run.count)) out.count = Math.max(0, Math.floor(run.count));
@@ -574,9 +637,17 @@ export function joinBlocker(state, id, today) {
   return "ok";
 }
 
-export function joinChallenge(state, id, today) {
+/**
+ * @param {{ ratings?: object }} [options] puan görevinde ZORUNLU: katılış anındaki puan haritası (başlangıç).
+ */
+export function joinChallenge(state, id, today, { ratings } = {}) {
   if (joinBlocker(state, id, today) !== "ok") return state;
-  return { runs: [...state.runs, { id, joinedAt: today, status: RUN_STATUS.ACTIVE }] };
+  const run = { id, joinedAt: today, status: RUN_STATUS.ACTIVE };
+  if (isRatingChallenge(getChallenge(id))) {
+    if (!ratings || typeof ratings !== "object") return state;
+    run.baseline = ratedKeysOf(ratings);
+  }
+  return { runs: [...state.runs, run] };
 }
 
 export function leaveChallenge(state, id) {
@@ -605,7 +676,7 @@ function capFinished(runs) {
  * Etkin görevleri bugüne göre sonuçlandırır: hedefe ulaşan TAMAMLANIR, penceresi geçen SÜRESİ DOLAR.
  * Saf; değişiklik yoksa AYNI nesne döner (gereksiz yazım olmasın).
  *
- * @param {(challenge, joinedAt) => {count:number, target:number, pending:Array}} progressOf
+ * @param {(challenge, joinedAt, run) => {count:number, target:number, pending:Array}} progressOf
  * @returns {{ state: object, completed: string[], expired: string[] }}
  */
 export function settleChallenges(state, progressOf, today) {
@@ -615,18 +686,19 @@ export function settleChallenges(state, progressOf, today) {
   const runs = state.runs.map((run) => {
     if (run.status !== RUN_STATUS.ACTIVE) return run;
     const challenge = getChallenge(run.id);
-    const { count, target, pending = [] } = progressOf(challenge, run.joinedAt);
+    const { count, target, pending = [] } = progressOf(challenge, run.joinedAt, run);
+    const { baseline: _baseline, ...rest } = run;
     if (count >= target) {
       changed = true;
       completed.push(run.id);
-      return { ...run, status: RUN_STATUS.DONE, endedAt: today, count, target };
+      return { ...rest, status: RUN_STATUS.DONE, endedAt: today, count, target };
     }
     const { end } = windowOf(challenge, run.joinedAt);
     // Ayrıntısı bekleyen film varken süre dolmuş sayılmaz: son günlerde izlenen film henüz okunmamış olabilir.
     if (end && today > end && pending.length === 0) {
       changed = true;
       expired.push(run.id);
-      return { ...run, status: RUN_STATUS.EXPIRED, endedAt: end, count, target };
+      return { ...rest, status: RUN_STATUS.EXPIRED, endedAt: end, count, target };
     }
     return run;
   });

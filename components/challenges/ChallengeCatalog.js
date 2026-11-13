@@ -135,7 +135,7 @@ function recentPostersOf(challenge, progress) {
   return [...progress.matches]
     .sort((a, b) => ((a.day || "") < (b.day || "") ? 1 : -1))
     .slice(0, 5)
-    .map((item) => ({ key: item.key, type: tv ? "tv" : "movie", id: item.id, path: item.imagePath }));
+    .map((item) => ({ key: item.key, type: item.type || (tv ? "tv" : "movie"), id: item.id, path: item.imagePath }));
 }
 
 export function ActiveChallengeCard({ entry, copy, theme, onPress }) {

@@ -25,6 +25,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { useOngoingTvShowsSettings } from "@context/AppSettingsContext";
 import useReduceMotion from "@hooks/useReduceMotion";
+import useMatchFeature from "../../../hooks/useMatchFeature";
 import {
   resetSectionVisibility,
   setScreenSectionsShown,
@@ -37,6 +38,7 @@ import {
   isSectionScreen,
   isSectionVisibilityCustomized,
   isSectionVisible,
+  gatedSectionsOf,
   sectionsOf,
   summarizeScreen,
 } from "@utils/sectionVisibility";
@@ -178,13 +180,17 @@ export default function SectionVisibilityScreen() {
   // Onay bekleyen gizleme: { screen, id } (tek bölüm) ya da { screen, all: true }.
   const [pending, setPending] = useState(null);
 
+  // Kapılı bölümler (ör. Zevk Çemberleri) yalnız kapı açıkken listelenir; katılım belgesi burada dinlenmez.
+  const matchAvailable = useMatchFeature({ subscribe: false }).available;
+  const gates = useMemo(() => ({ match: matchAvailable }), [matchAvailable]);
+
   const summaries = useMemo(
-    () => SECTION_SCREENS.map((screen) => ({ id: screen.id, icon: screen.icon, ...summarizeScreen(hidden, screen.id, legacyValues) })),
-    [hidden, legacyValues],
+    () => SECTION_SCREENS.map((screen) => ({ id: screen.id, icon: screen.icon, ...summarizeScreen(hidden, screen.id, legacyValues, gates) })),
+    [hidden, legacyValues, gates],
   );
   const current = summaries.find((entry) => entry.id === screenId) ?? summaries[0];
   const screenCopy = copy.screens[current.id];
-  const items = sectionsOf(current.id);
+  const items = gatedSectionsOf(current.id, gates);
   const allShown = current.hidden === 0;
   const customized = isSectionVisibilityCustomized(hidden) || showOngoingTvShows === false;
 

@@ -79,8 +79,14 @@ export const WEIGHTS = Object.freeze({
   ratingTrend: 0.15,
   format: 0.05,
 });
-/** Ana kartta ayrı satırda gösterilen derin analiz bileşenleri. */
-export const DEEP_COMPONENTS = Object.freeze(["genreRatings", "ratingTrend", "format"]);
+/** Ana kartta "Derin analiz" altında çubukla gösterilen bileşenler: yüzdeyi oluşturan v3 parçaları. */
+export const DEEP_COMPONENTS = Object.freeze(["opinion", "selection", "content"]);
+/** v3 birleştirme ağırlıkları (algoritma §6; bilgi sayfası rozetleri buradan okur). */
+export const V3_WEIGHTS = Object.freeze({
+  opinion: V3_DEFAULTS.wOpinion,
+  selection: V3_DEFAULTS.wSelection,
+  content: V3_DEFAULTS.wContent,
+});
 const CORE_COMPONENTS = ["genres", "overlap", "ratings"];
 export const MAX_CANDIDATES = 20;
 export const GENRE_TABLE_MIN = 5;
@@ -90,6 +96,8 @@ export const GENRE_TABLE_COVERAGE = 0.85;
 export const GENRE_TABLE_MIN_RATED = 2;
 
 import { genreParts, weightedGenres } from "./genreCanon";
+import { DEFAULTS as V3_DEFAULTS, buildProfile, scorePair, verdictOf } from "./tasteMatchV3";
+import { laneItems, mirrorVisibility, sideToTasteUser } from "./tasteMatchV3Adapter";
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 const keyOf = (type, id) => `${type === "tv" ? "tv" : "movie"}_${id}`;
@@ -234,10 +242,13 @@ const ratingOf = (ratings, key) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+// v3 (13 Kas) kademeleri: yeni skor geniş yayılır (rastgele çift ~0–30, ikiz 90+); eski 75/55/35
+// eşikleri sıkışık eski ölçek içindi. Faz 2 gerçek tablosu: 94 / 70 / 61 / 36 → çok yakın / epey /
+// kısmen / farklı.
 export const TIERS = Object.freeze([
-  { id: "veryHigh", min: 75 },
-  { id: "high", min: 55 },
-  { id: "medium", min: 35 },
+  { id: "veryHigh", min: 85 },
+  { id: "high", min: 65 },
+  { id: "medium", min: 40 },
   { id: "low", min: 0 },
 ]);
 export const tierOf = (score) => (score == null ? null : TIERS.find((tier) => score >= tier.min).id);
@@ -521,7 +532,9 @@ function compareSides(a, b) {
 }
 
 /**
- * Zevk uyumunun film / dizi kırılımı ile sarmalanmış hâli (asıl hesap `compareSides`).
+ * ESKİ (v2) hesap + içgörüler: `compareSides` sonucu ve film / dizi kırılımı. Skoru artık arayüze
+ * gitmez (bkz. `computeTasteMatch`); içgörü alanları (loved, split, highlights, genres, deep, ratings,
+ * watched, favorites) ve geliştirici karşılaştırması için durur.
  *
  * Ek alanlar:
  *   scope   "both" | "movies" | "shows" | "none"  arkadaşın bize AÇTIĞI izlenen kategorileri
@@ -530,7 +543,7 @@ function compareSides(a, b) {
  *           shared=true ama score=null: o kategoride karşılaştırmaya yetecek kayıt yok.
  * Kategori puanı ana puanla AYNI formüldür, yalnız o kategorinin izlenenleriyle (ortak favori hariç).
  */
-export function computeTasteMatch(mine, theirs) {
+export function computeTasteInsights(mine, theirs) {
   const a = prepareSide(mine);
   const b = prepareSide(theirs);
   const result = compareSides(a, b);
@@ -549,6 +562,81 @@ export function computeTasteMatch(mine, theirs) {
     ...result,
     scope: movie.shared && tv.shared ? "both" : movie.shared ? "movies" : tv.shared ? "shows" : "none",
     byType: { movie, tv },
+  };
+}
+
+const pct01 = (v) => (typeof v === "number" && Number.isFinite(v) ? Math.round(clamp01(v) * 100) : null);
+
+/** v3 sonucu (utils/tasteMatchV3.scorePair) → kartın kullandığı özet. Ham liste / yapım anahtarı yok. */
+function v3Summary(result) {
+  if (!result) return null;
+  return {
+    display: result.display,
+    verdict: verdictOf(result),
+    common: result.common,
+    E1: Math.round((result.E1 || 0) * 10) / 10,
+    flags: {
+      binding: result.flags.binding,
+      opinionGate: !!result.flags.opinionGate,
+      immature: !!result.flags.immature,
+      guide: !!result.flags.guide,
+      implicitHeavy: !!result.flags.implicitHeavy,
+    },
+    // Kartın çubukları (0–100): görüş uyumu yalnız ortak görüş varsa.
+    parts: [
+      ["opinion", result.K1 == null ? null : pct01(result.K1)],
+      ["selection", pct01(result.K2)],
+      ["content", pct01(result.K3)],
+    ]
+      .filter(([, value]) => value !== null)
+      .map(([id, value]) => ({ id, value, weight: V3_WEIGHTS[id] })),
+  };
+}
+
+/**
+ * Kulvar başına v3 skoru (film / dizi / ikisi). Bağlam `{}`: istemcide nüfus yok → varsayılan
+ * tablolar; K3 "lite" (algoritma §5.3). Arkadaşın görünmeyen listeleri iki tarafta da kapalı.
+ */
+export function computeTasteV3(mine, theirs, { now = Date.now(), ctx = {} } = {}) {
+  const a = sideToTasteUser(mirrorVisibility(mine, theirs));
+  const b = sideToTasteUser(theirs);
+  const lane = (id) => {
+    const pa = buildProfile(laneItems(a, id), ctx, { now });
+    const pb = buildProfile(laneItems(b, id), ctx, { now });
+    return v3Summary(scorePair(pa, pb, ctx));
+  };
+  return { all: lane("all"), movie: lane("movie"), tv: lane("tv") };
+}
+
+/**
+ * Arkadaş profilindeki ZEVK UYUMU (v3, 13 Kas).
+ *
+ * Yüzde, kademe ve film / dizi yüzdeleri yeni çekirdekten (utils/tasteMatchV3.js) gelir: görüş
+ * uyumu + seçim benzerliği (şansa göre) + içerik profili, az veri / boyut farkı / görüş kapısı
+ * tavanlarıyla. İçgörü alanları eski hesaptan (`computeTasteInsights`) aynen gelir; eski skor
+ * yalnız `legacy` alanında (geliştirici karşılaştırması) durur, arayüze girmez.
+ *
+ * Ek alanlar: `v3` (karma kulvar özeti: verdict, flags, E1, parts), `legacy` ({ score, tier }).
+ * `breakdown` = eski içgörü bileşenleri + v3 parçaları (opinion / selection / content).
+ */
+export function computeTasteMatch(mine, theirs, options = {}) {
+  const base = computeTasteInsights(mine, theirs);
+  const v3 = computeTasteV3(mine, theirs, options);
+  const main = v3.all;
+  const score = main ? main.display : null;
+  const typeOf = (info, lane) => (info.shared ? { ...info, score: lane ? lane.display : null } : info);
+  return {
+    ...base,
+    state: score === null ? "no-data" : base.state === "no-data" ? "limited" : base.state,
+    score,
+    tier: tierOf(score),
+    // Az veri: eski uyarı (az ortak / az puan / küçük liste) ya da v3 "olgun değil" (puan hijyeni).
+    // Kanıt tavanının "bağlaması" tek başına sayılmaz: skor 100'ü aşınca da bağlar (özdeş çift).
+    lowData: score !== null && (base.lowData || !!main.flags.immature),
+    breakdown: [...base.breakdown, ...(main ? main.parts : [])],
+    byType: { movie: typeOf(base.byType.movie, v3.movie), tv: typeOf(base.byType.tv, v3.tv) },
+    v3: main ? { ...main, movie: v3.movie, tv: v3.tv } : null,
+    legacy: { score: base.score, tier: base.tier },
   };
 }
 

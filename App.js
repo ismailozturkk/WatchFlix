@@ -806,6 +806,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="MatchSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/MatchSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="AISettingsScreen"
           getComponent={() => require("./screens/tabs/settings/AISettingsScreen").default}
           options={{ headerShown: false }}

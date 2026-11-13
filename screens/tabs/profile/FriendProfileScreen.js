@@ -99,6 +99,8 @@ import { useMediaQuickActions } from "../../../context/MediaQuickActionsContext"
 import { useListStatusContext } from "../../../context/ListStatusContext";
 import TasteMatchCard from "../../../components/friends/TasteMatchCard";
 import { candidatesToDeckSource, computeTasteMatch, findTogetherCandidates } from "../../../utils/tasteMatch";
+import { shadowCompare } from "../../../utils/tasteMatchV3Adapter";
+import { recordTasteShadow } from "../../../services/tasteShadowLog";
 import { buildTasteMatchShare, chatParamsForShare } from "../../../utils/chatShare";
 import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
 import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
@@ -788,6 +790,23 @@ export default function FriendProfileScreen({ route, navigation }) {
   const tasteReady = !!friendSide && !myLists.loading && !!myLists.watchedTvLoaded;
   const tasteMatch = useMemo(() => (tasteReady ? computeTasteMatch(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
   const together = useMemo(() => (tasteReady ? findTogetherCandidates(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
+  // Zevk uyumu kartı 13 Kas'tan beri v3 yüzdesini gösterir. Bu blok (yalnız __DEV__) kulvar ayrıntısını
+  // ve ESKİ (v2) skoru Geliştirici Laboratuvarı > "Zevk uyumu: eski / yeni" tablosuna yazar.
+  // Release'de hiç çalışmaz. Bkz. docs/planlama/ZEVK_ESLESMESI_UYGULAMA_REHBERI.md §4.
+  useEffect(() => {
+    if (!__DEV__ || !tasteReady || !friendUid || isSelf) return;
+    try {
+      const { lanes } = shadowCompare(mySide, friendSide);
+      recordTasteShadow({
+        uid: friendUid,
+        name: profile?.displayName || friendName || "",
+        oldScore: tasteMatch?.legacy?.score ?? null,
+        lanes,
+      });
+    } catch (e) {
+      console.warn("[tasteShadow]", e?.message || e);
+    }
+  }, [tasteReady, mySide, friendSide, friendUid, isSelf, tasteMatch, profile?.displayName, friendName]);
 
   const inviteToRoom = useCallback(() => {
     if (!together?.candidates.length || !friendUid) return;

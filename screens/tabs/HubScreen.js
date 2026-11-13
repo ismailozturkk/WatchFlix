@@ -44,6 +44,9 @@ import Top100Widget from "@components/hub/Top100Widget";
 import ChallengesWidget from "@components/hub/ChallengesWidget";
 import LeagueWidget from "@components/hub/LeagueWidget";
 import TierListWidget from "@components/hub/TierListWidget";
+import MatchWidget from "@components/hub/MatchWidget";
+import useMatchFeature from "@hooks/useMatchFeature";
+import { getMatchCopy } from "@utils/matchCopy";
 import { SectionHeader } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -59,7 +62,7 @@ import { isBetaFeature } from "@utils/betaFeatures";
 function HubSection({ id, title, theme, children }) {
   return (
     <View style={styles.section}>
-      <SectionHeader title={title} theme={theme} style={styles.sectionHeader} beta={isBetaFeature(id)} />
+      <SectionHeader title={title} theme={theme} style={styles.sectionHeader} beta={isBetaFeature(id)} betaFeatureId={id} />
       {children}
     </View>
   );
@@ -81,6 +84,8 @@ export default function HubScreen({ navigation }) {
   // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen kartlar
   // (utils/sectionVisibility.js "hub"). Selamlama başlığı her zaman görünür.
   const { isVisible: show, allHidden } = useScreenSections("hub");
+  // Zevk Çemberleri: kart yalnız bayrak açık + 18+ kanıtlıyken (hooks/useMatchFeature).
+  const match = useMatchFeature();
 
   // Kademeli kurulum (yol haritası Y17): ilk ekranı dolduran kartlar hemen;
   // aşağıdakiler (Bingo, anket, Top 100, meydan okumalar, tier list, oyunlar)
@@ -188,6 +193,13 @@ export default function HubScreen({ navigation }) {
           </HubSection>
         )}
 
+        {/* Zevk Çemberleri (eşleşme gücü + tek sonraki adım) */}
+        {match.available && show("match") && (
+          <HubSection id="match" title={getMatchCopy(language).hub.title} theme={theme}>
+            <MatchWidget navigation={navigation} match={match} />
+          </HubSection>
+        )}
+
         {/* Sinema Bingosu (haftalık kart) */}
         {deepMounted && show("bingo") && (
           <HubSection id="bingo" title="BINGO" theme={theme}>
@@ -226,7 +238,7 @@ export default function HubScreen({ navigation }) {
         {/* Oyunlar */}
         {deepMounted && show("games") && <ProfileGamesModule navigation={navigation} />}
 
-        {allHidden && <SectionsHiddenNotice navigation={navigation} screen="hub" />}
+        {allHidden && !(match.available && show("match")) && <SectionsHiddenNotice navigation={navigation} screen="hub" />}
         </MarkedScrollView>
       </View>
     </View>

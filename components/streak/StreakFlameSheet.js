@@ -170,8 +170,8 @@ function StreakFlameSheet({
               renderScale={HERO_RENDER_SCALE}
             />
             {isBetaFeature("streak_flame") ? (
-              <View pointerEvents="none" style={styles.betaCorner}>
-                <BetaBadge />
+              <View style={styles.betaCorner}>
+                <BetaBadge featureId="streak_flame" />
               </View>
             ) : null}
           </View>

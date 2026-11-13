@@ -35,6 +35,8 @@
 // da (en azından yedek yolda ya da sayfada) yer almalı.
 
 const { FieldValue } = require("firebase-admin/firestore");
+const { removeVotesForUser } = require("./betaFeatureVotes");
+const { removeMember: removeMatchMember } = require("./matchServer");
 
 /**
  * Silme aşamaları, ÇALIŞMA SIRASIYLA. İstemci (services/accountService.js
@@ -462,6 +464,9 @@ async function purgeAccountData({ db, rtdb = null, warn = console.warn }, uid, {
 
   // ── 6) KAYITLAR: geri bildirim, şikayetler, davet/promosyon ───────────────
   if (runs("records")) {
+  await step("beta-feature-votes", () => removeVotesForUser(db, uid));
+  // Zevk Çemberleri: üyelik, profil, öneriler, selamlar + başkalarının önerilerinden çıkarma (matchServer.removeMember).
+  await step("match", () => removeMatchMember(db, uid));
   await step("feedback", async () => {
     const snap = await db.collection("Feedback").where("uid", "==", uid).get();
     await deleteRefs(

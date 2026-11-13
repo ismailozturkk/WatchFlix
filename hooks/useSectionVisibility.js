@@ -55,7 +55,13 @@ export default function useScreenSections(screen) {
       hiddenCount,
       // Saklanan bölümlerin HEPSİ gizli (boş ekran bildirimi için). Eski tek anahtarlı
       // bölümler (Devam Edenler) sayılmaz; Film/Dizi boşluğu listeden ölçülür.
-      allHidden: hiddenCount > 0 && hiddenCount >= storedSectionsOf(screen).length,
+      // Kapılı bölümler (gate, ör. Zevk Çemberleri) sayılmaz: kapı kapalıyken ayar ekranında
+      // görünmedikleri için kullanıcı onları gizleyemez; ekran kapıyı kendisi denetler.
+      allHidden:
+        hiddenCount > 0 &&
+        storedSectionsOf(screen)
+          .filter((item) => !item.gate)
+          .every((item) => !isSectionVisible(hidden, screen, item.id)),
     };
   }, [hidden, screen]);
 }

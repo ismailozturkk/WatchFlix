@@ -38,7 +38,7 @@ jest.mock("../context/AppSettingsContext", () => ({
 
 const TasteMatchCard = require("../components/friends/TasteMatchCard").default;
 const { TASTE_MATCH_COPY } = require("../utils/tasteMatchCopy");
-const { MIN_FAVORITES, MIN_RATED_PAIRS, MIN_WATCHED_FOR_OVERLAP, WEIGHTS } = require("../utils/tasteMatch");
+const { V3_WEIGHTS, WEIGHTS } = require("../utils/tasteMatch");
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -219,18 +219,22 @@ describe("'!' bilgi sayfası", () => {
     expect(t).toContain(copy.info.title);
     expect(t).toContain(copy.info.intro);
     expect(t).toContain(copy.info.scopeBody);
-    expect(t).toContain(copy.info.minBody(MIN_WATCHED_FOR_OVERLAP, MIN_RATED_PAIRS, MIN_FAVORITES));
+    expect(t).toContain(copy.info.capsBody);
+    expect(t).toContain(copy.info.minBody);
   });
 
   it("ağırlıklar ve kademe aralıkları hesabın sabitlerinden okunur (elle yazılmaz)", () => {
     mount();
     open();
     const t = texts();
-    expect(t).toContain(copy.percent(Math.round(WEIGHTS.genres * 100)));
-    expect(t).toContain(copy.percent(Math.round(WEIGHTS.overlap * 100)));
-    expect(t).toContain(copy.info.bonus); // ortak favori: bonus
-    expect(t).toContain(`${copy.percent(75)}–${copy.percent(100)}`);
-    expect(t).toContain(`${copy.percent(0)}–${copy.percent(34)}`);
+    for (const id of ["opinion", "selection", "content"]) {
+      expect(t).toContain(copy.parts[id]);
+      expect(t).toContain(copy.info.partsDesc[id]);
+      expect(t).toContain(copy.percent(Math.round(V3_WEIGHTS[id] * 100)));
+    }
+    expect(t).toContain(`${copy.percent(85)}–${copy.percent(100)}`);
+    expect(t).toContain(`${copy.percent(65)}–${copy.percent(84)}`);
+    expect(t).toContain(`${copy.percent(0)}–${copy.percent(39)}`);
     for (const id of ["veryHigh", "high", "medium", "low"]) expect(t).toContain(copy.tiers[id]);
   });
 
@@ -439,8 +443,9 @@ describe("derin analiz + az veri", () => {
       match: match({
         confidence: "medium",
         breakdown: [
-          { id: "genreRatings", value: 64, weight: WEIGHTS.genreRatings },
           { id: "ratingTrend", value: 81, weight: WEIGHTS.ratingTrend },
+          { id: "opinion", value: 64, weight: V3_WEIGHTS.opinion },
+          { id: "selection", value: 72, weight: V3_WEIGHTS.selection },
         ],
         deep: {
           genreSplit: { genre: "Korku", mine: 8.5, theirs: 4 },
@@ -453,13 +458,15 @@ describe("derin analiz + az veri", () => {
       }),
     });
     expect(texts()).toContain(copy.deepTitle);
-    expect(texts()).not.toContain(copy.parts.genreRatings); // kapalıyken gövde yok
+    expect(texts()).not.toContain(copy.parts.opinion); // kapalıyken gövde yok
     expandAll();
     const t = texts();
     expect(t).toContain(copy.deepTitle);
-    expect(t).toContain(copy.parts.genreRatings);
+    expect(t).toContain(copy.parts.opinion);
     expect(t).toContain("%64");
-    expect(t).toContain(copy.parts.ratingTrend);
+    expect(t).toContain(copy.parts.selection);
+    expect(t).not.toContain(copy.parts.content); // dökümde yoksa çubuk yok
+    expect(t).not.toContain(copy.parts.ratingTrend); // eski bileşen artık çubuk değil, yalnız içgörü
     expect(t).toContain(copy.insights.genreSplit("Korku", 8.5, 4, "Ada"));
     expect(t).toContain(copy.insights.genreAgree("Dram")); // arayüz dilinde
     expect(t).toContain(copy.insights.trendHigh());
@@ -500,7 +507,7 @@ it("katlanır bölümler: varsayılan kapalı, başlıkta özet; dokununca açı
   mount({
     match: match({
       confidence: "high",
-      breakdown: [{ id: "genreRatings", value: 64, weight: WEIGHTS.genreRatings }],
+      breakdown: [{ id: "opinion", value: 64, weight: V3_WEIGHTS.opinion }],
       loved: [{ name: "Film 1", mine: 10, theirs: 9 }],
       split: { name: "Film 3", mine: 2, theirs: 9 },
       highlights: [{ key: "movie_1", id: 1, type: "movie", name: "Film 1", imagePath: "/m1.jpg", mine: 9, theirs: 8 }],

@@ -313,14 +313,18 @@ function Counted({ challenge, progress, copy, theme, color, posterWidth, titles,
           <GlassTouchable
             key={film.key}
             glass={false}
-            onPress={() => onOpen({ type: "movie", id: film.id })}
+            onPress={() => onOpen({ type: film.type || "movie", id: film.id })}
             accessibilityRole="button"
             accessibilityLabel={film.name}
             style={{ width: posterWidth }}
           >
-            <ChallengePoster id={film.id} path={film.imagePath} width={posterWidth} color={color} />
+            <ChallengePoster type={film.type || "movie"} id={film.id} path={film.imagePath} width={posterWidth} color={color} />
             <Text style={[styles.cellTitle, { color: theme.text.primary }]} numberOfLines={1}>
-              {kind === "countries" || kind === "country" ? `${flagOf(film.label)} ${film.name}` : film.name}
+              {kind === "countries" || kind === "country"
+                ? `${flagOf(film.label)} ${film.name}`
+                : kind === "ratingRange"
+                  ? `★ ${String(film.rating / 2)}${film.name ? ` · ${film.name}` : ""}`
+                  : film.name}
             </Text>
           </GlassTouchable>
         ))}

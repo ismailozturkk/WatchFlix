@@ -810,7 +810,7 @@ export default function FilmClubScreen({ navigation, route }) {
   }
 
   return (
-    <GameScreenShell navigation={navigation} title={copy.title} subtitle={subtitle} beta={isBetaFeature("film_club")}>
+    <GameScreenShell navigation={navigation} title={copy.title} subtitle={subtitle} beta={isBetaFeature("film_club")} betaFeatureId="film_club">
       {body}
       <ClubCandidatePicker
         visible={pickerOpen}

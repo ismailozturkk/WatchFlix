@@ -30,7 +30,13 @@ const langName = new Intl.DisplayNames(["tr"], { type: "language" });
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-const state = { days: 30, beta: [], wait: [], betaPlatform: "", overviewStats: null, page: { beta: 1, wait: 1 }, loaded: { beta: false, wait: false } };
+const state = { days: 30, beta: [], wait: [], betaVotes: {}, betaPlatform: "", overviewStats: null, page: { beta: 1, wait: 1 }, loaded: { beta: false, wait: false, votes: false } };
+const BETA_FEATURES = [
+  ["league", "Haftalık Lig"], ["challenges", "Meydan okumalar"], ["tierlist", "Tier list"],
+  ["top100", "Seelogd Top 100"], ["chain", "Film Zinciri"], ["rating", "Puan yukarı-aşağı"],
+  ["daily_frame", "Günün Karesi"], ["film_club", "Film Kulübü"], ["atmosphere", "Atmosfer"],
+  ["profile_banner", "Profil kapağı"], ["app_icon", "Uygulama simgesi"], ["streak_flame", "Haftalık seri alevi"],
+];
 const PAGE_SIZE = 25;
 
 /* ── Durum ekranları ─────────────────────────────────────────────── */
@@ -142,7 +148,7 @@ async function refreshAll() {
   const button = $("#refresh");
   button.disabled = true;
   $("#updatedAt").textContent = "Veriler yenileniyor…";
-  await Promise.allSettled([loadStats(), loadOverviewTraffic(), loadBeta(), loadWait()]);
+  await Promise.allSettled([loadStats(), loadOverviewTraffic(), loadBeta(), loadWait(), loadBetaVotes()]);
   $("#updatedAt").textContent = "Son kontrol: " + dateFmt.format(new Date()) + " · İstanbul";
   button.disabled = false;
 }
@@ -337,6 +343,35 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => renderTrend(lastStats), 120);
 });
+
+/* ── Beta özellik oyları (yalnız siteAdmins) ─────────────────────── */
+async function loadBetaVotes() {
+  try {
+    const snap = await getDocs(collection(db, "betaFeatureVotes"));
+    state.betaVotes = Object.fromEntries(snap.docs.map((item) => [item.id, item.data()]));
+    state.loaded.votes = true;
+    renderBetaVotes();
+  } catch (err) {
+    console.error(err);
+    toast("Özellik oyları okunamadı: " + (err.code || err.message));
+  }
+}
+
+function renderBetaVotes() {
+  const rows = BETA_FEATURES.map(([id, label]) => {
+    const item = state.betaVotes[id] || {};
+    const likes = Math.max(0, Number(item.likes) || 0);
+    const dislikes = Math.max(0, Number(item.dislikes) || 0);
+    return { label, likes, dislikes, total: likes + dislikes };
+  });
+  const totals = rows.reduce((sum, row) => ({ likes: sum.likes + row.likes, dislikes: sum.dislikes + row.dislikes, total: sum.total + row.total }), { likes: 0, dislikes: 0, total: 0 });
+  $("#voteKpis").innerHTML = [
+    kpi("Toplam oy", nf.format(totals.total), "Tüm beta özellikleri"),
+    kpi("Beğeni", nf.format(totals.likes), ""),
+    kpi("Beğenmeme", nf.format(totals.dislikes), ""),
+  ].join("");
+  $("#votesTable tbody").innerHTML = rows.map((row) => `<tr><td>${esc(row.label)}</td><td>${nf.format(row.likes)}</td><td>${nf.format(row.dislikes)}</td><td>${nf.format(row.total)}</td><td>${row.total ? pct.format(row.likes / row.total) : "—"}</td></tr>`).join("");
+}
 
 /* ── Beta testçileri ─────────────────────────────────────────────── */
 function betaSplit() {

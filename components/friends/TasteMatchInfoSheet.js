@@ -3,7 +3,8 @@
 // Zevk uyumu kartındaki "!" düğmesinin açtığı bilgi sayfası: yüzde neye göre belirlenir, hangi
 // bileşenin ağırlığı ne, kademeler, hangi veriler hesaba girer, ne zaman yüzde çıkmaz.
 //
-// Ağırlıklar, kademe eşikleri ve asgari kayıt sayıları utils/tasteMatch.js'teki SABİTLERDEN okunur
+// v3 (13 Kas): yüzde üç parçadan oluşur (görüş, seçim, içerik); ağırlıklar ve kademe eşikleri
+// utils/tasteMatch.js'teki SABİTLERDEN okunur
 // (metne elle yazılmaz): hesap değişince bu sayfa kendiliğinden doğru kalır.
 // Kabuk ortak BottomSheetModal (blur yerinde solar, sayfa kayar).
 import React, { memo } from "react";
@@ -14,24 +15,13 @@ import BottomSheetModal from "../common/BottomSheetModal";
 import GlassCloseButton from "../common/GlassCloseButton";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
-import {
-  MIN_FAVORITES,
-  MIN_RATED_PAIRS,
-  MIN_WATCHED_FOR_OVERLAP,
-  TIERS,
-  WEIGHTS,
-} from "../../utils/tasteMatch";
+import { TIERS, V3_WEIGHTS } from "../../utils/tasteMatch";
 
-const CORE = [
-  { id: "genres", icon: "pricetags-outline" },
-  { id: "overlap", icon: "checkmark-done-outline" },
-  { id: "ratings", icon: "star-half-outline" },
-];
-// Derin analiz bileşenleri: yeterli veri varsa göreli ağırlıkla hesaba katılır (yoksa düşer).
-const DEEP = [
-  { id: "genreRatings", icon: "bar-chart-outline" },
-  { id: "ratingTrend", icon: "trending-up-outline" },
-  { id: "format", icon: "film-outline" },
+// Yüzdeyi oluşturan parçalar (utils/tasteMatchV3.js §6). Rozet = birleştirme ağırlığı.
+const PARTS = [
+  { id: "opinion", icon: "star-half-outline" },
+  { id: "selection", icon: "checkmark-done-outline" },
+  { id: "content", icon: "pricetags-outline" },
 ];
 
 function Badge({ text, color }) {
@@ -109,30 +99,13 @@ function TasteMatchInfoSheet({ visible, onClose, copy }) {
 
         <Section title={info.partsTitle} theme={theme}>
           <View style={styles.parts}>
-            {CORE.map((part) => (
+            {PARTS.map((part) => (
               <PartRow
                 key={part.id}
                 icon={part.icon}
                 title={copy.parts[part.id]}
                 desc={info.partsDesc[part.id]}
-                badge={copy.percent(Math.round(WEIGHTS[part.id] * 100))}
-                theme={theme}
-              />
-            ))}
-            <PartRow
-              icon="heart-outline"
-              title={copy.parts.favorites}
-              desc={info.partsDesc.favorites}
-              badge={info.bonus}
-              theme={theme}
-            />
-            {DEEP.map((part) => (
-              <PartRow
-                key={part.id}
-                icon={part.icon}
-                title={copy.parts[part.id]}
-                desc={info.partsDesc[part.id]}
-                badge={info.bonus}
+                badge={copy.percent(Math.round(V3_WEIGHTS[part.id] * 100))}
                 theme={theme}
               />
             ))}
@@ -159,10 +132,12 @@ function TasteMatchInfoSheet({ visible, onClose, copy }) {
           <Text style={[styles.body, { color: theme.text.secondary }]}>{info.scopeBody}</Text>
         </Section>
 
+        <Section title={info.capsTitle} theme={theme}>
+          <Text style={[styles.body, { color: theme.text.secondary }]}>{info.capsBody}</Text>
+        </Section>
+
         <Section title={info.minTitle} theme={theme}>
-          <Text style={[styles.body, { color: theme.text.secondary }]}>
-            {info.minBody(MIN_WATCHED_FOR_OVERLAP, MIN_RATED_PAIRS, MIN_FAVORITES)}
-          </Text>
+          <Text style={[styles.body, { color: theme.text.secondary }]}>{info.minBody}</Text>
         </Section>
       </ScrollView>
     </BottomSheetModal>

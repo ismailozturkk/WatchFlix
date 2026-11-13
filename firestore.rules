@@ -94,6 +94,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Kullanıcı yalnız kendi seçimini okur. Toplamlar ve diğer oylar sadece
+    // siteAdmins hesabına açıktır; bütün yazılar voteBetaFeature callable'ından.
+    match /betaFeatureVotes/{featureId} {
+      allow get, list: if isSiteAdmin();
+      allow create, update, delete: if false;
+      match /votes/{uid} {
+        allow get: if isOwner(uid) || isSiteAdmin();
+        allow list: if isSiteAdmin();
+        allow create, update, delete: if false;
+      }
+    }
+
     // ─── Landing sitesi: geçici bekleme listesi ─────────────────────────
     match /waitlist/{docId} {
       // E-posta adresi kişisel veridir: koleksiyonu LİSTELEMEK serbest olamaz,
@@ -149,6 +161,21 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // ─── Zevk Çemberleri (Faz 5 sunucu hattı; functions/matchServer.js) ───
+    // Öneri belgesi yalnız SAHİBİNE okunur; adaylar opak kimlikle gelir (uid / kullanıcı adı yok).
+    // Yazan yalnız sunucu (Admin SDK kuralları aşar). Profil, eşleme, selam, bağlam ve yapım özellikleri
+    // istemciye tamamen KAPALI: ham zevk verisi ve aday uid'leri hiçbir istemciye gitmez.
+    match /MatchSuggestions/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+    match /MatchMembers/{uid} { allow read, write: if false; }
+    match /MatchProfiles/{uid}/{document=**} { allow read, write: if false; }
+    match /MatchPairs/{uid} { allow read, write: if false; }
+    match /MatchHellos/{pairId} { allow read, write: if false; }
+    match /MatchMeta/{docId} { allow read, write: if false; }
+    match /TitleFeatures/{titleId} { allow read, write: if false; }
 
     // NOT: /featureRequests kuralı 26 Tem 2026'da kaldırıldı — landing
     // sayfasındaki "sen iste, biz yapalım" bölümü kaldırıldığı için okuyan ya
@@ -687,11 +714,25 @@ service cloud.firestore {
       allow create: if isOwner(uid) && docId != 'entitlements'
                     && (docId != 'account' || accountCreateOk(uid))
                     && (docId != 'streak' || streakDocOk())
-                    && (docId != 'universes' || universesDocOk());
+                    && (docId != 'universes' || universesDocOk())
+                    && (docId != 'match' || matchDocOk());
       allow update: if isOwner(uid) && docId != 'entitlements'
                     && (docId != 'account' || accountUpdateOk(uid))
                     && (docId != 'streak' || streakDocOk())
-                    && (docId != 'universes' || universesDocOk());
+                    && (docId != 'universes' || universesDocOk())
+                    && (docId != 'match' || matchDocOk());
+      // private/match: Zevk Çemberleri katılımı (services/matchOptIn.js). Kökte DEĞİL: kök belge her
+      // oturumluya açık, kimin katıldığı görünmesin. Yaş (18+) sunucuda private/account'tan yeniden
+      // sınanır; bu belge tek başına havuza sokmaz. Ayrılınca istemci belgeyi siler.
+      function matchDocOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['optIn', 'lanes', 'consentVersion', 'updatedAt'])
+          && d.optIn is bool
+          && d.lanes is list && d.lanes.size() <= 3
+          && d.lanes.toSet().difference(['movie', 'tv', 'anime'].toSet()).size() == 0
+          && d.consentVersion is int && d.consentVersion >= 1
+          && d.updatedAt == request.time;
+      }
       // private/streak: haftalık seri (services/streakRuntime). Damga sunucu saatiyle
       // yazılır; son gün sunucu saatinin en fazla 14 saat ilerisinde olabilir.
       function streakDocOk() {
