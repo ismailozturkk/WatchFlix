@@ -35,6 +35,8 @@ const SERVER_PUSH_MARKER = "server";
 const TYPE_SETTING_KEY = {
   friend_request: "friendRequestsEnabled",
   friend_accepted: "friendAcceptedEnabled",
+  match_mutual: "friendAcceptedEnabled",
+  match_circle: "messagesEnabled",
   post_like: "postLikesEnabled",
   post_comment: "postCommentsEnabled",
   comment_reply: "postCommentsEnabled",

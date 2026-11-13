@@ -118,3 +118,21 @@ test("notificationContent tonu simgeyle birlikte döner", () => {
   expect(notificationContent({ type: "post_like", fromName: "Ada" }, {}, copy)).toMatchObject({ icon: "heart-outline", tone: "red" });
   expect(notificationContent({ type: "x" }, {}, copy)).toMatchObject({ icon: "notifications-outline", tone: "accent" });
 });
+
+describe("Zevk Çemberleri bildirimleri", () => {
+  const { notificationContent: content, notificationDestination: destination } = require("../utils/notificationInbox");
+  const t = { notifBodyMatchMutual: "karşılık", notifBodyMatchCircle: "çember" };
+  test("karşılıklı selam: sohbete; çember: grup sohbetine", () => {
+    expect(destination({ type: "match_mutual", fromUid: "u2", fromName: "Ece" })).toEqual({ name: "ChatScreen", params: { friendUid: "u2", friendName: "Ece" } });
+    expect(destination({ type: "match_circle", groupId: "g1", groupName: "Zevk Çemberi" })).toEqual({ name: "ChatScreen", params: { groupId: "g1", groupName: "Zevk Çemberi" } });
+    expect(destination({ type: "match_circle" })).toBeNull();
+    expect(content({ type: "match_mutual", fromName: "Ece" }, t, {}).action).toBe("karşılık");
+    expect(content({ type: "match_circle", groupName: "Zevk Çemberi", fromName: "Ece" }, t, {}).title).toBe("Zevk Çemberi");
+  });
+  test("6 dilde metin anahtarları var", () => {
+    for (const lang of ["tr", "en", "es", "pt", "de", "it"]) {
+      const json = require(`../translations/${lang}.json`);
+      expect([lang, typeof json.notifBodyMatchMutual, typeof json.notifBodyMatchCircle]).toEqual([lang, "string", "string"]);
+    }
+  });
+});

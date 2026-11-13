@@ -117,3 +117,15 @@ describe("puan görevleri", () => {
     }
   });
 });
+
+describe("eşleşme adımı → puan görevi", () => {
+  const { stepChallengeId } = require("../utils/matchCopy");
+  test("puan adımları gerçek görevlere gider; diğerleri yok", () => {
+    expect(stepChallengeId("movie", { id: "diversify" })).toBe("rateRange5");
+    expect(stepChallengeId("movie", { id: "rate", need: 4 })).toBe("rate10_7");
+    expect(stepChallengeId("movie", { id: "twinRate", need: 30 })).toBe("rate25_30");
+    expect(stepChallengeId("tv", { id: "rate", need: 30 })).toBe("rateShows5");
+    expect(stepChallengeId("movie", { id: "watch", need: 3 })).toBeNull();
+    for (const id of ["rateRange5", "rate10_7", "rate25_30", "rateShows5"]) expect(getChallenge(id)).toBeTruthy();
+  });
+});

@@ -1,7 +1,8 @@
 "use strict";
 
 // Zevk Çemberleri — SUNUCU HATTI, Firestore bağlantısı (rehber Faz 5). Saf kararlar matchPipeline.js'te.
-// index.js yalnız bu fonksiyonları çağırır: onMatchOptInWritten, matchNightly, matchHello, getMatchPairScore.
+// index.js yalnız bu fonksiyonları çağırır: onMatchOptInWritten, matchNightly, matchHello, getMatchPairScore,
+// matchAction (gizle / engelle / şikâyet; opak kimlikle), matchCircleJoin (çember → mevcut grup sohbeti).
 //
 // KOLEKSİYONLAR (hepsi istemciye KAPALI; yalnız MatchSuggestions/{uid} sahibine okunur — firestore.rules):
 //   MatchMembers/{uid}            katılım kaydı { lanes, joinedAt, updatedAt, hello: { day, count } }
@@ -10,6 +11,7 @@
 //   MatchSuggestions/{uid}        sahibin öneri belgesi (aday: opak cid + görünen ad + avatar; uid YOK)
 //   MatchPairs/{uid}              cid → aday uid eşlemesi + ters dizin `uids` (ayrılanı başkalarından silmek için)
 //   MatchHellos/{a_b}             selam durumu { uids:[a,b], lane, from: { uid: ms }, mutualAt? }
+//   MatchCircles/{key}            gece kurulan çember { lane, members, genres, joined: { uid: ms }, groupId? }
 //   TitleFeatures/{movie_123}     TMDB'den yapım özellikleri (kişisel veri yok; 90 günde bir tazelenir)
 //   MatchMeta/salt · MatchMeta/ctx_{lane} · MatchMeta/run   tuz, öğrenilen bağlam, son koşum özeti
 //
@@ -28,7 +30,15 @@ const COL = Object.freeze({
   hellos: "MatchHellos",
   titles: "TitleFeatures",
   meta: "MatchMeta",
+  circles: "MatchCircles",
 });
+/** Grubu kurulmamış çember kaydı bu kadar gün güncellenmezse silinir. */
+const CIRCLE_KEEP_DAYS = 30;
+/** Gizlenen aday listesi tavanı (üyelik belgesi şişmesin; en eskiler düşer). */
+const HIDDEN_MAX = 500;
+/** İstemcideki utils/reportValidation.js REPORT_REASONS ile AYNI. */
+const REPORT_REASONS = Object.freeze(["spam", "harassment", "hate_speech", "sexual_content", "violence", "self_harm", "misinformation", "other"]);
+const CID_RE = /^[A-Za-z0-9_-]{10,40}$/;
 const CTX_MAX_BYTES = 900 * 1024;
 const HELLO_KEEP_DAYS = 30;
 
@@ -97,6 +107,11 @@ async function removeMember(db, uid) {
   del(db.doc(`${COL.profiles}/${uid}`));
   const hellos = await db.collection(COL.hellos).where("uids", "array-contains", uid).get();
   hellos.docs.forEach((d) => del(d.ref));
+  // Çember kayıtlarından çıkar (kurulmuş grup sohbeti bozulmaz; gruptan ayrılmak grup ekranında).
+  const circles = await db.collection(COL.circles).where("members", "array-contains", uid).get();
+  circles.docs.forEach((d) =>
+    writer.update(d.ref, { members: FieldValue.arrayRemove(uid), [`joined.${uid}`]: FieldValue.delete() }).catch(() => {}),
+  );
   await writer.close();
 
   // Başkalarının önerilerinden çıkar (bir sonraki gece işini beklemeden).
@@ -236,7 +251,8 @@ async function runNightly(db, { now = Date.now(), fetchTitle = null, log = () =>
     const { profile, rebuilt: did } = await refreshProfile(db, uid, { lanes, now, cfg });
     if (did) rebuilt += 1;
     cards.set(uid, P.publicCard(user.data()));
-    blocks.set(uid, new Set(blocked.docs.map((d) => d.id)));
+    // Engellenenler + eşleşmede "gizle" denenler: ikisi de skorlanmaz (her iki yönde).
+    blocks.set(uid, new Set([...blocked.docs.map((d) => d.id), ...(Array.isArray(m.hidden) ? m.hidden : [])]));
     members.push({ uid, lanes, adult, profile, lastActive: profile?.lastActive ?? null });
   }
   const active = new Set(members.filter((m) => m.lastActive != null && now - m.lastActive <= cfg.activeDays * P.DAY).map((m) => m.uid));
@@ -267,6 +283,7 @@ async function runNightly(db, { now = Date.now(), fetchTitle = null, log = () =>
   const perOwner = new Map(members.map((m) => [m.uid, { lanes: {}, map: {}, uids: new Set() }]));
   const builtWriter = db.bulkWriter();
   const stats = {};
+  const circleDocs = new Map(); // key → { lane, members, genres }
   for (const lane of P.MATCH_LANES) {
     const pool = pools[lane];
     const activeInLane = pool.filter((m) => active.has(m.uid)).length;
@@ -278,6 +295,7 @@ async function runNightly(db, { now = Date.now(), fetchTitle = null, log = () =>
       const key = P.circleKey(salt, lane, members_);
       const genres = P.circleGenres(members_.map((u) => pool.find((m) => m.uid === u).profile.lanes[lane].items));
       for (const u of members_) circleOf.set(u, { key, size: members_.length, genres });
+      circleDocs.set(key, { lane, members: [...members_].sort(), genres });
     }
     await db.doc(`${COL.meta}/ctx_${lane}`).set({ updatedAt: now, poolSize: pool.length, ...storableContext(ctx) });
     for (const [uid, prof] of profiles) builtWriter.set(db.doc(`${COL.profiles}/${uid}/built/${lane}`), { builtAt: now, json: JSON.stringify(prof) }).catch(() => {});
@@ -298,12 +316,32 @@ async function runNightly(db, { now = Date.now(), fetchTitle = null, log = () =>
   }
   await builtWriter.close();
 
+  // 4b) Çember durumu (katılan / kurulan grup) önceki kayıtlardan; öneriye eklenir.
+  const circleState = new Map();
+  const circleRefs = [...circleDocs.keys()].map((key) => db.doc(`${COL.circles}/${key}`));
+  if (circleRefs.length) {
+    for (const snap of await db.getAll(...circleRefs)) {
+      if (snap.exists) circleState.set(snap.id, { joined: snap.get("joined") || {}, groupId: snap.get("groupId") || null });
+    }
+  }
+  for (const [uid, o] of perOwner) {
+    for (const entry of Object.values(o.lanes)) {
+      if (!entry.circle) continue;
+      const st = circleState.get(entry.circle.key) || { joined: {}, groupId: null };
+      entry.circle = P.circleView(entry.circle, st, uid);
+    }
+  }
+
   // 5) Belgeler.
   const writer = db.bulkWriter();
   for (const [uid, o] of perOwner) {
     writer.set(db.doc(`${COL.suggestions}/${uid}`), { v: 1, updatedAt: now, lanes: o.lanes }).catch(() => {});
     writer.set(db.doc(`${COL.pairs}/${uid}`), { updatedAt: now, map: o.map, uids: [...o.uids].sort() }).catch(() => {});
   }
+  for (const [key, c] of circleDocs) writer.set(db.doc(`${COL.circles}/${key}`), { ...c, updatedAt: now }, { merge: true }).catch(() => {});
+  // Grubu kurulmamış, uzun süredir oluşmayan çember kayıtları silinir.
+  const staleCircles = await db.collection(COL.circles).where("updatedAt", "<", now - CIRCLE_KEEP_DAYS * P.DAY).get();
+  staleCircles.docs.filter((d) => !d.get("groupId")).forEach((d) => writer.delete(d.ref).catch(() => {}));
   const stale = await db.collection(COL.hellos).where("createdAt", "<", now - HELLO_KEEP_DAYS * P.DAY).get();
   // 30 günü geçen selam kayıtları silinir (karşılıklıysa arkadaşlık zaten kuruldu; kayıt artık gereksiz).
   stale.docs.forEach((d) => writer.delete(d.ref).catch(() => {}));
@@ -330,7 +368,7 @@ const metaOf = (uid, data) => ({
  * @returns {Promise<{ status: "sent"|"mutual"|"already" }>}
  */
 async function sendHello(db, uid, { cid } = {}, { now = Date.now() } = {}) {
-  if (typeof cid !== "string" || !/^[A-Za-z0-9_-]{10,40}$/.test(cid)) throw new MatchError("invalid-argument");
+  if (typeof cid !== "string" || !CID_RE.test(cid)) throw new MatchError("invalid-argument");
   const config = await readConfig(db);
   if (!config.enabled) throw new MatchError("failed-precondition", "disabled");
   const pairSnap = await db.doc(`${COL.pairs}/${uid}`).get();
@@ -372,23 +410,26 @@ async function sendHello(db, uid, { cid } = {}, { now = Date.now() } = {}) {
     tx.set(helloRef, { uids: [uid, other].sort(), lane, from, createdAt: hello.exists ? hello.get("createdAt") : now, ...(mutual ? { mutualAt: now } : {}) });
 
     // Öneri belgelerinde bayraklar: bende "gönderdim", onda "selam verdi".
-    const flag = (sugSnap, cidOf, field) => {
+    const flag = (sugSnap, cidOf, patch) => {
       if (!sugSnap.exists) return null;
       const lanes = { ...(sugSnap.get("lanes") || {}) };
       let hit = false;
       for (const [l, e] of Object.entries(lanes)) {
-        lanes[l] = { ...e, items: (e.items || []).map((it) => (cidOf(it.cid) ? ((hit = true), { ...it, [field]: true }) : it)) };
+        lanes[l] = { ...e, items: (e.items || []).map((it) => (cidOf(it.cid) ? ((hit = true), { ...it, ...patch }) : it)) };
       }
       return hit ? lanes : null;
     };
-    const myLanes = flag(mySug, (c) => c === cid, "sent");
+    // Karşılıklıysa iki taraf artık arkadaş: kartta sohbet açmak için karşı tarafın uid'si yazılır.
+    const myLanes = flag(mySug, (c) => c === cid, mutual ? { sent: true, mutual: true, friendUid: other } : { sent: true });
     if (myLanes) tx.update(mySug.ref, { lanes: myLanes });
     const theirMap = theirPairs.exists ? theirPairs.get("map") || {} : {};
-    const theirLanes = flag(theirSug, (c) => theirMap[c]?.uid === uid, "greeted");
+    const theirLanes = flag(theirSug, (c) => theirMap[c]?.uid === uid, mutual ? { greeted: true, mutual: true, friendUid: uid } : { greeted: true });
     if (theirLanes) tx.update(theirSug.ref, { lanes: theirLanes });
 
     if (!mutual) return { status: "sent" };
-    if (friendSnap.exists) return { status: "mutual" };
+    // Karşılıklı: artık arkadaşlar → uid ve ad döner (sohbet açmak için; arkadaşlık belgesi zaten gösterir).
+    const done = { status: "mutual", friendUid: other, friendName: metaOf(other, otherUser.data()).displayName };
+    if (friendSnap.exists) return done;
     const me = metaOf(uid, meUser.data());
     const them = metaOf(other, otherUser.data());
     const since = FieldValue.serverTimestamp();
@@ -413,7 +454,7 @@ async function sendHello(db, uid, { cid } = {}, { now = Date.now() } = {}) {
     tx.update(db.doc(`Users/${other}`), theirCounters);
     const notify = (to, by) =>
       tx.set(db.collection(`Users/${to}/notifications`).doc(), {
-        type: "friend_accepted",
+        type: "match_mutual",
         source: "match",
         fromUid: by.uid,
         fromName: by.displayName,
@@ -424,7 +465,190 @@ async function sendHello(db, uid, { cid } = {}, { now = Date.now() } = {}) {
       });
     notify(uid, them);
     notify(other, me);
-    return { status: "mutual" };
+    return done;
+  });
+}
+
+// ── gizle / engelle / şikâyet (opak kimlikle; istemci adayın uid'sini bilmez) ───────────────
+
+/** Sahibin önerisinden ve eşlemesinden tek adayı çıkarır (gece işini beklemeden). */
+async function dropCandidate(db, uid, cid) {
+  await db.runTransaction(async (tx) => {
+    const pairRef = db.doc(`${COL.pairs}/${uid}`);
+    const sugRef = db.doc(`${COL.suggestions}/${uid}`);
+    const [pairSnap, sugSnap] = await Promise.all([tx.get(pairRef), tx.get(sugRef)]);
+    if (pairSnap.exists) {
+      const map = { ...(pairSnap.get("map") || {}) };
+      const other = map[cid]?.uid;
+      delete map[cid];
+      const still = new Set(Object.values(map).map((v) => v.uid));
+      // update: `map` alanı BÜTÜNÜYLE değişir (merge'lü set iç içe haritayı birleştirip silineni geri bırakırdı).
+      tx.update(pairRef, { map, uids: (pairSnap.get("uids") || []).filter((u) => u !== other || still.has(u)) });
+    }
+    if (sugSnap.exists) {
+      const lanes = { ...(sugSnap.get("lanes") || {}) };
+      for (const [lane, entry] of Object.entries(lanes)) {
+        lanes[lane] = { ...entry, items: (entry.items || []).filter((it) => it.cid !== cid) };
+      }
+      tx.update(sugRef, { lanes });
+    }
+  });
+}
+
+/**
+ * Kartın "…" menüsü. Üçü de adayı GİZLER (bir daha önerilmez; iki yönde skorlanmaz):
+ *   hide   — yalnız gizle
+ *   block  — + Users/{uid}/blocked/{aday} (istemcideki blockUser ile aynı belge; arkadaşsa arkadaşlık biter)
+ *   report — + ContentReports (istemcideki reportUser şekli, `source: "match"`)
+ * @returns {Promise<{ status: "ok" }>}
+ */
+async function matchAction(db, uid, { cid, action, reason } = {}) {
+  if (typeof cid !== "string" || !CID_RE.test(cid)) throw new MatchError("invalid-argument");
+  if (!["hide", "block", "report"].includes(action)) throw new MatchError("invalid-argument");
+  const pairSnap = await db.doc(`${COL.pairs}/${uid}`).get();
+  const other = pairSnap.exists ? (pairSnap.get("map") || {})[cid]?.uid : null;
+  if (!other || other === uid) throw new MatchError("not-found");
+  if (action === "block") {
+    const batch = db.batch();
+    batch.set(db.doc(`Users/${uid}/blocked/${other}`), { blockedAt: FieldValue.serverTimestamp() });
+    const friend = await db.doc(`Users/${uid}/friends/${other}`).get();
+    if (friend.exists) {
+      batch.delete(friend.ref);
+      batch.delete(db.doc(`Users/${other}/friends/${uid}`));
+      batch.update(db.doc(`Users/${uid}`), { friendsCount: FieldValue.increment(-1) });
+      batch.update(db.doc(`Users/${other}`), { friendsCount: FieldValue.increment(-1) });
+    }
+    await batch.commit();
+  }
+  if (action === "report") {
+    const target = await db.doc(`Users/${other}`).get();
+    await db.collection("ContentReports").add({
+      type: "user",
+      targetPath: `Users/${other}`,
+      targetUserId: other,
+      reporterId: uid,
+      targetPreview: String(target.get("displayName") || "").trim().slice(0, 200),
+      reason: REPORT_REASONS.includes(reason) ? reason : "other",
+      source: "match",
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  const memberRef = db.doc(`${COL.members}/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(memberRef);
+    if (!snap.exists) return;
+    const hidden = (snap.get("hidden") || []).filter((u) => u !== other);
+    hidden.push(other);
+    tx.update(memberRef, { hidden: hidden.slice(-HIDDEN_MAX) });
+  });
+  await dropCandidate(db, uid, cid);
+  return { status: "ok" };
+}
+
+// ── çember → grup sohbeti ────────────────────────────────────────────────────
+
+// Kullanıcı adı YAZILMAZ: gizlilik metni 1.8 "eşleşmede kullanıcı adınız gösterilmez" (grup kartında görünen ad + avatar).
+const memberInfoOf = (data) => ({
+  name: data?.displayName || "",
+  username: "",
+  avatarIndex: Number.isFinite(data?.avatarIndex) ? data.avatarIndex : 0,
+  photoURL: data?.photoURL || null,
+});
+
+/**
+ * Çembere katıl. Gece işi çemberi yalnız ÖNERİR; grup, en az `circleMin` üye "katıl" deyince kurulur
+ * (mevcut `groups` şekli: CreateGroupScreen ile aynı alanlar, `source: "match"`). Kurulduktan sonra katılan
+ * gruba eklenir. Katılan biri diğer katılanlardan biriyle engelliyse katılım reddedilir. Grup kurulunca diğer
+ * katılanlara `match_circle` bildirimi gider. Katılmayan üyenin uid'si kimseye açılmaz.
+ * @param {{ lane: "movie"|"tv", name?: string }} input name = grubun adı (istemci dilinde)
+ * @returns {Promise<{ status: "waiting"|"group", joined: number, size: number, groupId: string|null }>}
+ */
+async function joinCircle(db, uid, { lane, name } = {}, { now = Date.now() } = {}) {
+  if (!P.MATCH_LANES.includes(lane)) throw new MatchError("invalid-argument");
+  const config = await readConfig(db);
+  if (!config.enabled) throw new MatchError("failed-precondition", "disabled");
+  const sug = await db.doc(`${COL.suggestions}/${uid}`).get();
+  const key = sug.exists ? sug.get("lanes")?.[lane]?.circle?.key : null;
+  if (typeof key !== "string" || !key) throw new MatchError("not-found");
+  const circleRef = db.doc(`${COL.circles}/${key}`);
+  const groupName = String(name || "").trim().slice(0, 40) || "Seelogd";
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(circleRef);
+    const members = snap.exists ? snap.get("members") || [] : [];
+    if (!members.includes(uid)) throw new MatchError("not-found");
+    const joined = { ...(snap.get("joined") || {}) };
+    let groupId = snap.get("groupId") || null;
+    const result = (extra = {}) => ({
+      status: groupId ? "group" : "waiting",
+      joined: Object.keys(joined).filter((u) => members.includes(u)).length,
+      size: members.length,
+      groupId,
+      ...extra,
+    });
+    if (joined[uid]) return result();
+    const others = Object.keys(joined).filter((u) => members.includes(u) && u !== uid);
+    const blockSnaps = await Promise.all(
+      others.flatMap((o) => [tx.get(db.doc(`Users/${o}/blocked/${uid}`)), tx.get(db.doc(`Users/${uid}/blocked/${o}`))]),
+    );
+    if (blockSnaps.some((s) => s.exists)) throw new MatchError("failed-precondition", "blocked");
+    joined[uid] = now;
+    const ids = [...others, uid].sort((a, b) => joined[a] - joined[b] || (a < b ? -1 : 1));
+    const [users, sugSnaps] = await Promise.all([
+      Promise.all(ids.map((u) => tx.get(db.doc(`Users/${u}`)))),
+      Promise.all(members.map((u) => tx.get(db.doc(`${COL.suggestions}/${u}`)))),
+    ]);
+    // Kurulan grup sonradan silindiyse (kurucu sildi) çember yeniden kurulabilir.
+    if (groupId && !(await tx.get(db.doc(`groups/${groupId}`))).exists) groupId = null;
+    const ts = FieldValue.serverTimestamp();
+    let created = false;
+    if (groupId) {
+      tx.update(db.doc(`groups/${groupId}`), {
+        members: FieldValue.arrayUnion(uid),
+        [`memberInfo.${uid}`]: memberInfoOf(users[ids.indexOf(uid)].data()),
+        updatedAt: ts,
+      });
+    } else if (ids.length >= config.server.circleMin) {
+      const groupRef = db.collection("groups").doc();
+      groupId = groupRef.id;
+      created = true;
+      tx.set(groupRef, {
+        name: groupName,
+        color: "#8B5CF6",
+        avatarIndex: 0,
+        members: ids,
+        memberInfo: Object.fromEntries(ids.map((u, i) => [u, memberInfoOf(users[i].data())])),
+        admins: [],
+        createdBy: ids[0],
+        createdAt: ts,
+        updatedAt: ts,
+        lastMessage: null,
+        source: "match",
+      });
+      const me = metaOf(uid, users[ids.indexOf(uid)].data());
+      for (const to of ids.filter((u) => u !== uid)) {
+        tx.set(db.collection(`Users/${to}/notifications`).doc(), {
+          type: "match_circle",
+          source: "match",
+          groupId,
+          groupName,
+          fromUid: uid,
+          fromName: me.displayName,
+          fromAvatarIndex: me.avatarIndex,
+          fromPhotoURL: me.photoURL,
+          read: false,
+          createdAt: ts,
+        });
+        tx.update(db.doc(`Users/${to}`), { unreadNotifsCount: FieldValue.increment(1) });
+      }
+    }
+    tx.set(circleRef, { joined, groupId: groupId || FieldValue.delete() }, { merge: true });
+    // Üyelerin öneri belgelerinde sayaç (+ katılanlara grup kimliği) hemen güncellenir.
+    sugSnaps.forEach((s, i) => {
+      const circle = s.exists ? s.get("lanes")?.[lane]?.circle : null;
+      if (!circle || circle.key !== key) return;
+      tx.update(s.ref, { [`lanes.${lane}.circle`]: P.circleView(circle, { joined, groupId }, members[i]) });
+    });
+    return result({ created });
   });
 }
 
@@ -488,4 +712,20 @@ function tmdbFetcher(apiKey, fetchImpl = fetch) {
   };
 }
 
-module.exports = { COL, MatchError, readConfig, ensureSalt, syncMember, removeMember, refreshProfile, loadTitleFeatures, runNightly, sendHello, pairScore, tmdbFetcher, storableContext };
+module.exports = {
+  COL,
+  MatchError,
+  readConfig,
+  ensureSalt,
+  syncMember,
+  removeMember,
+  refreshProfile,
+  loadTitleFeatures,
+  runNightly,
+  sendHello,
+  matchAction,
+  joinCircle,
+  pairScore,
+  tmdbFetcher,
+  storableContext,
+};

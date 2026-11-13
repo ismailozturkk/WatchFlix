@@ -77,12 +77,18 @@ test("katılım → gece işi → selam → arkadaşlık → ayrılma", { skip }
     await assert.rejects(M.sendHello(db, "bob", { cid: "yanlis_kimlik_123" }, { now: NOW }), { code: "not-found" });
 
     // Karşılıklı → arkadaşlık + iki tarafa bildirim.
-    assert.deepEqual(await M.sendHello(db, "bob", { cid: aliceCard.cid }, { now: NOW }), { status: "mutual" });
+    assert.deepEqual(await M.sendHello(db, "bob", { cid: aliceCard.cid }, { now: NOW }), { status: "mutual", friendUid: "alice", friendName: "alice görünen" });
     assert.equal((await db.doc("Users/alice/friends/bob").get()).get("friendUsername"), "bob_kadi");
     assert.equal((await db.doc("Users/bob/friends/alice").get()).exists, true);
+    // Karşılıklıdan sonra iki kartta da sohbet için arkadaşın uid'si (artık arkadaşlar).
+    const aliceAfter = (await db.doc("MatchSuggestions/alice").get()).data().lanes.movie.items.find((it) => it.cid === bobCard.cid);
+    assert.equal(aliceAfter.mutual, true);
+    assert.equal(aliceAfter.friendUid, "bob");
+    const bobAfter = (await db.doc("MatchSuggestions/bob").get()).data().lanes.movie.items.find((it) => it.cid === aliceCard.cid);
+    assert.equal(bobAfter.friendUid, "alice");
     assert.equal((await db.doc("Users/alice").get()).get("friendsCount"), 1);
     const notes = await db.collection("Users/alice/notifications").get();
-    assert.equal(notes.docs[0].get("type"), "friend_accepted");
+    assert.equal(notes.docs[0].get("type"), "match_mutual");
     assert.equal(notes.docs[0].get("source"), "match");
 
     // Arkadaş kartı sunucu skoru: yalnız arkadaşa; yapım anahtarı dönmez.

@@ -45,6 +45,7 @@ beforeEach(async () => {
     await setDoc(doc(db, "MatchHellos", `${ALICE}_${BOB}`), { uids: [ALICE, BOB] });
     await setDoc(doc(db, "MatchMeta", "salt"), { salt: "x" });
     await setDoc(doc(db, "TitleFeatures", "movie_1"), { type: "movie" });
+    await setDoc(doc(db, "MatchCircles", "c1"), { members: [ALICE, BOB] });
   });
 });
 
@@ -65,6 +66,7 @@ test("profil, üyelik, eşleme, selam, bağlam ve yapım özellikleri: sahibine 
     ["MatchHellos", `${ALICE}_${BOB}`],
     ["MatchMeta", "salt"],
     ["TitleFeatures", "movie_1"],
+    ["MatchCircles", "c1"],
   ];
   for (const p of paths) {
     await assertFails(getDoc(doc(alice, ...p)));

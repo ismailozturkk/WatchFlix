@@ -150,6 +150,8 @@
   "notifChannelSocial": "Sociale",
   "notifBodyFriendRequest": "👤 ti ha inviato una richiesta di amicizia",
   "notifBodyFriendAccepted": "🤝 ha accettato la tua richiesta di amicizia",
+  "notifBodyMatchMutual": "✨ ha ricambiato il saluto: ora siete amici",
+  "notifBodyMatchCircle": "⭕ La tua Cerchia di gusto è pronta: entra nella chat",
   "notifBodyPostLike": "❤️ è piaciuto il tuo post",
   "notifBodyPostComment": "💬 ha commentato il tuo post",
   "notifBodyPostCommentText": "💬 ha commentato: {text}",

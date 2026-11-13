@@ -447,8 +447,16 @@ describe("DM mesajlari", () => {
     ...extra,
   });
 
-  test("uye kendi uid'iyle mesaj yazabilir", async () => {
+  test("uye kendi uid'iyle mesaj yazabilir (arkadaşsa)", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE, "friends", BOB), { friendUid: BOB }));
     await assertSucceeds(
+      addDoc(collection(alice, "chats", CHAT, "messages"), mesaj(ALICE)),
+    );
+  });
+
+  // 13 Kas: 1-1 yeni mesaj yalnız arkadaşa (sohbet kimliğini bilen yabancı yazamaz).
+  test("arkadaş olmayan üye mesaj YAZAMAZ", async () => {
+    await assertFails(
       addDoc(collection(alice, "chats", CHAT, "messages"), mesaj(ALICE)),
     );
   });

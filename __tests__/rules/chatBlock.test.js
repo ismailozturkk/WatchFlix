@@ -32,6 +32,11 @@ beforeEach(async () => {
     await setDoc(doc(db, `chats/${chatId(ALICE, CAROL)}`), { participants: [ALICE, CAROL].sort() });
     await setDoc(doc(db, `Users/${BOB}/conversations/${ALICE}`), { withUid: ALICE, lastText: "selam" });
     await setDoc(doc(db, `Users/${ALICE}/conversations/${BOB}`), { withUid: BOB, lastText: "selam" });
+    // 1-1 mesaj yalnız arkadaşa (firestore.rules isFriendWith): iki çift de arkadaş.
+    for (const [a, b] of [[ALICE, BOB], [ALICE, CAROL]]) {
+      await setDoc(doc(db, `Users/${a}/friends/${b}`), { friendUid: b });
+      await setDoc(doc(db, `Users/${b}/friends/${a}`), { friendUid: a });
+    }
   });
 });
 

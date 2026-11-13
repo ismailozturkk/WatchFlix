@@ -28,6 +28,7 @@ import StreakFlame from "../../../components/streak/StreakFlame";
 import { SKIA_FLAME_READY } from "../../../components/streak/SkiaStreakFlame";
 import DevPlanSimulatorCard from "../../../components/settings/DevPlanSimulatorCard";
 import DevTasteShadowCard from "../../../components/settings/DevTasteShadowCard";
+import DevMatchLab from "../../../components/settings/DevMatchLab";
 import toast from "../../../components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -489,6 +490,9 @@ export default function DevLabScreen() {
 
       <SectionLabel color={C.muted}>Zevk uyumu: eski / yeni (gölge mod)</SectionLabel>
       <DevTasteShadowCard C={C} />
+
+      <SectionLabel color={C.muted}>Zevk Çemberleri: öneri durumları (sahte veri)</SectionLabel>
+      <DevMatchLab C={C} language={language} />
 
       <SectionLabel color={C.muted}>Diğer</SectionLabel>
       <Card C={C} style={styles.listCard}>

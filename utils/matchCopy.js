@@ -343,6 +343,29 @@ export const MATCH_COPY = {
 /** Bilinmeyen dil İngilizce (utils/appLanguages kuralı). */
 export const getMatchCopy = (language) => MATCH_COPY[copyLanguage(language, Object.keys(MATCH_COPY))];
 
+const CHALLENGE_LINK = {
+  tr: "Puan görevine katıl",
+  en: "Join a rating challenge",
+  es: "Únete a un reto de puntuación",
+  pt: "Participe de um desafio de notas",
+  de: "Bei einer Bewertungs-Challenge mitmachen",
+  it: "Partecipa a una sfida di voti",
+};
+/** Puan adımını hızlandıran Meydan Okuma düğmesinin metni. */
+export const challengeLinkLabel = (language) => CHALLENGE_LINK[copyLanguage(language, Object.keys(CHALLENGE_LINK))];
+
+/**
+ * Sonraki adım puanla ilgiliyse ona uyan Meydan Okuma (utils/watchChallenges "ratings" grubu); değilse null.
+ * Çeşitlilik → ölçeğin tamamı; dizi kulvarı → 5 dizi; az eksik → haftalık 10, çok eksik → aylık 25.
+ */
+export function stepChallengeId(lane, next) {
+  const id = next?.id;
+  if (id === "diversify") return "rateRange5";
+  if (id !== "rate" && id !== "twinRate") return null;
+  if (lane === "tv") return "rateShows5";
+  return Number(next.need) > 10 ? "rate25_30" : "rate10_7";
+}
+
 /** Bir kulvarın sonraki adım metni. */
 export const stepText = (copy, next) => {
   const fn = copy.step[next?.id];

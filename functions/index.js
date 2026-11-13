@@ -1547,6 +1547,8 @@ const STRINGS = {
     game_challenge: "⚔️ seni günlük düelloya davet etti",
     friend_request: "👤 sana arkadaşlık isteği gönderdi",
     friend_accepted: "🤝 arkadaşlık isteğini kabul etti",
+    match_mutual: "✨ selamına karşılık verdi — artık arkadaşsınız",
+    match_circle: "⭕ Zevk Çemberin hazır — sohbete katıl",
     post_like: "❤️ gönderini beğendi",
     post_comment: "💬 gönderine yorum yaptı",
     post_comment_text: "💬 yorum yaptı: {text}",
@@ -1565,6 +1567,8 @@ const STRINGS = {
     game_challenge: "⚔️ challenged you to a daily duel",
     friend_request: "👤 sent you a friend request",
     friend_accepted: "🤝 accepted your friend request",
+    match_mutual: "✨ said hi back — you're friends now",
+    match_circle: "⭕ Your Taste Circle is ready — join the chat",
     post_like: "❤️ liked your post",
     post_comment: "💬 commented on your post",
     post_comment_text: "💬 commented: {text}",
@@ -1583,6 +1587,8 @@ const STRINGS = {
     game_challenge: "⚔️ te retó a un duelo diario",
     friend_request: "👤 te ha enviado una solicitud de amistad",
     friend_accepted: "🤝 ha aceptado tu solicitud de amistad",
+    match_mutual: "✨ te devolvió el saludo: ya sois amigos",
+    match_circle: "⭕ Tu Círculo de gusto está listo: únete al chat",
     post_like: "❤️ le ha dado me gusta a tu publicación",
     post_comment: "💬 ha comentado tu publicación",
     post_comment_text: "💬 ha comentado: {text}",
@@ -1601,6 +1607,8 @@ const STRINGS = {
     game_challenge: "⚔️ desafiou você para um duelo diário",
     friend_request: "👤 enviou um pedido de amizade para você",
     friend_accepted: "🤝 aceitou seu pedido de amizade",
+    match_mutual: "✨ retribuiu seu oi — agora vocês são amigos",
+    match_circle: "⭕ Seu Círculo de gosto está pronto — entre na conversa",
     post_like: "❤️ curtiu sua publicação",
     post_comment: "💬 comentou na sua publicação",
     post_comment_text: "💬 comentou: {text}",
@@ -1619,6 +1627,8 @@ const STRINGS = {
     game_challenge: "⚔️ hat dich zu einem Tagesduell herausgefordert",
     friend_request: "👤 hat dir eine Freundschaftsanfrage gesendet",
     friend_accepted: "🤝 hat deine Freundschaftsanfrage angenommen",
+    match_mutual: "✨ hat zurückgegrüßt – ihr seid jetzt befreundet",
+    match_circle: "⭕ Dein Geschmackskreis ist bereit – komm in den Chat",
     post_like: "❤️ gefällt dein Beitrag",
     post_comment: "💬 hat deinen Beitrag kommentiert",
     post_comment_text: "💬 hat kommentiert: {text}",
@@ -1637,6 +1647,8 @@ const STRINGS = {
     game_challenge: "⚔️ ti ha sfidato a un duello giornaliero",
     friend_request: "👤 ti ha inviato una richiesta di amicizia",
     friend_accepted: "🤝 ha accettato la tua richiesta di amicizia",
+    match_mutual: "✨ ha ricambiato il saluto: ora siete amici",
+    match_circle: "⭕ La tua Cerchia di gusto è pronta: entra nella chat",
     post_like: "❤️ ha messo Mi piace al tuo post",
     post_comment: "💬 ha commentato il tuo post",
     post_comment_text: "💬 ha commentato: {text}",
@@ -1668,6 +1680,10 @@ function buildContent(n, lang) {
       return { title: name, body: S.friend_request };
     case "friend_accepted":
       return { title: name, body: S.friend_accepted };
+    case "match_mutual":
+      return { title: name, body: S.match_mutual };
+    case "match_circle":
+      return { title: n.groupName || name, body: S.match_circle };
     case "post_like":
       return { title: name, body: S.post_like };
     case "post_comment":
@@ -2981,6 +2997,24 @@ exports.matchHello = onCall(CAPACITY.light, async (request) => {
 
 // Arkadaş kartı için sunucu skoru (iki arkadaş da havuzdaysa). Yapım anahtarı dönmez.
 const pairScoreAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 60 * 1000 });
+// Kartın menüsü: gizle / engelle / şikâyet (opak kimlikle; adayın uid'si istemciye hiç gelmez).
+const matchActionAllow = externalRatings.createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
+exports.matchAction = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  if (!matchActionAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
+  const { cid, action, reason } = request.data || {};
+  return matchServer.matchAction(db, request.auth.uid, { cid, action, reason }).catch(matchError);
+});
+
+// Çembere katıl: yeterli üye katılınca mevcut grup sohbeti kurulur, sonra katılan gruba eklenir.
+const matchCircleAllow = externalRatings.createRateLimiter({ limit: 10, windowMs: 60 * 1000 });
+exports.matchCircleJoin = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  if (!matchCircleAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
+  const { lane, name } = request.data || {};
+  return matchServer.joinCircle(db, request.auth.uid, { lane, name }).catch(matchError);
+});
+
 exports.getMatchPairScore = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   if (!pairScoreAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");

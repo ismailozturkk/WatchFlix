@@ -100,6 +100,9 @@ import { useListStatusContext } from "../../../context/ListStatusContext";
 import TasteMatchCard from "../../../components/friends/TasteMatchCard";
 import { candidatesToDeckSource, computeTasteMatch, findTogetherCandidates } from "../../../utils/tasteMatch";
 import { shadowCompare } from "../../../utils/tasteMatchV3Adapter";
+import useMatchFeature from "../../../hooks/useMatchFeature";
+import { fetchMatchPairScore } from "../../../services/matchSuggestions";
+import { applyServerPairScore } from "../../../utils/matchSuggestions";
 import { recordTasteShadow } from "../../../services/tasteShadowLog";
 import { buildTasteMatchShare, chatParamsForShare } from "../../../utils/chatShare";
 import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
@@ -788,7 +791,22 @@ export default function FriendProfileScreen({ route, navigation }) {
     [myLists.watchedMoviesItems, myLists.watchedTvMap, myLists.watchListItems, myLists.favoritesItems, myLists.activityIndex],
   );
   const tasteReady = !!friendSide && !myLists.loading && !!myLists.watchedTvLoaded;
-  const tasteMatch = useMemo(() => (tasteReady ? computeTasteMatch(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
+  // Zevk Çemberleri (Faz 6): iki arkadaş da havuzdaysa yüzde SUNUCUDAN (eşleşme kartıyla aynı sayı). Yalnız kapı
+  // açıkken (bayrak + 18+) sorulur; cevap cihazda 24 saat önbellekli. Biri havuzda değilse istemci hesabı kalır.
+  const matchAvailable = useMatchFeature({ subscribe: false }).available;
+  const [serverPair, setServerPair] = useState(null);
+  useEffect(() => {
+    if (preview || !matchAvailable || !currentUser?.uid || !friendUid) return undefined;
+    let alive = true;
+    fetchMatchPairScore(currentUser.uid, friendUid).then((result) => alive && setServerPair(result));
+    return () => {
+      alive = false;
+    };
+  }, [preview, matchAvailable, currentUser?.uid, friendUid]);
+  const tasteMatch = useMemo(
+    () => (tasteReady ? applyServerPairScore(computeTasteMatch(mySide, friendSide), serverPair) : null),
+    [tasteReady, mySide, friendSide, serverPair],
+  );
   const together = useMemo(() => (tasteReady ? findTogetherCandidates(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
   // Zevk uyumu kartı 13 Kas'tan beri v3 yüzdesini gösterir. Bu blok (yalnız __DEV__) kulvar ayrıntısını
   // ve ESKİ (v2) skoru Geliştirici Laboratuvarı > "Zevk uyumu: eski / yeni" tablosuna yazar.

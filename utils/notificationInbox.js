@@ -72,6 +72,8 @@ export function notificationDateLabel(item, language, copy, now = Date.now()) {
 const TYPES = {
   friend_request: ["person-add-outline", "notifBodyFriendRequest"],
   friend_accepted: ["people-outline", "notifBodyFriendAccepted"],
+  match_mutual: ["sparkles-outline", "notifBodyMatchMutual"],
+  match_circle: ["people-circle-outline", "notifBodyMatchCircle"],
   post_like: ["heart-outline", "notifBodyPostLike"],
   post_comment: ["chatbubble-outline", "notifBodyPostComment"],
   comment_reply: ["return-down-forward-outline", "notifBodyCommentReply"],
@@ -90,6 +92,8 @@ const TYPES = {
 const TONES = {
   friend_request: "blue",
   friend_accepted: "green",
+  match_mutual: "purple",
+  match_circle: "purple",
   post_like: "red",
   post_comment: "purple",
   comment_reply: "purple",
@@ -151,6 +155,12 @@ export function notificationDestination(item) {
   }
   if (item.type === "cineswipe_result") return cineResultDestination(item);
   if (item.type === "friend_request") return { name: "FriendRequestsScreen" };
+  if (item.type === "match_mutual" && item.fromUid) {
+    return { name: "ChatScreen", params: { friendUid: item.fromUid, friendName: item.fromName || "" } };
+  }
+  if (item.type === "match_circle" && item.groupId) {
+    return { name: "ChatScreen", params: { groupId: item.groupId, groupName: item.groupName || "" } };
+  }
   if (item.type === "friend_accepted" && item.fromUid) return {
     name: "FriendProfileScreen", params: { friendUid: item.fromUid, friendName: item.fromName || "" },
   };

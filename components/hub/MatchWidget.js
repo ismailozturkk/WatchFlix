@@ -2,7 +2,8 @@
 //
 // Hub'daki "Zevk Çemberleri" kartı (Faz 4). HubScreen yalnız `match.available` iken (bayrak açık +
 // 18+ kanıtlı) çizer. Katılmamışsa davet; katıldıysa kulvar başına güç çubuğu + TEK sonraki adım.
-// Dokununca Ayarlar > Zevk Çemberleri. Güç: hooks/useMatchStrength (yeni okuma yok).
+// Dokununca: katıldıysa Önerilerim (screens/match/MatchScreen), değilse Ayarlar > Zevk Çemberleri.
+// Güç: hooks/useMatchStrength (yeni okuma yok).
 //
 // Ölçüm: services/matchAnalytics.js (kimlik/skor yok).
 
@@ -33,7 +34,7 @@ function MatchWidget({ navigation, match }) {
       colors={COLORS}
       shadowColor={SHADOW}
       cardStyle={styles.card}
-      onPress={() => navigation.navigate("MatchSettingsScreen")}
+      onPress={() => navigation.navigate(match?.optedIn ? "MatchScreen" : "MatchSettingsScreen")}
       accessibilityRole="button"
       accessibilityLabel={`${copy.hub.title}, ${match?.optedIn ? copy.hub.hint : copy.hub.notJoined}`}
     >

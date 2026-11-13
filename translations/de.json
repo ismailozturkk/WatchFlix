@@ -150,6 +150,8 @@
   "notifChannelSocial": "Soziales",
   "notifBodyFriendRequest": "👤 hat dir eine Freundschaftsanfrage gesendet",
   "notifBodyFriendAccepted": "🤝 hat deine Freundschaftsanfrage angenommen",
+  "notifBodyMatchMutual": "✨ hat zurückgegrüßt – ihr seid jetzt befreundet",
+  "notifBodyMatchCircle": "⭕ Dein Geschmackskreis ist bereit – komm in den Chat",
   "notifBodyPostLike": "❤️ gefällt dein Beitrag",
   "notifBodyPostComment": "💬 hat deinen Beitrag kommentiert",
   "notifBodyPostCommentText": "💬 hat kommentiert: {text}",

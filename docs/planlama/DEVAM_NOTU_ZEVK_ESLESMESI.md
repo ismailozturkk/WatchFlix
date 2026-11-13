@@ -231,12 +231,47 @@ TitleFeatures okuması. İstemci: öneri belgesi 1 okuma (Faz 6).
 4. Güvenlik notu (rehber Faz 5): sohbet kuralında arkadaşlık şartı yok (`isChatMember` yalnız chatId'ye
    bakıyor). Eşleşme uid sızdırmadığı için bu hattı etkilemiyor ama ayrı iş olarak ele alınmalı.
 
+## Bitti: Faz 6 — arayüz + çember + bildirim (13 Kas) — cihazda GÖRÜLMEDİ
+
+| Dosya | İçerik |
+|---|---|
+| `utils/matchSuggestions.js` | Saf görünüm modeli: belge doğrulama (bozuk aday düşer, bilinmeyen alan taşınmaz), kulvar durumu (not-ready / not-selected / not-in-pool / empty / list), selam durumu, iyimser olmayan güncellemeler, hata kodu → metin, `applyServerPairScore` (arkadaş kartı). |
+| `utils/matchScreenCopy.js` | Ekran metinleri, 6 dil (anahtar/tür eşitliği testli). |
+| `services/matchSuggestions.js` | Belge okuma (DİNLEYİCİ YOK) + callable'lar; çift skoru 24 saat önbellek. |
+| `hooks/useMatchTitles.js` | Kart yapım anahtarı → ad/afiş (readTmdb disk önbelleği, 30 gün). |
+| `components/match/MatchSuggestionsView.js` | Gövde: kulvar sekmesi, havuz sayacı, soğuk başlangıç notu, çember kartı, aday kartı (rozet, yüzde, ortak sevilen afişler, ayrışılan yapım adı — puansız, "izleme geçmişinize göre", selam / karşılık ver / gönderildi / sohbete git, "…" menü). |
+| `screens/match/MatchScreen.js` | "Önerilerim" (App.js `MatchScreen`). Aşağı çek → yeniden okur. Menü: gizle / engelle (onaylı) / şikâyet (ReportReasonSheet). |
+| `components/settings/DevMatchLab.js` + `utils/matchDevSamples.js` | Geliştirici Laboratuvarı: 8 sahte durum (skor yok, az veri, boş, soğuk başlangıç, ikiz + selam durumları, rehber, çember daveti, çember sohbeti açık). |
+| Hub kartı / Ayarlar | Katıldıysa Hub kartı Önerilerim'e gider; Ayarlar'da "Önerilerimi gör" + puan adımında "Puan görevine katıl" (Meydan Okuma). |
+| `FriendProfileScreen` | İki arkadaş da havuzdaysa yüzde `getMatchPairScore`'dan (kulvar yüzdeleri aynen, ana yüzde ortak yapımı çok olan kulvar); değilse istemci v3. |
+| Bildirim | `match_mutual` (karşılıklı selam; eskiden friend_accepted+source) ve `match_circle` (grup kuruldu): push metinleri (functions/index.js, 6 dil), ayar eşlemesi (socialPush + DeviceNotificationsContext), gelen kutusu simge/ton/yönlendirme, `notifBodyMatch*` 6 dilde. |
+
+**Sunucu eklemeleri (functions/matchServer.js, DEPLOY YOK):**
+- `matchAction` (callable): opak kimlikle gizle / engelle / şikâyet. Üçü de `MatchMembers.hidden`'a yazar (en çok 500) → gece
+  işinde iki yönde skorlanmaz; engel = `Users/{uid}/blocked/{aday}` (+arkadaşsa arkadaşlık biter), şikâyet = `ContentReports`
+  (`source: "match"`). Aday öneri ve eşlemeden hemen çıkar.
+- `matchCircleJoin` (callable) + `MatchCircles/{key}`: gece işi çemberi kaydeder (üyeler, türler); en az 3 kişi "katıl"
+  deyince mevcut `groups` şekliyle grup kurulur (`source: "match"`, kurucu = ilk katılan, kullanıcı adı YAZILMAZ — gizlilik
+  metni 1.8), diğer katılanlara `match_circle` bildirimi; sonra katılan gruba eklenir. Katılan biriyle engel varsa reddedilir.
+  Grup silindiyse çember yeniden kurulabilir. 30 gün güncellenmeyen grupsuz çember silinir. Ayrılan üye çemberden düşer.
+- `sendHello` karşılıklıda `{ status, friendUid, friendName }` döner ve iki öneri kartına `mutual + friendUid` yazar
+  (artık arkadaşlar; sohbet bir dokunuş).
+- Kurallar: `MatchCircles` kapalı. **1-1 mesaj yalnız arkadaşa** (`isFriendWith`; rehber Faz 5 güvenlik notu).
+
+**Testler:** `__tests__/matchSuggestions.test.js` 14 · `__tests__/matchScreen.test.js` 9 · `notificationInbox` +2 ·
+`matchSettingsScreen` +1 · `functions/matchPhase6.integration.test.js` 2 (emülatör) · `matchServer.integration` karşılıklı
+kart · kurallar 400/400 (arkadaş olmayan yazamaz, MatchCircles kapalı). Functions sırayla 185/185 (paralel koşuda
+`accountPurge` testi, aynı emülatör projesini paylaşan dosyalar yüzünden ara sıra düşüyor — eşleşmeden bağımsız).
+Tam jest: 9414 testten 6 kırık / 7 dosya — önceden bilinen ilgisizler.
+
+**Doğrulanmadı:** cihazda / emülatörde ekran hiç açılmadı; gerçek push gitmedi; TMDB afiş okuması gerçek anahtarla denenmedi.
+**Kullanıcıya söylenecek (rehber Faz 6):** arkadaş kartı yüzdeleri v3'e geçtiği için mevcut yüzdeler düşecek; duyuru kararı onda.
+
 ## Sıradaki
 
-- Faz 2 ve 3'ün gerçek veri ölçümleri (kullanıcı işi).
-- Faz 5 deploy'u (yukarıdaki liste) — kullanıcı onayı.
-- Faz 6: öneri ekranı (MatchSuggestions okuma), ikiz kartı, selam düğmesi (`matchHello`), çember daveti/grup,
-  arkadaş kartının `getMatchPairScore`'a bağlanması, eşleşme bildirimi tipi, Geliştirici Laboratuvarı durumları.
-- ~~Meydan Okumalar'a puan görevi~~ — 13 Kas YAPILDI: "Puan" grubu, 5 görev, katılış başlangıcı (`baseline`);
-  ayrıntı `docs/ozellikler/MEYDAN_OKUMALAR.md` kural 11. Test `__tests__/watchChallengesRatings.test.js` (11).
-  Cihazda görülmedi. İsteğe bağlı: Hub eşleşme kartındaki "puan ver" adımı bu görevlere yönlendirilebilir.
+- Deploy (kullanıcı "hepsini yapalım" dedi): functions → rules; canlı kurallarla karşılaştır. `AppConfig/match` önce yalnız
+  test hesaplarında (rehber yayın sırası: bayrak kapalı sürüm → deploy → kendi hesap → herkes). Bayrak istemcide __DEV__'de
+  zorla açık; canlıda `AppConfig/match.enabled` belgesi yok → kapalı.
+- Faz 2 ve 3'ün gerçek veri ölçümleri (kullanıcı işi). Mağaza veri güvenliği formları (kullanıcı, elle).
+- Faz 7: kalibrasyon (havuz 150 etkin kişiye ulaşınca).
+- ~~Meydan Okumalar'a puan görevi~~ — 13 Kas YAPILDI (kural 11, `MEYDAN_OKUMALAR.md`); Ayarlar'daki puan adımı bağlı.

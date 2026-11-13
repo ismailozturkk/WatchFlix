@@ -7,6 +7,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import AppIcon from "@components/AppIcon";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
@@ -19,7 +20,8 @@ import LensLoader from "../../../components/LensLoader";
 import useMatchFeature from "../../../hooks/useMatchFeature";
 import useMatchStrength from "../../../hooks/useMatchStrength";
 import { intlLocaleOf } from "../../../utils/appLanguages";
-import { getMatchCopy, stepText } from "../../../utils/matchCopy";
+import { challengeLinkLabel, getMatchCopy, stepChallengeId, stepText } from "../../../utils/matchCopy";
+import { getMatchScreenCopy } from "../../../utils/matchScreenCopy";
 import { MATCH_LANES } from "../../../utils/matchFeature";
 import { PickRow, SectionHead } from "./BackupKit";
 import { SettingsSubScreen, buildUiColors, ui } from "./settingsUi";
@@ -43,6 +45,11 @@ export default function MatchSettingsScreen() {
   }, [match.optedIn, savedKey]);
 
   const strength = useMatchStrength({ enabled: match.available });
+  const navigation = useNavigation();
+  // Puan adımı varsa ona uyan Meydan Okuma (seçili kulvarlardan ilki).
+  const challengeId = strength
+    ? selected.map((lane) => stepChallengeId(lane, strength[lane]?.next)).find(Boolean) || null
+    : null;
 
   const tick = () => {
     try {
@@ -140,6 +147,36 @@ export default function MatchSettingsScreen() {
           );
         })}
       </GlassBox>
+      {match.optedIn ? (
+        <GlassTouchable
+          activeOpacity={0.75}
+          onPress={() => navigation.navigate("MatchScreen")}
+          accessibilityRole="button"
+          accessibilityLabel={getMatchScreenCopy(language).openSuggestions}
+          style={[s.challenge, { backgroundColor: C.accentDim, borderColor: C.accent }]}
+        >
+          <AppIcon family="Ionicons" name="people-circle-outline" size={18} color={C.accentStrong} />
+          <Text allowFontScaling={false} style={[s.challengeText, { color: C.accentStrong }]} numberOfLines={1}>
+            {getMatchScreenCopy(language).openSuggestions}
+          </Text>
+          <AppIcon family="Ionicons" name="chevron-forward" size={16} color={C.accentStrong} />
+        </GlassTouchable>
+      ) : null}
+      {challengeId ? (
+        <GlassTouchable
+          activeOpacity={0.75}
+          onPress={() => navigation.navigate("ChallengesScreen", { openId: challengeId })}
+          accessibilityRole="button"
+          accessibilityLabel={challengeLinkLabel(language)}
+          style={[s.challenge, { backgroundColor: C.card, borderColor: C.border }]}
+        >
+          <AppIcon family="Ionicons" name="star-outline" size={18} color={C.accent} />
+          <Text allowFontScaling={false} style={[s.challengeText, { color: C.text }]} numberOfLines={1}>
+            {challengeLinkLabel(language)}
+          </Text>
+          <AppIcon family="Ionicons" name="chevron-forward" size={16} color={C.muted} />
+        </GlassTouchable>
+      ) : null}
       <Text style={[s.hint, { color: C.muted }]}>{copy.hub.hint}</Text>
 
       {/* ── Onay metni (ilk katılım ya da metin sürümü değişince) ── */}
@@ -209,4 +246,6 @@ const s = StyleSheet.create({
   primaryText: { color: "#FFFFFF", fontSize: 14.5, fontWeight: "800" },
   secondary: { alignItems: "center", justifyContent: "center", borderRadius: 14, borderWidth: 1, paddingVertical: 12, marginTop: 10 },
   secondaryText: { fontSize: 13.5, fontWeight: "700" },
+  challenge: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginTop: 10 },
+  challengeText: { flex: 1, fontSize: 13.5, fontWeight: "700" },
 });

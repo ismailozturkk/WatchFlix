@@ -150,6 +150,8 @@
   "notifChannelSocial": "Sosyal",
   "notifBodyFriendRequest": "👤 sana arkadaşlık isteği gönderdi",
   "notifBodyFriendAccepted": "🤝 arkadaşlık isteğini kabul etti",
+  "notifBodyMatchMutual": "✨ selamına karşılık verdi — artık arkadaşsınız",
+  "notifBodyMatchCircle": "⭕ Zevk Çemberin hazır — sohbete katıl",
   "notifBodyPostLike": "❤️ gönderini beğendi",
   "notifBodyPostComment": "💬 gönderine yorum yaptı",
   "notifBodyPostCommentText": "💬 yorum yaptı: {text}",

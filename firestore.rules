@@ -68,6 +68,12 @@ service cloud.firestore {
         ? chatId.split('_')[1]
         : chatId.split('_')[0];
     }
+    // 1-1 yeni mesaj yalnız ARKADAŞA (13 Kas, Zevk Çemberleri güvenlik notu): sohbet kimliğini bilen herhangi
+    // biri yazamasın. Arkadaşlıktan çıkınca sohbet zaten silinir (services/friendsService.js); karşılıklı selam
+    // arkadaşlık kurduğu için eşleşme sohbeti de bu kuraldan geçer. Okuma / makbuz / silme değişmedi.
+    function isFriendWith(peerUid) {
+      return exists(/databases/$(database)/documents/Users/$(request.auth.uid)/friends/$(peerUid));
+    }
     // İki yönlü engel: karşı taraf beni engellediyse ya da ben onu engellediysem
     // yeni mesaj yazılmaz. Engel sohbeti SİLMEZ (geri alınabilir), bu yüzden
     // var olan sohbet üzerinden yazım burada kapanmalı (T3 B12).
@@ -176,6 +182,7 @@ service cloud.firestore {
     match /MatchHellos/{pairId} { allow read, write: if false; }
     match /MatchMeta/{docId} { allow read, write: if false; }
     match /TitleFeatures/{titleId} { allow read, write: if false; }
+    match /MatchCircles/{circleId} { allow read, write: if false; }
 
     // NOT: /featureRequests kuralı 26 Tem 2026'da kaldırıldı — landing
     // sayfasındaki "sen iste, biz yapalım" bölümü kaldırıldığı için okuyan ya
@@ -1260,7 +1267,8 @@ service cloud.firestore {
       // zaten böyle (groups/{groupId}/messages).
       allow create: if isChatMember(chatId)
                     && request.resource.data.senderId == request.auth.uid
-                    && notBlockedEitherWay(chatPeer(chatId));
+                    && notBlockedEitherWay(chatPeer(chatId))
+                    && isFriendWith(chatPeer(chatId));
       // "Yalnız gönderen günceller" DEĞİL: üç meşru güncellemenin ikisi karşı
       // tarafın dokümanına dokunuyor (bkz. screens/chat/ChatScreen.js).
       //   • gönderen kendi mesajının metnini düzenler,

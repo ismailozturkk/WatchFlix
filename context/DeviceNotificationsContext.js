@@ -90,6 +90,8 @@ export const useDeviceNotifications = () => useContext(DeviceNotificationsContex
 const SOCIAL_SETTING_KEY = {
   friend_request: "friendRequestsEnabled",
   friend_accepted: "friendAcceptedEnabled",
+  match_mutual: "friendAcceptedEnabled",
+  match_circle: "messagesEnabled",
   post_like: "postLikesEnabled",
   post_comment: "postCommentsEnabled",
   comment_reply: "postCommentsEnabled",
@@ -111,6 +113,10 @@ function buildSocialContent(item, t, language) {
       return { title: name, body: t.notifBodyFriendRequest || "👤 sana arkadaşlık isteği gönderdi" };
     case "friend_accepted":
       return { title: name, body: t.notifBodyFriendAccepted || "🤝 arkadaşlık isteğini kabul etti" };
+    case "match_mutual":
+      return { title: name, body: t.notifBodyMatchMutual || "✨ selamına karşılık verdi — artık arkadaşsınız" };
+    case "match_circle":
+      return { title: item.groupName || name, body: t.notifBodyMatchCircle || "⭕ Zevk Çemberin hazır — sohbete katıl" };
     case "post_like":
       return { title: name, body: t.notifBodyPostLike || "❤️ gönderini beğendi" };
     case "post_comment":

@@ -150,6 +150,8 @@
   "notifChannelSocial": "Social",
   "notifBodyFriendRequest": "👤 enviou um pedido de amizade para você",
   "notifBodyFriendAccepted": "🤝 aceitou seu pedido de amizade",
+  "notifBodyMatchMutual": "✨ retribuiu seu oi — agora vocês são amigos",
+  "notifBodyMatchCircle": "⭕ Seu Círculo de gosto está pronto — entre na conversa",
   "notifBodyPostLike": "❤️ curtiu sua publicação",
   "notifBodyPostComment": "💬 comentou na sua publicação",
   "notifBodyPostCommentText": "💬 comentou: {text}",

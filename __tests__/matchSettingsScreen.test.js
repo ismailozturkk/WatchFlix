@@ -26,6 +26,8 @@ jest.mock("@components/AppAlert", () => ({ appAlert: (...a) => mockAlert(...a) }
 jest.mock("@services/hapticsService", () => ({ selectionAsync: () => Promise.resolve() }));
 jest.mock("@context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
 jest.mock("@context/ThemeContext", () => ({ useTheme: () => ({ theme: {} }) }));
+const mockNavigate = jest.fn();
+jest.mock("@react-navigation/native", () => ({ useNavigation: () => ({ navigate: mockNavigate }) }));
 
 let mockProfile;
 jest.mock("../context/UserProfileContext", () => ({ useUserProfile: () => ({ uid: "u1", profile: mockProfile }) }));
@@ -129,6 +131,9 @@ test("açık + katılmamış: onay metni, kulvar gücü ve sonraki adım; Katıl
   for (const point of copy.consent.points) expect(t).toContain(point);
   // 40 film, puansız: puan yolu için 20 puan eksik
   expect(t).toContain(copy.step.rate(20));
+  // Puan adımı → Meydan Okuma düğmesi (20 eksik → aylık 25 puan görevi).
+  await act(async () => pressable("Puan görevine katıl").props.onPress());
+  expect(mockNavigate).toHaveBeenCalledWith("ChallengesScreen", { openId: "rate25_30" });
   await act(async () => pressable(copy.join).props.onPress());
   expect(mockSave).toHaveBeenCalledWith("u1", ["movie", "tv"]);
   expect(mockToast.success).toHaveBeenCalledWith(copy.joined);

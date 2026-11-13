@@ -434,6 +434,24 @@ function circleGenres(memberItems) {
 }
 
 /** Aday kartının herkese açık kısmı. Başka alan EKLEME (gizlilik değişmezi, test). */
+/**
+ * Öneri belgesindeki çember görünümü (sahibe göre). Katılmayan üyelerin kimliği YOK; yalnız sayılar.
+ * Grup kimliği yalnız katılmış sahibe verilir (katılmayan önce "katıl" der, sonra gruba eklenir).
+ */
+function circleView(circle, state, owner) {
+  const joined = state?.joined || {};
+  const me = !!joined[owner];
+  return {
+    key: circle.key,
+    size: circle.size,
+    genres: circle.genres || [],
+    joined: me,
+    joinedCount: Object.keys(joined).length,
+    groupId: me ? state?.groupId || null : null,
+    groupReady: !!state?.groupId,
+  };
+}
+
 function publicCard(user) {
   const u = user || {};
   return {
@@ -514,6 +532,7 @@ module.exports = {
   opaqueId,
   circleKey,
   circleGenres,
+  circleView,
   publicCard,
   buildLaneSuggestion,
   nextHelloQuota,
