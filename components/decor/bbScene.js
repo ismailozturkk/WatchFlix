@@ -14,6 +14,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, Skia, vec } from "@shopify/react-native-skia";
+import { BbEventB } from "./sceneEventsB";
 import { bbFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -613,6 +614,8 @@ export default function BbScene({ p, clock, width, height, tone }) {
         <Path path={`M${-7 * k} 0 L${7 * k} 0 M0 ${-7 * k} L0 ${7 * k}`} style="stroke" strokeWidth={0.6 * k} color="rgba(220,245,255,0.9)" />
       </Group>
       <Rect x={0} y={height - 1} width={width} height={1} color="rgba(0,0,0,0)" />
+      {/* olay B (A ile sırayla) */}
+      <BbEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

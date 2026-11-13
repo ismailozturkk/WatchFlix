@@ -9,9 +9,8 @@ jest.mock("@shopify/react-native-skia", () => ({ Skia: { Path: { Make: () => ({}
 const layerOf = (id, part) => buildParticles(id, { count: 60, seed: 5 }).find((q) => q.kind === KIND.overlay && q.part === part);
 
 const tAt = (p, u) => {
-  let c = u / p.rest - p.y0;
-  c -= Math.floor(c);
-  return c * p.period + p.period * 3;
+  // çift döngü = olay A (tek döngülerde sahnenin olay B'si oynar: eventU)
+  return (4 + u / p.rest - p.y0) * p.period;
 };
 
 const first = (p, frame, pred) => {

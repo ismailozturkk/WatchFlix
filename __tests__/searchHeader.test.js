@@ -68,6 +68,12 @@ jest.mock("../screens/search/MovieSearch", () => ({ __esModule: true, default: "
 jest.mock("../screens/search/TvShowSearch", () => ({ __esModule: true, default: "TvShowSearch" }));
 jest.mock("../screens/search/ActorSearch", () => ({ __esModule: true, default: "ActorSearch" }));
 jest.mock("expo-clipboard", () => ({ getStringAsync: () => Promise.resolve("") }));
+// Gizli replik (SearchScreen → useUniverseUnlocks): Firebase'e inmesin.
+jest.mock("../hooks/useUniverseUnlocks", () => ({
+  __esModule: true,
+  default: () => ({ isSolved: () => false, solve: () => false }),
+}));
+jest.mock("../components/settings/AtmosphereControls", () => ({ effectLabel: (id) => id }));
 jest.mock("../services/mediaLinkResolver", () => ({ resolveMediaLink: () => Promise.resolve(null) }));
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: mockLang, t: {} }) }));

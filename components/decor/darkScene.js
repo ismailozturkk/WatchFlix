@@ -7,13 +7,15 @@
 //     mağaraya uzanır.
 //   • Olay (74 sn'de bir ~29 sn): mağarada karanlık küre belirir (çevresinde bükülen halkalar), göğün
 //     üstünde üç halkalı sembol parlar; siluet mağaraya yürür ve kaybolur, sonra her şey söner.
+//   • Olay B (dönüşümlü): bir kuş sürüsü ormanın üstünden geçer; mağaradan soluk bir zaman dalgası
+//     yayılır, santralin ikaz ışıkları söner — kuşlar kanatları kapanmış hâlde dönerek ormana düşer.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[67] (DK_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, addPine, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const DK_TONE = [
@@ -195,7 +197,7 @@ function Wanderer({ p, clock, L, c, night }) {
     return q;
   }, [k]);
   const state = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const walk = u > 1 ? 0 : sm(0.45, 0.75, u);
     const back = u > 1 ? 0 : sm(0.9, 1, u);
     return { walk, a: u > 1 ? 1 : Math.max(back, 1 - sm(0.7, 0.78, u)) };
@@ -232,6 +234,75 @@ function Wanderer({ p, clock, L, c, night }) {
   );
 }
 
+// ───────────────────────────── olay B: zaman dalgası + düşen kuşlar
+
+const BIRDS = 16;
+const SHOCK = 0.44;
+
+function FallingBirds({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const [cx, cy] = L.cave;
+  const birds = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    for (let i = 0; i < BIRDS; i += 1) {
+      const e = (u - 0.02 - hash(i, 91) * 0.06) / 0.9;
+      if (e <= 0) continue;
+      const s = (1.3 + hash(i, 92) * 0.6) * k;
+      const row = (i % 4) * 14 + Math.floor(i / 4) * 6;
+      let x = width * 1.08 - e * width * 1.1 + (i % 4) * 22 * k + hash(i, 93) * 20 * k;
+      let y = base - (380 + row + hash(i, 94) * 40) * k + Math.sin(clock.value * 1.4 + i) * 4 * k;
+      const tf = SHOCK + 0.01 + hash(i, 95) * 0.06;
+      if (u > tf) {
+        const d = Math.min(1, (u - tf) / 0.3);
+        x = width * 1.08 - ((tf - 0.02 - hash(i, 91) * 0.06) / 0.9) * width * 1.1 + (i % 4) * 22 * k + hash(i, 93) * 20 * k - d * 40 * k;
+        y += d * d * 420 * k;
+        const r = d * 9 + i;
+        const ca = Math.cos(r) * 5 * s;
+        const sa = Math.sin(r) * 5 * s;
+        q.moveTo(x + ca, y + sa);
+        q.lineTo(x - sa * 0.4, y + ca * 0.4);
+        q.lineTo(x - ca, y - sa);
+        q.lineTo(x + sa * 0.4, y - ca * 0.4);
+        q.close();
+        continue;
+      }
+      const f = Math.sin(clock.value * 9 + i * 1.3);
+      q.moveTo(x - 9 * s, y - f * 5 * s);
+      q.quadTo(x - 4 * s, y - 2 * s, x, y);
+      q.quadTo(x + 4 * s, y - 2 * s, x + 9 * s, y - f * 5 * s);
+      q.quadTo(x + 4 * s, y + 1 * s, x, y + 1.6 * s);
+      q.quadTo(x - 4 * s, y + 1 * s, x - 9 * s, y - f * 5 * s);
+      q.close();
+    }
+    return q;
+  });
+  const wave = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    const e = (u - SHOCK) / 0.18;
+    if (e <= 0 || e >= 1) return q;
+    for (let i = 0; i < 2; i += 1) {
+      const r = Math.max(1, (e - i * 0.15) * 520 * k);
+      q.addOval(Skia.XYWHRect(cx - r, cy - 30 * k - r * 0.7, r * 2, r * 1.4));
+    }
+    return q;
+  });
+  const waveO = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    const e = (u - SHOCK) / 0.18;
+    return u > 1 || e <= 0 || e >= 1 ? 0 : 0.6 * (1 - e);
+  });
+  return (
+    <Group>
+      <Path path={wave} style="stroke" strokeWidth={2.2 * k} color={c.ring} opacity={waveO} />
+      <Path path={birds} color={c.steam} opacity={0.85} />
+    </Group>
+  );
+}
+
 export default function DarkScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => dkLayout(width, height), [width, height]);
   const clouds = useMemo(() => buildClouds(L), [L]);
@@ -244,7 +315,7 @@ export default function DarkScene({ p, clock, width, height, tone, lightSurface 
   const night = !lightSurface;
   const symbol = useMemo(() => buildSymbol(70 * k), [k]);
   const ev = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.12, 0.32, u) * (1 - sm(0.82, 0.97, u));
   });
   const symA = useDerivedValue(() => ev.value * (0.7 + 0.3 * Math.sin(clock.value * 3)));
@@ -263,7 +334,12 @@ export default function DarkScene({ p, clock, width, height, tone, lightSurface 
     }
     return q;
   });
-  const warnA = useDerivedValue(() => (Math.sin(clock.value * 3) > 0.3 ? 1 : 0.2));
+  const warnA = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    const off = u > 1 ? 0 : sm(0.44, 0.47, u) * (1 - sm(0.8, 0.9, u));
+    const on = Math.sin(clock.value * 3) > 0.3 ? 1 : 0.2;
+    return on * (1 - off) + off * (Math.sin(clock.value * 41) > 0.85 ? 0.5 : 0);
+  });
   return (
     <Group opacity={tone.alpha}>
       {/* kapalı gök */}
@@ -294,6 +370,7 @@ export default function DarkScene({ p, clock, width, height, tone, lightSurface 
         <Glow r={34 * k} color={c.orb} a={1} mid={0.95} />
         <Path path={rings} style="stroke" strokeWidth={1.4 * k} color={c.ring} />
       </Group>
+      <FallingBirds p={p} clock={clock} L={L} c={c} />
       <Path path={forest.mid} color={c.pine} />
       <Path path={forest.ground} color={c.ground} />
       <Wanderer p={p} clock={clock} L={L} c={c} night={night} />

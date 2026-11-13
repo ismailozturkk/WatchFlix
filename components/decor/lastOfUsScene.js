@@ -7,13 +7,15 @@
 //   • Önde su basmış cadde: durgun su, yansıyan ışık, kenarlarda uzun çimen ve çalı.
 //   • Olay (70 sn'de bir ~27 sn): iki zürafa (biri genç) soldan sağa ağır adımlarla yürür — boyunları
 //     yürüyüşle sallanır, ayakları suda halka bırakır; aynı anda bir kuş sürüsü çatıdan havalanır.
+//   • Olay B (dönüşümlü): çimenlerden ateş böcekleri yükselir ve salınarak süzülür; sırt çantalı
+//     iki yolcu (biri ufak tefek) feneriyle önündeki suyu aydınlatarak caddeyi soldan sağa geçer.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[60] (TL_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const TL_TONE = [
@@ -237,7 +239,7 @@ function Giraffe({ p, clock, L, c, s, delay, lane }) {
   const body = useDerivedValue(() => d.value.body);
   const spots = useDerivedValue(() => d.value.spots);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const e = u > 1 ? -1 : (u - 0.04 - delay) / 0.86;
     if (e < 0 || e > 1) return [{ translateX: -900 }, { translateY: -900 }];
     const x = -90 * k + (width + 200 * k) * e;
@@ -265,7 +267,7 @@ function Birds({ p, clock, L, c }) {
   const { k, width, base } = L;
   const flock = useDerivedValue(() => {
     const q = Skia.Path.Make();
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.3 || u > 0.8) return q;
     const e = (u - 0.3) / 0.5;
     for (let i = 0; i < 14; i += 1) {
@@ -318,6 +320,97 @@ function Ray({ q, i, clock, c, base, night }) {
   );
 }
 
+// ───────────────────────────── olay B: ateş böcekleri + iki yolcu
+
+function Fireflies({ p, clock, L, c }) {
+  const { k, width, water } = L;
+  const d = useDerivedValue(() => {
+    const core = Skia.Path.Make();
+    const halo = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { core, halo };
+    const on = sm(0.02, 0.2, u) * (1 - sm(0.82, 0.98, u));
+    const t = clock.value;
+    for (let i = 0; i < 34; i += 1) {
+      const blink = Math.max(0, Math.sin(t * (1.3 + hash(i, 111)) + i * 2.3));
+      const a = on * blink;
+      if (a < 0.08) continue;
+      const rise = sm(0, 0.6, u - hash(i, 112) * 0.2) * (60 + hash(i, 113) * 180) * k;
+      const x = width * hash(i, 114) + Math.sin(t * 0.5 + i) * 18 * k;
+      const y = water + 10 * k - rise + Math.sin(t * 0.8 + i * 3) * 8 * k;
+      core.addCircle(x, y, 1.4 * k * a);
+      halo.addCircle(x, y, 6 * k * a);
+    }
+    return { core, halo };
+  });
+  const core = useDerivedValue(() => d.value.core);
+  const halo = useDerivedValue(() => d.value.halo);
+  return (
+    <Group>
+      <Path path={halo} color={c.ray} opacity={0.3} />
+      <Path path={core} color={c.ray} />
+    </Group>
+  );
+}
+
+/** Sırt çantalı yürüyen siluet (sağa bakar). */
+function addWalker(q, x, y, s, ph) {
+  "worklet";
+  const bob = Math.abs(Math.sin(ph)) * 0.8 * s;
+  const by = y - bob;
+  q.addCircle(x + 1 * s, by - 33 * s, 3.4 * s);
+  q.addRRect(Skia.RRectXY(Skia.XYWHRect(x - 4 * s, by - 29 * s, 9 * s, 15 * s), 2.5 * s, 2.5 * s));
+  q.addRRect(Skia.RRectXY(Skia.XYWHRect(x - 9 * s, by - 28 * s, 6 * s, 11 * s), 2 * s, 2 * s));
+  for (let j = 0; j < 2; j += 1) {
+    const a = Math.sin(ph + j * Math.PI) * 0.45;
+    const lx = x + Math.sin(a) * 7 * s;
+    q.moveTo(x - 2.4 * s, by - 15 * s);
+    q.lineTo(x + 1.4 * s, by - 15 * s);
+    q.lineTo(lx + 1.6 * s, y);
+    q.lineTo(lx - 1.6 * s, y);
+    q.close();
+  }
+}
+
+function Travelers({ p, clock, L, c }) {
+  const { k, width, walk } = L;
+  const d = useDerivedValue(() => {
+    const body = Skia.Path.Make();
+    const beam = Skia.Path.Make();
+    const rings = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { body, beam, rings };
+    const e = sm(0.12, 0.96, u);
+    const x = -40 * k + e * (width + 80 * k);
+    const s = k * 1.15;
+    const ph = clock.value * 4.2;
+    addWalker(body, x, walk, s, ph);
+    addWalker(body, x - 22 * k, walk + 3 * k, s * 0.8, ph + 1.1);
+    const fx = x + 6 * s;
+    const fy = walk - 22 * s;
+    beam.moveTo(fx, fy);
+    beam.lineTo(fx + 120 * k, fy + 26 * k);
+    beam.lineTo(fx + 110 * k, fy + 44 * k);
+    beam.close();
+    for (let i = 0; i < 3; i += 1) {
+      const f = (((clock.value * 0.7 + i / 3) % 1) + 1) % 1;
+      const r = (4 + f * 16) * k;
+      rings.addOval(Skia.XYWHRect(x - 10 * k * i - r, walk - r * 0.15, r * 2, r * 0.3));
+    }
+    return { body, beam, rings };
+  });
+  const body = useDerivedValue(() => d.value.body);
+  const beam = useDerivedValue(() => d.value.beam);
+  const rings = useDerivedValue(() => d.value.rings);
+  return (
+    <Group>
+      <Path path={beam} color={c.ray} opacity={0.22} />
+      <Path path={rings} style="stroke" strokeWidth={0.8 * k} color={c.waterHi} opacity={0.5} />
+      <Path path={body} color={c.bldNear} />
+    </Group>
+  );
+}
+
 export default function LastOfUsScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => tlLayout(width, height), [width, height]);
   const city = useMemo(() => buildCity(L), [L]);
@@ -362,7 +455,9 @@ export default function LastOfUsScene({ p, clock, width, height, tone, lightSurf
       </Group>
       <Giraffe p={p} clock={clock} L={L} c={c} s={1} delay={0} lane={0} />
       <Giraffe p={p} clock={clock} L={L} c={c} s={0.7} delay={0.05} lane={6 * k} />
+      <Travelers p={p} clock={clock} L={L} c={c} />
       <Path path={street.grass} color={c.grass} />
+      <Fireflies p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

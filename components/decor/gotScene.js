@@ -18,6 +18,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { GotEventB } from "./sceneEventsB";
 import { gotFrame, hash01, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -948,6 +949,8 @@ export default function GotScene({ p, clock, width, height, tone }) {
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <DustPuff key={i} L={L} i={i} f={f} color={c.snow} />
       ))}
+      {/* olay B (A ile sırayla) */}
+      <GotEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

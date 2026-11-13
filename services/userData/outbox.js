@@ -120,6 +120,7 @@ export function enqueue(uid, ops) {
       tries: 0,
     };
     if (input.op === "set") record.data = input.data;
+    if (input.op === "set" && input.merge) record.merge = true;
     if (input.domain) {
       record.domain = input.domain;
       record.kind = input.kind;

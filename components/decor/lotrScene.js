@@ -16,6 +16,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { LotrEventB } from "./sceneEventsB";
 import { lotrFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -659,6 +660,8 @@ export default function LotrScene({ p, clock, width, height, tone }) {
       <Group opacity={lavaO}>
         <Path path={G.cracks} style="stroke" strokeWidth={1.6 * k} strokeJoin="round" color={rgba(c.lava, 0.75)} />
       </Group>
+      {/* olay B (A ile sırayla) */}
+      <LotrEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

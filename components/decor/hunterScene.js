@@ -6,14 +6,17 @@
 //   • Önde göl kıyısı: kayaya saplanmış olta, sarkan misina ve suda sallanan şamandıra.
 //   • Olay (66 sn'de bir ~27 sn): şamandıra birden batar, gölün dev bıyıklı balığı sudan yay çizerek
 //     sıçrar ve geri dalar (su halkaları, sıçrantı); üstten Avcı Birliği zeplini geçer.
+//   • Olay B (dönüşümlü): tepede diken saçlı bir çocuk belirir; çevresinde altın aura alev alev
+//     kabarır, yumruğunu denize doğru savurur — şok dalgası suyu yararak ufka koşar ve orada dev bir
+//     su sütunu patlatır; aura söner.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[69] (HX_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
-import { addCloud, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
+import { eventU } from "../../utils/weatherParticles";
+import { Glow, addCloud, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 import { addBlade } from "./universeKit";
 
 export const HX_TONE = [
@@ -216,7 +219,7 @@ function Lake({ p, clock, L, c, island }) {
   const fish = useMemo(() => buildFish(k), [k]);
   const fx = width * 0.5;
   const leap = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1) return -1;
     return (u - 0.3) / 0.32; // 0–1 sıçrayış
   });
@@ -327,7 +330,7 @@ function Airship({ p, clock, L, c }) {
     return { body, dark };
   }, [k]);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.04 || u > 0.96) return [{ translateX: -900 }, { translateY: -900 }];
     const e = (u - 0.04) / 0.92;
     return [{ translateX: width + 90 * k - e * (width + 180 * k) }, { translateY: horizon - 420 * k + Math.sin(e * 5) * 6 * k }];
@@ -336,6 +339,118 @@ function Airship({ p, clock, L, c }) {
     <Group transform={at}>
       <Path path={shape.body} color={c.ship} />
       <Path path={shape.dark} color={c.shipDark} />
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: aura + yumruk dalgası
+
+const AURA = "#ffd36a";
+const PUNCH = 0.5;
+
+function AuraPunch({ p, clock, L, c }) {
+  const { k, width, horizon } = L;
+  const bx = width * 0.42;
+  const by = horizon - 90 * k;
+  const s = k * 1.1;
+  const vis = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.06, 0.14, u) * (1 - sm(0.86, 0.96, u));
+  });
+  const aura = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.14, 0.42, u) * (1 - sm(0.56, 0.8, u));
+  });
+  const pose = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(PUNCH - 0.04, PUNCH, u) * (1 - sm(0.66, 0.74, u));
+  });
+  const boy = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const pz = pose.value;
+    q.addCircle(bx, by - 31 * s, 4.4 * s);
+    for (let i = 0; i < 6; i += 1) {
+      const a = -Math.PI * (0.18 + (i / 5) * 0.64);
+      q.moveTo(bx + Math.cos(a - 0.35) * 3.6 * s, by - 31 * s + Math.sin(a - 0.35) * 3.6 * s);
+      q.lineTo(bx + Math.cos(a) * (11 + (i % 2) * 3) * s, by - 31 * s + Math.sin(a) * (11 + (i % 2) * 3) * s);
+      q.lineTo(bx + Math.cos(a + 0.35) * 3.6 * s, by - 31 * s + Math.sin(a + 0.35) * 3.6 * s);
+      q.close();
+    }
+    q.addRRect(Skia.RRectXY(Skia.XYWHRect(bx - 4 * s, by - 26 * s, 8 * s, 13 * s), 2 * s, 2 * s));
+    q.moveTo(bx - 3 * s, by - 14 * s);
+    q.lineTo(bx - 9 * s, by);
+    q.lineTo(bx - 6 * s, by);
+    q.lineTo(bx, by - 11 * s);
+    q.lineTo(bx + 6 * s, by);
+    q.lineTo(bx + 9 * s, by);
+    q.lineTo(bx + 3 * s, by - 14 * s);
+    q.close();
+    const ax = bx + 3 * s + pz * 10 * s;
+    q.addRRect(Skia.RRectXY(Skia.XYWHRect(Math.min(bx + 2 * s, ax), by - 24 * s, Math.abs(ax - bx) + 3 * s, 3 * s), 1.4 * s, 1.4 * s));
+    q.addCircle(ax + 2 * s, by - 22.5 * s, 2.6 * s);
+    return q;
+  });
+  const flames = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const a = aura.value;
+    if (a < 0.02) return q;
+    const t = clock.value;
+    for (let i = 0; i < 9; i += 1) {
+      const x = bx + (i - 4) * 4.4 * s;
+      const h = (20 + 22 * Math.abs(Math.sin(t * 6 + i * 1.9))) * s * a;
+      const w = 5 * s * a;
+      q.moveTo(x - w, by + 2 * s);
+      q.quadTo(x - w * 0.6, by - 16 * s * a - h * 0.5, x + Math.sin(t * 4 + i) * 2 * s, by - 18 * s - h);
+      q.quadTo(x + w * 0.6, by - 16 * s * a - h * 0.5, x + w, by + 2 * s);
+      q.close();
+    }
+    return q;
+  });
+  const wave = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    const e = (u - PUNCH) / 0.18;
+    if (e <= 0 || e >= 1) return q;
+    const x = bx + 20 * s + e * (width * 0.88 - bx);
+    const y = by - 22 * s + e * (horizon - by + 4 * k);
+    const r = (10 + e * 14) * k;
+    q.addOval(Skia.XYWHRect(x - r * 0.4, y - r, r * 0.8, r * 2));
+    q.moveTo(x - 30 * k * e, y + r * 0.3);
+    q.lineTo(x - 80 * k * e, y + r * 0.6);
+    return q;
+  });
+  const column = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    const e = (u - PUNCH - 0.18) / 0.22;
+    if (e <= 0 || e >= 1) return q;
+    const x = width * 0.88;
+    const h = Math.sin(e * Math.PI) * 120 * k;
+    const w = (8 + e * 24) * k;
+    q.moveTo(x - w, horizon + 2 * k);
+    q.quadTo(x - w * 0.4, horizon - h * 0.6, x, horizon - h);
+    q.quadTo(x + w * 0.4, horizon - h * 0.6, x + w, horizon + 2 * k);
+    q.close();
+    for (let i = 0; i < 10; i += 1) {
+      const a = -Math.PI * (0.1 + (i / 9) * 0.8);
+      q.addCircle(x + Math.cos(a) * (h * 0.5 + 10 * k), horizon - h * 0.8 + Math.sin(a) * h * 0.3 + e * e * 50 * k, 2.4 * k * (1 - e));
+    }
+    return q;
+  });
+  const glowA = useDerivedValue(() => aura.value * 0.8);
+  return (
+    <Group>
+      <Group opacity={glowA}>
+        <Glow cx={bx} cy={by - 20 * s} r={70 * k} color={AURA} a={0.5} mid={0.35} />
+        <Path path={flames} color={AURA} opacity={0.7} />
+      </Group>
+      <Group opacity={vis}>
+        <Path path={boy} color={c.rockDark} />
+      </Group>
+      <Path path={wave} style="stroke" strokeWidth={2 * k} strokeCap="round" color={AURA} opacity={0.85} />
+      <Path path={column} color={c.splash} opacity={0.9} />
     </Group>
   );
 }
@@ -368,6 +483,7 @@ export default function HunterScene({ p, clock, width, height, tone, lightSurfac
         <Path path={island.leaf} color={c.leaf} />
         <Path path={island.leafHi} color={c.leafHi} />
       </Group>
+      <AuraPunch p={p} clock={clock} L={L} c={c} />
       <Lake p={p} clock={clock} L={L} c={c} island={island} />
       <Path path={island.rock} color={c.rock} />
       <Path path={island.rockDark} color={c.rockDark} opacity={0.6} />

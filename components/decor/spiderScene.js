@@ -16,6 +16,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { SpiderEventB } from "./sceneEventsB";
 import { sceneScale, spiderFrame } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 import { WEB_RINGS, WEB_SPOKES } from "./universeSprites";
@@ -673,6 +674,8 @@ export default function SpiderScene({ p, clock, width, height, tone }) {
           ))}
         </>
       ) : null}
+      {/* olay B (A ile sırayla) */}
+      <SpiderEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

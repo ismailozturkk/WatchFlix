@@ -6,16 +6,19 @@
 //     kümeleri ve tüten duman, ışıklı cumbalı pencereler, kemerli kapılar, demir parmaklıklar.
 //   • Sokak: kaldırım, ıslak arnavut kaldırımı; gaz lambalarının ışık konileri ve sudaki yansımaları;
 //     yerde süzülen sis.
-//   • Olay (70 sn'de bir ~27 sn): pelerinli, kulaklı şapkalı dedektif soldan yürür, lambanın altında
+//   • İKİ olay (70 sn'de bir ~27 sn; döngüde sırayla, eventPick):
+//   A) pelerinli, kulaklı şapkalı dedektif soldan yürür, lambanın altında
 //     durur, büyüteci kaldırır (cam parlar), pipodan duman çıkar; sonra yürüyüp gider. Arkasından
 //     ıslak taşta ayak izleri kalır. Sağdan atlı bir fayton geçer (tekerlekler döner, at tırıs).
+//   B) ÇATI KOVALAMACASI: paltolu bir kaçak çatı sırtlarında koşar, evlerin arasındaki boşluklardan
+//     atlar; kulaklı şapkalı, pelerinli dedektif hemen arkasından kovalar (bacaların arkasından geçerler).
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[50] (SH_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventPick, restU } from "../../utils/weatherParticles";
 import { Glow, TAU, addCloud, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const SH_TONE = [
@@ -43,6 +46,12 @@ export const SH_TONE = [
   "glint",
   "clockFace",
 ];
+
+/** A olayının (dedektif + fayton) saati: B döngülerinde dinlenmede (2). */
+function evA(p, t) {
+  "worklet";
+  return eventPick(p, t, 2) === 0 ? restU(p, t) : 2;
+}
 
 export function shLayout(width, height) {
   const L = groundLayout(width, height);
@@ -133,6 +142,7 @@ function buildHouses(L) {
   const trim = Skia.Path.Make();
   const rails = Skia.Path.Make();
   const pots = [];
+  const ridges = [];
   let x = -6 * k;
   let i = 0;
   while (x < width + 6 * k) {
@@ -147,6 +157,7 @@ function buildHouses(L) {
     roofs.moveTo(x - 2 * k, top - 3 * k);
     roofs.lineTo(x + w * 0.12, top - 34 * k);
     roofs.lineTo(x + w * 0.88, top - 34 * k);
+    ridges.push([x + w * 0.12, x + w * 0.88, top - 34 * k]);
     roofs.lineTo(x + w + 2 * k, top - 3 * k);
     roofs.close();
     const dw = x + w * 0.42;
@@ -198,7 +209,7 @@ function buildHouses(L) {
     x += w + 2 * k;
     i += 1;
   }
-  return { fronts, roofs, chim, lit, litDim, dark, trim, rails, pots };
+  return { fronts, roofs, chim, lit, litDim, dark, trim, rails, pots, ridges };
 }
 
 function buildStreet(L) {
@@ -454,7 +465,7 @@ function FogPuff({ clock, i, L, c, night }) {
 
 function Detective({ p, clock, L, c }) {
   const { k, width } = L;
-  const st = useDerivedValue(() => detectiveAt(restU(p, clock.value), width, k));
+  const st = useDerivedValue(() => detectiveAt(evA(p, clock.value), width, k));
   const d = useDerivedValue(() => detectivePaths(clock.value, st.value.walk, st.value.look, k));
   const body = useDerivedValue(() => d.value.body);
   const lens = useDerivedValue(() => d.value.lens);
@@ -475,7 +486,7 @@ function Detective({ p, clock, L, c }) {
   // ayak izleri: yürüdüğü yol boyunca, eskiyen silinir
   const prints = useDerivedValue(() => {
     const q = Skia.Path.Make();
-    const u = restU(p, clock.value);
+    const u = evA(p, clock.value);
     if (u > 1) return q;
     const step = 9 * k;
     const cur = st.value.on ? st.value.x : u > 0.84 ? width + 40 * k : -999;
@@ -485,7 +496,7 @@ function Detective({ p, clock, L, c }) {
     return q;
   });
   const printA = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = evA(p, clock.value);
     return u > 1 ? 0 : 0.45 * (1 - sm(0.84, 0.98, u));
   });
   return (
@@ -517,7 +528,7 @@ function Cab({ p, clock, L, c }) {
   const wheel = useDerivedValue(() => d.value.wheel);
   const legs = useDerivedValue(() => d.value.legs);
   const transform = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = evA(p, clock.value);
     const e = u > 1 ? -1 : (u - 0.6) / 0.28;
     if (e < 0 || e > 1) return [{ translateX: -900 }, { translateY: -900 }];
     // sağdan sola: aynalanmış (at önde)
@@ -560,6 +571,89 @@ function ClockHands({ clock, face, k, c }) {
       </Group>
       <Group transform={hour}>
         <Rect x={-0.9 * k} y={-r * 0.5} width={1.8 * k} height={r * 0.5} color={c.towerFar} />
+      </Group>
+    </Group>
+  );
+}
+
+// ───────────────────────────── B: çatı kovalamacası
+
+/** Çatı sırtında x'teki ayak yüksekliği: sırtta düz, ev aralarında atlayış yayı. */
+function roofRunY(ridges, x) {
+  "worklet";
+  for (let i = 0; i < ridges.length; i += 1) {
+    const [a, b, y] = ridges[i];
+    if (x >= a && x <= b) return y;
+    const nx = ridges[i + 1];
+    if (nx && x > b && x < nx[0]) {
+      const f = (x - b) / (nx[0] - b);
+      return y + (nx[2] - y) * f - Math.sin(f * Math.PI) * (16 + (nx[0] - b) * 0.25);
+    }
+  }
+  return ridges.length ? ridges[0][2] : 0;
+}
+
+/** Koşan siluet (taban 0,0; birim dp/k). hat 1 = kulaklı şapka + pelerin. */
+function runnerPath(ph, hat) {
+  "worklet";
+  const q = Skia.Path.Make();
+  const a = Math.sin(ph) * 0.8;
+  // bacaklar
+  q.moveTo(-1, -11);
+  q.lineTo(-1 + Math.sin(a) * 6, -11 + Math.cos(a) * 6);
+  q.lineTo(-1 + Math.sin(a) * 6 - Math.max(0, -a) * 4, -11 + Math.cos(a) * 11);
+  q.moveTo(-1, -11);
+  q.lineTo(-1 - Math.sin(a) * 6, -11 + Math.cos(a) * 6);
+  q.lineTo(-1 - Math.sin(a) * 6 - Math.max(0, a) * 4, -11 + Math.cos(a) * 11);
+  // kollar
+  q.moveTo(1, -21);
+  q.lineTo(1 - Math.sin(a) * 6, -16);
+  q.moveTo(1, -21);
+  q.lineTo(1 + Math.sin(a) * 6, -16);
+  return q;
+}
+
+const RUN_COAT = "M -3.6 -10 L -2.4 -22.6 Q 0.4 -24.6 3.4 -22.4 L 3.8 -10 Z";
+const RUN_HEAD = "M 1 -26.4 m -2.6 0 a 2.6 2.6 0 1 0 5.2 0 a 2.6 2.6 0 1 0 -5.2 0";
+const RUN_CAPE = "M -2.6 -22.6 Q -9 -18 -10 -12 L -3 -14 Z";
+const RUN_DEER = "M -2.4 -27.4 Q 1 -31.4 4.4 -27.4 L 6.4 -26.6 L -4.2 -26.4 Z";
+
+function RoofChase({ p, clock, L, ridges, c }) {
+  const { k, width } = L;
+  const span = width + 120 * k;
+  const xAt = (u, lead) => {
+    "worklet";
+    return -60 * k + span * sm(0.08, 0.84, u) + lead;
+  };
+  const show = useDerivedValue(() => {
+    const u = restU(p, clock.value);
+    if (u > 1 || eventPick(p, clock.value, 2) !== 1) return 0;
+    return sm(0.06, 0.1, u) * (1 - sm(0.82, 0.86, u));
+  });
+  const pose = (lead) => {
+    "worklet";
+    const u = Math.min(1, restU(p, clock.value));
+    const x = xAt(u, lead);
+    const y = roofRunY(ridges, x) - Math.abs(Math.sin(clock.value * 7 + lead)) * 1.5 * k;
+    return [{ translateX: x }, { translateY: y }, { scale: k * 1.6 }, { rotate: 0.08 }];
+  };
+  const atA = useDerivedValue(() => pose(46 * k));
+  const atB = useDerivedValue(() => pose(0));
+  const limbsA = useDerivedValue(() => runnerPath(clock.value * 7 + 1, 0));
+  const limbsB = useDerivedValue(() => runnerPath(clock.value * 7, 1));
+  return (
+    <Group opacity={show}>
+      <Group transform={atA}>
+        <Path path={limbsA} style="stroke" strokeWidth={2} strokeCap="round" strokeJoin="round" color={c.coat} />
+        <Path path={RUN_COAT} color={c.coat} />
+        <Path path={RUN_HEAD} color={c.coat} />
+      </Group>
+      <Group transform={atB}>
+        <Path path={limbsB} style="stroke" strokeWidth={2} strokeCap="round" strokeJoin="round" color={c.coat} />
+        <Path path={RUN_CAPE} color={c.coat} />
+        <Path path={RUN_COAT} color={c.coat} />
+        <Path path={RUN_HEAD} color={c.coat} />
+        <Path path={RUN_DEER} color={c.coat} />
       </Group>
     </Group>
   );
@@ -608,6 +702,7 @@ export default function SherlockScene({ p, clock, width, height, tone, lightSurf
       )}
       {/* sıra evler */}
       <Path path={houses.roofs} color={c.roof} />
+      <RoofChase p={p} clock={clock} L={L} ridges={houses.ridges} c={c} />
       <Path path={houses.chim} color={c.chimney} />
       <Path path={houses.fronts[0]} color={c.house} />
       <Path path={houses.fronts[1]} color={c.houseSide} />

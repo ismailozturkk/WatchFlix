@@ -8,13 +8,16 @@
 //   • Yağmur ve ateş böcekleri bileşikteki parçacıklardan.
 //   • Olay (66 sn'de bir ~25 sn): eski, yuvarlak burunlu kırsal otobüs farlarıyla soldan gelir, durakta
 //     durur (kapı ışığı), yolcu biner, otobüs sağa gider; tarlada büyük bir rüzgâr dalgası geçer.
+//   • Olay B (dönüşümlü): sert bir esinti — ağaçtan kopan yapraklar girdap çizerek savrulur; tepelerin
+//     üstünden pervanesi dönen küçük, kırmızı eski bir deniz uçağı alçaktan geçer, gölgesi tarlada
+//     koşar; tarladaki rüzgâr dalgası yine geçer.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[59] (GH_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU, restU } from "../../utils/weatherParticles";
 import { Glow, addCloud, groundLayout, hash, rgba, ridgePath, sm, toneMap } from "./seasonKit";
 
 export const GH_TONE = [
@@ -191,7 +194,7 @@ function Bus({ p, clock, L, c }) {
     return q;
   }, [k]);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1) return [{ translateX: -900 }, { translateY: -900 }];
     const stopX = L.stop - 30 * k;
     const x = u < 0.55 ? -90 * k + (stopX + 90 * k) * sm(0, 0.3, u) : stopX + (width + 120 * k - stopX) * sm(0.55, 0.85, u) * sm(0.55, 0.85, u);
@@ -201,7 +204,7 @@ function Bus({ p, clock, L, c }) {
   });
   const wheel = useDerivedValue(() => [{ rotate: clock.value * 6 }]);
   const door = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.32, 0.36, u) * (1 - sm(0.5, 0.54, u));
   });
   return (
@@ -234,7 +237,7 @@ function Waiter({ p, clock, L, c }) {
   const x = L.stop + 34 * k;
   const g = L.road - 4 * k;
   const a = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     // otobüs gelince biner; otobüs gidince yeni bir yolcu belirir
     return u > 1 ? 1 : 1 - sm(0.42, 0.48, u) + sm(0.9, 1, u);
   });
@@ -275,6 +278,100 @@ function FieldWave({ p, clock, L, c }) {
   );
 }
 
+// ───────────────────────────── olay B: esinti + alçaktan geçen eski uçak
+
+function Seaplane({ p, clock, L, c }) {
+  const { k, width, fieldTop } = L;
+  const s = k * 1.7;
+  const st = useMemo(() => {
+    const body = Skia.Path.Make();
+    body.moveTo(-26 * s, -2 * s);
+    body.quadTo(-20 * s, -7 * s, -4 * s, -7 * s);
+    body.lineTo(22 * s, -4 * s);
+    body.lineTo(30 * s, -12 * s);
+    body.lineTo(33 * s, -12 * s);
+    body.lineTo(31 * s, 0);
+    body.quadTo(0, 4 * s, -26 * s, -2 * s);
+    body.close();
+    const wing = Skia.Path.Make();
+    wing.addRRect(Skia.RRectXY(Skia.XYWHRect(-14 * s, -15 * s, 24 * s, 3 * s), 1.4 * s, 1.4 * s));
+    wing.addRRect(Skia.RRectXY(Skia.XYWHRect(-12 * s, -2 * s, 20 * s, 2.4 * s), 1.2 * s, 1.2 * s));
+    wing.addRect(Skia.XYWHRect(-9 * s, -13 * s, 1.2 * s, 11 * s));
+    wing.addRect(Skia.XYWHRect(5 * s, -13 * s, 1.2 * s, 11 * s));
+    wing.addRRect(Skia.RRectXY(Skia.XYWHRect(-16 * s, 6 * s, 26 * s, 3 * s), 1.5 * s, 1.5 * s));
+    wing.addRect(Skia.XYWHRect(-8 * s, 0, 1 * s, 6 * s));
+    wing.addRect(Skia.XYWHRect(4 * s, 0, 1 * s, 6 * s));
+    const win = Skia.Path.Make();
+    win.addRRect(Skia.RRectXY(Skia.XYWHRect(-6 * s, -10 * s, 7 * s, 3.4 * s), 1.4 * s, 1.4 * s));
+    return { body, wing, win };
+  }, [s]);
+  const fly = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? -1 : sm(0.18, 0.86, u);
+  });
+  const at = useDerivedValue(() => {
+    const e = fly.value;
+    if (e < 0) return [{ translateX: -999 }, { translateY: -999 }];
+    const x = width + 60 * s - e * (width + 120 * s);
+    const y = fieldTop - 150 * k + Math.sin(e * 5) * 16 * k - Math.sin(e * Math.PI) * 40 * k;
+    return [{ translateX: x }, { translateY: y }, { rotate: Math.cos(e * 5) * 0.06 }];
+  });
+  const shadow = useDerivedValue(() => {
+    const e = fly.value;
+    if (e < 0) return [{ translateX: -999 }, { translateY: -999 }];
+    const x = width + 60 * s - e * (width + 120 * s) + 30 * k;
+    return [{ translateX: x }, { translateY: fieldTop + 20 * k }, { scaleY: 0.22 }];
+  });
+  const prop = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const a = Math.abs(Math.sin(clock.value * 40));
+    q.addOval(Skia.XYWHRect(-30 * s, -2 * s - 9 * s * a, 3 * s, 18 * s * a + 1));
+    return q;
+  });
+  return (
+    <Group>
+      <Group transform={shadow} opacity={0.25}>
+        <Path path={st.body} color={c.field} />
+        <Path path={st.wing} color={c.field} />
+      </Group>
+      <Group transform={at}>
+        <Path path={st.wing} color={c.busTrim} />
+        <Path path={st.body} color={c.roof} />
+        <Path path={st.win} color={c.busWin} />
+        <Path path={prop} color={c.post} opacity={0.6} />
+      </Group>
+    </Group>
+  );
+}
+
+function LeafGust({ p, clock, L, c }) {
+  const { k, width } = L;
+  const [tx, ty, tr] = L.tree;
+  const q = useDerivedValue(() => {
+    const path = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return path;
+    const t = clock.value;
+    for (let i = 0; i < 26; i += 1) {
+      const e = (u - 0.08 - hash(i, 191) * 0.3) / 0.45;
+      if (e <= 0 || e >= 1) continue;
+      const sx = tx + (hash(i, 192) - 0.5) * tr * 1.4;
+      const sy = ty + (hash(i, 193) - 0.5) * tr * 0.8;
+      const x = sx - e * width * (0.5 + hash(i, 194) * 0.5) + Math.sin(e * 9 + i) * 26 * k;
+      const y = sy + Math.cos(e * 7 + i) * 30 * k - e * 60 * k + e * e * 120 * k;
+      const r = t * 4 + i;
+      const ca = Math.cos(r) * 4 * k;
+      const sa = Math.sin(r) * 1.8 * k;
+      path.moveTo(x - ca, y - sa);
+      path.quadTo(x - sa, y + ca * 0.4, x + ca, y + sa);
+      path.quadTo(x + sa, y - ca * 0.4, x - ca, y - sa);
+      path.close();
+    }
+    return path;
+  });
+  return <Path path={q} color={c.treeLight} />;
+}
+
 export default function GhibliScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => ghLayout(width, height), [width, height]);
   const land = useMemo(() => buildLand(L), [L]);
@@ -312,6 +409,7 @@ export default function GhibliScene({ p, clock, width, height, tone, lightSurfac
       <Group transform={[{ translateX: tx - 10 * k }, { translateY: ty - 30 * k }]} opacity={0.35}>
         <Glow r={60 * k} color={c.fieldLight} a={night ? 0.15 : 0.5} mid={0.4} />
       </Group>
+      <Seaplane p={p} clock={clock} L={L} c={c} />
       {/* pirinç tarlası */}
       <Rect x={0} y={fieldTop} width={width} height={L.road - fieldTop}>
         <LinearGradient start={vec(0, fieldTop)} end={vec(0, L.road)} colors={[c.fieldLight, c.field]} />
@@ -332,6 +430,7 @@ export default function GhibliScene({ p, clock, width, height, tone, lightSurfac
       <Circle cx={sgx} cy={sgy} r={sgr * 0.62} color={c.post} />
       <Waiter p={p} clock={clock} L={L} c={c} />
       <Bus p={p} clock={clock} L={L} c={c} />
+      <LeafGust p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

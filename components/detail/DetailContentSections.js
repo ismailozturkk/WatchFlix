@@ -59,7 +59,7 @@ function ActionButton({ action, theme, featured = false }) {
 }
 
 // `featured`: üst yuvaya hazır bir öğe (ör. TasteFitButton) konur; verilmezse `review` eylemi öne çıkar.
-export function DetailActionCluster({ theme, featured, review, ai, send }) {
+export function DetailActionCluster({ theme, featured, featuredAccessory, review, ai, send }) {
   const actions = [
     review ? { ...review, color: theme.colors?.blue || FALLBACK_COLORS.blue } : null,
     { ...ai, color: theme.colors?.purple || FALLBACK_COLORS.purple },
@@ -68,7 +68,12 @@ export function DetailActionCluster({ theme, featured, review, ai, send }) {
 
   return (
     <View style={styles.actionCluster}>
-      {featured || (actions[0] ? <ActionButton action={actions[0]} theme={theme} featured /> : null)}
+      {featured && featuredAccessory ? (
+        <View style={styles.featuredRow}>
+          <View style={styles.featuredMain}>{featured}</View>
+          {featuredAccessory}
+        </View>
+      ) : featured || (actions[0] ? <ActionButton action={actions[0]} theme={theme} featured /> : null)}
       <View style={styles.quickActions}>
         <ActionButton action={actions[1]} theme={theme} />
         <ActionButton action={actions[2]} theme={theme} />
@@ -298,6 +303,8 @@ export function DetailProviderRail({ theme, title, providers = [], networks = []
 
 const styles = StyleSheet.create({
   actionCluster: { marginBottom: 18, gap: 9 },
+  featuredRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  featuredMain: { flex: 1, minWidth: 0 },
   featuredAction: {
     minHeight: 64,
     borderRadius: 20,

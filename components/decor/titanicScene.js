@@ -7,13 +7,15 @@
 //   • Sağda buzdağı: suyun üstünde keskin, altında soluk büyük gövde.
 //   • Olay (72 sn'de bir ~29 sn): ilk üç bacadan buhar yükselir, ışıklar daha parlak yanar, pruvada
 //     kollarını iki yana açmış iki siluet belirir; gökten bir kayan yıldız geçer.
+//   • Olay B (dönüşümlü): güverteden üç beyaz imdat fişeği yükselir, gökte yıldız gibi patlayıp
+//     süzülerek söner; fenerli bir filika kürek çekerek gemiden uzaklaşır.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[66] (TI_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const TI_TONE = [
@@ -168,7 +170,7 @@ function Ship({ p, clock, L, c, night }) {
     { rotate: Math.sin(clock.value * 0.5) * 0.006 },
   ]);
   const boost = useDerivedValue(() => {
-    const e = restU(p, clock.value);
+    const e = eventU(p, clock.value, 0);
     return e > 1 ? 0 : sm(0.06, 0.2, e) * (1 - sm(0.82, 0.98, e));
   });
   const lightA = useDerivedValue(() => Math.min(1, (night ? 0.8 : 0.55) + boost.value * 0.2 + Math.sin(clock.value * 2.3) * 0.05));
@@ -242,7 +244,7 @@ function ShootingStar({ p, clock, L, c }) {
   const { k, width, horizon } = L;
   const q = useDerivedValue(() => {
     const path = Skia.Path.Make();
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.55 || u > 0.66) return path;
     const e = (u - 0.55) / 0.11;
     const x = width * (0.15 + e * 0.6);
@@ -252,6 +254,133 @@ function ShootingStar({ p, clock, L, c }) {
     return path;
   });
   return <Path path={q} style="stroke" strokeWidth={1.6 * k} strokeCap="round" color={c.star} />;
+}
+
+// ───────────────────────────── olay B: imdat fişekleri + filika
+
+const FLARES = [0.08, 0.3, 0.52];
+
+function DistressFlares({ p, clock, L, c }) {
+  const { k, width, line, horizon } = L;
+  const su = Math.min(k, (width * 0.92) / 340);
+  const ox = width * 0.46 + 10 * su;
+  const oy = line - 64 * su;
+  const trail = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    for (let i = 0; i < 3; i += 1) {
+      const e = (u - FLARES[i]) / 0.1;
+      if (e <= 0 || e >= 1) continue;
+      const top = horizon - (330 + i * 30) * k;
+      const y = oy - (oy - top) * (1 - (1 - e) * (1 - e));
+      const x = ox + (i - 1) * 18 * k * e;
+      q.moveTo(x, y);
+      q.lineTo(x - (i - 1) * 4 * k, y + 34 * k * (1 - e * 0.6));
+    }
+    return q;
+  });
+  const sparks = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return q;
+    for (let i = 0; i < 3; i += 1) {
+      const e = (u - FLARES[i] - 0.1) / 0.24;
+      if (e <= 0 || e >= 1) continue;
+      const cx = ox + (i - 1) * 18 * k;
+      const cy = horizon - (330 + i * 30) * k;
+      const r = (8 + 64 * sm(0, 0.45, e)) * k;
+      for (let j = 0; j < 22; j += 1) {
+        const a = (j / 22) * Math.PI * 2 + i;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r * 0.8 + e * e * 46 * k;
+        q.addCircle(x, y, Math.max(0.2, (2.6 - e * 1.9) * k));
+      }
+    }
+    return q;
+  });
+  const flashT = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    let i = 0;
+    for (let j = 0; j < 3; j += 1) if (u > FLARES[j] + 0.1) i = j;
+    return [{ translateX: ox + (i - 1) * 18 * k }, { translateY: horizon - (330 + i * 30) * k }];
+  });
+  const flashO = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return 0;
+    let o = 0;
+    for (let j = 0; j < 3; j += 1) {
+      const e = (u - FLARES[j] - 0.1) / 0.24;
+      if (e > 0 && e < 1) o = Math.max(o, 1 - sm(0, 1, e));
+    }
+    return o;
+  });
+  return (
+    <Group>
+      <Path path={trail} style="stroke" strokeWidth={1.4 * k} strokeCap="round" color={c.star} opacity={0.75} />
+      <Group transform={flashT} opacity={flashO}>
+        <Glow r={80 * k} color={c.star} a={0.32} mid={0.3} />
+      </Group>
+      <Path path={sparks} color={c.star} />
+    </Group>
+  );
+}
+
+function Lifeboat({ p, clock, L, c }) {
+  const { width, line } = L;
+  const k = L.k * 1.6;
+  const boat = useMemo(() => {
+    const hull = Skia.Path.Make();
+    hull.moveTo(-18 * k, -2 * k);
+    hull.lineTo(18 * k, -2 * k);
+    hull.quadTo(16 * k, 5 * k, 8 * k, 5 * k);
+    hull.lineTo(-10 * k, 5 * k);
+    hull.quadTo(-17 * k, 4 * k, -18 * k, -2 * k);
+    hull.close();
+    const crew = Skia.Path.Make();
+    [-11, -4, 3, 10].forEach((x, i) => {
+      crew.addCircle(x * k, (-8 - (i % 2) * 0.6) * k, 1.7 * k);
+      crew.addRect(Skia.XYWHRect((x - 1.6) * k, -6.4 * k, 3.2 * k, 5 * k));
+    });
+    return { hull, crew };
+  }, [k]);
+  const T = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return [{ translateX: -999 }, { translateY: -999 }];
+    const e = sm(0.06, 0.98, u);
+    return [{ translateX: width * 0.38 - e * width * 0.5 }, { translateY: line + 40 * k + Math.sin(clock.value * 2.1) * 0.8 * k }];
+  });
+  const op = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.04, 0.12, u) * (1 - sm(0.9, 0.99, u));
+  });
+  const oars = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const a = Math.sin(clock.value * 3.2) * 0.5;
+    [-1, 1].forEach((s) => {
+      const bx = s * 6 * k;
+      q.moveTo(bx, -3 * k);
+      q.lineTo(bx + Math.cos(a + 1.9) * 14 * k * s, -3 * k + Math.abs(Math.sin(a + 1.9)) * 9 * k);
+    });
+    return q;
+  });
+  const wake = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    for (let i = 0; i < 5; i += 1) q.addRect(Skia.XYWHRect(18 * k + i * 9 * k, 5 * k + (i % 2) * 2 * k, (8 - i) * k, 0.9 * k));
+    return q;
+  });
+  return (
+    <Group transform={T} opacity={op}>
+      <Group transform={[{ translateX: -13 * k }, { translateY: -14 * k }]}>
+        <Glow r={22 * k} color={c.light} a={0.45} mid={0.3} />
+      </Group>
+      <Path path={wake} color={c.light} opacity={0.35} />
+      <Path path={oars} style="stroke" strokeWidth={1 * k} color={c.mast} />
+      <Path path={boat.crew} color={c.couple} />
+      <Path path={boat.hull} color={c.sup} />
+      <Rect x={-14 * k} y={-16 * k} width={2 * k} height={3 * k} color={c.light} />
+    </Group>
+  );
 }
 
 export default function TitanicScene({ p, clock, width, height, tone, lightSurface }) {
@@ -272,6 +401,7 @@ export default function TitanicScene({ p, clock, width, height, tone, lightSurfa
       </Group>
       <Path path={moon} color={c.moon} />
       <ShootingStar p={p} clock={clock} L={L} c={c} />
+      <DistressFlares p={p} clock={clock} L={L} c={c} />
       <Rect x={0} y={horizon - 180 * k} width={width} height={180 * k}>
         <LinearGradient start={vec(0, horizon - 180 * k)} end={vec(0, horizon)} colors={[rgba(c.haze, 0), c.haze]} />
       </Rect>
@@ -287,6 +417,7 @@ export default function TitanicScene({ p, clock, width, height, tone, lightSurfa
       <Path path={ice.shade} color={c.iceShade} />
       <Reflections clock={clock} L={L} c={c} night={night} />
       <Ship p={p} clock={clock} L={L} c={c} night={night} />
+      <Lifeboat p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

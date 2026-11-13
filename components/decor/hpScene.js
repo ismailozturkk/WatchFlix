@@ -15,6 +15,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { HpEventB } from "./sceneEventsB";
 import { hpFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -494,6 +495,8 @@ export default function HpScene({ p, clock, width, height, tone }) {
           <RadialGradient c={vec(0, 0)} r={24 * k} colors={[rgba(c.silver, 0.6), rgba(c.silver, 0)]} />
         </Circle>
       </Group>
+      {/* olay B (A ile sırayla) */}
+      <HpEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

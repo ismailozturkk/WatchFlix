@@ -7,13 +7,15 @@
 //   • Önde masa kenarında dönen topaç: çizgileri döner, hafifçe yalpalar.
 //   • Olay (70 sn'de bir ~28 sn): şehir katlanır — tepedeki şehir aşağı doğru uzayıp yaklaşır,
 //     sahne hafifçe döner; topaç sallanmaya başlar… ve yeniden toparlanır.
+//   • Olay B (dönüşümlü): kafe ağır çekimde patlar — tente, pencere ve taş parçaları havada
+//     dönerek asılı kalır, şok halkası yayılır… sonra her parça geri sarılarak yerine oturur.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[65] (IN_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const IN_TONE = [
@@ -191,7 +193,7 @@ function SpinningTop({ p, clock, L, c }) {
   const hi = useDerivedValue(() => d.value.hi);
   const dark = useDerivedValue(() => d.value.dark);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const wob = u > 1 ? 0 : sm(0.5, 0.62, u) * (1 - sm(0.66, 0.74, u));
     const tilt = Math.sin(clock.value * 6) * (0.03 + wob * 0.16);
     return [{ translateX: width * 0.76 + Math.sin(clock.value * 3) * wob * 3 * k }, { translateY: table + 1 * k }, { rotate: tilt }];
@@ -210,6 +212,86 @@ function SpinningTop({ p, clock, L, c }) {
   );
 }
 
+// ───────────────────────────── olay B: ağır çekim kafe patlaması (geri sarılır)
+
+function SlowBlast({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const cx = width * 0.08 + 60 * k;
+  const cy = base - 40 * k;
+  const ex = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.08, 0.34, u) * (1 - sm(0.7, 0.93, u));
+  });
+  const shards = useDerivedValue(() => {
+    const q = [Skia.Path.Make(), Skia.Path.Make(), Skia.Path.Make()];
+    const e = ex.value;
+    if (e < 0.005) return q;
+    const t = clock.value;
+    for (let i = 0; i < 64; i += 1) {
+      const a = -Math.PI * (0.04 + 0.92 * hash(i, 31));
+      const d = (30 + 210 * hash(i, 32)) * k * e;
+      const dr = Math.sin(t * 0.6 + i) * 3 * k * e;
+      const x = cx + Math.cos(a) * d + dr;
+      const y = cy + Math.sin(a) * d * 0.85 + Math.cos(t * 0.5 + i * 2) * 2 * k * e;
+      const r = (hash(i, 33) - 0.5) * 7 * e + t * 0.2 * e * (hash(i, 34) - 0.5);
+      const s = (4.5 + 6 * hash(i, 35)) * k;
+      const ca = Math.cos(r);
+      const sa = Math.sin(r);
+      const path = q[i % 3];
+      path.moveTo(x + ca * s, y + sa * s);
+      path.lineTo(x - sa * s * 0.6, y + ca * s * 0.6);
+      path.lineTo(x - ca * s * 0.8, y - sa * s * 0.8);
+      path.lineTo(x + sa * s * 0.4, y - ca * s * 0.5);
+      path.close();
+    }
+    return q;
+  });
+  const sA = useDerivedValue(() => shards.value[0]);
+  const sB = useDerivedValue(() => shards.value[1]);
+  const sC = useDerivedValue(() => shards.value[2]);
+  const ring = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const e = ex.value;
+    if (e < 0.02) return q;
+    q.addOval(Skia.XYWHRect(cx - 200 * k * e, cy - 120 * k * e, 400 * k * e, 240 * k * e));
+    return q;
+  });
+  const ringO = useDerivedValue(() => 0.45 * ex.value);
+  // donmuş ateş topu: iç içe kabarcıklar, genişler ve havada asılı kalır
+  const fire = useDerivedValue(() => {
+    const q = [Skia.Path.Make(), Skia.Path.Make()];
+    const e = ex.value;
+    if (e < 0.01) return q;
+    for (let i = 0; i < 16; i += 1) {
+      const a = (i / 16) * Math.PI * 2 + hash(i, 36);
+      const d = (10 + 34 * hash(i, 37)) * k * e;
+      const r = (12 + 18 * hash(i, 38)) * k * e;
+      q[0].addCircle(cx + Math.cos(a) * d, cy - 8 * k * e + Math.sin(a) * d * 0.7, r);
+      q[1].addCircle(cx + Math.cos(a) * d * 0.5, cy - 8 * k * e + Math.sin(a) * d * 0.35, r * 0.55);
+    }
+    return q;
+  });
+  const fireOut = useDerivedValue(() => fire.value[0]);
+  const fireIn = useDerivedValue(() => fire.value[1]);
+  const flashO = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.06, 0.12, u) * (1 - sm(0.14, 0.36, u)) + 0.25 * ex.value;
+  });
+  return (
+    <Group>
+      <Group transform={[{ translateX: cx }, { translateY: cy }]} opacity={flashO}>
+        <Glow r={120 * k} color={c.lamp} a={0.55} mid={0.3} />
+      </Group>
+      <Path path={ring} style="stroke" strokeWidth={1.6 * k} color={c.fog} opacity={ringO} />
+      <Path path={fireOut} color={c.awning} opacity={0.4} />
+      <Path path={fireIn} color={c.lamp} opacity={0.8} />
+      <Path path={sA} color={c.awning} />
+      <Path path={sB} color={c.windowLit} />
+      <Path path={sC} color={c.bld} />
+    </Group>
+  );
+}
+
 export default function InceptionScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => inLayout(width, height), [width, height]);
   const { k, base } = L;
@@ -221,7 +303,7 @@ export default function InceptionScene({ p, clock, width, height, tone, lightSur
   const night = !lightSurface;
   // katlanma: 0 = dinlenme (tepede sıkışık şerit), 1 = tam katlanmış (iri, aşağı sarkan)
   const fold = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.08, 0.4, u) * (1 - sm(0.72, 0.96, u));
   });
   const topY = base - 760 * k;
@@ -277,6 +359,7 @@ export default function InceptionScene({ p, clock, width, height, tone, lightSur
         <Path path={street.awn} color={c.awning} />
         <Path path={street.awnB} color={c.awningB} />
         <Path path={street.poles} color={c.bldDark} />
+        <SlowBlast p={p} clock={clock} L={L} c={c} />
         {street.lamps.map(([x, y], i) => (
           <Group key={i} opacity={lampA} transform={[{ translateX: x }, { translateY: y }]}>
             <Glow r={40 * k} color={c.lamp} a={0.9} mid={0.3} />

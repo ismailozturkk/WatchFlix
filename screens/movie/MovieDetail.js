@@ -65,6 +65,8 @@ import { showLibraryError } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import { movieWatchEvents } from "../../utils/watchHistory";
 import ScreenDecor from "../../components/ScreenDecor";
+import UniversePreviewCard from "../../components/decor/UniversePreviewCard";
+import { universeFor } from "../../utils/weatherUniverses";
 import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
 
 import { useAuth } from "../../context/AuthContext";
@@ -1159,6 +1161,14 @@ export default function MovieDetails({ navigation, route }) {
                 similar={details.recommendations?.results}
               />
             }
+            featuredAccessory={universeFor({ type: "movie", id: details.id, collectionId: details.belongs_to_collection?.id }) ? (
+              <UniversePreviewCard
+                titleType="movie"
+                titleId={details.id}
+                collectionId={details.belongs_to_collection?.id}
+                theme={theme}
+              />
+            ) : null}
             ai={{
               title: i18nText("autoI18n.yapay_zeka", "Yapay Zeka"),
               subtitle: i18nText("autoI18n.ai_action_subtitle", "Bilgi / Öneri"),

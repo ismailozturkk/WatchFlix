@@ -16,6 +16,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { PbEventB } from "./sceneEventsB";
 import { pbFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -592,6 +593,8 @@ export default function PbScene({ p, clock, width, height, tone }) {
       {[0, 1, 2, 3].map((i) => (
         <Inmate key={`f${i}`} L={L} f={f} clock={clock} i={i} c={c} front />
       ))}
+      {/* olay B (A ile sırayla) */}
+      <PbEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

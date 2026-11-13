@@ -34,6 +34,12 @@ import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
 import { useFocusEffect } from "@react-navigation/native";
 import { Keys, get, set } from "../../services/storage";
+import useUniverseUnlocks from "../../hooks/useUniverseUnlocks";
+import { showToast } from "../../components/AppToast";
+import { effectLabel } from "../../components/settings/AtmosphereControls";
+import * as Haptics from "../../services/hapticsService";
+import { i18nText } from "../../utils/i18nText";
+import { matchUniverseQuote } from "../../utils/universeQuotes";
 
 // Başlık satırındaki her öğe (geri, alan, görünüm) aynı yükseklikte ve cam olmayan
 // yolda da yuvarlak: hap alanın iki yanında daire düğmeler, tek hizada okunur.
@@ -140,6 +146,24 @@ export default function SearchScreen({ navigation, route }) {
     },
     [API_KEY, language, linkCopy, navigation],
   );
+  // ── Gizli replik (utils/universeQuotes.js) ─────────────────────────────────
+  // Bir evrenin meşhur repliği yazılırsa evren kalıcı açılır; arama yine normal çalışır.
+  const universes = useUniverseUnlocks();
+  const universesRef = useRef(universes);
+  universesRef.current = universes;
+  const tryQuote = useCallback((text, lenient) => {
+    const id = matchUniverseQuote(text, { lenient });
+    const u = universesRef.current;
+    if (!id || u.isSolved(id)) return;
+    if (!u.solve(id)) return;
+    Haptics.notificationAsync?.(Haptics.NotificationFeedbackType?.Success);
+    showToast({
+      kind: "success",
+      title: i18nText("autoI18n.evren_kesfedildi", "Yeni evren keşfettin: {{name}}").replace("{{name}}", effectLabel(id)),
+      message: i18nText("autoI18n.evren_kesfedildi_alt", "Artık Atmosfer'de seni bekliyor."),
+    });
+  }, []);
+
   const handleChangeText = useCallback(
     (text) => {
       // Yapıştırılan bağlantı arama sorgusu OLMAZ; alana yazılmadan açılır.
@@ -148,8 +172,9 @@ export default function SearchScreen({ navigation, route }) {
         return;
       }
       setSearchQuery(text);
+      tryQuote(text, false);
     },
-    [openMediaLink],
+    [openMediaLink, tryQuote],
   );
   const pasteLink = useCallback(async () => {
     let text = "";
@@ -258,7 +283,10 @@ export default function SearchScreen({ navigation, route }) {
             maxLength={80}
             returnKeyType="search"
             keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
-            onSubmitEditing={() => Keyboard.dismiss()}
+            onSubmitEditing={() => {
+              tryQuote(searchQuery, true);
+              Keyboard.dismiss();
+            }}
           />
           {/* Alan içi eylem: boşken "bağlantıdan aç", yazarken "temizle". Camın
               içinde olduğundan düz dokunulabilir (cam içine cam konmaz). */}

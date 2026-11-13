@@ -4,9 +4,8 @@ import { KIND, OVERLAY, buildParticles, gotFrame } from "../utils/weatherParticl
 const wallOf = () => buildParticles("got", { count: 60, seed: 5 }).find((q) => q.kind === KIND.overlay && q.part === OVERLAY.iceWall);
 
 const tAt = (p, u) => {
-  let c = u / p.rest - p.y0;
-  c -= Math.floor(c);
-  return c * p.period + p.period * 3;
+  // çift döngü = olay A (tek döngülerde sahnenin olay B'si oynar: eventU)
+  return (4 + u / p.rest - p.y0) * p.period;
 };
 
 describe("gotFrame", () => {

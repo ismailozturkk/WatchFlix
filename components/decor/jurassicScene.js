@@ -8,13 +8,15 @@
 //   • Önde eğrelti otları ve palmiyeler (rüzgârla hafif salınır).
 //   • Olay (66 sn'de bir ~27 sn): T-Rex sağdan girer, ortada durup başını kaldırarak kükrer (çene açılır,
 //     sahne sarsılır), sonra sola çıkar; üstte bir helikopter adayı geçer.
+//   • Olay B (dönüşümlü): ormandan bir uçan sürüngen sürüsü havalanıp gökyüzünü geçer; ardından
+//     ince bacaklı, uzun boyunlu bir sürü dinozor sağdan sola, iki sıra halinde ovayı koşarak geçer.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[61] (JP_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, peaksPath, rgba, ridgePath, sm, toneMap } from "./seasonKit";
 import { addBlade, addFlame, addPalm } from "./universeKit";
 
@@ -308,7 +310,7 @@ function rexState(u, width, k) {
 
 function TRex({ p, clock, L, c }) {
   const { k, width } = L;
-  const st = useDerivedValue(() => rexState(restU(p, clock.value), width, k));
+  const st = useDerivedValue(() => rexState(eventU(p, clock.value, 0), width, k));
   const d = useDerivedValue(() => {
     const s = st.value;
     const walk = s && s.moving ? clock.value * 3.2 : 0;
@@ -354,7 +356,7 @@ function Heli({ p, clock, L, c }) {
     return q;
   });
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.08 || u > 0.6) return [{ translateX: -900 }, { translateY: -900 }];
     const e = (u - 0.08) / 0.52;
     return [
@@ -416,6 +418,106 @@ function Sparks({ clock, L, c, fence }) {
   return <Path path={q} style="stroke" strokeWidth={1.2 * k} strokeCap="round" color={c.spark} />;
 }
 
+// ───────────────────────────── olay B: koşan sürü + uçan sürüngenler
+
+/** Koşan iki ayaklı (sola bakar); gövde dolgu yolu q'ya, bacaklar çizgi yolu legs'e. */
+function addRunner(q, legs, x, y, s, ph) {
+  "worklet";
+  const bob = Math.abs(Math.sin(ph)) * 1.4 * s;
+  const by = y - bob;
+  q.addOval(Skia.XYWHRect(x - 7 * s, by - 21 * s, 16 * s, 8 * s));
+  q.moveTo(x + 8 * s, by - 18 * s);
+  q.lineTo(x + 26 * s, by - 21 * s);
+  q.lineTo(x + 8 * s, by - 14 * s);
+  q.close();
+  q.moveTo(x - 6 * s, by - 19 * s);
+  q.lineTo(x - 13 * s, by - 32 * s);
+  q.lineTo(x - 10 * s, by - 33 * s);
+  q.lineTo(x - 2 * s, by - 17 * s);
+  q.close();
+  q.addOval(Skia.XYWHRect(x - 19 * s, by - 35 * s, 9 * s, 3.6 * s));
+  for (let j = 0; j < 2; j += 1) {
+    const a = ph + j * Math.PI;
+    const kx = x + Math.sin(a) * 4 * s - 1 * s;
+    const fx = x + Math.sin(a) * 9 * s - Math.max(0, Math.cos(a)) * 3 * s;
+    legs.moveTo(x + 1 * s, by - 14 * s);
+    legs.lineTo(kx - 3 * s, by - 7 * s);
+    legs.lineTo(fx, y - Math.max(0, Math.cos(a)) * 4 * s);
+  }
+}
+
+const HERD = 10;
+
+function Herd({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const d = useDerivedValue(() => {
+    const body = Skia.Path.Make();
+    const legs = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { body, legs };
+    for (let i = 0; i < HERD; i += 1) {
+      const row = i % 2;
+      const delay = 0.3 + hash(i, 71) * 0.18 + row * 0.04;
+      const e = (u - delay) / (0.3 + hash(i, 72) * 0.08);
+      if (e <= 0 || e >= 1) continue;
+      const s = k * (row ? 1.6 : 1.25);
+      const x = width + 40 * k - e * (width + 120 * k);
+      const y = base + (row ? 14 : 2) * k;
+      addRunner(body, legs, x, y, s, clock.value * 15 + i * 1.3);
+    }
+    return { body, legs };
+  });
+  const body = useDerivedValue(() => d.value.body);
+  const legs = useDerivedValue(() => d.value.legs);
+  const dust = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1 || u < 0.3) return q;
+    const e = sm(0.3, 0.55, u) * (1 - sm(0.75, 0.95, u));
+    for (let i = 0; i < 16; i += 1) {
+      const x = width * (1 - ((u - 0.3) / 0.45) * 1.1) + hash(i, 73) * 160 * k;
+      q.addCircle(x, base + (6 + hash(i, 74) * 12) * k, (6 + hash(i, 75) * 10) * k * e);
+    }
+    return q;
+  });
+  return (
+    <Group>
+      <Path path={dust} color={c.mist} opacity={0.35} />
+      <Path path={legs} style="stroke" strokeWidth={1.8 * k} strokeCap="round" strokeJoin="round" color={c.brachio} />
+      <Path path={body} color={c.brachio} />
+    </Group>
+  );
+}
+
+function Pterosaurs({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const q = useDerivedValue(() => {
+    const path = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return path;
+    for (let i = 0; i < 5; i += 1) {
+      const e = (u - 0.04 - i * 0.035) / 0.42;
+      if (e <= 0 || e >= 1) continue;
+      const s = k * (1.2 - i * 0.12);
+      const x = -60 * k + e * (width + 120 * k);
+      const y = base - (300 + i * 26 + hash(i, 76) * 40) * k - Math.sin(e * 3 + i) * 30 * k;
+      const f = Math.sin(clock.value * 6 + i * 1.7);
+      path.moveTo(x - 22 * s, y - f * 9 * s);
+      path.quadTo(x - 10 * s, y - 4 * s - f * 4 * s, x, y);
+      path.quadTo(x + 10 * s, y - 4 * s - f * 4 * s, x + 22 * s, y - f * 9 * s);
+      path.quadTo(x + 10 * s, y + 1 * s, x, y + 2 * s);
+      path.quadTo(x - 10 * s, y + 1 * s, x - 22 * s, y - f * 9 * s);
+      path.close();
+      path.moveTo(x + 2 * s, y);
+      path.lineTo(x + 11 * s, y - 2 * s);
+      path.lineTo(x + 2 * s, y + 2 * s);
+      path.close();
+    }
+    return path;
+  });
+  return <Path path={q} color={c.heli} />;
+}
+
 export default function JurassicScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => jpLayout(width, height), [width, height]);
   const land = useMemo(() => buildLand(L), [L]);
@@ -428,7 +530,7 @@ export default function JurassicScene({ p, clock, width, height, tone, lightSurf
   const night = !lightSurface;
   // kükreme anında sahne titrer
   const shake = useDerivedValue(() => {
-    const s = rexState(restU(p, clock.value), width, k);
+    const s = rexState(eventU(p, clock.value, 0), width, k);
     const a = s ? s.roar * 2.2 * k : 0;
     return [{ translateX: Math.sin(clock.value * 47) * a }, { translateY: Math.cos(clock.value * 39) * a * 0.6 }];
   });
@@ -453,6 +555,7 @@ export default function JurassicScene({ p, clock, width, height, tone, lightSurf
           <LinearGradient start={vec(0, base - 260 * k)} end={vec(0, base - 60 * k)} colors={[rgba(c.mist, 0), c.mist]} />
         </Rect>
         <Path path={land.jungleFar} color={c.mtnNear} />
+        <Pterosaurs p={p} clock={clock} L={L} c={c} />
         {/* Brachiosaurus'lar orman üstünde */}
         <Group transform={[{ translateX: width * 0.66 }, { translateY: base - 120 * k }]}>
           <Path path={brachio.body} color={c.brachio} />
@@ -485,6 +588,7 @@ export default function JurassicScene({ p, clock, width, height, tone, lightSurf
           <Torch key={i} x={x} y={y} clock={clock} k={k} c={c} seed={i * 3 + 1} night={night} />
         ))}
         <Heli p={p} clock={clock} L={L} c={c} />
+        <Herd p={p} clock={clock} L={L} c={c} />
         <TRex p={p} clock={clock} L={L} c={c} />
         {/* ön plan bitkileri */}
         <Group transform={sway}>

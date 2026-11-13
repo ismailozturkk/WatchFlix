@@ -17,6 +17,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, Skia, vec } from "@shopify/react-native-skia";
+import { AotEventB } from "./sceneEventsB";
 import { aotFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 import { seededRandom } from "../../utils/decorLayout";
@@ -995,6 +996,8 @@ export default function AotScene({ p, clock, width, height, tone }) {
         // eslint-disable-next-line react/no-array-index-key
         <Debris key={i} f={f} piece={piece} C={C} />
       ))}
+      {/* olay B (A ile sırayla) */}
+      <AotEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

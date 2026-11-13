@@ -8,6 +8,8 @@
 //       1) üç çocuk bisikletle, farları yolu tarayarak soldan sağa geçer (pedallar döner);
 //       2) "öbür taraf": gök kızıla döner, bulutların içinde kızıl şimşek yumuşakça parlar, ev ışıkları
 //          hızlanıp titrer, evlerin duvarına koyu sarmaşıklar yerden tırmanır; sonra her şey söner.
+//   • Olay B (dönüşümlü): havada kül gibi süzülen sporlar belirir; ormanın ardından, kızıl ışıkla
+//     çevrelenmiş dev, örümcek bacaklı bir gölge yükselir, bacakları ağır ağır kıvrılır ve geri çekilir.
 //   Işığa duyarlılık: parlamalar yumuşak zarflı, saniyede 3'ten az.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[56] (ST_TONE).
@@ -15,7 +17,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, TAU, addCloud, addPine, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const ST_TONE = [
@@ -251,7 +253,7 @@ function Bikes({ p, clock, L, c }) {
 
 function Bike({ i, p, clock, L, c, frame, width, k }) {
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const e = u > 1 ? -1 : (u - 0.04 - i * 0.035) / 0.34;
     if (e < 0 || e > 1) return [{ translateX: -900 }, { translateY: -900 }];
     const x = -60 * k + (width + 140 * k) * e;
@@ -295,7 +297,7 @@ function Lightning({ p, clock, L, c }) {
 
 function Flash({ i, x, y, p, clock, c, k }) {
   const a = useDerivedValue(() => {
-    const up = upAmt(restU(p, clock.value));
+    const up = upAmt(eventU(p, clock.value, 0));
     // yumuşak tepe: her nokta ~3,7 sn'de bir, kısa ama sert olmayan zarf
     const s = Math.sin(clock.value * 1.7 + i * 2.1);
     return up * Math.pow(Math.max(0, s), 10);
@@ -326,6 +328,77 @@ function Bulbs({ j, path, halo, color, clock, up }) {
   );
 }
 
+// ───────────────────────────── olay B: kül sporları + ormanın ardından yükselen gölge
+
+function Shadow({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const sx = width * 0.52;
+  const show = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.14, 0.42, u) * (1 - sm(0.74, 0.94, u));
+  });
+  const body = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const s = show.value;
+    if (s < 0.005) return q;
+    const t = clock.value;
+    const cy = base - 120 * k - s * 300 * k;
+    q.addOval(Skia.XYWHRect(sx - 70 * k, cy - 50 * k, 140 * k, 90 * k));
+    q.addOval(Skia.XYWHRect(sx - 40 * k, cy - 80 * k, 80 * k, 60 * k));
+    for (let i = 0; i < 8; i += 1) {
+      const side = i < 4 ? -1 : 1;
+      const j = i % 4;
+      const ax = sx + side * (30 + j * 12) * k;
+      const ay = cy + 10 * k;
+      const reach = (150 + j * 40) * k;
+      const w = Math.sin(t * 0.8 + i * 1.3) * 18 * k;
+      const ex = ax + side * (60 + j * 55) * k * (0.6 + 0.4 * s) + w;
+      const ey = base + 20 * k;
+      const mx = ax + side * (40 + j * 40) * k + w * 0.5;
+      const my = ay - (40 + j * 10) * k + Math.cos(t * 0.6 + i) * 10 * k - reach * 0.1;
+      const th = (9 - j) * k;
+      q.moveTo(ax - th, ay);
+      q.quadTo(mx - th * 0.6, my, ex, ey);
+      q.quadTo(mx + th * 0.6, my + th * 1.4, ax + th, ay + th);
+      q.close();
+    }
+    return q;
+  });
+  const glowT = useDerivedValue(() => [{ translateX: sx }, { translateY: base - 120 * k - show.value * 300 * k }, { scaleX: 1.8 }]);
+  const glowA = useDerivedValue(() => show.value * (0.7 + 0.3 * Math.sin(clock.value * 1.7)));
+  return (
+    <Group>
+      <Group transform={glowT} opacity={glowA}>
+        <Glow r={170 * k} color={c.upsideGlow} a={0.45} mid={0.4} />
+      </Group>
+      <Group opacity={show}>
+        <Path path={body} color={c.forestNear} />
+        <Path path={body} style="stroke" strokeWidth={1.4 * k} color={c.lightning} opacity={0.35} />
+      </Group>
+    </Group>
+  );
+}
+
+function Spores({ p, clock, L, c }) {
+  const { k, width, height } = L;
+  const q = useDerivedValue(() => {
+    const path = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return path;
+    const a = sm(0.04, 0.2, u) * (1 - sm(0.84, 0.98, u));
+    if (a < 0.01) return path;
+    const t = clock.value;
+    for (let i = 0; i < 46; i += 1) {
+      const f = (((t * (0.02 + hash(i, 121) * 0.03) + hash(i, 122)) % 1) + 1) % 1;
+      const x = width * hash(i, 123) + Math.sin(t * 0.4 + i) * 20 * k;
+      const y = height * (0.05 + f * 0.85);
+      path.addCircle(x, y, (0.8 + hash(i, 124) * 1.6) * k * a);
+    }
+    return path;
+  });
+  return <Path path={q} color={c.cloud} opacity={0.8} />;
+}
+
 export default function StrangerScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => stLayout(width, height), [width, height]);
   const forest = useMemo(() => buildForest(L), [L]);
@@ -343,14 +416,14 @@ export default function StrangerScene({ p, clock, width, height, tone, lightSurf
   const { k, ground, base } = L;
   const night = !lightSurface;
   const [mx, my, mr] = L.moon;
-  const up = useDerivedValue(() => upAmt(restU(p, clock.value)));
+  const up = useDerivedValue(() => upAmt(eventU(p, clock.value, 0)));
   const notUp = useDerivedValue(() => 1 - up.value * 0.85);
   const winA = useDerivedValue(() => {
     const w = 0.85 + 0.08 * Math.sin(clock.value * 2.1);
     return w * (1 - up.value * 0.5 * (0.5 + 0.5 * Math.sin(clock.value * 13)));
   });
   const vineGrow = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const g = u > 1 ? 0 : sm(0.5, 0.72, u) * (1 - sm(0.86, 0.97, u));
     return [{ translateY: base }, { scaleY: Math.max(0.001, g) }, { translateY: -base }];
   });
@@ -374,6 +447,7 @@ export default function StrangerScene({ p, clock, width, height, tone, lightSurf
       <Group opacity={up}>
         <Path path={clouds} color={c.upside} opacity={0.6} />
       </Group>
+      <Shadow p={p} clock={clock} L={L} c={c} />
       {/* orman ve su kulesi */}
       <Path path={forest.far} color={c.forest} />
       <Path path={forest.near} color={c.forestNear} />
@@ -413,6 +487,7 @@ export default function StrangerScene({ p, clock, width, height, tone, lightSurf
         <Circle cx={L.lamp + 12 * k} cy={base - 88 * k} r={2.6 * k} color={c.lamp} />
       </Group>
       <Bikes p={p} clock={clock} L={L} c={c} />
+      <Spores p={p} clock={clock} L={L} c={c} />
       {/* öbür taraf: zemin pusu */}
       <Group opacity={up}>
         <Rect x={0} y={base - 30 * k} width={width} height={height - base + 30 * k}>

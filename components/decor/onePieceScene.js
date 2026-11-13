@@ -6,15 +6,18 @@
 //   • Sol ve sağda göğe yükselen dev kümülüs kuleleri (gölgeli, çizgi film tonlu), ağır kayar.
 //   • Ufukta uzak adalar, palmiyeli ada, kemerli deniz kayası; ufuk parıltısı.
 //   • Rüzgâra kapılmış hasır şapka kendi döngüsünde göğü takla atarak geçer.
-//   • Olay (66 sn'de bir ~25 sn): ufuk ile kıyı arasında köpükler kaynar, dev bir deniz kralı
-//     yükselir, etrafa bakar, kükrer (çene açılır), sonra köpük sıçratarak dalar.
+//   • İKİ olay (66 sn'de bir ~25 sn; döngüde sırayla, eventPick):
+//       A) ufuk ile kıyı arasında köpükler kaynar, dev bir deniz kralı yükselir, etrafa bakar,
+//          kükrer (çene açılır), sonra köpük sıçratarak dalar.
+//       B) ufukta üç direkli bir savaş gemisi belirir, yan toplarıyla dört kez ateş eder:
+//          namlu parlaması (küçük, yumuşak), duman bulutu, yay çizen gülle, denizde su sütunu.
 //
 // Ölçek: shoreMetrics k; kıyı SCENERY.lift kadar kaldırılmıştır (ParticleField seaLift ile aynı).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU, shoreMetrics } from "../../utils/weatherParticles";
+import { eventPick, restU, shoreMetrics } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 import { Glow, TAU, hash, rgba, sm, toneMap } from "./seasonKit";
 
@@ -308,7 +311,7 @@ function buildHead(k) {
 function SeaKing({ p, clock, L, c }) {
   const { k } = L;
   const [bx, by] = L.king;
-  const st = useDerivedValue(() => kingState(restU(p, clock.value)));
+  const st = useDerivedValue(() => kingState(eventPick(p, clock.value, 2) === 0 ? restU(p, clock.value) : 2));
   const d = useDerivedValue(() => kingPaths(clock.value, st.value, bx, by, k));
   const body = useDerivedValue(() => d.value.body);
   const belly = useDerivedValue(() => d.value.belly);
@@ -362,7 +365,7 @@ function SeaKing({ p, clock, L, c }) {
 function KingFoam({ p, clock, L, c }) {
   const { k } = L;
   const [bx, by] = L.king;
-  const st = useDerivedValue(() => kingState(restU(p, clock.value)));
+  const st = useDerivedValue(() => kingState(eventPick(p, clock.value, 2) === 0 ? restU(p, clock.value) : 2));
   const ring = useDerivedValue(() => {
     const q = Skia.Path.Make();
     const t = clock.value;
@@ -402,6 +405,110 @@ function KingFoam({ p, clock, L, c }) {
 }
 
 /** Rüzgârda takla atan hasır şapka (kendi 26 sn döngüsü; ~15 sn görünür). */
+// ───────────────────────────── B: ufukta top atışı yapan savaş gemisi
+
+const GALLEON_HULL = "M -32 0 L 26 0 L 33 -10 L -37 -9 Z M 18 -10 L 33 -10 L 33 -17 L 18 -15 Z M -37 -9 L -46 -13 L -36 -11 Z";
+const GALLEON_SAILS = (() => {
+  let d = "";
+  [
+    [-14, -42, -26, -24, -12],
+    [2, -48, -30, -28, -12],
+    [17, -38, -24, -22, -13],
+  ].forEach(([x, a0, a1, b0, b1]) => {
+    d += `M ${x - 9} ${a0} Q ${x} ${a0 + 2} ${x + 9} ${a0} L ${x + 8} ${a1} Q ${x} ${a1 + 3} ${x - 8} ${a1} Z `;
+    d += `M ${x - 10} ${b0} Q ${x} ${b0 + 2} ${x + 10} ${b0} L ${x + 9} ${b1} Q ${x} ${b1 + 3} ${x - 9} ${b1} Z `;
+  });
+  return d;
+})();
+const GALLEON_MASTS = "M -14.7 -9 L -13.3 -9 L -13.3 -46 L -14.7 -46 Z M 1.3 -9 L 2.7 -9 L 2.7 -53 L 1.3 -53 Z M 16.3 -10 L 17.7 -10 L 17.7 -42 L 16.3 -42 Z";
+const SHOTS = [0.2, 0.33, 0.46, 0.59];
+const PORTS = [-22, -10, 2, 14];
+
+function Cannonade({ p, clock, L, c }) {
+  const { k, width, horizon } = L;
+  const gs = k * 1.25;
+  const gx = width * 0.56;
+  const gy = horizon + 3 * k;
+  const show = useDerivedValue(() => {
+    const u = restU(p, clock.value);
+    if (u > 1 || eventPick(p, clock.value, 2) !== 1) return 0;
+    return sm(0.05, 0.13, u) * (1 - sm(0.84, 0.93, u));
+  });
+  const at = useDerivedValue(() => [
+    { translateX: gx - (1 - show.value) * 20 * k },
+    { translateY: gy + Math.sin(clock.value * 1.1) * 0.8 * k },
+    { rotate: Math.sin(clock.value * 0.9) * 0.02 },
+    { scale: gs },
+  ]);
+  // namlu parlaması + duman + gülle + su sütunu (dünya koordinatı)
+  const fx = useDerivedValue(() => {
+    const flash = Skia.Path.Make();
+    const smoke = Skia.Path.Make();
+    const ball = Skia.Path.Make();
+    const splash = Skia.Path.Make();
+    const u = restU(p, clock.value);
+    if (u > 1 || eventPick(p, clock.value, 2) !== 1) return [flash, smoke, ball, splash];
+    const D = p.period / (p.rest || 1);
+    for (let i = 0; i < SHOTS.length; i += 1) {
+      const s0 = SHOTS[i];
+      if (u < s0) continue;
+      const tau = (u - s0) * D; // sn
+      const mx = gx + PORTS[i] * gs - 2 * gs;
+      const my = gy - 4 * gs;
+      if (tau < 0.35) flash.addCircle(mx - 3 * gs, my, (3.5 - tau * 6) * gs);
+      // duman: birkaç top, büyür ve sola sürüklenir
+      if (tau < 6) {
+        for (let j = 0; j < 4; j += 1) {
+          const f = Math.min(1, tau / 6);
+          const r = (3 + j * 1.5 + f * 10) * gs * (1 - f * 0.4);
+          smoke.addCircle(mx - (6 + j * 5) * gs - f * 18 * k, my - j * 2 * gs - f * 14 * k, r * (1 - sm(0.6, 1, f)));
+        }
+      }
+      // gülle: 1.6 sn uçuş, yay
+      const tx = width * (0.14 + hash(i, 3) * 0.32);
+      const ty = horizon + (18 + hash(i, 4) * 36) * k;
+      const fl = tau / 1.6;
+      if (fl < 1) {
+        const x = mx + (tx - mx) * fl;
+        const y = my + (ty - my) * fl - Math.sin(fl * Math.PI) * 46 * k;
+        ball.addCircle(x, y, 1.6 * k);
+      } else if (fl < 2.6) {
+        // su sütunu: yükselir, çöker
+        const e = fl - 1;
+        const h = Math.sin(Math.min(1, e / 1.6) * Math.PI) * 26 * k;
+        const w = (4 + e * 5) * k;
+        splash.moveTo(tx - w, ty);
+        splash.quadTo(tx - w * 0.3, ty - h * 0.6, tx, ty - h);
+        splash.quadTo(tx + w * 0.3, ty - h * 0.6, tx + w, ty);
+        splash.close();
+        for (let j = 0; j < 5; j += 1) {
+          const a = -Math.PI / 2 + (j - 2) * 0.5;
+          splash.addCircle(tx + Math.cos(a) * (w + e * 8 * k), ty - h * 0.7 + Math.sin(a) * e * 10 * k + e * e * 12 * k, 1.4 * k * (1 - e / 1.6));
+        }
+      }
+    }
+    return [flash, smoke, ball, splash];
+  });
+  const flash = useDerivedValue(() => fx.value[0]);
+  const smoke = useDerivedValue(() => fx.value[1]);
+  const ball = useDerivedValue(() => fx.value[2]);
+  const splash = useDerivedValue(() => fx.value[3]);
+  return (
+    <Group opacity={show}>
+      <Group transform={at}>
+        <Path path={GALLEON_MASTS} color={c.island} />
+        <Path path={GALLEON_SAILS} color={c.cloud} />
+        <Path path={GALLEON_HULL} color={c.island} />
+        <Path path="M -24 -5 m -1 0 a 1 1 0 1 0 2 0 a 1 1 0 1 0 -2 0 M -12 -5 m -1 0 a 1 1 0 1 0 2 0 a 1 1 0 1 0 -2 0 M 0 -5 m -1 0 a 1 1 0 1 0 2 0 a 1 1 0 1 0 -2 0 M 12 -5 m -1 0 a 1 1 0 1 0 2 0 a 1 1 0 1 0 -2 0" color={c.rock} />
+      </Group>
+      <Path path={smoke} color={c.cloudShade} opacity={0.75} />
+      <Path path={flash} color={c.sun} />
+      <Path path={ball} color={c.rock} />
+      <Path path={splash} color={c.foam} opacity={0.9} />
+    </Group>
+  );
+}
+
 function StrawHat({ clock, L, c }) {
   const { k, width, horizon } = L;
   const geo = useMemo(() => {
@@ -505,6 +612,7 @@ export default function OnePieceScene({ p, clock, width, height, tone, lightSurf
       <Path path={geo.isl} color={c.island} />
       <Path path={geo.palms} color={c.palm} />
       <Shimmer clock={clock} paths={geo.glitter} color={c.glitter} />
+      <Cannonade p={p} clock={clock} L={L} c={c} />
       <SeaKing p={p} clock={clock} L={L} c={c} />
       <KingFoam p={p} clock={clock} L={L} c={c} />
       <Path path={geo.rock} color={c.rock} />

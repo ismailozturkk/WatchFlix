@@ -8,13 +8,16 @@
 //   • Olay (66 sn'de bir ~25 sn): simyacı ellerini çırpar, avuçlarını yere koyar; çember mavi
 //     yanar, saniyede en çok 3 kısa şimşek çakar, kırmızı kıvılcımlar yükselir; çemberin ortasından
 //     taş sütun yükselir, bir süre durur, sonra parçalanıp çöker.
+//   • Olay B (dönüşümlü): çember kırmızı yanar; ortasından oymalı dev taş kapı yükselir, kanatları
+//     ağır ağır açılır — içindeki karanlıkta tek bir iri göz ve uzanan gölge kollar — sonra kapanıp
+//     yere geri gömülür.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[54] (FM_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, TAU, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const FM_TONE = [
@@ -472,7 +475,7 @@ function Ring({ p, clock, L, c }) {
   const { k } = L;
   const ring = useMemo(() => buildRing(L), [L]);
   const [cx, cy, rx] = L.ring;
-  const st = useDerivedValue(() => eventState(restU(p, clock.value)));
+  const st = useDerivedValue(() => eventState(eventU(p, clock.value, 0)));
   const glow = useDerivedValue(() => st.value.glow);
   const arcs = useDerivedValue(() => arcPaths(clock.value, st.value.glow, L));
   const sparks = useDerivedValue(() => {
@@ -510,7 +513,7 @@ function Ring({ p, clock, L, c }) {
 
 function Pillar({ p, clock, L, c }) {
   const { k } = L;
-  const st = useDerivedValue(() => eventState(restU(p, clock.value)));
+  const st = useDerivedValue(() => eventState(eventU(p, clock.value, 0)));
   const d = useDerivedValue(() => pillarPaths(st.value, L));
   const lit = useDerivedValue(() => d.value.lit);
   const shade = useDerivedValue(() => d.value.shade);
@@ -536,7 +539,7 @@ function Pillar({ p, clock, L, c }) {
 function Alchemist({ p, clock, L, c }) {
   const { k } = L;
   const [ax, ay] = L.alch;
-  const st = useDerivedValue(() => eventState(restU(p, clock.value)));
+  const st = useDerivedValue(() => eventState(eventU(p, clock.value, 0)));
   const d = useDerivedValue(() => alchPaths(st.value.clap, st.value.down, clock.value, k));
   const legs = useDerivedValue(() => d.value.legs);
   const coat = useDerivedValue(() => d.value.coat);
@@ -552,7 +555,7 @@ function Alchemist({ p, clock, L, c }) {
   // ışık orijinde çizilir, grup animasyonlu el konumuna kaydırılır.
   const h1At = useDerivedValue(() => [{ translateX: d.value.h1x }, { translateY: d.value.h1y }]);
   const clapFlash = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.11, 0.12, u) * (1 - sm(0.12, 0.15, u));
   });
   const hr = 2.2 * k * ALCH_S;
@@ -683,6 +686,106 @@ function ClockHands({ clock, L, c }) {
   );
 }
 
+// ───────────────────────────── olay B: yerden yükselen dev taş kapı
+
+function Gate({ p, clock, L, c }) {
+  const { k, width } = L;
+  const [gx, gy, rw] = L.ring;
+  const W = 62 * k;
+  const H = 190 * k;
+  const st = useMemo(() => {
+    const frame = Skia.Path.Make();
+    frame.addRect(Skia.XYWHRect(-W - 10 * k, -H - 14 * k, W * 2 + 20 * k, 14 * k));
+    frame.addRect(Skia.XYWHRect(-W - 10 * k, -H, 10 * k, H));
+    frame.addRect(Skia.XYWHRect(W, -H, 10 * k, H));
+    frame.moveTo(-W - 16 * k, -H - 14 * k);
+    frame.lineTo(0, -H - 40 * k);
+    frame.lineTo(W + 16 * k, -H - 14 * k);
+    frame.close();
+    const leaf = Skia.Path.Make();
+    leaf.addRect(Skia.XYWHRect(0, -H, W, H));
+    const carve = Skia.Path.Make();
+    for (let i = 0; i < 6; i += 1) {
+      const y = -H + (14 + i * 30) * k;
+      carve.addRect(Skia.XYWHRect(8 * k, y, W - 16 * k, 1.4 * k));
+      for (let j = 0; j < 3; j += 1) carve.addCircle(14 * k + j * ((W - 28 * k) / 2), y + 13 * k, (2.4 + hash(i, j + 160) * 3) * k);
+    }
+    const inside = Skia.Path.Make();
+    inside.addRect(Skia.XYWHRect(-W, -H, W * 2, H));
+    const eye = Skia.Path.Make();
+    eye.moveTo(-22 * k, -H * 0.6);
+    eye.quadTo(0, -H * 0.6 - 16 * k, 22 * k, -H * 0.6);
+    eye.quadTo(0, -H * 0.6 + 16 * k, -22 * k, -H * 0.6);
+    eye.close();
+    return { frame, leaf, carve, inside, eye };
+  }, [W, H, k]);
+  const rise = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.12, 0.32, u) * (1 - sm(0.82, 0.97, u));
+  });
+  const open = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.36, 0.52, u) * (1 - sm(0.68, 0.8, u));
+  });
+  const glow = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.02, 0.12, u) * (1 - sm(0.9, 0.99, u));
+  });
+  const clip = useMemo(() => Skia.XYWHRect(-10, -10, width + 20, gy + 10), [width, gy]);
+  const at = useDerivedValue(() => [{ translateX: gx }, { translateY: gy + (1 - rise.value) * (H + 50 * k) }]);
+  const leftT = useDerivedValue(() => [{ translateX: -W }, { scaleX: Math.max(0.06, 1 - open.value * 0.9) }]);
+  const rightT = useDerivedValue(() => [{ translateX: W }, { scaleX: -Math.max(0.06, 1 - open.value * 0.9) }]);
+  const arms = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const o = open.value;
+    if (o < 0.05) return q;
+    for (let i = 0; i < 7; i += 1) {
+      const side = i % 2 ? 1 : -1;
+      const y0 = -H * (0.15 + hash(i, 171) * 0.7);
+      const len = (40 + hash(i, 172) * 70) * k * o;
+      const w = Math.sin(clock.value * 2.4 + i * 1.7) * 10 * k;
+      q.moveTo(side * W * 0.5, y0);
+      q.quadTo(side * (W * 0.5 + len * 0.5), y0 + w, side * (W * 0.5 + len), y0 + w * 0.4 + 12 * k);
+    }
+    return q;
+  });
+  const eyeA = useDerivedValue(() => open.value);
+  const ring = useMemo(() => {
+    const q = Skia.Path.Make();
+    q.addOval(Skia.XYWHRect(gx - rw, gy - L.ring[3], rw * 2, L.ring[3] * 2));
+    return q;
+  }, [gx, gy, rw, L.ring]);
+  return (
+    <Group>
+      <Group opacity={glow}>
+        <Group transform={[{ translateX: gx }, { translateY: gy }, { scaleY: 0.3 }]}>
+          <Glow r={rw * 1.6} color={c.redStone} a={0.6} mid={0.35} />
+        </Group>
+        <Path path={ring} style="stroke" strokeWidth={2.4 * k} color={c.redStone} />
+      </Group>
+      <Group clip={clip}>
+        <Group transform={at}>
+          <Path path={st.inside} color={c.street} />
+          <Group opacity={eyeA}>
+            <Path path={st.eye} color={c.chalk} />
+            <Circle cx={0} cy={-H * 0.6} r={7 * k} color={c.street} />
+            <Path path={arms} style="stroke" strokeWidth={3.2 * k} strokeCap="round" color={c.street} />
+          </Group>
+          <Group transform={leftT}>
+            <Path path={st.leaf} color={c.pillar} />
+            <Path path={st.carve} color={c.pillarShade} />
+          </Group>
+          <Group transform={rightT}>
+            <Path path={st.leaf} color={c.pillar} />
+            <Path path={st.carve} color={c.pillarShade} />
+          </Group>
+          <Path path={st.frame} color={c.pillarShade} />
+        </Group>
+      </Group>
+    </Group>
+  );
+}
+
 export default function FmaScene({ p, clock, width, height, tone, lightSurface }) {
   const night = !lightSurface;
   const L = useMemo(() => fmaLayout(width, height), [width, height]);
@@ -718,6 +821,7 @@ export default function FmaScene({ p, clock, width, height, tone, lightSurface }
       <Path path={town.roofs} color={c.roof} />
       <Ring p={p} clock={clock} L={L} c={c} />
       <Pillar p={p} clock={clock} L={L} c={c} />
+      <Gate p={p} clock={clock} L={L} c={c} />
       <Alchemist p={p} clock={clock} L={L} c={c} />
       <Armor L={L} c={c} clock={clock} />
       <PocketWatch clock={clock} L={L} c={c} />

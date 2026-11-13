@@ -83,11 +83,11 @@ const local = (pose, u, v) => ({
 });
 
 describe("weatherParticles — katalog", () => {
-  it("7 grup (4 + film/dizi/anime), 53 efekt + auto; grup başına en çok 15, her seçim tek grupta, her efektin kendi tanımı var", () => {
+  it("7 grup (4 + film/dizi/anime), 59 efekt + auto; grup başına en çok 17, her seçim tek grupta, her efektin kendi tanımı var", () => {
     expect(WEATHER_GROUPS.map((g) => g.id)).toEqual(["seasons", "sky", "nature", "festive", "films", "series", "anime"]);
     for (const g of WEATHER_GROUPS) expect(g.effects.length).toBeLessThanOrEqual(WEATHER_GROUP_MAX);
     expect(WEATHER_CHOICES[0]).toBe("auto");
-    expect(WEATHER_EFFECTS).toHaveLength(53);
+    expect(WEATHER_EFFECTS).toHaveLength(59);
     expect(new Set(WEATHER_CHOICES).size).toBe(WEATHER_CHOICES.length);
     for (const e of ALL) {
       expect(getWeatherSpec(e)).toBeTruthy();

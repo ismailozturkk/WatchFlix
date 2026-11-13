@@ -57,10 +57,10 @@ describe("evren eşlemesi (detay ekranı)", () => {
     expect(universeFor({ type: "movie" })).toBeNull();
   });
 
-  it("34 evren, 3 grup (15 + 9 + 10); hepsi seçicide (Sopranos 12 Kas'ta kaldırıldı)", () => {
-    expect(UNIVERSE_IDS).toHaveLength(34);
+  it("40 evren, 3 grup (17 + 12 + 11); hepsi seçicide (Sopranos 12 Kas'ta kaldırıldı, 13 Kas'ta 6 yeni)", () => {
+    expect(UNIVERSE_IDS).toHaveLength(40);
     expect(UNIVERSE_IDS).not.toContain("sopranos");
-    expect(UNIVERSE_GROUPS.map((g) => g.effects.length)).toEqual([15, 9, 10]);
+    expect(UNIVERSE_GROUPS.map((g) => g.effects.length)).toEqual([17, 12, 11]);
     for (const id of UNIVERSE_IDS) expect(WEATHER_EFFECTS).toContain(id);
   });
 

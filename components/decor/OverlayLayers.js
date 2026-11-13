@@ -50,6 +50,12 @@ import OnePieceScene from "./onePieceScene";
 import NarutoScene from "./narutoScene";
 import FmaScene from "./fmaScene";
 import JujutsuScene from "./jujutsuScene";
+import BttfScene from "./bttfScene";
+import ShiningScene from "./shiningScene";
+import WitcherScene from "./witcherScene";
+import FalloutScene from "./falloutScene";
+import MoneyHeistScene from "./moneyHeistScene";
+import ArcaneScene from "./arcaneScene";
 import HunterScene from "./hunterScene";
 import SquidGameScene from "./squidGameScene";
 import DarkScene from "./darkScene";
@@ -463,6 +469,12 @@ const LAYERS = {
   [OVERLAY.narVec]: NarutoScene,
   [OVERLAY.fmaVec]: FmaScene,
   [OVERLAY.jjVec]: JujutsuScene,
+  [OVERLAY.btVec]: BttfScene,
+  [OVERLAY.snVec]: ShiningScene,
+  [OVERLAY.wiVec]: WitcherScene,
+  [OVERLAY.foVec]: FalloutScene,
+  [OVERLAY.mhVec]: MoneyHeistScene,
+  [OVERLAY.arVec]: ArcaneScene,
   [OVERLAY.hxVec]: HunterScene,
   [OVERLAY.sqVec]: SquidGameScene,
   [OVERLAY.dkVec]: DarkScene,

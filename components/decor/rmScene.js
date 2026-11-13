@@ -16,6 +16,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { RmEventB } from "./sceneEventsB";
 import { rmFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -706,6 +707,8 @@ export default function RmScene({ p, clock, width, height, tone }) {
         <Circle cx={-6 * k} cy={-7 * k} r={3 * k} style="stroke" strokeWidth={0.9 * k} color="rgba(180,255,170,0.8)" />
         <Circle cx={-2 * k} cy={-15 * k} r={1.6 * k} style="stroke" strokeWidth={0.8 * k} color="rgba(180,255,170,0.7)" />
       </Group>
+      {/* olay B (A ile sırayla) */}
+      <RmEventB p={p} clock={clock} width={width} height={height} />
     </>
   );
 }

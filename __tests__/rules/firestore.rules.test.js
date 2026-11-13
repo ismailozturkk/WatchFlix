@@ -680,6 +680,20 @@ describe("Users/{uid}/private", () => {
     await assertFails(setDoc(ref, veri({ gunler: Array(401).fill("2026-01-01") })));
   });
 
+  // private/universes (gizli atmosfer evrenleri, 13 Kas): tek belge, sahibi yazar/okur, şişirilemez.
+  test("evren belgesi: sahibi merge ile yazar, baskasi okuyamaz, sisirilemez", async () => {
+    const ref = doc(alice, "Users", ALICE, "private", "universes");
+    await assertSucceeds(setDoc(ref, { id: "all", solved: { dark: 1731500000000 }, updatedAt: 1731500000000 }, { merge: true }));
+    await assertSucceeds(setDoc(ref, { id: "all", solved: { got: 1731500001000 }, updatedAt: 1731500001000 }, { merge: true }));
+    const snap = await getDoc(ref);
+    expect(Object.keys(snap.data().solved).sort()).toEqual(["dark", "got"]);
+    await assertFails(getDoc(doc(bob, "Users", ALICE, "private", "universes")));
+    await assertFails(setDoc(doc(bob, "Users", ALICE, "private", "universes"), { id: "all", solved: {}, updatedAt: 1 }));
+    const big = Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`e${i}`, 1]));
+    await assertFails(setDoc(ref, { id: "all", solved: big, updatedAt: 1 }));
+    await assertFails(setDoc(ref, { id: "all", solved: {}, updatedAt: 1, ekstra: "x" }, { merge: true }));
+  });
+
   test("oturumsuz kullanici okuyamaz", async () => {
     await seed((db) =>
       setDoc(doc(db, "Users", ALICE, "private", "push"), { expoPushToken: TOKEN }),

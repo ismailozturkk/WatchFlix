@@ -8,13 +8,15 @@
 //   • Önde biyolüminesan bitkiler (kıvrık eğrelti başları, mantarlar, ışık noktaları) — dalga dalga yanar.
 //   • Olay (64 sn'de bir ~27 sn): ikran soldan dalış yapıp kanat çırparak sağa süzülür; o sırada ağacın
 //     telleri ve bitkiler daha parlak yanar.
+//   • Olay B (dönüşümlü): Ruhlar Ağacı'ndan denizanası gibi atımlı, ışıl ışıl tohumlar kopar; salınarak
+//     süzülür, yere yaklaştıkça söner — ağaç ve bitkiler yine daha parlak yanar.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[62] (AV_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU, restU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, ridgePath, sm, toneMap } from "./seasonKit";
 import { addBlade } from "./universeKit";
 
@@ -301,7 +303,7 @@ function ikranPaths(flap, k) {
 function Ikran({ p, clock, L, c }) {
   const { k, width, base } = L;
   const d = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const glide = u > 0.45 && u < 0.62;
     const flap = glide ? 0.25 : Math.sin(clock.value * 5.2);
     return ikranPaths(flap, k);
@@ -309,7 +311,7 @@ function Ikran({ p, clock, L, c }) {
   const body = useDerivedValue(() => d.value.body);
   const stripe = useDerivedValue(() => d.value.stripe);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.06 || u > 0.94) return [{ translateX: -900 }, { translateY: -900 }];
     const e = (u - 0.06) / 0.88;
     const x = -100 * k + (width + 200 * k) * e;
@@ -322,6 +324,58 @@ function Ikran({ p, clock, L, c }) {
     <Group transform={at}>
       <Path path={body} color={c.ikran} />
       <Path path={stripe} color={c.stripe} />
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: Ruhlar Ağacı'nın süzülen tohumları
+
+const SEEDS = 20;
+
+function SpiritSeeds({ p, clock, L, c, cx }) {
+  const { k, base } = L;
+  const d = useDerivedValue(() => {
+    const core = Skia.Path.Make();
+    const halo = Skia.Path.Make();
+    const legs = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { core, halo, legs };
+    const t = clock.value;
+    for (let i = 0; i < SEEDS; i += 1) {
+      const start = 0.04 + hash(i, 61) * 0.45;
+      const e = (u - start) / 0.5;
+      if (e <= 0 || e >= 1) continue;
+      const fade = sm(0, 0.12, e) * (1 - sm(0.75, 1, e));
+      const x0 = cx + (hash(i, 62) - 0.5) * 160 * k;
+      const x = x0 + (hash(i, 63) - 0.5) * 220 * k * e + Math.sin(t * 0.9 + i * 1.7) * 14 * k;
+      const y = base - 230 * k - hash(i, 64) * 60 * k + e * 200 * k + Math.sin(t * 1.3 + i) * 6 * k;
+      const pulse = 0.8 + 0.2 * Math.sin(t * 3 + i * 2);
+      const r = (3.4 + hash(i, 65) * 2) * k * pulse * fade;
+      if (r < 0.2) continue;
+      halo.addCircle(x, y, r * 3.2);
+      core.addCircle(x, y, r);
+      for (let j = 0; j < 7; j += 1) {
+        const a = Math.PI * (0.15 + (j / 6) * 0.7);
+        const len = r * (3.4 + Math.sin(t * 2.2 + j + i) * 0.6);
+        legs.moveTo(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.4);
+        legs.quadTo(
+          x + Math.cos(a) * len * 0.6 + Math.sin(t * 2 + j) * r * 0.5,
+          y + len * 0.5,
+          x + Math.cos(a) * len * 0.9,
+          y + Math.sin(a) * len,
+        );
+      }
+    }
+    return { core, halo, legs };
+  });
+  const core = useDerivedValue(() => d.value.core);
+  const halo = useDerivedValue(() => d.value.halo);
+  const legs = useDerivedValue(() => d.value.legs);
+  return (
+    <Group>
+      <Path path={halo} color={c.strand} opacity={0.24} />
+      <Path path={legs} style="stroke" strokeWidth={0.7 * k} strokeCap="round" color={c.strand} opacity={0.75} />
+      <Path path={core} color={c.glow} />
     </Group>
   );
 }
@@ -379,6 +433,7 @@ export default function AvatarScene({ p, clock, width, height, tone, lightSurfac
       <Group opacity={strandA} transform={sway}>
         <Path path={forest.strands} style="stroke" strokeWidth={1.3 * k} strokeCap="round" color={c.strand} />
       </Group>
+      <SpiritSeeds p={p} clock={clock} L={L} c={c} cx={forest.cx} />
       {/* biyolüminesan ön plan */}
       <Path path={forest.plantDark} color={c.plantDark} />
       <Path path={forest.plant} color={c.plant} />

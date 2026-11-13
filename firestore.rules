@@ -686,10 +686,12 @@ service cloud.firestore {
       allow read, delete: if isOwner(uid);
       allow create: if isOwner(uid) && docId != 'entitlements'
                     && (docId != 'account' || accountCreateOk(uid))
-                    && (docId != 'streak' || streakDocOk());
+                    && (docId != 'streak' || streakDocOk())
+                    && (docId != 'universes' || universesDocOk());
       allow update: if isOwner(uid) && docId != 'entitlements'
                     && (docId != 'account' || accountUpdateOk(uid))
-                    && (docId != 'streak' || streakDocOk());
+                    && (docId != 'streak' || streakDocOk())
+                    && (docId != 'universes' || universesDocOk());
       // private/streak: haftalık seri (services/streakRuntime). Damga sunucu saatiyle
       // yazılır; son gün sunucu saatinin en fazla 14 saat ilerisinde olabilir.
       function streakDocOk() {
@@ -697,6 +699,15 @@ service cloud.firestore {
         return d.guncellendi == request.time
           && d.sonGunMs is int && d.sonGunMs <= request.time.toMillis() + 50400000
           && d.gunler is list && d.gunler.size() <= 400;
+      }
+      // private/universes: atmosferin açılmış gizli evrenleri (utils/universeUnlocks.js)
+      // { id: "all", solved: { [evrenId]: ms }, updatedAt }. Evren sayısı 40; harita 64 ile sınırlı
+      // (yeni evrenlere pay), belge şişirilemez. İstemci okurken bilinmeyen kimlikleri süzer.
+      function universesDocOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['id', 'solved', 'updatedAt'])
+          && d.get('solved', {}) is map && d.get('solved', {}).size() <= 64
+          && d.get('updatedAt', 0) is int;
       }
     }
 

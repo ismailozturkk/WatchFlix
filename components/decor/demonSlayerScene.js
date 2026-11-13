@@ -7,13 +7,16 @@
 //   • Olay (64 sn'de bir ~25 sn): kareli pelerinli kılıç ustası soldan koşarak gelir, durur, kılıcını
 //     çeker; kılıcın ucundan ekranın ortasında kıvrılan bir SU dalgası şeridi büyür (köpüklü baş,
 //     damlalar), ardından dalga çözülüp söner; kılıç kınına girer, usta koşup gider.
+//   • Olay B (dönüşümlü): ormanın karanlığında kızıl iblis gözleri yanıp söner; bir haberci karga
+//     gökten süzülerek geçer; ardından iki köşedeki salkımlardan kopan mor yaprak fırtınası sahneyi
+//     süpürür ve gözler geri çekilip kaybolur.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[57] (DS_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, TAU, addPine, groundLayout, hash, ridgePath, sm, toneMap } from "./seasonKit";
 
 export const DS_TONE = [
@@ -237,13 +240,13 @@ function waterParts(u, t, L) {
 
 function WaterArc({ p, clock, L, c }) {
   const { k } = L;
-  const parts = useDerivedValue(() => waterParts(restU(p, clock.value), clock.value, L));
+  const parts = useDerivedValue(() => waterParts(eventU(p, clock.value, 0), clock.value, L));
   const body = useDerivedValue(() => parts.value.body);
   const core = useDerivedValue(() => parts.value.core);
   const crests = useDerivedValue(() => parts.value.crests);
   const foam = useDerivedValue(() => parts.value.foam);
   const a = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.3, 0.34, u) * (1 - sm(0.78, 0.86, u));
   });
   return (
@@ -304,20 +307,20 @@ function slayerPaths(u, t, k) {
 
 function Slayer({ p, clock, L, c }) {
   const { k, width } = L;
-  const d = useDerivedValue(() => slayerPaths(restU(p, clock.value), clock.value, k));
+  const d = useDerivedValue(() => slayerPaths(eventU(p, clock.value, 0), clock.value, k));
   const body = useDerivedValue(() => d.value.body);
   const cape = useDerivedValue(() => d.value.cape);
   const check = useDerivedValue(() => d.value.check);
   const blade = useDerivedValue(() => d.value.blade);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1) return [{ translateX: -900 }, { translateY: -900 }];
     const xin = -30 * k + (L.stand + 30 * k) * sm(0, 0.2, u);
     const x = u < 0.8 ? xin : L.stand + (width + 60 * k - L.stand) * sm(0.8, 0.95, u);
     return [{ translateX: x }, { translateY: L.base + 22 * k }, { scale: 1.5 }];
   });
   const gleam = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.24, 0.3, u) * (1 - sm(0.3, 0.4, u));
   });
   return (
@@ -369,6 +372,114 @@ function Lantern({ x, y, clock, i, c, k }) {
   );
 }
 
+// ───────────────────────────── olay B: iblis gözleri + karga + salkım yaprağı fırtınası
+
+function DemonEyes({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const d = useDerivedValue(() => {
+    const eyes = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return eyes;
+    for (let i = 0; i < 6; i += 1) {
+      const on = sm(0.08 + i * 0.04, 0.14 + i * 0.04, u) * (1 - sm(0.5 + i * 0.02, 0.58 + i * 0.02, u));
+      const blink = Math.sin(clock.value * 0.9 + i * 2.1) > -0.85 ? 1 : 0.1;
+      const a = on * blink;
+      if (a < 0.05) continue;
+      const x = width * (0.06 + (i / 5) * 0.88) + (hash(i, 201) - 0.5) * 30 * k;
+      if (x > width * 0.36 && x < width * 0.64) continue;
+      const y = base - (30 + hash(i, 202) * 50) * k;
+      const s = (1.5 + hash(i, 203) * 0.6) * k * a;
+      [-1, 1].forEach((side) => {
+        const ex = x + side * 5 * s;
+        eyes.moveTo(ex - 3.4 * s, y);
+        eyes.quadTo(ex, y - 2.2 * s * (side > 0 ? 1 : 0.8), ex + 3.4 * s, y - side * 0.8 * s);
+        eyes.quadTo(ex, y + 1.6 * s, ex - 3.4 * s, y);
+        eyes.close();
+      });
+    }
+    return eyes;
+  });
+  return (
+    <Group>
+      <Path path={d} color={c.lantern} />
+      <Path path={d} style="stroke" strokeWidth={4 * k} color={c.lanternGlow} opacity={0.45} />
+    </Group>
+  );
+}
+
+function Crow({ p, clock, L, c }) {
+  const { k, width, height } = L;
+  const q = useDerivedValue(() => {
+    const path = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return path;
+    const e = (u - 0.12) / 0.36;
+    if (e <= 0 || e >= 1) return path;
+    const s = k * 1.3;
+    const x = width + 40 * s - e * (width + 80 * s);
+    const y = height * 0.28 + Math.sin(e * 6) * 30 * k;
+    const f = Math.sin(clock.value * 8);
+    path.moveTo(x - 10 * s, y);
+    path.quadTo(x, y - 4 * s, x + 12 * s, y + 1 * s);
+    path.lineTo(x + 18 * s, y - 2 * s);
+    path.lineTo(x + 17 * s, y + 3 * s);
+    path.quadTo(x, y + 5 * s, x - 10 * s, y);
+    path.close();
+    path.addCircle(x - 9 * s, y - 1 * s, 3 * s);
+    path.moveTo(x - 12 * s, y - 1.4 * s);
+    path.lineTo(x - 17 * s, y);
+    path.lineTo(x - 12 * s, y + 0.6 * s);
+    path.close();
+    path.moveTo(x - 2 * s, y - 1 * s);
+    path.quadTo(x + 4 * s, y - 14 * s * f - 4 * s, x + 14 * s, y - 20 * s * f);
+    path.quadTo(x + 8 * s, y - 6 * s * f, x + 6 * s, y);
+    path.close();
+    return path;
+  });
+  return <Path path={q} color={c.forest} />;
+}
+
+const PETALS = 66;
+
+function PetalStorm({ p, clock, L, c }) {
+  const { k, width, height } = L;
+  const d = useDerivedValue(() => {
+    const out = [Skia.Path.Make(), Skia.Path.Make(), Skia.Path.Make()];
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return out;
+    const t = clock.value;
+    for (let i = 0; i < PETALS; i += 1) {
+      const e = (u - 0.36 - hash(i, 211) * 0.18) / 0.4;
+      if (e <= 0 || e >= 1) continue;
+      const left = i % 2 === 0;
+      const sx = left ? width * 0.05 * hash(i, 212) : width * (1 - 0.05 * hash(i, 212));
+      const sy = height * (0.02 + hash(i, 213) * 0.2);
+      const dx = (left ? 1 : -1) * e * width * (0.5 + hash(i, 214) * 0.6);
+      const x = sx + dx + Math.sin(e * 8 + i) * 30 * k;
+      const y = sy + e * height * (0.4 + hash(i, 215) * 0.4) + Math.cos(e * 6 + i) * 20 * k;
+      const r = t * (2 + hash(i, 216) * 3) + i;
+      const ca = Math.cos(r) * 3.4 * k;
+      const sa = Math.sin(r) * 1.6 * k;
+      const path = out[i % 3];
+      path.moveTo(x - ca, y - sa);
+      path.quadTo(x - sa, y + ca * 0.5, x + ca, y + sa);
+      path.quadTo(x + sa, y - ca * 0.5, x - ca, y - sa);
+      path.close();
+    }
+    return out;
+  });
+  const a = useDerivedValue(() => d.value[0]);
+  const b = useDerivedValue(() => d.value[1]);
+  const cc = useDerivedValue(() => d.value[2]);
+  return (
+    <Group>
+      <Path path={a} color={c.wis1} />
+      <Path path={b} color={c.wis2} />
+      <Path path={cc} color={c.wis3} />
+    </Group>
+  );
+}
+
 export default function DemonSlayerScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => dsLayout(width, height), [width, height]);
   const land = useMemo(() => buildLand(L), [L]);
@@ -382,7 +493,7 @@ export default function DemonSlayerScene({ p, clock, width, height, tone, lightS
   const shojiA = useDerivedValue(() => 0.85 + 0.07 * Math.sin(clock.value * 2.2) + 0.05 * Math.sin(clock.value * 5.3));
   // dalga sırasında ay ışığı serinler
   const cool = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : 0.35 * sm(0.3, 0.45, u) * (1 - sm(0.75, 0.9, u));
   });
   const [slx, sly] = house.stoneLamp;
@@ -400,6 +511,8 @@ export default function DemonSlayerScene({ p, clock, width, height, tone, lightS
       <Path path={land.far} color={c.mountFar} />
       <Path path={land.near} color={c.mountNear} />
       <Path path={land.forest} color={c.forest} />
+      <DemonEyes p={p} clock={clock} L={L} c={c} />
+      <Crow p={p} clock={clock} L={L} c={c} />
       {/* ev */}
       <Path path={house.wall} color={c.wall} />
       <Group opacity={shojiA}>
@@ -422,6 +535,7 @@ export default function DemonSlayerScene({ p, clock, width, height, tone, lightS
       {/* wisteria en önde, üst köşelerde */}
       <Wisteria data={wisL} clock={clock} side={-1} c={c} k={k} />
       <Wisteria data={wisR} clock={clock} side={1} c={c} k={k} />
+      <PetalStorm p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

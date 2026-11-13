@@ -7,13 +7,16 @@
 //   • Katman katman, kayan dalgalar; önde köpüklü dalga sırtı.
 //   • Olay (68 sn'de bir ~28 sn): Kraken — sağda denizden dört dokunaç kıvrılarak yükselir, salınır
 //     ve geri batar; gemi daha sert yalpalar, yükseldikleri yerde su halkaları.
+//   • Olay B (dönüşümlü): hayalet gemi — sağda deniz kabarır, yosunlu, delik yelkenli soluk bir
+//     kalyon pruvası önde sudan yükselir (gövdesinden şelale gibi su akar), soğuk ışıkla parlar,
+//     bir süre süzülür ve yeniden dalgaların altına iner.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[64] (PC_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 import { addPalm, wavePath } from "./universeKit";
 
@@ -187,7 +190,7 @@ function Tentacle({ p, clock, L, c, spec }) {
   const { k, width, line } = L;
   const [fx, hs, dir, delay] = spec;
   const d = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const rise = u > 1 ? 0 : sm(0.12 + delay, 0.34 + delay, u) * (1 - sm(0.7 + delay, 0.9, u));
     return tentaclePath(width * fx, line + 6 * k, rise * hs * 300 * k, dir, clock.value + delay * 20, k);
   });
@@ -205,7 +208,7 @@ function Splash({ p, clock, L, c }) {
   const { k, width, line } = L;
   const ring = useDerivedValue(() => {
     const q = Skia.Path.Make();
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.12) return q;
     TENTACLES.forEach(([fx, , , delay]) => {
       const e = (u - 0.12 - delay) / 0.3;
@@ -222,7 +225,7 @@ function Ship({ p, clock, L, c, night }) {
   const { k, width, line } = L;
   const ship = useMemo(() => buildShip(k), [k]);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const storm = u > 1 ? 0 : sm(0.1, 0.3, u) * (1 - sm(0.75, 0.95, u));
     const roll = Math.sin(clock.value * 0.9) * (0.035 + storm * 0.06);
     const heave = Math.sin(clock.value * 1.1 + 1) * (3 + storm * 5) * k;
@@ -263,6 +266,76 @@ function Waves({ clock, L, c, y, amp, len, speed, color, opacity }) {
   return (
     <Group transform={at} opacity={opacity}>
       <Path path={q} color={color} />
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: sudan yükselen hayalet gemi
+
+function GhostShip({ p, clock, L, c }) {
+  const { k, width, horizon } = L;
+  const ship = useMemo(() => buildShip(k * 0.72), [k]);
+  const su = k * 0.72 * 1.05;
+  const gx = width * 0.8;
+  const gy = horizon + 46 * k;
+  const clip = useMemo(() => Skia.XYWHRect(-10, -10, width + 20, gy + 10), [width, gy]);
+  const rise = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.06, 0.36, u) * (1 - sm(0.74, 0.96, u));
+  });
+  const at = useDerivedValue(() => {
+    const r = rise.value;
+    const tilt = (1 - r) * 0.35;
+    return [
+      { translateX: gx },
+      { translateY: gy + (1 - r) * 230 * su + Math.sin(clock.value * 0.8) * 2 * k },
+      { rotate: -tilt + Math.sin(clock.value * 0.7) * 0.02 },
+      { scaleX: -1 },
+    ];
+  });
+  const op = useDerivedValue(() => (rise.value < 0.01 ? 0 : 0.85));
+  const falls = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const r = rise.value;
+    if (r < 0.02 || r > 0.995) return q;
+    const s = Math.min(1, r * 3) * (1 - sm(0.8, 1, r));
+    for (let i = 0; i < 14; i += 1) {
+      const x = gx + (-90 + i * 13) * su;
+      const top = gy + (1 - r) * 230 * su - 20 * su - hash(i, 41) * 20 * su;
+      const len = (20 + hash(i, 42) * 30) * su * s;
+      const f = (clock.value * 1.6 + hash(i, 43)) % 1;
+      q.moveTo(x, Math.max(top, gy - 300 * su));
+      q.lineTo(x + Math.sin(i) * 2 * k, Math.min(gy, top + len + f * 8 * k));
+    }
+    return q;
+  });
+  const boil = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const r = rise.value;
+    if (r < 0.01) return q;
+    for (let i = 0; i < 3; i += 1) {
+      const f = (((clock.value * 0.4 + i / 3) % 1) + 1) % 1;
+      const w = (80 + f * 120) * su;
+      q.addOval(Skia.XYWHRect(gx - w, gy - w * 0.06, w * 2, w * 0.12));
+    }
+    return q;
+  });
+  const boilO = useDerivedValue(() => 0.5 * Math.min(1, rise.value * 4));
+  return (
+    <Group>
+      <Group transform={[{ translateX: gx }, { translateY: gy - 90 * su }]} opacity={rise}>
+        <Glow r={170 * k} color={c.moonGlow} a={0.35} mid={0.35} />
+      </Group>
+      <Group clip={clip}>
+        <Group transform={at} opacity={op}>
+          <Path path={ship.rig} style="stroke" strokeWidth={0.7 * k} color={rgba(c.foam, 0.6)} />
+          <Path path={ship.sails} color={rgba(c.foam, 0.42)} />
+          <Path path={ship.hull} color={c.hullDark} />
+          <Path path={ship.dark} color={rgba(c.moonGlow, 0.5)} />
+        </Group>
+      </Group>
+      <Path path={falls} style="stroke" strokeWidth={1.3 * k} strokeCap="round" color={c.foam} opacity={0.75} />
+      <Path path={boil} style="stroke" strokeWidth={1.2 * k} color={c.foam} opacity={boilO} />
     </Group>
   );
 }
@@ -311,6 +384,7 @@ export default function PiratesScene({ p, clock, width, height, tone, lightSurfa
       <Group opacity={shimmer}>
         <Path path={path} color={c.moon} />
       </Group>
+      <GhostShip p={p} clock={clock} L={L} c={c} />
       <Waves clock={clock} L={L} c={c} y={horizon + 40 * k} amp={3 * k} len={60 * k} speed={0.6} color={c.sea} opacity={0.6} />
       {TENTACLES.slice(0, 2).map((s, i) => (
         <Tentacle key={i} p={p} clock={clock} L={L} c={c} spec={s} />

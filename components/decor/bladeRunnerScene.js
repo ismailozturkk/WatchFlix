@@ -9,13 +9,15 @@
 //   • Olay (60 sn'de bir ~24 sn): uçan polis arabası sağdan süzülerek gelir, kırmızı-mavi tepe lambası
 //     yumuşakça yanıp söner, farları yağmuru yarar; piramidin önünde yavaşlayıp yükselir ve gider.
 //     Aynı anda bir projektör gökte ağır ağır tarar.
+//   • Olay B (dönüşümlü): dev reklam zeplini şehrin üstünden ağır ağır geçer — yan yüzünde kayan
+//     renkli ekran şeridi, yanıp sönen seyir ışıkları, alttan yağmurlu caddeyi tarayan iki ışık konisi.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[58] (BR_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const BR_TONE = [
@@ -229,7 +231,7 @@ function Spinner({ p, clock, L, c }) {
     return q;
   }, [k]);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1) return [{ translateX: -900 }, { translateY: -900 }];
     // sağdan gelir (aynalı), ortada yavaşlar, yükselip sola gider
     const e = sm(0, 0.45, u) * 0.5 + sm(0.55, 1, u) * 0.5;
@@ -273,7 +275,7 @@ function Searchlight({ p, clock, L, c }) {
   }, [k, width]);
   const at = useDerivedValue(() => [{ translateX: cx }, { translateY: top }, { rotate: 0.55 * Math.sin(clock.value * 0.11) }]);
   const a = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return 0.35 + (u > 1 ? 0 : 0.35 * sm(0.1, 0.3, u) * (1 - sm(0.8, 1, u)));
   });
   return (
@@ -281,6 +283,78 @@ function Searchlight({ p, clock, L, c }) {
       <Path path={beam}>
         <LinearGradient start={vec(0, 0)} end={vec(0, -width * 1.1)} colors={[c.search, rgba(c.search, 0)]} />
       </Path>
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: reklam zeplini
+
+function AdBlimp({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const s = k * 1.15;
+  const st = useMemo(() => {
+    const body = Skia.Path.Make();
+    body.addOval(Skia.XYWHRect(-90 * s, -24 * s, 180 * s, 48 * s));
+    const fins = Skia.Path.Make();
+    fins.moveTo(78 * s, -6 * s);
+    fins.lineTo(104 * s, -30 * s);
+    fins.lineTo(108 * s, -26 * s);
+    fins.lineTo(92 * s, 0);
+    fins.lineTo(108 * s, 24 * s);
+    fins.lineTo(104 * s, 28 * s);
+    fins.lineTo(78 * s, 6 * s);
+    fins.close();
+    fins.addRRect(Skia.RRectXY(Skia.XYWHRect(-22 * s, 20 * s, 44 * s, 10 * s), 4 * s, 4 * s));
+    const screen = Skia.XYWHRect(-60 * s, -12 * s, 120 * s, 18 * s);
+    const scan = Skia.Path.Make();
+    for (let j = 0; j < 6; j += 1) scan.addRect(Skia.XYWHRect(-60 * s, (-12 + j * 3) * s, 120 * s, 0.8 * s));
+    const beams = Skia.Path.Make();
+    [-14, 14].forEach((bx) => {
+      beams.moveTo((bx - 3) * s, 28 * s);
+      beams.lineTo((bx + 3) * s, 28 * s);
+      beams.lineTo((bx + 40) * s, 330 * s);
+      beams.lineTo((bx - 40) * s, 330 * s);
+      beams.close();
+    });
+    return { body, fins, screen, scan, beams };
+  }, [s]);
+  const at = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return [{ translateX: -999 }, { translateY: -999 }];
+    const e = u;
+    return [
+      { translateX: -130 * s + e * (width + 260 * s) },
+      { translateY: base - 470 * k + Math.sin(clock.value * 0.5) * 4 * k },
+      { rotate: Math.sin(clock.value * 0.4) * 0.02 },
+    ];
+  });
+  const shift = useDerivedValue(() => [{ translateX: ((clock.value * 24 * s) % (120 * s)) - 120 * s }]);
+  const blink = useDerivedValue(() => (Math.sin(clock.value * 5) > 0.6 ? 1 : 0.15));
+  const beamT = useDerivedValue(() => [{ translateY: 28 * s }, { rotate: Math.sin(clock.value * 0.7) * 0.25 }, { translateY: -28 * s }]);
+  return (
+    <Group transform={at}>
+      <Group transform={beamT}>
+        <Path path={st.beams}>
+          <LinearGradient start={vec(0, 28 * s)} end={vec(0, 330 * s)} colors={[rgba(c.search, 0.4), rgba(c.search, 0)]} />
+        </Path>
+      </Group>
+      <Glow r={140 * s} color={c.neon2} a={0.18} mid={0.3} />
+      <Path path={st.fins} color={c.towerFar} />
+      <Path path={st.body} color={c.tower} />
+      <Group clip={st.screen}>
+        <Group transform={shift}>
+          {[0, 1].map((r) => (
+            <Rect key={r} x={-60 * s + r * 120 * s} y={-12 * s} width={120 * s} height={18 * s}>
+              <LinearGradient start={vec(-60 * s + r * 120 * s, 0)} end={vec(60 * s + r * 120 * s, 0)} colors={[c.neon1, c.neon3, c.neon4, c.neon1]} />
+            </Rect>
+          ))}
+        </Group>
+        <Path path={st.scan} color={c.tower} opacity={0.4} />
+      </Group>
+      <Group opacity={blink}>
+        <Glow cx={-88 * s} cy={0} r={8 * s} color={c.beacon1} a={0.9} mid={0.3} />
+        <Glow cx={106 * s} cy={-28 * s} r={8 * s} color={c.beacon2} a={0.9} mid={0.3} />
+      </Group>
     </Group>
   );
 }
@@ -304,6 +378,7 @@ export default function BladeRunnerScene({ p, clock, width, height, tone, lightS
         </Rect>
       </Group>
       <Searchlight p={p} clock={clock} L={L} c={c} />
+      <AdBlimp p={p} clock={clock} L={L} c={c} />
       {/* sanayi bacaları + alevler */}
       <Path path={city.stacks} color={c.stack} />
       {stackTops.map(([x, top], i) => (

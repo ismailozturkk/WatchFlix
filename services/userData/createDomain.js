@@ -233,7 +233,7 @@ export function createUserDataDomain(spec, deps) {
       const path = def.pathOf(uid, key);
       if (doc) {
         st.maps[change.kind].set(key, doc);
-        ops.push({ path, op: "set", data: doc, domain: name, kind: change.kind, key });
+        ops.push({ path, op: "set", data: doc, domain: name, kind: change.kind, key, ...(def.merge ? { merge: true } : null) });
       } else {
         st.maps[change.kind].delete(key);
         ops.push({ path, op: "delete", domain: name, kind: change.kind, key });

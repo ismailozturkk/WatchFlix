@@ -1,6 +1,6 @@
 // utils/weatherUniverses.js
 //
-// Atmosferin "evren" sahneleri: 15 film, 9 dizi, 10 anime. Her sahne bir ANA OLAY
+// Atmosferin "evren" sahneleri: 17 film, 12 dizi, 11 anime. Her sahne bir ANA OLAY
 // (ejderha gelir → duvara ateş üfler → gider) ve 2–3 sürekli arka hareketten
 // (kar, kuzgun, kod yağmuru) kurulu "yaşayan döngü". Hepsi motorun saf, kare
 // başına state'siz modelinde: konum/opaklık/şekil karesi yalnız saatten.
@@ -45,6 +45,8 @@ export const UNIVERSES = Object.freeze([
   { id: "pirates", group: "films", collections: [295] },
   { id: "inception", group: "films", movies: [27205] },
   { id: "titanic", group: "films", movies: [597] },
+  { id: "backToTheFuture", group: "films", collections: [264] }, // üçleme
+  { id: "shining", group: "films", movies: [694, 501170] }, // + Doctor Sleep
   // diziler
   { id: "breakingBad", group: "series", tv: [1396] },
   { id: "got", group: "series", tv: [1399] },
@@ -55,6 +57,9 @@ export const UNIVERSES = Object.freeze([
   { id: "lastOfUs", group: "series", tv: [100088] },
   { id: "dark", group: "series", tv: [70523] },
   { id: "squidGame", group: "series", tv: [93405] },
+  { id: "witcher", group: "series", tv: [71912, 106541] }, // + Blood Origin
+  { id: "fallout", group: "series", tv: [106379] },
+  { id: "moneyHeist", group: "series", tv: [71446, 146176] }, // + Berlin
   // anime
   { id: "deathNote", group: "anime", tv: [13916] },
   { id: "aot", group: "anime", tv: [1429] },
@@ -66,6 +71,7 @@ export const UNIVERSES = Object.freeze([
   { id: "ghibli", group: "anime", movies: [8392, 129, 4935, 128, 16859, 12429, 10515, 81, 149870, 51739, 508883, 37797, 11621, 12477] }, // Studio Ghibli filmleri
   { id: "hunterXHunter", group: "anime", tv: [46298] },
   { id: "jujutsuKaisen", group: "anime", tv: [95479], movies: [810693] }, // + Jujutsu Kaisen 0
+  { id: "arcane", group: "anime", tv: [94605] },
 ].map((u) => Object.freeze(u)));
 
 export const UNIVERSE_IDS = Object.freeze(UNIVERSES.map((u) => u.id));
@@ -153,6 +159,12 @@ export const UNIVERSE_COMPOSITES = Object.freeze({
   squidGame: Object.freeze([["sqVec", { fixed: 1 }], ["motes", 0.6]]),
   hunterXHunter: Object.freeze([["hxVec", { fixed: 1 }], ["butterflies", 0.5]]),
   jujutsuKaisen: Object.freeze([["jjVec", { fixed: 1 }], ["ash", 0.6]]),
+  backToTheFuture: Object.freeze([["btVec", { fixed: 1 }], ["rain", 0.5]]),
+  shining: Object.freeze([["snVec", { fixed: 1 }], ["snow", 1]]),
+  witcher: Object.freeze([["wiVec", { fixed: 1 }], ["motes", 0.6]]),
+  fallout: Object.freeze([["foVec", { fixed: 1 }], ["sandDrift", 0.8]]),
+  moneyHeist: Object.freeze([["mhVec", { fixed: 1 }], ["motes", 0.5]]),
+  arcane: Object.freeze([["arVec", { fixed: 1 }], ["motes", 0.7]]),
   rickAndMorty: Object.freeze([["skyStars", 0.5], ["motes", 0.5], ["rmPortal", { fixed: 1 }], ["rmScene", { fixed: 18 }]]),
 });
 
@@ -182,6 +194,12 @@ export const UNIVERSE_SPECS = Object.freeze({
   fma: { counts: c3(13, 19, 27) }, // + 1 sahne
   rickAndMorty: { counts: c3(52, 74, 100) },
   jujutsuKaisen: { counts: c3(18, 30, 48) }, // + 1 sahne
+  backToTheFuture: { counts: c3(24, 40, 64) }, // + 1 sahne
+  shining: { counts: c3(40, 60, 90) }, // + 1 sahne
+  witcher: { counts: c3(13, 21, 29) }, // + 1 sahne
+  fallout: { counts: c3(24, 40, 64) }, // + 1 sahne
+  moneyHeist: { counts: c3(10, 16, 24) }, // + 1 sahne
+  arcane: { counts: c3(13, 21, 29) }, // + 1 sahne
   hunterXHunter: { counts: c3(4, 6, 9) }, // + 1 sahne
   squidGame: { counts: c3(8, 12, 18) }, // + 1 sahne
   dark: { counts: c3(40, 60, 90) }, // + 1 sahne

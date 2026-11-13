@@ -67,6 +67,8 @@ import { customListHas, listItemFromDetails } from "../../utils/libraryCore";
 import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import ScreenDecor from "../../components/ScreenDecor";
+import UniversePreviewCard from "../../components/decor/UniversePreviewCard";
+import { universeFor } from "../../utils/weatherUniverses";
 import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
 
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
@@ -976,6 +978,9 @@ export default function TvShowsDetails({ route, navigation }) {
                 similar={details.recommendations?.results}
               />
             }
+            featuredAccessory={universeFor({ type: "tv", id: details.id }) ? (
+              <UniversePreviewCard titleType="tv" titleId={details.id} theme={theme} />
+            ) : null}
             ai={{
               title: i18nText("autoI18n.yapay_zeka", "Yapay Zeka"),
               subtitle: i18nText("autoI18n.ai_action_subtitle", "Bilgi / Öneri"),

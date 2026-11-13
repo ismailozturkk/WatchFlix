@@ -52,7 +52,11 @@ export function createFirestoreRemote() {
       const batch = writeBatch(db);
       for (const op of ops) {
         const ref = doc(db, op.path);
-        if (op.op === "set") batch.set(ref, op.data);
+        // `merge`: belge alanları birleştirilir (iki cihazdan gelen harita girdileri birbirini ezmez).
+        if (op.op === "set") {
+          if (op.merge) batch.set(ref, op.data, { merge: true });
+          else batch.set(ref, op.data);
+        }
         else batch.delete(ref);
       }
       await batch.commit();

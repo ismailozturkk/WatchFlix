@@ -6,9 +6,8 @@ const wallOf = (light = false) =>
 
 // u (olay saati) → t
 const tAt = (p, u) => {
-  let c = u / p.rest - p.y0;
-  c -= Math.floor(c);
-  return c * p.period + p.period * 3;
+  // çift döngü = olay A (tek döngülerde sahnenin olay B'si oynar: eventU)
+  return (4 + u / p.rest - p.y0) * p.period;
 };
 
 describe("aotFrame", () => {
@@ -72,7 +71,8 @@ describe("aotFrame", () => {
     let onsets = 0;
     let lit = 0;
     let prev = 0;
-    for (let t = 0; t < p.period; t += 1 / 60) {
+    // iki döngü: biri olay A (şimşekli), öbürü olay B (sahne sakin)
+    for (let t = 0; t < 2 * p.period; t += 1 / 60) {
       const a = aotFrame(p, t).flash;
       if (a > 0.05 && prev <= 0.05) onsets += 1;
       if (a > 0.05) lit += 1 / 60;

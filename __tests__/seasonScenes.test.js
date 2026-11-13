@@ -169,6 +169,12 @@ const SCENES = [
   ["squidGame", "sqVec", OVERLAY.sqVec, () => require("../components/decor/squidGameScene").default],
   ["hunterXHunter", "hxVec", OVERLAY.hxVec, () => require("../components/decor/hunterScene").default],
   ["jujutsuKaisen", "jjVec", OVERLAY.jjVec, () => require("../components/decor/jujutsuScene").default],
+  ["backToTheFuture", "btVec", OVERLAY.btVec, () => require("../components/decor/bttfScene").default],
+  ["shining", "snVec", OVERLAY.snVec, () => require("../components/decor/shiningScene").default],
+  ["witcher", "wiVec", OVERLAY.wiVec, () => require("../components/decor/witcherScene").default],
+  ["fallout", "foVec", OVERLAY.foVec, () => require("../components/decor/falloutScene").default],
+  ["moneyHeist", "mhVec", OVERLAY.mhVec, () => require("../components/decor/moneyHeistScene").default],
+  ["arcane", "arVec", OVERLAY.arVec, () => require("../components/decor/arcaneScene").default],
 ];
 
 const val = (v) => (v && typeof v === "object" && "value" in v ? v.value : v);
@@ -227,11 +233,13 @@ describe("mevsim / gökyüzü sahneleri", () => {
         }).find((q) => q.kind === KIND.overlay && q.part === part);
         expect(p).toBeTruthy();
         const tone = overlayStyle(part, lightSurface);
+        // döngü 2 ve 3: çok olaylı sahnelerde (eventPick) iki olay da denenir
+        for (const cycle of [2, 3])
         for (const u of [0.02, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 2]) {
           const uu = u > 1 ? 0.5 * p.rest + 0.1 : u;
           let c = uu / p.rest - p.y0;
           c -= Math.floor(c);
-          const t = c * p.period + p.period * 2;
+          const t = c * p.period + p.period * cycle;
           const stats = { nodes: 0 };
           walk(
             React.createElement(Scene, {

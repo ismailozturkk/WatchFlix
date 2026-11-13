@@ -40,6 +40,7 @@ jest.mock("../screens/tabs/profile/ProfileLists", () => ({ __esModule: true, def
 jest.mock("../screens/tabs/profile/RemindersPreviewButton", () => ({ __esModule: true, default: "Reminders" }));
 jest.mock("../screens/tabs/profile/NotesCard", () => ({ __esModule: true, default: "Notes" }));
 jest.mock("../components/hub/HubWrappedModule", () => ({ __esModule: true, default: "Wrapped" }));
+jest.mock("../components/decor/UniverseCollectionPill", () => ({ __esModule: true, default: "UniversePill" }));
 
 const LibraryScreen = require("../screens/tabs/LibraryScreen").default;
 

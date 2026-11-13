@@ -9,6 +9,7 @@
 //   3. Hatırlatmalar  — Profil'den (RemindersPreviewButton: yaklaşanlar + Takvim girişi)
 //   4. Notlar         — Profil'den (NotesCard)
 //   5. Wrapped        — Eğlence (Hub) sekmesinden (components/hub/HubWrappedModule)
+// Başlığın altında "Evren koleksiyonu N/M" hapı (izledikçe açılan atmosfer evrenleri).
 //
 // BÖLÜM GÖRÜNÜRLÜĞÜ: Ayarlar > Kişiselleştirme > Ekran bölümleri > Kütüphane
 // (utils/sectionVisibility.js "library"). "Sıradaki" TV rafıyla AYNI ayarı
@@ -25,6 +26,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ScreenDecor from "../../components/ScreenDecor";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
+import UniverseCollectionPill from "../../components/decor/UniverseCollectionPill";
 import HubWrappedModule from "../../components/hub/HubWrappedModule";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import { useLanguage } from "../../context/LanguageContext";
@@ -97,6 +99,8 @@ export default function LibraryScreen({ navigation }) {
         >
           {t.library}
         </Text>
+        {/* İzledikçe açılan atmosfer evrenleri: N/M (dokununca Atmosfer ekranı) */}
+        <UniverseCollectionPill navigation={navigation} theme={theme} />
 
         {showOngoingTvShows && <TvOngoingSection navigation={navigation} surface="library" />}
         {show("lists") && <ProfileLists navigation={navigation} />}

@@ -15,6 +15,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { VikingsEventB } from "./sceneEventsB";
 import { sceneScale, vikFrame } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -511,6 +512,8 @@ export default function VikingsScene({ p, clock, width, height, tone }) {
       {ARROWS.map((_, i) => (
         <Arrow key={`a${i}`} L={L} width={width} f={f} i={i} abbey={abbey} c={c} />
       ))}
+      {/* olay B (A ile sırayla) */}
+      <VikingsEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

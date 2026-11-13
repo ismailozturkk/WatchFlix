@@ -17,6 +17,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { BatmanEventB } from "./sceneEventsB";
 import { batFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -665,6 +666,8 @@ export default function BatScene({ p, clock, width, height, tone }) {
           </React.Fragment>
         ))}
       </Group>
+      {/* olay B (A ile sırayla) */}
+      <BatmanEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

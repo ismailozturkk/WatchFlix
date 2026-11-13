@@ -8,13 +8,16 @@
 //   • Olay (72 sn'de bir ~28 sn): yırtık kanatlı, sivri saçlı uzun bir ölüm meleği aydan süzülüp
 //     korkuluğun üstünde asılı kalır; elma eline yükselir, bir ısırık alınır, gözleri parlar,
 //     sırıtır; sonra elmayla birlikte göğe çekilip gider.
+//   • Olay B (dönüşümlü): sert rüzgâr — defterden kopan, satır satır yazılı sayfalar dönerek göğe
+//     savrulur; iki yumuşak şimşek arasında su deposunun tepesinde dizlerini kucaklamış, dağınık
+//     saçlı bir gözlemci belirir, sayfaları izler ve karanlıkta kaybolur.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[51] (DN_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, addCloud, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const DN_TONE = [
@@ -341,7 +344,7 @@ function Apple({ p, clock, L, c }) {
   const [ax, ay] = L.apple;
   const r = 8 * k;
   const st = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const sh = shiniAt(u > 1 ? 2 : u, L);
     const hand = [sh.x + 52 * k * sh.s, sh.y - 13 * k * sh.s];
     let x = ax;
@@ -383,7 +386,7 @@ function Shinigami({ p, clock, L, c, night }) {
   const wingR = useDerivedValue(() => d.value.wingR);
   const grin = useDerivedValue(() => d.value.grin);
   const teeth = useDerivedValue(() => d.value.teeth);
-  const st = useDerivedValue(() => shiniAt(restU(p, clock.value), L));
+  const st = useDerivedValue(() => shiniAt(eventU(p, clock.value, 0), L));
   const at = useDerivedValue(() => [
     { translateX: st.value.x },
     { translateY: st.value.y + Math.sin(clock.value * 1.1) * 5 * k },
@@ -393,7 +396,7 @@ function Shinigami({ p, clock, L, c, night }) {
   const flapL = useDerivedValue(() => [{ translateX: -4 * k }, { translateY: -30 * k }, { rotate: Math.sin(clock.value * 2.2) * 0.16 }, { translateX: 4 * k }, { translateY: 30 * k }]);
   const flapR = useDerivedValue(() => [{ translateX: 4 * k }, { translateY: -30 * k }, { rotate: -Math.sin(clock.value * 2.2) * 0.16 }, { translateX: -4 * k }, { translateY: 30 * k }]);
   const eyes = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : 0.75 + 0.25 * sm(0.44, 0.52, u) * (1 - sm(0.62, 0.7, u));
   });
   return (
@@ -450,6 +453,115 @@ function Beacon({ clock, x, y, i, k, c }) {
     <Group opacity={op}>
       <Glow cx={x} cy={y} r={8 * k} color={c.beacon} a={0.9} mid={0.4} />
       <Circle cx={x} cy={y} r={1.5 * k} color={c.beacon} />
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: savrulan sayfalar + depodaki gözlemci
+
+const PAGES = 11;
+
+function FlyingPages({ p, clock, L, c }) {
+  const { k, width } = L;
+  const [nx, ny] = L.note;
+  const d = useDerivedValue(() => {
+    const page = Skia.Path.Make();
+    const ink = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { page, ink };
+    const t = clock.value;
+    for (let i = 0; i < PAGES; i += 1) {
+      const e = (u - 0.1 - i * 0.045) / 0.42;
+      if (e <= 0 || e >= 1) continue;
+      const dir = hash(i, 131) > 0.35 ? 1 : -1;
+      const x = nx + dir * e * (width * (0.35 + hash(i, 132) * 0.4)) + Math.sin(t * 2 + i) * 14 * k * e;
+      const y = ny - 10 * k - (1 - (1 - e) * (1 - e)) * (260 + hash(i, 133) * 260) * k;
+      const flip = Math.cos(t * (3 + hash(i, 134) * 2) + i);
+      const rot = t * (0.8 + hash(i, 135)) * dir + i;
+      const w = 13 * k * Math.max(0.12, Math.abs(flip));
+      const h = 17 * k;
+      const ca = Math.cos(rot);
+      const sa = Math.sin(rot);
+      const pt = (px, py) => [x + px * ca - py * sa, y + px * sa + py * ca];
+      const a = pt(-w, -h);
+      const b = pt(w, -h);
+      const cc = pt(w, h);
+      const dd = pt(-w, h);
+      page.moveTo(a[0], a[1]);
+      page.lineTo(b[0], b[1]);
+      page.lineTo(cc[0], cc[1]);
+      page.lineTo(dd[0], dd[1]);
+      page.close();
+      for (let j = 0; j < 5; j += 1) {
+        const yy = -h + (5 + j * 6) * k;
+        const l0 = pt(-w * 0.75, yy);
+        const l1 = pt(w * (0.75 - (j === 4 ? 0.5 : 0)), yy);
+        ink.moveTo(l0[0], l0[1]);
+        ink.lineTo(l1[0], l1[1]);
+      }
+    }
+    return { page, ink };
+  });
+  const page = useDerivedValue(() => d.value.page);
+  const ink = useDerivedValue(() => d.value.ink);
+  return (
+    <Group>
+      <Path path={page} color={c.page} />
+      <Path path={ink} style="stroke" strokeWidth={0.8 * k} color={c.ink} />
+    </Group>
+  );
+}
+
+function Watcher({ p, clock, L, c }) {
+  const { k, width, ledge } = L;
+  const x = width * 0.12;
+  const y = ledge - 84 * k;
+  const s = k * 1.05;
+  const fig = useMemo(() => {
+    const q = Skia.Path.Make();
+    q.addOval(Skia.XYWHRect(x - 9 * s, y - 22 * s, 18 * s, 22 * s));
+    q.addCircle(x + 1 * s, y - 27 * s, 6.2 * s);
+    for (let i = 0; i < 9; i += 1) {
+      const a = Math.PI * (1.05 + (i / 8) * 0.95);
+      const bx = x + 1 * s + Math.cos(a) * 5.5 * s;
+      const by = y - 27 * s + Math.sin(a) * 5.5 * s;
+      q.moveTo(bx - 1.6 * s, by);
+      q.lineTo(x + 1 * s + Math.cos(a) * (10 + hash(i, 141) * 3) * s, y - 27 * s + Math.sin(a) * (10 + hash(i, 142) * 3) * s);
+      q.lineTo(bx + 1.6 * s, by);
+      q.close();
+    }
+    q.addRRect(Skia.RRectXY(Skia.XYWHRect(x - 1 * s, y - 20 * s, 12 * s, 6 * s), 3 * s, 3 * s));
+    q.addRRect(Skia.RRectXY(Skia.XYWHRect(x + 4 * s, y - 18 * s, 5 * s, 18 * s), 2 * s, 2 * s));
+    q.addRRect(Skia.RRectXY(Skia.XYWHRect(x - 8 * s, y - 4 * s, 18 * s, 5 * s), 2 * s, 2 * s));
+    return q;
+  }, [x, y, s]);
+  const eyes = useMemo(() => {
+    const q = Skia.Path.Make();
+    q.addCircle(x + 3 * s, y - 27 * s, 0.9 * s);
+    q.addCircle(x + 6 * s, y - 27 * s, 0.9 * s);
+    return q;
+  }, [x, y, s]);
+  const flash = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return 0;
+    const f = (a) => Math.max(0, 1 - Math.abs(u - a) / 0.025);
+    return f(0.3) + f(0.62) * 0.8;
+  });
+  const vis = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.29, 0.33, u) * (1 - sm(0.78, 0.9, u));
+  });
+  return (
+    <Group>
+      <Group opacity={flash}>
+        <Rect x={0} y={0} width={width} height={ledge} color={c.moonGlow} opacity={0.1} />
+        <Glow cx={x} cy={y - 60 * k} r={220 * k} color={c.moonGlow} a={0.35} mid={0.3} />
+      </Group>
+      <Group opacity={vis}>
+        <Path path={fig} color={c.note} />
+        <Path path={fig} style="stroke" strokeWidth={0.9 * k} color={c.moonGlow} opacity={0.45} />
+        <Path path={eyes} color={c.moonGlow} opacity={0.7} />
+      </Group>
     </Group>
   );
 }
@@ -518,6 +630,7 @@ export default function DeathNoteScene({ p, clock, width, height, tone, lightSur
       ))}
       {/* çatı: depo, korkuluk, zemin */}
       <Path path={city.tank} color={c.tank} />
+      <Watcher p={p} clock={clock} L={L} c={c} />
       <Rect x={0} y={ledge} width={width} height={height - ledge + 10}>
         <LinearGradient start={vec(0, ledge)} end={vec(0, height)} colors={[c.roof, c.note]} />
       </Rect>
@@ -532,6 +645,7 @@ export default function DeathNoteScene({ p, clock, width, height, tone, lightSur
       <Rect x={0} y={ground} width={width} height={1.4 * k} color={c.roofEdge} opacity={0.4} />
       <Notebook clock={clock} L={L} c={c} />
       <Apple p={p} clock={clock} L={L} c={c} />
+      <FlyingPages p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

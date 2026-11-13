@@ -17,6 +17,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Skia, vec } from "@shopify/react-native-skia";
+import { DuneEventB } from "./sceneEventsB";
 import { duneFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -973,6 +974,8 @@ export default function DuneScene({ p, clock, width, height, tone }) {
       <Group opacity={tone.alpha}>
         <DuneLayer d={geo.dunes[2]} c={c} k={k} top={L.layers[2].base - L.layers[2].amp} bottom={height} lit={lit} front />
       </Group>
+      {/* olay B (A ile sırayla) */}
+      <DuneEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

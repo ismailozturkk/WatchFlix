@@ -10,13 +10,15 @@
 //     (kıvılcım), çatılara geri seker; biri shuriken atar — öbürü duman bulutuyla kütükle yer
 //     değiştirir (shuriken kütüğe saplanır, kütük düşer), antrenman kütüğünün üstünde belirir;
 //     karşılıklı bekleyiş, ikisi de duman bulutunda kaybolur.
+//   • Olay B (dönüşümlü): gölge klon tekniği — çatılarda soldan sağa birer duman patlamasıyla el
+//     mühürlü ninja klonları belirir; hepsi aynı anda yukarı sıçrar ve havada duman olup dağılır.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[53] (NR_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, TAU, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const NR_TONE = [
@@ -444,7 +446,7 @@ function duel(u, L) {
 function Ninja({ p, clock, L, c, which }) {
   const { k } = L;
   const st = useDerivedValue(() => {
-    const d = duel(restU(p, clock.value), L);
+    const d = duel(eventU(p, clock.value, 0), L);
     return which === 0 ? d.a : d.b;
   });
   const g = useDerivedValue(() => ninjaPaths(st.value.tuck, st.value.arm, st.value.dir, clock.value, k));
@@ -470,7 +472,7 @@ function Ninja({ p, clock, L, c, which }) {
 
 function Duel({ p, clock, L, c }) {
   const { k } = L;
-  const d = useDerivedValue(() => duel(restU(p, clock.value), L));
+  const d = useDerivedValue(() => duel(eventU(p, clock.value, 0), L));
   const sparkO = useDerivedValue(() => d.value.spark);
   const sparkP = useDerivedValue(() => {
     const q = Skia.Path.Make();
@@ -584,6 +586,92 @@ function CloudStrip({ clock, q, i, width, k, c }) {
   );
 }
 
+// ───────────────────────────── olay B: gölge klonları
+
+const CLONES = 9;
+const CLONE_JUMP = 0.66;
+
+function cloneAt(i) {
+  "worklet";
+  return 0.1 + i * 0.035;
+}
+
+function Clones({ p, clock, L, c }) {
+  const { k, width, roof } = L;
+  const s = 1.15 * k;
+  const d = useDerivedValue(() => {
+    const limbs = Skia.Path.Make();
+    const heads = Skia.Path.Make();
+    const bands = Skia.Path.Make();
+    const puffs = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return { limbs, heads, bands, puffs };
+    const puff = (x, y, e) => {
+      if (e <= 0 || e >= 1) return;
+      for (let j = 0; j < 5; j += 1) {
+        const a = (j / 5) * TAU + e;
+        const r = (5 + 12 * e) * k * (1 - e * e);
+        puffs.addCircle(x + Math.cos(a) * 9 * k * e, y + Math.sin(a) * 6 * k * e, r);
+      }
+    };
+    for (let i = 0; i < CLONES; i += 1) {
+      const x = width * (0.06 + (i + 0.5) * (0.88 / CLONES));
+      const y0 = roof - 2 * k - hash(i, 151) * 8 * k;
+      const a0 = cloneAt(i);
+      puff(x, y0 - 16 * s, (u - a0) / 0.08);
+      const j = sm(CLONE_JUMP, CLONE_JUMP + 0.08, u);
+      puff(x, y0 - 16 * s - j * 120 * k, (u - CLONE_JUMP - 0.08) / 0.09);
+      if (u < a0 + 0.02 || u > CLONE_JUMP + 0.09) continue;
+      const y = y0 - j * 120 * k;
+      const tuck = j > 0 && j < 1 ? 1 : 0;
+      const dir = i % 2 ? 1 : -1;
+      heads.addCircle(x, y - 30 * s, 4.6 * k);
+      bands.addRect(Skia.XYWHRect(x - 4.6 * k, y - 30 * s - 2.4 * k, 9.2 * k, 2 * k));
+      limbs.moveTo(x, y - 25 * s);
+      limbs.lineTo(x, y - 12 * s);
+      if (tuck) {
+        limbs.lineTo(x + 6 * s * dir, y - 8 * s);
+        limbs.lineTo(x + 1 * s * dir, y - 3 * s);
+        limbs.moveTo(x, y - 12 * s);
+        limbs.lineTo(x - 5 * s * dir, y - 6 * s);
+        limbs.lineTo(x - 1 * s * dir, y - 2 * s);
+        limbs.moveTo(x, y - 22 * s);
+        limbs.lineTo(x - 8 * s, y - 28 * s);
+        limbs.moveTo(x, y - 22 * s);
+        limbs.lineTo(x + 8 * s, y - 28 * s);
+      } else {
+        limbs.lineTo(x - 5 * s, y);
+        limbs.moveTo(x, y - 12 * s);
+        limbs.lineTo(x + 5 * s, y);
+        limbs.moveTo(x, y - 22 * s);
+        limbs.lineTo(x + 4 * s, y - 17 * s);
+        limbs.lineTo(x + 1 * s, y - 15 * s);
+        limbs.moveTo(x, y - 22 * s);
+        limbs.lineTo(x - 3 * s, y - 17 * s);
+        limbs.lineTo(x, y - 15 * s);
+      }
+      const sc = Math.sin(clock.value * 3 + i);
+      bands.moveTo(x - 4.6 * k, y - 30 * s - 1.4 * k);
+      bands.lineTo(x - 11 * s, y - 29 * s + sc * 2 * s);
+      bands.lineTo(x - 4.6 * k, y - 30 * s - 0.2 * k);
+      bands.close();
+    }
+    return { limbs, heads, bands, puffs };
+  });
+  const limbs = useDerivedValue(() => d.value.limbs);
+  const heads = useDerivedValue(() => d.value.heads);
+  const bands = useDerivedValue(() => d.value.bands);
+  const puffs = useDerivedValue(() => d.value.puffs);
+  return (
+    <Group>
+      <Path path={limbs} style="stroke" strokeWidth={4.4 * k} strokeCap="round" strokeJoin="round" color={c.ninja} />
+      <Path path={heads} color={c.ninja} />
+      <Path path={bands} color={c.band} />
+      <Path path={puffs} color={c.smoke} opacity={0.88} />
+    </Group>
+  );
+}
+
 export default function NarutoScene({ p, clock, width, height, tone, lightSurface }) {
   const night = !lightSurface;
   const L = useMemo(() => narLayout(width, height), [width, height]);
@@ -630,6 +718,7 @@ export default function NarutoScene({ p, clock, width, height, tone, lightSurfac
         <Path path={vil.wins} color={c.window} />
       </Group>
       <Duel p={p} clock={clock} L={L} c={c} />
+      <Clones p={p} clock={clock} L={L} c={c} />
       <Path path={fore.grass} color={c.tree} />
       <Path path={fore.posts} color={c.post} />
       <Path path={fore.ropes} color={c.band} />

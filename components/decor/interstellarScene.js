@@ -9,13 +9,16 @@
 //   • Olay (66 sn'de bir ~25 sn): ufuktaki sırtlardan biri yükselir, dev bir dalga duvarına dönüşüp
 //     yaklaşır; tepesinde köpük. Dalga gelmeden sudaki iniş aracı motorlarını yakıp yükselir ve kaçar;
 //     dalga söner, su durulur.
+//   • Olay B (dönüşümlü): sağ gökte küre biçimli solucan deliği açılır (içinde bükülmüş yıldız
+//     ışığı, dönen mercek halkaları); istasyondan ayrılan küçük mekik motor iziyle ona süzülür,
+//     küçülerek içine girer; solucan deliği kapanır.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[55] (IS_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, TAU, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const IS_TONE = [
@@ -186,7 +189,7 @@ function skirtPaths(u, L) {
 
 function Wave({ p, clock, L, c }) {
   const { k, width } = L;
-  const u = useDerivedValue(() => restU(p, clock.value));
+  const u = useDerivedValue(() => eventU(p, clock.value, 0));
   const wave = useDerivedValue(() => wavePath(u.value, L));
   const skirt = useDerivedValue(() => skirtPaths(u.value, L));
   const sk0 = useDerivedValue(() => skirt.value[0]);
@@ -303,18 +306,18 @@ function Lander({ p, clock, L, c }) {
     return q;
   }, [k]);
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const lift = u > 1 ? 0 : sm(0.42, 0.7, u) * (1 - sm(0.88, 0.9, u));
     const x = lx + lift * lift * (width * 0.5);
     const y = ly - lift * (ly - 40 * k) + Math.sin(clock.value * 1.3) * (1 - lift) * 0.8 * k;
     return [{ translateX: x }, { translateY: y }, { rotate: -0.35 * sm(0.42, 0.55, u > 1 ? 0 : u) }];
   });
   const burn = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : sm(0.36, 0.44, u) * (1 - sm(0.72, 0.78, u)) * (0.85 + 0.15 * Math.sin(clock.value * 23));
   });
   const shown = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 1 : 1 - sm(0.7, 0.76, u) + sm(0.92, 1, u);
   });
   return (
@@ -325,6 +328,94 @@ function Lander({ p, clock, L, c }) {
       </Group>
       <Path path={body} color={c.lander} />
       <Rect x={10 * k} y={-9 * k} width={7 * k} height={2.4 * k} color={c.glint} opacity={0.7} />
+    </Group>
+  );
+}
+
+// ───────────────────────────── olay B: solucan deliği + mekik
+
+function Wormhole({ p, clock, L, c }) {
+  const { k, width, height } = L;
+  const wx = width * 0.84;
+  const wy = height * 0.42;
+  const R = 46 * k;
+  const [sx, sy] = L.station;
+  const st = useMemo(() => {
+    const core = Skia.Path.Make();
+    core.addCircle(0, 0, R);
+    const rings = Skia.Path.Make();
+    for (let i = 0; i < 4; i += 1) {
+      const rr = R * (0.45 + i * 0.16);
+      rings.addOval(Skia.XYWHRect(-rr, -rr * 0.38, rr * 2, rr * 0.76));
+    }
+    const stars = Skia.Path.Make();
+    for (let i = 0; i < 26; i += 1) {
+      const a = hash(i, 81) * TAU;
+      const r = R * Math.sqrt(hash(i, 82)) * 0.92;
+      stars.addCircle(Math.cos(a) * r, Math.sin(a) * r, (0.5 + hash(i, 83)) * k);
+    }
+    return { core, rings, stars };
+  }, [R, k]);
+  const open = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.04, 0.24, u) * (1 - sm(0.82, 0.96, u));
+  });
+  const at = useDerivedValue(() => [{ translateX: wx }, { translateY: wy }, { scale: Math.max(0.001, open.value) }]);
+  const spin = useDerivedValue(() => [{ rotate: clock.value * 0.4 }]);
+  const spinB = useDerivedValue(() => [{ rotate: -clock.value * 0.25 }, { scaleY: 0.6 }]);
+  const shipT = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    if (u > 1) return [{ translateX: -999 }, { translateY: -999 }];
+    const e = sm(0.26, 0.74, u);
+    const mx = (sx + wx) / 2;
+    const my = Math.min(sy, wy) - 80 * k;
+    const x = (1 - e) * (1 - e) * sx + 2 * (1 - e) * e * mx + e * e * wx;
+    const y = (1 - e) * (1 - e) * sy + 2 * (1 - e) * e * my + e * e * wy;
+    const dx = 2 * (1 - e) * (mx - sx) + 2 * e * (wx - mx);
+    const dy = 2 * (1 - e) * (my - sy) + 2 * e * (wy - my);
+    const s = Math.max(0.001, (1 - sm(0.82, 1, e)) * (0.9 + 0.6 * sm(0, 0.2, e)));
+    return [{ translateX: x }, { translateY: y }, { rotate: Math.atan2(dy, dx) }, { scale: s }];
+  });
+  const shipO = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 || u < 0.26 || u > 0.74 ? 0 : 1;
+  });
+  const ship = useMemo(() => {
+    const q = Skia.Path.Make();
+    q.moveTo(9 * k, 0);
+    q.lineTo(-6 * k, -4 * k);
+    q.lineTo(-4 * k, 0);
+    q.lineTo(-6 * k, 4 * k);
+    q.close();
+    return q;
+  }, [k]);
+  const flame = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const f = 10 + Math.sin(clock.value * 30) * 3;
+    q.moveTo(-4 * k, -1.6 * k);
+    q.lineTo(-4 * k - f * k, 0);
+    q.lineTo(-4 * k, 1.6 * k);
+    q.close();
+    return q;
+  });
+  return (
+    <Group>
+      <Group transform={at}>
+        <Glow r={R * 2.6} color={c.diskGlow} a={0.28} mid={0.35} />
+        <Path path={st.core} color={c.hole} />
+        <Path path={st.core} color={c.nebula} opacity={0.55} />
+        <Group transform={spin}>
+          <Path path={st.stars} color={c.glint} />
+        </Group>
+        <Group transform={spinB}>
+          <Path path={st.rings} style="stroke" strokeWidth={1.2 * k} color={c.glint} opacity={0.5} />
+        </Group>
+        <Path path={st.core} style="stroke" strokeWidth={2 * k} color={c.diskCool} opacity={0.8} />
+      </Group>
+      <Group transform={shipT} opacity={shipO}>
+        <Path path={flame} color={c.engine} />
+        <Path path={ship} color={c.lander} />
+      </Group>
     </Group>
   );
 }
@@ -341,7 +432,7 @@ export default function InterstellarScene({ p, clock, width, height, tone, light
   const shimmer = useDerivedValue(() => 0.5 + 0.25 * Math.sin(clock.value * 0.9));
   // dalga yaklaşırken su kararır
   const dim = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     return u > 1 ? 0 : 0.35 * sm(0.2, 0.55, u) * (1 - sm(0.66, 0.85, u));
   });
   return (
@@ -365,6 +456,7 @@ export default function InterstellarScene({ p, clock, width, height, tone, light
       </Group>
       {/* halka istasyon */}
       <Station clock={clock} L={L} c={c} />
+      <Wormhole p={p} clock={clock} L={L} c={c} />
       {/* su gezegeni */}
       <Path path={sea.ridges} color={c.horizon} opacity={0.9} />
       <Rect x={0} y={horizon} width={width} height={height - horizon}>

@@ -13,6 +13,7 @@ import { i18nText } from "../../utils/i18nText";
 import { DECOR_DENSITIES } from "../../utils/decorLayout";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 import { WEATHER_GROUPS } from "../../utils/weatherParticles";
+import { groupUnlockCount } from "../../utils/universeUnlocks";
 
 export const DENSITY_LABELS = {
   auto: () => i18nText("autoI18n.dekor_yogunluk_otomatik", "Otomatik"),
@@ -102,6 +103,12 @@ export const WEATHER_LABELS = {
   fma: () => i18nText("autoI18n.evren_fullmetal", "Fullmetal Alchemist"),
   rickAndMorty: () => i18nText("autoI18n.evren_rick_morty", "Rick and Morty"),
   jujutsuKaisen: () => i18nText("autoI18n.evren_jujutsu_kaisen", "Jujutsu Kaisen"),
+  backToTheFuture: () => i18nText("autoI18n.evren_back_to_the_future", "Geleceğe Dönüş"),
+  shining: () => i18nText("autoI18n.evren_shining", "The Shining"),
+  witcher: () => i18nText("autoI18n.evren_witcher", "The Witcher"),
+  fallout: () => i18nText("autoI18n.evren_fallout", "Fallout"),
+  moneyHeist: () => i18nText("autoI18n.evren_money_heist", "La Casa de Papel"),
+  arcane: () => i18nText("autoI18n.evren_arcane", "Arcane"),
   hunterXHunter: () => i18nText("autoI18n.evren_hunter_x_hunter", "Hunter x Hunter"),
   squidGame: () => i18nText("autoI18n.evren_squid_game", "Squid Game"),
   dark: () => i18nText("autoI18n.evren_dark", "Dark"),
@@ -171,6 +178,12 @@ export const WEATHER_ICONS = {
   fma: { family: MCI, name: "hexagram-outline" },
   rickAndMorty: { family: MCI, name: "alien-outline" },
   jujutsuKaisen: { family: MCI, name: "eye-circle-outline" },
+  backToTheFuture: { family: MCI, name: "clock-time-ten-outline" },
+  shining: { family: MCI, name: "axe" },
+  witcher: { family: MCI, name: "sword-cross" },
+  fallout: { family: MCI, name: "radioactive" },
+  moneyHeist: { family: MCI, name: "cash-multiple" },
+  arcane: { family: MCI, name: "flask-round-bottom-outline" },
   hunterXHunter: { family: MCI, name: "fishbowl-outline" },
   squidGame: { family: MCI, name: "shape-outline" },
   dark: { family: MCI, name: "timer-sand" },
@@ -309,14 +322,16 @@ function ExpandingChip({ item, colors, labelWidth }) {
   return (
     <GlassTouchable
       accessibilityRole={item.role || "radio"}
-      accessibilityState={{ checked: item.active }}
+      accessibilityState={{ checked: item.active, disabled: !!item.locked }}
       accessibilityLabel={item.label}
+      accessibilityHint={item.locked ? lockedHint() : undefined}
       style={[
         s.iconChip,
         {
           backgroundColor: item.active ? colors.accent : colors.cardAlt,
           borderColor: item.active ? colors.accent : colors.border,
         },
+        item.locked ? s.secret : null,
       ]}
       onPress={item.onPress}
       activeOpacity={0.7}
@@ -387,32 +402,50 @@ export function ChipRow({ items, colors }) {
   );
 }
 
-// Atmosfer seçici: grup başlığı + kayan çip şeridi (7 grup, en çok 15 simge).
+// Gizli evren çipi: ad, simge, ipucu YOK (utils/universeUnlocks.js — evren detay sayfasındaki
+// kapı sorusuyla açılır). Erişilebilirlik adı da yalnız "Gizli evren".
+const SECRET_ICON = { name: "help" };
+const secretLabel = () => i18nText("autoI18n.evren_gizli", "Gizli evren");
+const lockedHint = () => i18nText("autoI18n.evren_kesfedilmedi", "Henüz keşfedilmedi");
+
+// Atmosfer seçici: grup başlığı + kayan çip şeridi (7 grup, en çok 17 simge).
 // Kapalıyken de seçilebilir — önizleme seçileni gösterir (Free da görür).
-export function WeatherPicker({ value, onChange, colors }) {
+// `unlocks` (useUniverseUnlocks) verilirse evren grupları gizlidir: açılmamış evren adsız
+// "?" çip, dokununca `onLocked(id)`; grup başlığında yalnız açık/toplam sayısı.
+// Şu an seçili olan evren kilitli olsa da seçili kalır (eski seçimler bozulmaz).
+export function WeatherPicker({ value, onChange, colors, unlocks, onLocked }) {
   return (
     <View accessibilityRole="radiogroup" style={s.groups}>
-      {WEATHER_GROUPS.map((group) => (
+      {WEATHER_GROUPS.map((group) => {
+        const tally = unlocks ? groupUnlockCount(group.effects, unlocks.unlocked) : null;
+        return (
         <View key={group.id}>
           <Text allowFontScaling={false} style={[s.groupTitle, { color: colors.muted }]}>
             {WEATHER_GROUP_LABELS[group.id]()}
+            {tally && tally.total ? `  ·  ${tally.open}/${tally.total}` : ""}
           </Text>
           <ChipRow
             colors={colors}
-            items={group.effects.map((c) => ({
-              key: c,
-              label: WEATHER_LABELS[c](),
-              icon: WEATHER_ICONS[c],
-              active: value === c,
-              onPress: () => {
-                if (value === c) return;
-                Haptics.selectionAsync();
-                onChange(c);
-              },
-            }))}
+            items={group.effects.map((c) => {
+              const locked = !!unlocks && value !== c && !unlocks.isUnlocked(c);
+              return {
+                key: c,
+                label: locked ? secretLabel() : WEATHER_LABELS[c](),
+                icon: locked ? SECRET_ICON : WEATHER_ICONS[c],
+                active: value === c,
+                locked,
+                onPress: () => {
+                  if (value === c) return;
+                  Haptics.selectionAsync();
+                  if (locked) onLocked?.(c);
+                  else onChange(c);
+                },
+              };
+            })}
           />
         </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -440,7 +473,7 @@ const QS_LAYOUT = (() => {
   return { items, width: x - QS_GAP + QS_PAD };
 })();
 
-export function QuickWeatherStrip({ value, effect, onChange, accent, width }) {
+export function QuickWeatherStrip({ value, effect, onChange, accent, width, unlocks, onLocked }) {
   const scrollRef = useRef(null);
   const first = useRef(true);
   useEffect(() => {
@@ -460,31 +493,36 @@ export function QuickWeatherStrip({ value, effect, onChange, accent, width }) {
         ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={s.qsScroll}
         contentContainerStyle={s.qsRow}
         accessibilityRole="radiogroup"
       >
         {QS_LAYOUT.items.map(({ key, sepBefore }) => {
           const active = key === value;
-          const icon = WEATHER_ICONS[key];
+          const locked = !!unlocks && !active && !unlocks.isUnlocked(key);
+          const icon = locked ? SECRET_ICON : WEATHER_ICONS[key];
           return (
             <React.Fragment key={key}>
               {sepBefore ? <View style={s.qsSep} /> : null}
               <GlassTouchable
                 glass={false}
                 accessibilityRole="radio"
-                accessibilityState={{ checked: active }}
-                accessibilityLabel={WEATHER_LABELS[key]()}
+                accessibilityState={{ checked: active, disabled: locked }}
+                accessibilityLabel={locked ? secretLabel() : WEATHER_LABELS[key]()}
+                accessibilityHint={locked ? lockedHint() : undefined}
                 activeOpacity={0.7}
                 style={[
                   s.qsItem,
                   active
                     ? { backgroundColor: accent, borderColor: accent }
                     : { backgroundColor: "rgba(255,255,255,0.08)", borderColor: "rgba(255,255,255,0.14)" },
+                  locked ? s.secret : null,
                 ]}
                 onPress={() => {
                   if (active) return;
                   Haptics.selectionAsync();
-                  onChange(key);
+                  if (locked) onLocked?.(key);
+                  else onChange(key);
                 }}
               >
                 <AppIcon
@@ -505,7 +543,9 @@ export function QuickWeatherStrip({ value, effect, onChange, accent, width }) {
 const s = StyleSheet.create({
   qsWrap: { alignSelf: "stretch", gap: 8 },
   qsName: { color: "#ffffff", fontSize: 13, fontWeight: "700", textAlign: "center", paddingHorizontal: QS_PAD },
-  qsRow: { paddingHorizontal: QS_PAD, gap: QS_GAP, alignItems: "center" },
+  // Basılan cam çip büyürken kaydırıcı kesmesin: dikey pay + eksi kenar (yerleşim değişmez).
+  qsScroll: { marginVertical: -GLASS_PRESS_ROOM },
+  qsRow: { paddingHorizontal: QS_PAD, paddingVertical: GLASS_PRESS_ROOM, gap: QS_GAP, alignItems: "center" },
   qsItem: {
     width: QS_ITEM,
     height: QS_ITEM,
@@ -551,6 +591,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   labelClip: { overflow: "hidden" },
+  // gizli evren (açılmamış): kesik çerçeve, sönük
+  secret: { opacity: 0.55, borderStyle: "dashed" },
   measure: { position: "absolute", flexDirection: "row", opacity: 0, left: 0, top: 0 },
   chipText: { fontSize: 12 },
   chipTextOn: { fontWeight: "700" },

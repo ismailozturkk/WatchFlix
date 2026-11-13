@@ -6,13 +6,16 @@
 //   • Binaların arasından bakan lanet gözleri (göz kırpar), yerden yükselen mor lanet enerjisi alevleri.
 //   • Olay (70 sn'de bir ~28 sn): Hollow Purple — solda mavi, sağda kırmızı küre belirir, ortada birleşip
 //     mor küreye dönüşür, sonra ekranı yatay bir ışın olarak süpürür (parlama), iz yavaşça söner.
+//   • Olay B (dönüşümlü): alan genişlemesi — şehrin ortasındaki bir noktadan kara bir küre yayılıp
+//     sahneyi yutar; içinde merkeze akan sonsuz ışık çizgileri, kıyısında mor-mavi hale; sonra küre
+//     çatlayıp kırılır ve şehir geri gelir.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[70] (JJ_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
+import { eventU } from "../../utils/weatherParticles";
 import { Glow, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 import { addFlame } from "./universeKit";
 
@@ -231,7 +234,7 @@ function CursedFlames({ clock, L, c }) {
 
 function HollowPurple({ p, clock, L, c }) {
   const { k, width, height, orbY } = L;
-  const st = useDerivedValue(() => hollow(restU(p, clock.value), width, k));
+  const st = useDerivedValue(() => hollow(eventU(p, clock.value, 0), width, k));
   const blueAt = useDerivedValue(() => {
     const s = st.value;
     return s && s.sep > 0.01 ? [{ translateX: s.blueX }, { translateY: orbY }, { scale: s.sep }] : [{ translateX: -900 }, { translateY: -900 }];
@@ -326,6 +329,81 @@ function HollowPurple({ p, clock, L, c }) {
   );
 }
 
+// ───────────────────────────── olay B: alan genişlemesi
+
+function Domain({ p, clock, L, c }) {
+  const { k, width, height, base } = L;
+  const cx = width * 0.62;
+  const cy = base - 210 * k;
+  const RMAX = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy)) + 20 * k;
+  const grow = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.08, 0.36, u);
+  });
+  const fade = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : 1 - sm(0.8, 0.92, u);
+  });
+  const disk = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const r = grow.value * grow.value * RMAX;
+    if (r > 0.5) q.addCircle(cx, cy, r);
+    return q;
+  });
+  const streaks = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const r = grow.value * grow.value * RMAX;
+    if (r < 2) return q;
+    const t = clock.value;
+    for (let i = 0; i < 60; i += 1) {
+      const a = hash(i, 181) * Math.PI * 2;
+      const f = (((t * (0.25 + hash(i, 182) * 0.3) + hash(i, 183)) % 1) + 1) % 1;
+      const d0 = (1 - f) * r;
+      const d1 = Math.max(0, d0 - (10 + 40 * (1 - f)) * k);
+      q.moveTo(cx + Math.cos(a) * d0, cy + Math.sin(a) * d0);
+      q.lineTo(cx + Math.cos(a) * d1, cy + Math.sin(a) * d1);
+    }
+    return q;
+  });
+  const cracks = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1 || u < 0.7) return q;
+    const e = sm(0.7, 0.82, u);
+    for (let i = 0; i < 9; i += 1) {
+      let a = (i / 9) * Math.PI * 2 + hash(i, 184);
+      let x = cx;
+      let y = cy;
+      q.moveTo(x, y);
+      const steps = 6;
+      for (let j = 1; j <= steps; j += 1) {
+        a += (hash(i, j + 185) - 0.5) * 0.7;
+        const d = (RMAX / steps) * e;
+        x += Math.cos(a) * d;
+        y += Math.sin(a) * d;
+        q.lineTo(x, y);
+      }
+    }
+    return q;
+  });
+  const coreA = useDerivedValue(() => 0.6 + 0.4 * Math.sin(clock.value * 2));
+  return (
+    <Group opacity={fade}>
+      <Path path={disk} color={c.bldDark} opacity={0.94} />
+      <Group clip={disk}>
+        <Path path={streaks} style="stroke" strokeWidth={1.3 * k} strokeCap="round" color={c.moon} opacity={0.75} />
+        <Group transform={[{ translateX: cx }, { translateY: cy }]} opacity={coreA}>
+          <Glow r={90 * k} color={c.purple} a={0.6} mid={0.3} />
+          <Glow r={26 * k} color={c.purpleCore} a={1} mid={0.6} />
+        </Group>
+      </Group>
+      <Path path={disk} style="stroke" strokeWidth={6 * k} color={c.purple} opacity={0.5} />
+      <Path path={disk} style="stroke" strokeWidth={1.6 * k} color={c.blue} />
+      <Path path={cracks} style="stroke" strokeWidth={2 * k} strokeJoin="round" color={c.purpleCore} />
+    </Group>
+  );
+}
+
 export default function JujutsuScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => jjLayout(width, height), [width, height]);
   const temple = useMemo(() => buildTemple(L), [L]);
@@ -367,6 +445,7 @@ export default function JujutsuScene({ p, clock, width, height, tone, lightSurfa
       <Path path={temple.torii} color={c.torii} />
       <CursedFlames clock={clock} L={L} c={c} />
       <HollowPurple p={p} clock={clock} L={L} c={c} />
+      <Domain p={p} clock={clock} L={L} c={c} />
     </Group>
   );
 }

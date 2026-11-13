@@ -8,6 +8,7 @@
 //   notesDomain · mediaNotesDomain · remindersDomain   okuma (senkron) + apply
 //   aiConversationsDomain · aiConversations            AI sohbet geçmişi (+ depo API'si)
 //   posterChoicesDomain                                 özel afiş seçimleri (tek belge)
+//   universeUnlocksDomain                               gizli atmosfer evrenleri (tek belge)
 //   remindersActions                                    hatırlatıcı yazma
 //   startUserData(uid)                                  giriş: işçi + indirme
 //   clearUserLocal(uid)                                 çıkış
@@ -33,6 +34,7 @@ import {
   notesSpec,
   posterChoicesSpec,
   remindersSpec,
+  universeUnlocksSpec,
 } from "./domains";
 
 const remote = createFirestoreRemote();
@@ -63,12 +65,14 @@ export const mediaNotesDomain = createUserDataDomain(mediaNotesSpec, deps);
 export const remindersDomain = createUserDataDomain(remindersSpec, deps);
 export const aiConversationsDomain = createUserDataDomain(aiConversationsSpec, deps);
 export const posterChoicesDomain = createUserDataDomain(posterChoicesSpec, deps);
+export const universeUnlocksDomain = createUserDataDomain(universeUnlocksSpec, deps);
 export const ALL_DOMAINS = Object.freeze([
   notesDomain,
   mediaNotesDomain,
   remindersDomain,
   aiConversationsDomain,
   posterChoicesDomain,
+  universeUnlocksDomain,
 ]);
 
 export const remindersActions = createRemindersActions(remindersDomain);

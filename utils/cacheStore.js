@@ -50,6 +50,7 @@ export const DURABLE_NAMESPACES = Object.freeze([
   "mediaNotes",
   "aiConversations",
   "posterChoices",
+  "universeUnlocks",
   "reminders",
   "lists",
 ]);

@@ -8,14 +8,16 @@
 //     pembe tulumlu muhafızlar.
 //   • Olay (60 sn'de bir ~25 sn): "kırmızı ışık, yeşil ışık" — bebek üç kez döner; yeşilde oyuncular
 //     koşar gibi sallanır, kırmızıda donar, bebeğin gözleri ve sahne kırmızıya boyanır.
+//   • Olay B (dönüşümlü): tavandan tel ile dev saydam kumbara iner; yukarıdan dönerek düşen
+//     banknotlar içine dolar, kumbara altın ışıkla dolup parlar, sonra yeniden yukarı çekilir.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[68] (SQ_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
-import { Glow, addCloud, groundLayout, hash, sm, toneMap } from "./seasonKit";
+import { eventU } from "../../utils/weatherParticles";
+import { Glow, addCloud, groundLayout, hash, rgba, sm, toneMap } from "./seasonKit";
 
 export const SQ_TONE = [
   "wallSky",
@@ -222,7 +224,7 @@ function symbolPath(kind, x, y, r) {
 function Doll({ p, clock, L, c }) {
   const { k, width, wallBottom } = L;
   const doll = useMemo(() => buildDoll(k), [k]);
-  const red = useDerivedValue(() => redLight(restU(p, clock.value)));
+  const red = useDerivedValue(() => redLight(eventU(p, clock.value, 0)));
   // dönüş: baş yatayda daralıp geri açılır; 0.5'te arka ↔ ön
   const headT = useDerivedValue(() => [{ scaleX: Math.max(0.05, Math.abs(1 - 2 * Math.min(1, red.value * 1.0))) }]);
   const backA = useDerivedValue(() => (red.value < 0.5 ? 1 : 0));
@@ -287,7 +289,7 @@ function Players({ p, clock, L, c }) {
 
 function Player({ sp, p, clock, c, shape, k }) {
   const at = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     const red = redLight(u);
     const go = u > 1 ? 0.25 : 1;
     const run = red > 0.05 ? 0 : go;
@@ -303,6 +305,99 @@ function Player({ sp, p, clock, c, shape, k }) {
   );
 }
 
+// ───────────────────────────── olay B: tavandan inen, dolan kumbara
+
+function PiggyBank({ p, clock, L, c }) {
+  const { k, width, wallTop, wallBottom } = L;
+  const s = k * 1.35;
+  const st = useMemo(() => {
+    const body = Skia.Path.Make();
+    body.addOval(Skia.XYWHRect(-60 * s, -40 * s, 120 * s, 80 * s));
+    body.addOval(Skia.XYWHRect(-78 * s, -14 * s, 24 * s, 22 * s));
+    const parts = Skia.Path.Make();
+    [-36, -16, 16, 36].forEach((x) => parts.addRRect(Skia.RRectXY(Skia.XYWHRect((x - 7) * s, 30 * s, 14 * s, 18 * s), 3 * s, 3 * s)));
+    parts.moveTo(-40 * s, -30 * s);
+    parts.lineTo(-30 * s, -52 * s);
+    parts.lineTo(-20 * s, -36 * s);
+    parts.close();
+    parts.moveTo(-14 * s, -38 * s);
+    parts.lineTo(-2 * s, -56 * s);
+    parts.lineTo(6 * s, -39 * s);
+    parts.close();
+    const slot = Skia.Path.Make();
+    slot.addRRect(Skia.RRectXY(Skia.XYWHRect(4 * s, -42 * s, 26 * s, 4 * s), 2 * s, 2 * s));
+    const eye = Skia.Path.Make();
+    eye.addCircle(-46 * s, -14 * s, 3 * s);
+    eye.addOval(Skia.XYWHRect(-72 * s, -7 * s, 4 * s, 6 * s));
+    eye.addOval(Skia.XYWHRect(-64 * s, -7 * s, 4 * s, 6 * s));
+    const shine = Skia.Path.Make();
+    shine.moveTo(-30 * s, -28 * s);
+    shine.quadTo(-6 * s, -38 * s, 20 * s, -32 * s);
+    return { body, parts, slot, eye, shine };
+  }, [s]);
+  const drop = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.04, 0.22, u) * (1 - sm(0.84, 0.98, u));
+  });
+  const fill = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.3, 0.78, u);
+  });
+  const restY = wallTop + 120 * s;
+  const at = useDerivedValue(() => [
+    { translateX: width * 0.3 },
+    { translateY: -100 * s + drop.value * (restY + 100 * s) + Math.sin(clock.value * 0.9) * 2 * k },
+    { rotate: Math.sin(clock.value * 0.7) * 0.03 },
+  ]);
+  const fillP = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const h = fill.value * 74 * s;
+    if (h > 0.5) q.addRect(Skia.XYWHRect(-80 * s, 40 * s - h, 160 * s, h + 2 * s));
+    return q;
+  });
+  const vis = useDerivedValue(() => (drop.value < 0.005 ? 0 : 1));
+  const glowA = useDerivedValue(() => fill.value * (0.6 + 0.2 * Math.sin(clock.value * 3)));
+  const notes = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const u = eventU(p, clock.value, 1);
+    if (u > 1 || u < 0.26 || u > 0.82) return q;
+    for (let i = 0; i < 14; i += 1) {
+      const f = (((clock.value * 0.55 + hash(i, 101)) % 1) + 1) % 1;
+      const y = -wallTop - 140 * s + f * (wallTop + 100 * s);
+      const x = 17 * s + Math.sin(f * 7 + i) * 26 * s * (1 - f);
+      const r = clock.value * 3 + i;
+      const w = 9 * s;
+      const h = 4.5 * s * Math.abs(Math.cos(r));
+      q.addRect(Skia.XYWHRect(x - w / 2, y - h / 2, w, Math.max(0.6 * s, h)));
+    }
+    return q;
+  });
+  const wire = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    q.moveTo(0, -48 * s);
+    q.lineTo(0, -2000);
+    return q;
+  });
+  return (
+    <Group transform={at} opacity={vis}>
+      <Path path={wire} style="stroke" strokeWidth={1.2 * k} color={c.wallEdge} />
+      <Group opacity={glowA}>
+        <Glow r={120 * s} color={c.shirt} a={0.45} mid={0.3} />
+      </Group>
+      <Path path={st.body} color={rgba(c.cloud, 0.38)} />
+      <Group clip={st.body}>
+        <Path path={fillP} color={c.shirt} />
+      </Group>
+      <Path path={st.body} style="stroke" strokeWidth={2.4 * k} color={c.wallEdge} opacity={0.9} />
+      <Path path={st.parts} color={rgba(c.wallEdge, 0.6)} />
+      <Path path={st.eye} color={c.wallEdge} />
+      <Path path={st.slot} color={c.wallEdge} />
+      <Path path={st.shine} style="stroke" strokeWidth={2.4 * k} strokeCap="round" color="#ffffff" opacity={0.5} />
+      <Path path={notes} color={c.shirt} />
+    </Group>
+  );
+}
+
 export default function SquidGameScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => sqLayout(width, height), [width, height]);
   const arena = useMemo(() => buildArena(L), [L]);
@@ -314,7 +409,7 @@ export default function SquidGameScene({ p, clock, width, height, tone, lightSur
   const c = useMemo(() => toneMap(SQ_TONE, tone.colors), [tone]);
   const { k, wallBottom, wallTop, height: H } = L;
   const night = !lightSurface;
-  const redA = useDerivedValue(() => redLight(restU(p, clock.value)) * (night ? 0.22 : 0.16));
+  const redA = useDerivedValue(() => redLight(eventU(p, clock.value, 0)) * (night ? 0.22 : 0.16));
   const guards = [
     [width * 0.06, wallBottom + 70 * k, 1.1, 0],
     [width * 0.94, wallBottom + 90 * k, 1.2, 1],
@@ -346,6 +441,7 @@ export default function SquidGameScene({ p, clock, width, height, tone, lightSur
       <Path path={arena.branches} style="stroke" strokeWidth={2.2 * k} strokeCap="round" color={c.tree} />
       <Path path={arena.tree} color={c.tree} />
       <Doll p={p} clock={clock} L={L} c={c} />
+      <PiggyBank p={p} clock={clock} L={L} c={c} />
       {guards.map(([x, y, s, kind]) => (
         <Group key={kind} transform={[{ translateX: x }, { translateY: y }, { scale: s }]}>
           <Path path={guard.body} color={c.guard} />

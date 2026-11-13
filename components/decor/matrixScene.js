@@ -14,6 +14,7 @@
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, Skia, vec } from "@shopify/react-native-skia";
+import { MatrixEventB } from "./sceneEventsB";
 import { matrixFrame, sceneScale } from "../../utils/weatherParticles";
 import { SCENERY } from "../../utils/weatherUniverses";
 
@@ -516,6 +517,8 @@ export default function MatrixScene({ p, clock, width, height, tone }) {
       {STOPS.map((_, i) => (
         <StopBullet key={`s${i}`} L={L} f={f} i={i} clock={clock} c={c} />
       ))}
+      {/* olay B (A ile sırayla) */}
+      <MatrixEventB p={p} clock={clock} width={width} height={height} />
     </Group>
   );
 }

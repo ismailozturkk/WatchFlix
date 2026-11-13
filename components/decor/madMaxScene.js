@@ -6,14 +6,17 @@
 //   • Önde kum tepeleri, uzak masalar ve tozlu yol.
 //   • Olay (62 sn'de bir ~26 sn): War Rig (çekici + tanker) soldan sağa toz bulutu kaldırarak geçer;
 //     peşinde alev püskürten gitarlı takip aracı.
+//   • Olay B (dönüşümlü): Citadel suyu salar — kule yüzlerindeki oluklardan üç büyük şelale
+//     açılır, dipte su sisi kabarır; kulelerin dibine toplanan kalabalık kollarını kaldırır;
+//     su kesilir, kalabalık dağılır.
 //
 // Ölçek: sceneScale (k). Zemin SCENERY.lift. Renkler OVERLAY_TONES[63] (MM_TONE).
 
 import React, { useMemo } from "react";
 import { useDerivedValue } from "react-native-reanimated";
 import { Group, LinearGradient, Path, Rect, Skia, vec } from "@shopify/react-native-skia";
-import { restU } from "../../utils/weatherParticles";
-import { Glow, groundLayout, hash, rgba, ridgePath, toneMap } from "./seasonKit";
+import { eventU } from "../../utils/weatherParticles";
+import { Glow, groundLayout, hash, rgba, ridgePath, sm, toneMap } from "./seasonKit";
 import { addFlame } from "./universeKit";
 
 export const MM_TONE = [
@@ -232,7 +235,7 @@ function Convoy({ p, clock, L, c }) {
   const car = useMemo(() => buildCar(k), [k]);
   const gap = 150 * k;
   const pos = useDerivedValue(() => {
-    const u = restU(p, clock.value);
+    const u = eventU(p, clock.value, 0);
     if (u > 1 || u < 0.04 || u > 0.96) return null;
     const e = (u - 0.04) / 0.92;
     return -rig.len - gap + (width + rig.len * 2 + gap * 2) * e;
@@ -356,6 +359,103 @@ function Lightning({ clock, L, c }) {
   );
 }
 
+// ───────────────────────────── olay B: Citadel su salar, kalabalık kollarını kaldırır
+
+const OUTLETS = [
+  [0.72, 250],
+  [0.84, 300],
+  [0.96, 230],
+];
+
+function WaterRelease({ p, clock, L, c }) {
+  const { k, width, base } = L;
+  const flow = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.16, 0.3, u) * (1 - sm(0.7, 0.84, u));
+  });
+  const crowdO = useDerivedValue(() => {
+    const u = eventU(p, clock.value, 1);
+    return u > 1 ? 0 : sm(0.04, 0.16, u) * (1 - sm(0.86, 0.97, u));
+  });
+  const falls = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const f = flow.value;
+    if (f < 0.01) return q;
+    OUTLETS.forEach(([fx, h], i) => {
+      const x = width * fx - 6 * k;
+      const top = base - h * k * 0.58;
+      const w0 = (3 + 3 * f) * k;
+      const w1 = (6 + 12 * f) * k;
+      const bot = top + (base - top) * Math.min(1, f * 1.4);
+      const sway = Math.sin(clock.value * 2 + i) * 2 * k;
+      q.moveTo(x - w0, top);
+      q.lineTo(x + w0, top);
+      q.quadTo(x + w0 + 3 * k * f, (top + bot) / 2, x + w1 + sway, bot);
+      q.lineTo(x - w1 + sway, bot);
+      q.quadTo(x - w0 - 2 * k * f, (top + bot) / 2, x - w0, top);
+      q.close();
+    });
+    return q;
+  });
+  const streaks = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const f = flow.value;
+    if (f < 0.05) return q;
+    OUTLETS.forEach(([fx, h], i) => {
+      const x = width * fx - 6 * k;
+      const top = base - h * k * 0.58;
+      for (let j = 0; j < 5; j += 1) {
+        const ph = (((clock.value * 1.4 + j / 5 + i * 0.3) % 1) + 1) % 1;
+        const y = top + ph * (base - top);
+        const dx = (j - 2) * 3 * k * (0.4 + ph) * f;
+        q.moveTo(x + dx, y);
+        q.lineTo(x + dx * 1.2, y + 18 * k);
+      }
+    });
+    return q;
+  });
+  const mist = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const f = flow.value;
+    if (f < 0.01) return q;
+    OUTLETS.forEach(([fx], i) => {
+      for (let j = 0; j < 4; j += 1) {
+        const ph = (((clock.value * 0.5 + j / 4 + i * 0.2) % 1) + 1) % 1;
+        q.addCircle(width * fx - 6 * k + (j - 1.5) * 12 * k, base - ph * 26 * k, (10 + ph * 16) * k * f);
+      }
+    });
+    return q;
+  });
+  const crowd = useDerivedValue(() => {
+    const q = Skia.Path.Make();
+    const f = flow.value;
+    for (let i = 0; i < 30; i += 1) {
+      const x = width * (0.64 + 0.34 * hash(i, 51));
+      const y = base + (4 + hash(i, 52) * 16) * k;
+      const s = (0.8 + hash(i, 53) * 0.35) * k;
+      const jump = f * Math.max(0, Math.sin(clock.value * 5 + i)) * 2 * s;
+      q.addCircle(x, y - 13 * s - jump, 1.8 * s);
+      q.addRect(Skia.XYWHRect(x - 1.6 * s, y - 11 * s - jump, 3.2 * s, 11 * s + jump));
+      const arm = 3 + f * 7;
+      q.addRect(Skia.XYWHRect(x - 3 * s, y - 10 * s - arm * s - jump, 1.1 * s, arm * s));
+      q.addRect(Skia.XYWHRect(x + 1.9 * s, y - 10 * s - arm * s * (0.7 + 0.3 * hash(i, 54)) - jump, 1.1 * s, arm * s));
+    }
+    return q;
+  });
+  const fallO = useDerivedValue(() => 0.55 * Math.min(1, flow.value * 2));
+  const mistO = useDerivedValue(() => 0.4 * flow.value);
+  return (
+    <Group>
+      <Path path={falls} color={c.water} opacity={fallO} />
+      <Path path={streaks} style="stroke" strokeWidth={1.1 * k} strokeCap="round" color={c.duneHi} opacity={fallO} />
+      <Path path={mist} color={c.water} opacity={mistO} />
+      <Group opacity={crowdO}>
+        <Path path={crowd} color={c.rigDark} />
+      </Group>
+    </Group>
+  );
+}
+
 export default function MadMaxScene({ p, clock, width, height, tone, lightSurface }) {
   const L = useMemo(() => mmLayout(width, height), [width, height]);
   const storm = useMemo(() => buildStorm(L), [L]);
@@ -404,6 +504,7 @@ export default function MadMaxScene({ p, clock, width, height, tone, lightSurfac
       <Path path={desert.dune} color={c.dune} />
       <Path path={desert.duneHi} color={c.duneHi} opacity={0.6} />
       <Path path={desert.road} color={c.road} opacity={0.7} />
+      <WaterRelease p={p} clock={clock} L={L} c={c} />
       <Convoy p={p} clock={clock} L={L} c={c} />
     </Group>
   );

@@ -153,6 +153,32 @@ export const posterChoicesSpec = {
 };
 
 /* ================================================================== */
+/* GİZLİ EVRENLER — Users/{uid}/private/universes (TEK belge)          */
+/* ================================================================== */
+
+// Atmosferin kapı sorusu çözülmüş evrenleri: { id: "all", solved: { [evrenId]: ms }, updatedAt }
+// (utils/universeUnlocks.js). Yük: cihaz başına BİR okuma (yalnız yerel kopya yokken), çözülen
+// evren başına BİR yazma (en çok 40). Yazım `merge`: iki cihazda çözülen evrenler birbirini
+// ezmez, haritada birleşir. Hesap silmede private/* ile birlikte silinir.
+export const UNIVERSES_DOC_PATH = (uid) => `Users/${uid}/private/universes`;
+
+export const universeUnlocksSpec = {
+  name: "universeUnlocks",
+  kinds: {
+    doc: {
+      cacheKey: (uid) => cacheKeys.universeUnlocks(uid),
+      keyOf: (doc) => doc.id,
+      pathOf: (uid) => UNIVERSES_DOC_PATH(uid),
+      merge: true,
+    },
+  },
+  fetchCloud: async (uid, remote) => {
+    const data = await remote.fetchDoc(UNIVERSES_DOC_PATH(uid));
+    return { doc: data ? [{ ...data, id: "all" }] : [] };
+  },
+};
+
+/* ================================================================== */
 /* HATIRLATICILAR — Reminders/{uid}/movies + tvShows/{id}/episodes     */
 /* ================================================================== */
 

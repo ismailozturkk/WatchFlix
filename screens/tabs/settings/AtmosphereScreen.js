@@ -53,6 +53,7 @@ import {
 import {
   ChipRow,
   DENSITY_LABELS,
+  effectLabel,
   QuickWeatherStrip,
   SPECIAL_DAY_ICONS,
   SPECIAL_DAY_LABELS,
@@ -60,6 +61,8 @@ import {
   WeatherPicker,
   weatherChoiceLabel,
 } from "@components/settings/AtmosphereControls";
+import { showToast } from "@components/AppToast";
+import useUniverseUnlocks from "@hooks/useUniverseUnlocks";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import useWeatherSettings from "@hooks/useWeatherSettings";
 import useAppActive from "@hooks/useAppActive";
@@ -728,6 +731,16 @@ export default function AtmosphereScreen() {
     changeByGenre,
     changeSpecialDays,
   } = useWeatherSettings();
+  // Gizli evrenler: açılmamış evren adsız "?" çip; dokununca da İPUCU verilmez
+  // (evren, yapımının detay sayfasındaki kapı sorusuyla açılır — utils/universeUnlocks.js).
+  const unlocks = useUniverseUnlocks();
+  const onLockedUniverse = useCallback(() => {
+    showToast({
+      kind: "info",
+      title: i18nText("autoI18n.evren_gizli", "Gizli evren"),
+      message: i18nText("autoI18n.evren_kesfedilmedi", "Henüz keşfedilmedi"),
+    });
+  }, []);
   // Arka plan katmanları: Free'de de önizlemede görünür (ne alacağını görür),
   // Premium'da yalnız açıksa.
   const { showAmbientBackground, ambientAllowed } = useAmbientBackgroundSettings();
@@ -866,7 +879,20 @@ export default function AtmosphereScreen() {
                 : i18nText("autoI18n.hava_tur_alt", "Ekranlarının arka planında ne olsun")
             }
           />
-          <WeatherPicker value={choice} onChange={changeChoice} colors={C} />
+          <Text allowFontScaling={false} style={[st.collection, { color: C.muted }]}>
+            {i18nText("autoI18n.evren_koleksiyonu", "Evren koleksiyonu")}
+            {`  ${unlocks.count}/${unlocks.total}`}
+          </Text>
+          {/* Evren günü (4 Mayıs Star Wars…): o evren bugün herkese açık. */}
+          {[...unlocks.today].filter((id) => !unlocks.unlocked.has(id)).map((id) => (
+            <Text key={id} allowFontScaling={false} style={[st.collection, { color: C.muted }]}>
+              {i18nText("autoI18n.evren_gunu", "Bugün {{name}} günü: bu evren yalnız bugün herkese açık.").replace(
+                "{{name}}",
+                effectLabel(id),
+              )}
+            </Text>
+          ))}
+          <WeatherPicker value={choice} onChange={changeChoice} colors={C} unlocks={unlocks} onLocked={onLockedUniverse} />
         </GlassBox>
 
         {/* Türe göre açıkken: önizlemede tür dene (kaydedilmez). */}
@@ -987,6 +1013,8 @@ export default function AtmosphereScreen() {
                 onChange={quickPick}
                 accent={previewTheme.accent}
                 width={windowW}
+                unlocks={unlocks}
+                onLocked={onLockedUniverse}
               />
             </View>
           ) : null}
@@ -1100,6 +1128,7 @@ const ms = StyleSheet.create({
 
 const st = StyleSheet.create({
   flex: { flex: 1 },
+  collection: { fontSize: 11.5, fontWeight: "700", marginTop: -2, marginBottom: 10 },
   fullBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.88)", alignItems: "center", justifyContent: "center" },
   quickStrip: { alignSelf: "stretch", height: QUICK_STRIP_H, justifyContent: "flex-end" },
   previewArea: { flexDirection: "row", alignItems: "center", paddingTop: 4, paddingBottom: 14, gap: 12 },

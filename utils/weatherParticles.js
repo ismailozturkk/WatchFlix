@@ -67,7 +67,7 @@ export const WEATHER_GROUPS = Object.freeze([
 ]);
 
 /** Seçicide bir grubun en çok simge sayısı (kayan tek satır). */
-export const WEATHER_GROUP_MAX = 15; // 12 Kas: evren grupları 15 + 9 + 10 (satır yatay kayar)
+export const WEATHER_GROUP_MAX = 17; // 13 Kas: evren grupları 17 + 12 + 11 (satır yatay kayar)
 
 /** Seçici değerleri ("auto" dahil). */
 export const WEATHER_CHOICES = Object.freeze(WEATHER_GROUPS.flatMap((g) => g.effects));
@@ -90,6 +90,7 @@ const OVERLAY_EFFECT_OF = Object.freeze({
   fireworksScene: 47, halloweenScene: 48, christmasScene: 49,
   // evren vektör sahneleri (components/decor/<ad>Scene.js; olay saati SEASON_EVENT)
   sherVec: 50, dnVec: 51, opSky: 52, narVec: 53, fmaVec: 54, isVec: 55, stVec: 56, dsVec: 57, brVec: 58, ghVec: 59, tlVec: 60, jpVec: 61, avVec: 62, mmVec: 63, pcVec: 64, inVec: 65, tiVec: 66, dkVec: 67, sqVec: 68, hxVec: 69, jjVec: 70,
+  btVec: 71, snVec: 72, wiVec: 73, foVec: 74, mhVec: 75, arVec: 76,
 });
 const OVERLAY_EFFECTS = Object.keys(OVERLAY_EFFECT_OF);
 
@@ -412,6 +413,12 @@ export const OVERLAY = Object.freeze({
   sqVec: 68, // Squid Game: bulut boyalı duvarlı oyun alanı, ağaç + dev bebek, yeşil eşofmanlı oyuncular, maskeli pembe muhafızlar; olay: kırmızı ışık / yeşil ışık
   hxVec: 69, // Hunter x Hunter: Balina Adası tepesi ve dev ağaç, bulutları delen Göklerin Arenası, kayaya saplı olta + şamandıra; olay: gölün dev balığı sıçrar + Avcı Birliği zeplini
   jjVec: 70, // Jujutsu Kaisen: dolunaylı Tokyo, pagoda + torii, Shibuya gökdelenleri ve dev ekranlar, lanet gözleri, mor lanet alevleri; olay: Hollow Purple
+  btVec: 71, // Geleceğe Dönüş: fırtınalı kasaba meydanı, saat kulesi (10:04), kablo + fener; olaylar: yıldırım + ateş izleri / uçan araba
+  snVec: 72, // The Shining: karlı dağlar, dağ oteli, karlı çit labirenti; olaylar: fenerli siluet labirentte / tipi + kar aracı
+  wiVec: 73, // The Witcher: dolunaylı sisli bozkır, yıkık kale, kuru ağaçlar, kargalar; olaylar: atlı + ateş dalgası / kanatlı yaratık
+  foVec: 74, // Fallout: turuncu pus, yıkık şehir, çorak arazi, enkaz; kayada sığınak kapısı; olaylar: kapı açılır + mavi tulumlu / pervaneli uçak + projektör
+  mhVec: 75, // Money Heist: kırmızı projektörlü darphane cephesi, polis ışıkları, gök projektörleri; olaylar: zeplinden para yağmuru / maskeli kırmızı tulumlular
+  arVec: 76, // Arcane: iki katlı şehir — altın kuleler + köprü güvertesi / altta borular, neonlar, yeşil sis; olaylar: hava gemisi / boya roketi
   fmaVec: 54, // Fullmetal Alchemist: tuğla kasaba meydanı, saat kulesi, cep saati; olay: dönüşüm çemberi + taş sütun
 });
 /** Kıyı katmanının (dalga + kum) da ALTINDA çizilen katmanlar. */
@@ -592,7 +599,7 @@ const EFFECT_SPECS = Object.freeze({
   ...Object.fromEntries(
     ["iceWall", "dunes", "gotham", "skyline", "mordor", "mesa", "prison", "titanWall", "skyBeam", "river", "swPlanet", "hogwarts", "opShip", "rmPortal", "matrixCity",
       "winterScene", "springScene", "summerSky", "summerBeach", "autumnScene", "rainScene", "stormScene", "auroraScene", "starScene", "campfireScene",
-      "fireworksScene", "halloweenScene", "christmasScene", "sherVec", "dnVec", "opSky", "narVec", "fmaVec", "isVec", "stVec", "dsVec", "brVec", "ghVec", "tlVec", "jpVec", "avVec", "mmVec", "pcVec", "inVec", "tiVec", "dkVec", "sqVec", "hxVec", "jjVec"]
+      "fireworksScene", "halloweenScene", "christmasScene", "sherVec", "dnVec", "opSky", "narVec", "fmaVec", "isVec", "stVec", "dsVec", "brVec", "ghVec", "tlVec", "jpVec", "avVec", "mmVec", "pcVec", "inVec", "tiVec", "dkVec", "sqVec", "hxVec", "jjVec", "btVec", "snVec", "wiVec", "foVec", "mhVec", "arVec"]
       .map((e) => [e, { counts: { low: 1, medium: 1, high: 1 }, palette: OVERLAY_PALETTE }]),
   ),
   ...UNIVERSE_SPECS,
@@ -1758,26 +1765,32 @@ const SEASON_EVENT = Object.freeze({
   christmasScene: [64, 2.5], // Noel Baba kızağı ~26 sn
   // evren vektör sahneleri
   sherVec: [70, 2.6], // dedektif + fayton ~27 sn
-  dnVec: [72, 2.6], // ölüm meleği elmayı alır ~28 sn
+  dnVec: [72, 2.6], // ölüm meleği elmayı alır ~28 sn · B: savrulan sayfalar + gözlemci
   opSky: [66, 2.6], // deniz canavarı yükselir ~25 sn
-  narVec: [64, 2.5], // ninja düellosu ~26 sn
-  fmaVec: [66, 2.6], // dönüşüm: taş sütun yükselir ~25 sn
-  isVec: [66, 2.6], // dev dalga + iniş aracı ~25 sn
-  stVec: [68, 2.6], // bisikletler + öbür taraf ~26 sn
-  dsVec: [64, 2.6], // kılıç ustası + su dalgası ~25 sn
-  brVec: [60, 2.5], // uçan araba + projektör ~24 sn
-  ghVec: [66, 2.6], // kırsal otobüs + rüzgâr dalgası ~25 sn
-  tlVec: [70, 2.6], // zürafalar + kuş sürüsü ~27 sn
-  jpVec: [66, 2.4], // T-Rex + helikopter ~27 sn
-  avVec: [64, 2.4], // ikran dalışı ~27 sn
-  mmVec: [62, 2.4], // War Rig konvoyu ~26 sn
-  pcVec: [68, 2.4], // Kraken ~28 sn
-  inVec: [70, 2.5], // şehrin katlanması ~28 sn
-  tiVec: [72, 2.5], // pruva sahnesi ~29 sn
-  dkVec: [74, 2.55], // mağara geçidi ~29 sn
-  sqVec: [60, 2.4], // kırmızı ışık, yeşil ışık ~25 sn
-  hxVec: [66, 2.4], // balık sıçrayışı + zeplin ~27 sn
-  jjVec: [70, 2.5], // Hollow Purple ~28 sn
+  narVec: [64, 2.5], // ninja düellosu ~26 sn · B: gölge klonları
+  fmaVec: [66, 2.6], // dönüşüm: taş sütun yükselir ~25 sn · B: taş kapı
+  isVec: [66, 2.6], // dev dalga + iniş aracı ~25 sn · B: solucan deliği + mekik
+  stVec: [68, 2.6], // bisikletler + öbür taraf ~26 sn · B: gölge + sporlar
+  dsVec: [64, 2.6], // kılıç ustası + su dalgası ~25 sn · B: iblis gözleri + yaprak fırtınası
+  brVec: [60, 2.5], // uçan araba + projektör ~24 sn · B: reklam zeplini
+  ghVec: [66, 2.6], // kırsal otobüs + rüzgâr dalgası ~25 sn · B: esinti + eski uçak
+  tlVec: [70, 2.6], // zürafalar + kuş sürüsü ~27 sn · B: ateş böcekleri + iki yolcu
+  jpVec: [66, 2.4], // T-Rex + helikopter ~27 sn · B: koşan sürü + uçan sürüngenler
+  avVec: [64, 2.4], // ikran dalışı ~27 sn · B: Ruhlar Ağacı tohumları
+  mmVec: [62, 2.4], // War Rig konvoyu ~26 sn · B: Citadel su salar
+  pcVec: [68, 2.4], // Kraken ~28 sn · B: hayalet gemi
+  inVec: [70, 2.5], // şehrin katlanması ~28 sn · B: ağır çekim patlama
+  tiVec: [72, 2.5], // pruva sahnesi ~29 sn · B: imdat fişekleri + filika
+  dkVec: [74, 2.55], // mağara geçidi ~29 sn · B: zaman dalgası + düşen kuşlar
+  sqVec: [60, 2.4], // kırmızı ışık, yeşil ışık ~25 sn · B: inen kumbara
+  hxVec: [66, 2.4], // balık sıçrayışı + zeplin ~27 sn · B: aura yumruğu
+  jjVec: [70, 2.5], // Hollow Purple ~28 sn · B: alan genişlemesi
+  btVec: [68, 2.5], // iki olay, sırayla (eventPick) ~27 sn
+  snVec: [70, 2.6], // iki olay, sırayla (eventPick) ~27 sn
+  wiVec: [66, 2.5], // iki olay, sırayla (eventPick) ~26 sn
+  foVec: [70, 2.5], // iki olay, sırayla (eventPick) ~28 sn
+  mhVec: [64, 2.4], // iki olay, sırayla (eventPick) ~27 sn
+  arVec: [66, 2.5], // iki olay, sırayla (eventPick) ~26 sn
 });
 
 function makeOverlay(effect, p, rand, index) {
@@ -1905,6 +1918,12 @@ function makeOverlay(effect, p, rand, index) {
     case "hxVec":
     case "jjVec":
     case "fmaVec":
+    case "btVec":
+    case "snVec":
+    case "wiVec":
+    case "foVec":
+    case "mhVec":
+    case "arVec":
     case "isVec": {
       // olay dönemi (sn) ve seyrekliği (rest): olay = dönem / rest
       const [per, rest] = SEASON_EVENT[effect];
@@ -2049,6 +2068,28 @@ export function restU(p, t) {
   const c = (t / p.period + p.y0) % 1;
   const u = (c < 0 ? c + 1 : c) * (p.rest || 1);
   return u > 1 ? 2 : u;
+}
+
+/**
+ * Sahne başına BİRDEN FAZLA olay: restU ile aynı döngü sayacından, bu döngüde
+ * n olaydan hangisinin (0…n−1) oynayacağı. Döngü boyunca (olay + dinlenme)
+ * sabit kalır → olay ortasında başka olaya atlamaz. Sıra döner (A, B, C, A…);
+ * aynı olay art arda gelmez. restU'dan SONRA, kullanılmadan ÖNCE tanımlı.
+ */
+export function eventPick(p, t, n) {
+  "worklet";
+  if (!(n > 1)) return 0;
+  const c = Math.floor(t / p.period + p.y0);
+  return ((c % n) + n) % n;
+}
+
+/**
+ * Çok olaylı sahnede k. olayın ilerlemesi: bu döngü k. olaysa restU (0..1 olay, 2 dinlenme),
+ * değilse 2 (dinlenme). Tek olaylı eski sahnelerde restU(p, t) → eventU(p, t, 0) olur.
+ */
+export function eventU(p, t, k, n) {
+  "worklet";
+  return eventPick(p, t, n || 2) === k ? restU(p, t) : 2;
 }
 
 /** Kıyı yerleşimi (dp): ölçek k, kumun üst kenarı, deniz bandı, katman tabanları.
@@ -2692,7 +2733,7 @@ const smooth01 = (a, b, x) => {
  */
 export function bbFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) {
     return { u, pants: -1, drive: 0, depart: 0, dust: 0, door: 0, smoke: 0, outJ: 0, outW: 0, walkJ: 0, walkW: 0, facingJ: -1, facingW: -1, visJ: 0, visW: 0, hold: 0, glint: 0 };
   }
@@ -2730,7 +2771,7 @@ export function bbFrame(p, t) {
  */
 export function pbFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, plan: 0, planO: 0, alarm: 0 };
   return {
     u,
@@ -2743,7 +2784,7 @@ export function pbFrame(p, t) {
 /** GoT: ejderha gelir, duvarı yıkar, ölüler gedikten geçer. */
 export function gotFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   const fl = 0.9 + 0.06 * Math.sin(t * 4.1) + 0.04 * Math.sin(t * 7.3 + 1);
   if (u > 1) {
     return { u, fly: 0, inhale: 0, breath: 0, reach: 0, sweep: 0, leave: 0, dvis: 0, heat: 0, fall: 0, vis: 1, rubble: 0, dust: 0, shake: 0, army: 0, armyO: 0, fl };
@@ -2779,7 +2820,7 @@ export function gotFrame(p, t) {
  */
 export function vikFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, sail: 0, leave: 0, row: 0, draw: 0, burn: 0, smoke: 0, bell: 0 };
   const sail = u >= 0.26 ? 1 : u / 0.26;
   const moving = smooth01(0, 0.03, u) * (1 - smooth01(0.24, 0.3, u)) + smooth01(0.82, 0.86, u);
@@ -2802,7 +2843,7 @@ export function vikFrame(p, t) {
  */
 export function hpFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, dem: 0, flee: 0, dark: 0, frost: 0, raise: 0, wand: 0, burst: -1, stag: -1, sparks: -1 };
   const win = (a, b) => (u >= a && u < b ? (u - a) / (b - a) : -1);
   return {
@@ -2828,7 +2869,7 @@ export function hpFrame(p, t) {
  */
 export function lotrFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) {
     return { u, climb: -1, glint: 0, look: 0, flare: 0, erupt: 0, eyeDie: 0, boom: -1, collapse: 0, fallen: 0, restore: 1, dust: 0, beastFall: -1, eagles: -1, out: 0, shake: 0 };
   }
@@ -2866,7 +2907,7 @@ export function lotrFrame(p, t) {
  */
 export function batFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, sig: 0, flash: 0, stand: 0, leap: -1, glide: -1, grap: -1, back: -1, bats: 0 };
   const win = (a, b) => (u >= a && u < b ? (u - a) / (b - a) : -1);
   const tri = (c, w) => {
@@ -2910,7 +2951,7 @@ export function solarFrame(p, t) {
  */
 export function spiderFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, s1: -1, f1: -1, s2: -1, f2: -1, perch: 0, land: 0, look: 1, zipLine: 0, zip: -1, siren: 0 };
   const win = (a, b) => (u >= a && u < b ? (u - a) / (b - a) : -1);
   const landK = (u - 0.42) / 0.05;
@@ -2978,7 +3019,7 @@ export function swFrame(p, t) {
  */
 export function duneFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   const pulse = (t / 3.3) % 1;
   if (u > 1) {
     return { u, walk: 0, plant: 0, back: 0, thump: 0, pulse, wake: 0, shake: 0, rise: 0, open: 0, fall: 0, sink: 0, leap: -1, ride: -1, burst: -1, dive: -1 };
@@ -3015,7 +3056,7 @@ export function duneFrame(p, t) {
 export const AOT_KICK_U = 0.46;
 export function aotFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) {
     return { u, flash: 0, column: 0, rise: 0, hand: 0, thump: 0, lean: 0, broken: 0, foot: 0, deb: -1, dust: 0, spread: 0, shake: 0, vanish: 0, burst: 0 };
   }
@@ -3050,7 +3091,7 @@ export function aotFrame(p, t) {
  */
 export function rmFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) {
     return { u, a: 0, b: 0, c: 0, r1: 0, r2: 0, m1: 0, m2: 0, ampR: 0, ampM: 0, swig: 0, burp: -1, look: 0, aim: 0, shot: -1, recoil: 0, ship: -1, sa: -1, sb: -1, sc: -1 };
   }
@@ -3087,7 +3128,7 @@ export function rmFrame(p, t) {
  */
 export function matrixFrame(p, t) {
   "worklet";
-  const u = restU(p, t);
+  const u = eventU(p, t, 0); // olay A (B: components/decor/sceneEventsB.js)
   if (u > 1) return { u, walk: 0, aim: 0, kick: 0, flash: 0, slow: 0, lean: 0, hand: 0, hold: 0, dissolve: 0 };
   const shots = [0.19, 0.235, 0.28, 0.325, 0.62, 0.632, 0.644];
   let flash = 0;
@@ -3452,6 +3493,42 @@ const OVERLAY_TONES = Object.freeze({
   70: {
     dark: ["#f4f0ff", "#b8a8ff", "#1a1630", "#1a1a2c", "#141420", "#0c0c16", "#ffd890", "#ff3a8a", "#2ad0ff", "#1a1a22", "#3a2a2a", "#120c0e", "#d02a2a", "#0a0a10", "#8a3aff", "#ff3a3a", "#3a7aff", "#ff2a3a", "#9a3aff", "#f4e8ff"],
     light: ["#ffffff", "#d8d0ff", "#e0dcf0", "#9a9ab0", "#6a6a84", "#4a4a60", "#fff0b0", "#ff4a9a", "#2ab8f0", "#3a3a44", "#a07a6a", "#4a3a3a", "#e03030", "#5a5a68", "#7a3ad8", "#d02020", "#2a6aff", "#ff2a3a", "#8a2ae0", "#ffffff"],
+    alpha: [0.95, 0.92],
+  },
+  // Geleceğe Dönüş (bttfScene.js BT_TONE)
+  71: {
+    dark: ["#20242e", "#4a5470", "#ffffff", "#3a3530", "#26221e", "#8c857a", "#2a2622", "#ffcf7a", "#423b34", "#fff2c8", "#1a1612", "#1a2620", "#121418", "#3a3c40", "#ffd68a", "#4a4e56", "#e8f0ff", "#a8adb5", "#e4e8ee", "#2a2c30", "#ff6a1a", "#ffd060", "#7ac8ff", "#c8b060"],
+    light: ["#7a8296", "#b8c0d0", "#ffffff", "#c8b8a0", "#a89880", "#f4f0e8", "#7a6a5a", "#ffe8b0", "#b8a890", "#ffffff", "#2a2420", "#4a6a48", "#5a5e66", "#a8aab0", "#ffe4a0", "#5a5e66", "#ffffff", "#8a9098", "#e8ecf0", "#2a2c30", "#ff5a10", "#ffc040", "#3aa0ff", "#f0d070"],
+    alpha: [0.95, 0.92],
+  },
+  // The Shining (shiningScene.js SN_TONE)
+  72: {
+    dark: ["#1a2236", "#e8eef8", "#2a3448", "#1e2638", "#c8d4e8", "#0e1a1a", "#b8c8dc", "#3a3026", "#2a221a", "#1a1a1e", "#d8e2f0", "#ffc870", "#8e9ab0", "#5e6a82", "#1c3020", "#122016", "#dce6f2", "#0a0c10", "#ffb050", "#c83a2a", "#fff0c0", "#e8f0ff", "#7a88a0"],
+    light: ["#dde6f2", "#ffffff", "#8a9ab4", "#6a7a96", "#ffffff", "#2a4a3a", "#ffffff", "#8a6a4a", "#6a4e36", "#3a3a44", "#ffffff", "#ffd88a", "#f4f8fc", "#c8d4e4", "#2e5a3a", "#1e4028", "#ffffff", "#1a1c22", "#ffb050", "#d84030", "#fff4d0", "#ffffff", "#a8b6cc"],
+    alpha: [0.95, 0.92],
+  },
+  // The Witcher (witcherScene.js WI_TONE)
+  73: {
+    dark: ["#f2ead8", "#d8d0c0", "#8a94a8", "#141a1c", "#232b30", "#1c2226", "#ffb860", "#0c1012", "#0a0e0e", "#0a0c0e", "#0e1012", "#e8e8ec", "#b0b8c4", "#ff6a20", "#ffd070", "#121416", "#1a1e22", "#08090a", "#ffffff"],
+    light: ["#fffaf0", "#fff4dc", "#ffffff", "#3a4a3e", "#6a7a72", "#4a5258", "#ffb860", "#2a3030", "#2a3a2e", "#1e2224", "#22262a", "#ffffff", "#8a929c", "#ff5a10", "#ffc040", "#2a2e30", "#3a4044", "#1a1c1e", "#ffffff"],
+    alpha: [0.95, 0.92],
+  },
+  // Fallout (falloutScene.js FO_TONE)
+  74: {
+    dark: ["#6a3a20", "#ffcf8a", "#2a1a14", "#2a201a", "#3e2c22", "#5a3e28", "#4a3424", "#3a2e26", "#261e18", "#8a8a80", "#5a5a54", "#3a3a36", "#0a0a0a", "#fff2c0", "#ffcc20", "#1a1410", "#4a2e20", "#7a4024", "#2a5ab0", "#f0c020", "#e0b090", "#3a4038", "#22261e", "#8a8a80", "#fff4c8", "#a07a54"],
+    light: ["#f0b070", "#fff0c0", "#f8d8b0", "#9a7a60", "#c0a080", "#d0a070", "#b88a5a", "#8a6a50", "#6a503a", "#b8b8b0", "#8a8a84", "#6a6a64", "#1a1a1a", "#fff8d8", "#ffbb00", "#4a3a2a", "#8a5030", "#b06030", "#2a60c8", "#f0c020", "#e8b890", "#5a6458", "#3a4038", "#a0a098", "#fff8e0", "#d8b080"],
+    alpha: [0.95, 0.92],
+  },
+  // Money Heist (moneyHeistScene.js MH_TONE)
+  75: {
+    dark: ["#c8d4ff", "#3a2e2a", "#261e1c", "#9a8a80", "#4a3a34", "#ffcf80", "#5a4c46", "#ff3a2a", "#142018", "#ffd890", "#1a1a1e", "#141416", "#2a2e38", "#3a7aff", "#ff3a3a", "#c8c8cc", "#6a6a72", "#c8e0b0", "#7aa070", "#c82020", "#8a1414", "#f4eee4", "#1a1414"],
+    light: ["#ffffff", "#d8c8b8", "#b8a898", "#f8f2ea", "#c8b4a0", "#ffe0a0", "#c0b0a4", "#ff4a3a", "#3a5a40", "#ffe0a0", "#3a3a40", "#6a6a70", "#2a2c34", "#2a6aff", "#ff2a2a", "#e8e8ec", "#8a8a92", "#b8d8a0", "#5a8a50", "#d02020", "#9a1818", "#ffffff", "#1a1414"],
+    alpha: [0.95, 0.92],
+  },
+  // Arcane (arcaneScene.js AR_TONE)
+  76: {
+    dark: ["#ffcf80", "#d8c8a8", "#a8987c", "#c8a050", "#e8dcc0", "#fff0c0", "#3a3430", "#24201e", "#141a18", "#0c100e", "#2a302c", "#1a201c", "#3a4440", "#3aff8a", "#8affb0", "#ff4ab0", "#3ae0ff", "#ffb050", "#e8dcc8", "#c89a40", "#ff4ab0", "#ffffff"],
+    light: ["#ffd890", "#f4ead6", "#d4c4a4", "#d8a840", "#ffffff", "#fff4c8", "#8a7a6c", "#6a5c50", "#3a4440", "#2a322e", "#4a5450", "#3a4440", "#8a9490", "#20d070", "#60f0a0", "#ff2a9a", "#10b8e0", "#ff9a30", "#ffffff", "#c89030", "#ff2a9a", "#ffffff"],
     alpha: [0.95, 0.92],
   },
   // vikings (components/decor/vikingsScene.js VIK_TONE): [deniz, derin su, parıltı, kaya, aydınlık kaya,

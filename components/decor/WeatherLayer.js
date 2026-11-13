@@ -22,6 +22,7 @@ import {
   resolvePlan,
 } from "../../utils/weatherParticles";
 import { universeFor, universeTitleKey } from "../../utils/weatherUniverses";
+import useUniverseUnlocks from "../../hooks/useUniverseUnlocks";
 
 let ParticleFieldImpl = null;
 function getParticleField() {
@@ -63,9 +64,12 @@ function WeatherLayer({ playing, width, height, preview = false, speedScale = 1,
 
   const gKey = genresKey(genres);
   const tKey = universeTitleKey(title);
+  // Gizli evrenler: türe göre modda yapımın evreni yalnız AÇILMIŞSA çizilir (yoksa tür karışımı).
+  const { unlocked, today: universeDay } = useUniverseUnlocks();
   const plan = useMemo(() => {
     // Özel günde (ayar açıkken) yapımın türü/evreni değil günün efekti çizilir.
-    const fromTitle = byGenre && !special && !effectOverride ? universeFor(title) : null;
+    const titleUniverse = byGenre && !special && !effectOverride ? universeFor(title) : null;
+    const fromTitle = titleUniverse && (unlocked.has(titleUniverse) || universeDay.has(titleUniverse)) ? titleUniverse : null;
     const fromGenres = !fromTitle && byGenre && gKey && !special && !effectOverride ? genreEffectsFor(genres) : [];
     const chosen = fromTitle ? [fromTitle] : fromGenres.length ? fromGenres : [effect];
     const base = resolvePlan(chosen, density, effectMode);
@@ -74,7 +78,7 @@ function WeatherLayer({ playing, width, height, preview = false, speedScale = 1,
     const screenArea = screen.width * screen.height;
     return base.map(([e, c]) => [e, previewParticleCount(c, ratioArea, screenArea)]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byGenre, gKey, tKey, special, effectOverride, effect, density, effectMode, preview, w, h, screen]);
+  }, [byGenre, gKey, tKey, unlocked, universeDay, special, effectOverride, effect, density, effectMode, preview, w, h, screen]);
 
   if (!(w > 0 && h > 0) || !plan.length) return null;
 
