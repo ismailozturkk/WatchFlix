@@ -18,7 +18,7 @@ import { Linking } from "react-native";
 export const LEGAL_SITE = "https://seelogd.com";
 export const SUPPORT_EMAIL = "support@seelogd.com";
 
-/** Sayfa anahtarı → dosya adı. Site iki dili tek dosyada tutuyor. */
+/** Sayfa anahtarı → dosya adı. Site her dili aynı dosyada ayrı blok olarak tutuyor. */
 export const LEGAL_PAGES = Object.freeze({
   privacy: "privacy.html",
   terms: "terms.html",
@@ -30,8 +30,9 @@ export const LEGAL_PAGES = Object.freeze({
  *
  * `?lang=` ŞART: sayfa dili tarayıcıdan seçiyor, yani Türkçe uygulamayı
  * İngilizce cihazda kullanan biri metni İngilizce görürdü. Uygulamanın
- * dilini açıkça geçiyoruz. Site yalnız tr/en biliyor; başka dil İngilizce sayfaya
- * düşer (utils/appLanguages `legalLang`). Siteye yeni dil eklenince kayıttan açılır.
+ * dilini açıkça geçiyoruz. Metin uygulamanın 8 dilinin hepsinde var
+ * (utils/appLanguages `legalLang`); yeni uygulama dili eklenince sayfalara o dilin
+ * bloğu yazılıp kayıtta `legalLang` açılır, o zamana kadar "en" kalır.
  */
 export function legalUrl(page, language) {
   const file = LEGAL_PAGES[page] || page;

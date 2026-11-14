@@ -23,7 +23,7 @@
  * @property {string} tmdbLanguage TMDB `language` parametresi
  * @property {string} tmdbRegion  TMDB `region` / `watch_region` (dil ≠ ülke: tek değerli varsayım)
  * @property {string[]} tmdbImageLanguages TMDB poster/arka plan dilleri, öncelik sırasıyla (`null` dilsiz görseller her zaman sona eklenir)
- * @property {string} legalLang   website/legal.js'in bildiği sayfa dili (yalnız tr/en)
+ * @property {string} legalLang   website/legal.js'in bildiği sayfa dili (8 uygulama dilinin hepsi)
  * @property {string} aiPromptName Gemini sistem talimatına yazılan dil etiketi
  */
 
@@ -64,8 +64,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "es-ES",
     tmdbRegion: "ES",
     tmdbImageLanguages: ["es", "en"],
-    // website/legal.js henüz yalnız tr/en biliyor → İngilizce sayfa.
-    legalLang: "en",
+    legalLang: "es",
     aiPromptName: "Spanish (es)",
   },
   {
@@ -80,8 +79,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "pt-BR",
     tmdbRegion: "BR",
     tmdbImageLanguages: ["pt", "en"],
-    // website/legal.js henüz yalnız tr/en biliyor → İngilizce sayfa.
-    legalLang: "en",
+    legalLang: "pt",
     aiPromptName: "Portuguese (pt-BR)",
   },
   {
@@ -95,8 +93,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "de-DE",
     tmdbRegion: "DE",
     tmdbImageLanguages: ["de", "en"],
-    // website/legal.js henüz yalnız tr/en biliyor → İngilizce sayfa.
-    legalLang: "en",
+    legalLang: "de",
     aiPromptName: "German (de)",
   },
   {
@@ -108,7 +105,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "it-IT",
     tmdbRegion: "IT",
     tmdbImageLanguages: ["it", "en"],
-    legalLang: "en",
+    legalLang: "it",
     aiPromptName: "Italian (it)",
   },
   {
@@ -120,7 +117,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "fr-FR",
     tmdbRegion: "FR",
     tmdbImageLanguages: ["fr", "en"],
-    legalLang: "en",
+    legalLang: "fr",
     aiPromptName: "French (fr)",
   },
   {
@@ -132,7 +129,7 @@ export const APP_LANGUAGES = Object.freeze([
     tmdbLanguage: "ja-JP",
     tmdbRegion: "JP",
     tmdbImageLanguages: ["ja", "en"],
-    legalLang: "en",
+    legalLang: "ja",
     aiPromptName: "Japanese (ja)",
   },
 ]);

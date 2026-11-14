@@ -38,7 +38,7 @@ describe("Japonca: kayıt ve cihaz dili", () => {
   it("TMDB ja-JP, Intl ja-JP, yasal sayfa İngilizce", () => {
     expect(tmdbLanguageOf("ja")).toBe("ja-JP");
     expect(intlLocaleOf("ja")).toBe("ja-JP");
-    expect(legalLanguageOf("ja")).toBe("en");
+    expect(legalLanguageOf("ja")).toBe("ja");
   });
 
   it("onboarding dil düğmesi döngüsü fr → ja → tr", () => {

@@ -36,7 +36,7 @@ describe("Fransızca: kayıt ve cihaz dili", () => {
   it("TMDB fr-FR, Intl fr-FR, yasal sayfa İngilizce", () => {
     expect(tmdbLanguageOf("fr")).toBe("fr-FR");
     expect(intlLocaleOf("fr")).toBe("fr-FR");
-    expect(legalLanguageOf("fr")).toBe("en");
+    expect(legalLanguageOf("fr")).toBe("fr");
   });
 
   it("onboarding dil düğmesi döngüsü it → fr → ja", () => {

@@ -51,10 +51,10 @@ describe("dil kaydı yapısı", () => {
     expect(SUPPORTED_LANGUAGE_CODES).toContain(FALLBACK_LANGUAGE);
   });
 
-  it("yasal sayfa dili yalnız sitede var olan dillerden biri", () => {
-    // website/ yalnız tr ve en yasal sayfalarını yayımlıyor; yeni dil için sayfa
-    // yazılana kadar legalLang "en" kalır (docs/mimari/DIL_DESTEGI_REHBERI.md).
-    for (const dil of APP_LANGUAGES) expect(["tr", "en"]).toContain(dil.legalLang);
+  it("yasal sayfa her uygulama dilinde kendi dilinde açılır", () => {
+    // website/privacy.html, terms.html, delete-account.html 8 dilin hepsinde
+    // <section data-lang-block="xx"> taşıyor (website/legal.js BLOCK_LANGS).
+    for (const dil of APP_LANGUAGES) expect(dil.legalLang).toBe(dil.code);
   });
 
   it("her dilin çeviri paketi var ve index.js'e bağlı", () => {
@@ -125,7 +125,7 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbRegionOf("es")).toBe("ES");
     expect(intlLocaleOf("es")).toBe("es-ES");
     expect(aiPromptLanguageOf("es")).toBe("Spanish (es)");
-    expect(legalLanguageOf("es")).toBe("en");
+    expect(legalLanguageOf("es")).toBe("es");
     expect(tmdbImageLanguageOrderOf("es")).toBe("es,en,null");
   });
 
@@ -134,7 +134,7 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbRegionOf("pt")).toBe("BR");
     expect(intlLocaleOf("pt")).toBe("pt-BR");
     expect(aiPromptLanguageOf("pt")).toBe("Portuguese (pt-BR)");
-    expect(legalLanguageOf("pt")).toBe("en");
+    expect(legalLanguageOf("pt")).toBe("pt");
     expect(tmdbImageLanguageOrderOf("pt")).toBe("pt,en,null");
   });
 
@@ -143,7 +143,7 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbRegionOf("de")).toBe("DE");
     expect(intlLocaleOf("de")).toBe("de-DE");
     expect(aiPromptLanguageOf("de")).toBe("German (de)");
-    expect(legalLanguageOf("de")).toBe("en");
+    expect(legalLanguageOf("de")).toBe("de");
     expect(tmdbImageLanguageOrderOf("de")).toBe("de,en,null");
   });
 
@@ -152,7 +152,7 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbRegionOf("it")).toBe("IT");
     expect(intlLocaleOf("it")).toBe("it-IT");
     expect(aiPromptLanguageOf("it")).toBe("Italian (it)");
-    expect(legalLanguageOf("it")).toBe("en");
+    expect(legalLanguageOf("it")).toBe("it");
     expect(tmdbImageLanguageOrderOf("it")).toBe("it,en,null");
   });
 

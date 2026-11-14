@@ -35,7 +35,7 @@ describe("Almanca: cihaz dili ve TMDB bağları", () => {
     expect(tmdbLanguageForApp("de")).toBe("de-DE");
     expect(tmdbLanguageForApp("de_AT")).toBe("de-DE");
     expect(intlLocaleOf("de")).toBe("de-DE");
-    expect(legalLanguageOf("de")).toBe("en");
+    expect(legalLanguageOf("de")).toBe("de");
   });
 
   it("kayıtta Almanca bayrağı ve kendi adı var", () => {

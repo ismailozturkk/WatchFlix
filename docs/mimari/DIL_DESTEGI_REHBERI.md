@@ -109,7 +109,7 @@ Bölüm 5, 6. JS paketlerinden bağımsız; ayrı deploy/derleme ister.
 | **Sıralama / harf grubu** | `utils/friendsListModel.js` (dile bağlı), `SharedListsContext:68` ve `utils/listSearch.js:239` (**`"tr"` sabit**) | Bu iki yer hâlâ `localeCompare(…, "tr")`: İspanyolca `ñ`/`á` kullanıcılarında yalnız liste adı sıralaması etkilenir. **Yapılmadı** (düşük etki) |
 | **Arama katlama** | `foldForSearch` (arkadaş/sohbet/liste aramaları) | NFD + aksan atma; İspanyolca için ek iş gerekmez (`ñ` → `n`, arama toleransı, bilinçli) |
 | **AI sohbeti (Gemini)** | `services/geminiService.js`, `aiCineService.js` | Prompt'a `aiPromptLanguageOf(language)` konur (`"tr"`, `"en"`, `"Spanish (es)"`). Ham kod yerine **dil adı** vermek daha güvenli |
-| **Hukuki bağlantılar** | `utils/legalLinks.js` → `…/privacy.html?lang=tr|en` | `legalLanguageOf(language)`; `website/legal.js` yalnız `tr`/`en` biliyor → **İspanyolca kullanıcı İngilizce sayfayı açar** (kayıtta `legalLang: "en"`). `LegalConsentNotice` metni ise İspanyolca |
+| **Hukuki bağlantılar** | `utils/legalLinks.js` → `…/privacy.html?lang=xx` | `legalLanguageOf(language)`; yasal sayfalar 14 Kas 2026'dan beri 8 uygulama dilinin hepsinde var (`website/legal.js → BLOCK_LANGS`) → her dil kendi metnini açar (kayıtta `legalLang` = dil kodu). Çeviriler; çelişkide Türkçe esas |
 | **Analytics** | `utils/analyticsEvents.js` `APP_LANGUAGE`, `OnboardingScreen` `entry_language` | Değer serbest dil kodu; panelde `es` yeni değer olarak görünür |
 | **Premium fiyat pazarı** | `utils/premium.js:365` `language === "tr" ? configured.tr : configured.global` | Pazar **dile** bağlı (TR/global). İspanyolca → `global` fiyat. Ülke bazlı fiyat gerekirse dilden değil mağaza ülkesinden okunmalı |
 | **Rakam/birim kısaltmaları** | "sa/dk" ↔ "h/m", "S1 · 3. Bölüm" | JSON'da `notifEpisodeShort`; widget yükü `reminderWidgetService`te `pickByLanguage`. İspanyolca ondalık virgül + "mil" kısaltması |
@@ -205,7 +205,7 @@ Kod ADI = ISO 639-1 (`"xx"`). Aşağıda `xx` yerine onu koy. İspanyolca bu lis
 
 **Çekirdek (zorunlu)**
 1. `utils/appLanguages.js` → `APP_LANGUAGES`'e satır: `code, name, nativeName, flag (ISO ülke), intlLocale,
-   tmdbLanguage, tmdbRegion, tmdbImageLanguages ([xx,"en"]), legalLang ("en" — sayfa yoksa), aiPromptName`.
+   tmdbLanguage, tmdbRegion, tmdbImageLanguages ([xx,"en"]), legalLang (sayfada o dilin bloğu yoksa "en"), aiPromptName`.
    Bu tek satır Ayarlar seçicisini, cihaz dilini, yedek doğrulayıcısını, onboarding düğmesini, fragmanı, TMDB'yi besler.
 2. `translations/xx.json` — `en.json` ile **birebir aynı anahtar kümesi**; `{{x}}` yer tutucuları aynen; `\n`
    ve emoji aynen; dizi uzunlukları aynı. (Çeviri yöntemi: bölümlere ayırıp doldur, `scratchpad/es/merge.js`
@@ -235,7 +235,7 @@ Kod ADI = ISO 639-1 (`"xx"`). Aşağıda `xx` yerine onu koy. İspanyolca bu lis
 **Dışarısı**
 12. Mağaza: `store/play/xx-XX/` metinleri + ekran görüntüleri (şu an `en-US`, `tr-TR`).
 13. Web: `website/privacy.html`, `terms.html`, `delete-account.html`, `legal.js` `data-lang` düğmeleri — sayfa
-    yazılınca kayıtta `legalLang: "xx"` yap.
+    yazılınca kayıtta `legalLang: "xx"` yap. (8 dil için yapıldı, 14 Kas 2026; metin değişince 8 blok birlikte güncellenir.)
 14. `utils/analyticsEvents.js` yorumu (güncel), `localeCompare(…, "tr")` sabit yerleri (bölüm 4).
 
 **Doğrulama**
@@ -254,7 +254,7 @@ Kod ADI = ISO 639-1 (`"xx"`). Aşağıda `xx` yerine onu koy. İspanyolca bu lis
   içinde "Gratis" (Free), "Premium Max" aynen.
 - Biçim: ondalık virgül, kompakt sayıda " mil" son eki, haftanın ilk günü Pazartesi, ay/gün adları küçük harf.
 - Çoğul/eril-dişil: cinsiyetsiz ifadeler tercih edilir; "arkadaş" → `amistades`/`amigos`.
-- Yasal sayfalar çevrilmedi → `legalLang: "en"` (kullanıcı İngilizce sayfayı açar; onay metni İspanyolca).
+- Yasal sayfalar çevrilmedi → `legalLang: "en"` (kullanıcı İngilizce sayfayı açar; onay metni İspanyolca). **14 Kas 2026: çevrildi, `legalLang: "es"`.**
 
 ## 11. Portekizce (pt, Brezilya) — kararlar ve nasıl eklendi
 
@@ -452,7 +452,7 @@ temiz; tanımsız-değişken taramasında tek bulgu `plugins/withAndroidWidgets.
     (a) prebuild/native build ile doğrulanmadı (Windows); (b) `.lproj`lar eklendi diye iOS sistem arayüzü (İptal/Tamam vb.) artık tr/en/es cihaz dilini izler ve Ayarlar > Seelogd'da "Dil" seçici (uygulama başına dil) çıkar — yan etki, istenmiyorsa `locales`+`CFBundleLocalizations` geri alınır;
     (c) `NSFaceIDUsageDescription` yerelleştirildi ama uygulama biyometri kullanmıyor (yalnız expo-secure-store varsayılanı); (d) Android izin diyaloğu sistem metnidir, yapılacak yok; Expo `locales` Android için boş `values-b+xx/strings.xml` üretir (zararsız).
 6. `store/play/es-ES/` yok (Play mağaza sayfası); App Store metni de ayrıca gerekir.
-7. Web yasal sayfaları yalnız `tr`/`en` → İspanyolca kullanıcı İngilizce sayfayı görür.
+7. ~~Web yasal sayfaları yalnız `tr`/`en`~~ → 14 Kas 2026: es/pt/de/it/fr/ja blokları eklendi (çeviri; hukuki gözden geçirme önerilir).
 8. `SharedListsContext.js:68`, `utils/listSearch.js:239` `localeCompare(…, "tr")` — İspanyolca sıralamada `ñ`/aksan farkı.
 9. `utils/premium.js:365` fiyat pazarı dile bağlı (TR/global) — İspanyolca `global` fiyat.
 10. **`autoI18n.bolum` anahtarı çakışması (eski hata):** tr/en paketinde değeri `"- Bölüm:"` / `"- Episode:"` (başka bir

@@ -31,13 +31,14 @@ Site 12 dili destekler: **tr · en · es · pt (Brasil) · de · it · fr · ja 
   `?lang=` de güncellenir (yenilemede eski dile dönmesin).
 - **Tanıtım sayfası ve etkileşimli maket** 12 dilde tam çevrilidir. Eksik anahtar İngilizceye düşer. **Yeni dil eklemek:**
   `site-lang.js` (LANGS/NAMES/SHORT/REGION_LANG/TZ_LANG) → `home-i18n.js` (sözlük) → `mock-i18n.js` (maket sözlüğü) → `legal.js` (CHROME).
-- **Yasal metinler yalnız tr/en.** Diğer 10 dil seçiliyse İngilizce metin gösterilir; sayfanın çerçevesi
-  (başlık, içindekiler, altbilgi) seçilen dildedir ve üstte o dilde bir not çıkar ("metin tr/en;
-  çelişkide Türkçe esas"). **Neden çevrilmedi:** hukuki metin çevirisi hukuki inceleme ister ve her
-  değişiklikte kopyalar senkron tutulur. Çevrilirse `<section data-lang-block="xx">` ekle,
-  `legal.js → BLOCK_LANGS`'e yaz, `CHROME.<dil>.note`'u sil.
-- Uygulama içi bağlantılar (Ayarlar → Hakkında) `?lang=tr|en` ekler (`utils/appLanguages.legalLanguageOf`);
-  diğer diller için `en` gider. İstenirse uygulama gerçek kodu (`?lang=es`, `?lang=ja` vb.) da gönderebilir — site kabul eder.
+- **Yasal metinler 8 dilde** (uygulamanın dilleri): tr · en · es · pt · de · it · fr · ja (14 Kas 2026; gizlilik 1.10,
+  şartlar 1.4). Her dil aynı dosyada bir `<section data-lang-block="xx">` bloğudur; başlık kimlikleri `xx-1…`,
+  silme şablonu `tpl-xx`. Türkçe dışındakiler çeviridir, çelişkide Türkçe esastır (metinde "Dil" paragrafı +
+  üstte `CHROME.<dil>.note`). zh/hi/id/ko seçiliyse İngilizce blok gösterilir ve o dilde "henüz bu dilde yok" notu çıkar.
+  **Metin değişince 8 blok da güncellenmeli** (sürüm, tarih, geçmiş). Yeni dil: blok ekle → `legal.js → BLOCK_LANGS`
+  → `CHROME.<dil>.note` → uygulamada `legalLang: "xx"`.
+- Uygulama içi bağlantılar (Ayarlar → Hakkında) `?lang=<uygulama dili>` ekler (`utils/appLanguages.legalLanguageOf`);
+  8 uygulama dilinin hepsi kendi blokunu açar.
 
 ## Mağaza bağlantıları
 

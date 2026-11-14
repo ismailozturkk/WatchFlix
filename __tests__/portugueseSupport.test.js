@@ -27,7 +27,7 @@ describe("Portekizce: cihaz dili ve TMDB bağları", () => {
     expect(tmdbLanguageForApp("pt")).toBe("pt-BR");
     expect(tmdbLanguageForApp("pt_BR")).toBe("pt-BR");
     expect(intlLocaleOf("pt")).toBe("pt-BR");
-    expect(legalLanguageOf("pt")).toBe("en");
+    expect(legalLanguageOf("pt")).toBe("pt");
   });
 });
 
