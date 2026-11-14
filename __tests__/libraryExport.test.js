@@ -53,7 +53,7 @@ const library = () =>
 describe("buildLibrarySnapshot", () => {
   it("üst bilgi ve sayaçlar", () => {
     const snap = library();
-    expect(snap).toMatchObject({ app: "seelogd", kind: "library-export", version: 1, appVersion: "1.4.9", platform: "ios" });
+    expect(snap).toMatchObject({ app: "seelogd", kind: "library-export", version: 2, appVersion: "1.4.9", platform: "ios" });
     expect(snap.exportedAt).toBe(NOW.toISOString());
     expect(snap.counts).toEqual({
       watchedMovies: 3,
@@ -64,6 +64,7 @@ describe("buildLibrarySnapshot", () => {
       customLists: 1,
       customListItems: 2,
       ratings: 4, // 0 ve bozuk anahtar elenir; listede olmayan movie_999 KALIR (puan tek başına bilgi)
+      comments: 0,
     });
   });
 
@@ -80,10 +81,58 @@ describe("buildLibrarySnapshot", () => {
     const [dizi] = library().watchedShows;
     expect(dizi).toMatchObject({ tmdbId: 10, type: "tv", episodesWatched: 3, rating: 9 });
     expect(dizi.episodes).toEqual([
-      { season: 1, episode: 1, watchedDates: ["2026-04-01"] },
-      { season: 1, episode: 2, watchedDates: ["2026-04-02"] },
-      { season: 2, episode: 1, watchedDates: ["2026-05-01"] },
+      { season: 1, episode: 1, watchedDates: ["2026-04-01"], minutes: null, name: null },
+      { season: 1, episode: 2, watchedDates: ["2026-04-02"], minutes: null, name: null },
+      { season: 2, episode: 1, watchedDates: ["2026-05-01"], minutes: null, name: null },
     ]);
+  });
+
+  it("v2: bölüm süresi/adı, dizi sayıları ve afiş yolu taşınır; bozuk afiş yolu atılır", () => {
+    const snap = buildLibrarySnapshot(
+      {
+        lists: {
+          watchedTv: [
+            show(5, "D", [{ seasonNumber: 1, episodes: [{ ...ep(1, "2026-01-01"), episodeMinutes: 42, episodeName: "Pilot" }] }], {
+              showSeasonCount: 3,
+              showEpisodeCount: 30,
+              poster_path: "/abc.jpg",
+            }),
+          ],
+          watchList: [movie(6, "M", { poster_path: "javascript:alert(1)" })],
+        },
+      },
+      { now: NOW },
+    );
+    const [dizi] = snap.watchedShows;
+    expect(dizi).toMatchObject({ seasonCount: 3, episodeCount: 30, poster: "/abc.jpg" });
+    expect(dizi.episodes[0]).toMatchObject({ minutes: 42, name: "Pilot" });
+    expect(snap.watchList[0].poster).toBeNull();
+  });
+
+  it("yorumlar: temizlenir, yinelenen kimlik tekleşir, tarihe göre sıralanır, CSV'ye girer", () => {
+    const snap = buildLibrarySnapshot(
+      {
+        lists: {},
+        comments: [
+          { id: "c2", kind: "tv", targetId: 10, text: "İkinci", createdAt: "2026-03-02T10:00:00.000Z", isSpoiler: true, scope: { scope: "episode", seasonNumber: 1, episodeNumber: 2 } },
+          { id: "c1", kind: "movie", targetId: 1, text: "  Birinci  ", createdAt: "2026-03-01T10:00:00.000Z" },
+          { id: "c1", kind: "movie", targetId: 1, text: "kopya", createdAt: "2026-03-01T10:00:00.000Z" },
+          { id: "bad/id", kind: "movie", targetId: 1, text: "x" },
+          { id: "c3", kind: "post", targetId: 1, text: "gönderi" },
+          { id: "c4", kind: "movie", targetId: 1, text: "   " },
+        ],
+      },
+      { now: NOW },
+    );
+    expect(snap.counts.comments).toBe(2);
+    expect(snap.comments.map((c) => c.id)).toEqual(["c1", "c2"]);
+    expect(snap.comments[0]).toMatchObject({ type: "movie", tmdbId: 1, text: "Birinci", isSpoiler: false });
+    expect(snap.comments[1]).toMatchObject({ type: "tv", isSpoiler: true, scope: expect.objectContaining({ scope: "episode", seasonNumber: 1, episodeNumber: 2 }) });
+    expect(isSnapshotEmpty(snap)).toBe(false);
+    const files = buildCsvBundle(snap);
+    const commentsCsv = files.find((file) => file.name === "comments.csv");
+    expect(commentsCsv).toBeTruthy();
+    expect(commentsCsv.text).toContain("Birinci");
   });
 
   it("özel listeler ayrı, reserved adlar özel sayılmaz", () => {

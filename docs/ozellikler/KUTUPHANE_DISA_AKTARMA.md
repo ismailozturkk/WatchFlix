@@ -52,8 +52,7 @@ olduğu gibi kalır (içe aktarıcıya bozuk başlık gitmesin).
 
 ## Bilerek yapılmadı
 
-- **Yorumlar, gönderiler, notlar, hatırlatıcılar, sohbetler, hesap bilgileri** dışa aktarılmaz (ekranda yazar). Notlar ve hatırlatıcılar yerel-öncelikli kaynak; ayrı bir "Notlarımı dışa aktar" olabilir.
-- **İçe aktarma (Seelogd JSON'u geri yükleme)**: JSON şeması sürümlü (`version: 1`), ama geri yükleme yok. Başka cihaza taşıma için hesap zaten bulutta.
+- **Gönderiler ve gönderi yorumları, notlar, hatırlatıcılar, sohbetler, hesap bilgileri** dışa aktarılmaz (ekranda yazar). Film/dizi yorumları 13 Kas'tan beri DAHİL (aşağıda). Notlar ve hatırlatıcılar yerel-öncelikli kaynak; ayrı bir "Notlarımı dışa aktar" olabilir.
 - **IMDb biçimi** (ratings.csv) ve **Trakt**: istek olursa çekirdeğe yeni üretici eklenir.
 - **Yayın yılı**: liste öğelerinde yok; TMDB'den çekmek her film için istek demek.
 - **Yasal sayfalar**: `website/privacy.html` (satır ~463 ve İngilizce ~983) hâlâ "hesap verisini tek dokunuşla dışa aktaran bir ekran yok" diyor. Bu özellik sürüme girince **yanlış kalır**; metin güncellenmeli ve hosting deploy edilmeli (yapılmadı — hukuki beyan, karar kullanıcıda).
@@ -64,3 +63,50 @@ Jest temiz (tam paket 260 dosya): çekirdek (anlık görüntü, tekrar izleme, d
 servis (gerçek JSZip ile ZIP içeriği, hata kodları), ekran (durumlar, çift basış, dil). **Görülmeyenler:** `expo-file-system`'in `File.write(Uint8Array)` çağrısı gerçek
 cihazda (tipi doğrulandı, çalıştırılmadı), iOS/Android paylaşım sayfasında `public.zip-archive` / `application/zip`, ZIP'in Dosyalar uygulamasında açılması, Excel'de Türkçe karakterler
 (BOM), Letterboxd'ın gerçek yüklemede `tmdbID` ile eşleşmesi ve dosya sınırı, uzun sürede binlerce bölümlü kütüphanede JSON boyutu/süresi, ekranın gerçek görünümü.
+
+---
+
+# İçe aktarma (geri yükleme) + yorumlar — 13 Kas 2026
+
+Ayarlar → Veri ve depolama → **Kütüphaneni İçe Aktar** (`LibraryImportScreen`). Kütüphaneni Dışa Aktar'ın **Tam yedek (JSON)**
+dosyasını geri yükler. ZIP/CSV seçilirse "JSON'u seç" der (Letterboxd/IMDb CSV'si için mevcut İçe Aktar modalı var).
+
+## Şema v2 (`EXPORT_VERSION = 2`)
+
+v1 dosyaları da okunur. v2'de eklenenler: her kayıtta `poster` (TMDB yolu, `/^\/[\w.-]{1,120}$/`), dizide `seasonCount`/`episodeCount`,
+bölümde `minutes`/`name`, üst düzeyde `comments[]` = `{id, type, tmdbId, title, poster, text, isSpoiler, createdAt, parentId, scope}`
+ve `counts.comments`. ZIP'e `comments.csv` girer (yorum varsa).
+
+## Akış ve dosyalar
+
+| Dosya | Görev |
+| --- | --- |
+| `utils/libraryImport.js` | SAF: `parseLibraryBackup` (BOM, 40 MB sınırı, sürüm, tür/uzunluk/tarih denetimi, bozuk kaydı atla+say), `backupCounts`, `buildImportPlan` (seçili bölümler → importRunner öğeleri + üst düzey yorumlar), `planStages`/`reduceStages` (ekran aşamaları). |
+| `services/libraryImportService.js` | Dosya seçici (`expo-document-picker` + `File.text()`), `createLibraryRestoreJob`, `runLibraryRestore` (importRunner eşzamanlılık 6 → yorum aşaması; sürdürülebilir), `restoreSummary`. |
+| `services/libraryCommentsIO.js` | `readMyTitleComments` (myComments aynası + özgün belge: spoiler, tarih, kapsam), `restoreTitleComments` (özgün kimlikle, transaction, yineleme koruması). |
+| `services/import/tmdbResolver.js` | `tmdbId` varsa KESİN eşleşme; ad+afiş dosyadaysa ağa çıkmaz, yoksa TMDB detayı, 404'te dosyadaki bilgi. |
+| `services/import/importMerge.js` | `mergeRestoredTv`: bölüm bölüm iskelet + gün başına tek `restore_tv_{id}_{tarih}` olayı (kapsam `episode`). |
+| `services/import/importWriter.js` | Dizi geri yüklemesi `mergeRestoredTv` ile; özel liste ad çakışması öneki "Seelogd - ". |
+| `screens/tabs/settings/LibraryImportScreen.js`, `libraryImportCopy.js` (6 dil) | Giriş → önizleme (bölüm seç) → aşamalar → özet / kesildi (sürdür, baştan). |
+| `components/libraryImport/RestoreVisuals.js` | Küre (nabız / dönen yay / onay), aşama listesi + çubuk, bölüm satırı (yay basışı, kademeli giriş), afiş yelpazesi, sayan özet kutuları. Hareket azaltmaya uyar; ilk değerler görünür. |
+
+## Kurallar (birleştirme)
+
+- **Hiçbir şey silinmez ya da ezilmez.** İzleme tarihleri birleşir (aynı gün tekrar eklenmez), mevcut puan korunur, dizi bölüm bilgisi yalnız eksikse dolar.
+- **Aynı dosya iki kez aktarılınca çoğalmaz**: dizi olay kimliği tarihe bağlı, yorumlar özgün kimlikle yazılır (`existing` sayılır), aynı yapıma aynı metin ikinci kez yazılmaz.
+- **Puan** yapımın ilk kaydına (izlenen > izleme listesi > favori) bir kez eklenir; kütüphanede karşılığı olmayan puan yazılmaz ve özette söylenir.
+- **Yanıtlar geri yüklenmez** (başkasının yorumuna bağlı; o yorum silinmiş olabilir); önizlemede yazar.
+- **Yorum** yazımı kurallara uyar (`userId == auth.uid`), `restored: true` ve özgün tarih taşır; `mediaCommentCount` yalnız ayna yeniyse artar.
+- Ekrandan çıkılırsa iş durur; yazılanlar kalır. Ağ kesilirse "Devam et" aynı işi kaldığı yerden sürdürür.
+- Bitişte `rebuildImportedProfileStats` istatistikleri alt koleksiyonlardan yeniden kurar.
+
+## Testler
+
+`libraryImport.test.js` (doğrulama, kötü dosyalar, uçtan uca dönüş, plan, `mergeRestoredTv` tekrar aktarım, kimlikle eşleşme, 6 dil şekli),
+`libraryImportScreen.test.js` (akış, seçim, sürdür), `restoreVisuals.render.test.js`, güncellenen `libraryExport*.test.js`.
+
+## Açık / görülmedi
+
+- Cihazda görülmedi: dosya seçici + `File.text()` büyük dosyada, animasyonların gerçek görünümü, binlerce kayıtta süre.
+- `website/privacy.html` yorumların dışa aktarıldığını ve geri yüklemeyi henüz anmıyor (karar kullanıcıda; deploy edilmedi).
+- Gönderi yorumları (kind `post`) kapsam dışı.

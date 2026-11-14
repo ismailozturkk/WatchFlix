@@ -4,20 +4,23 @@
 //
 // İzlenenler, listeler, izleme tarihleri ve puanlar iki biçimde dışa aktarılır: tek JSON (eksiksiz kopya)
 // ya da ZIP (library.csv + Letterboxd'a aktarılabilir CSV'ler). Hangi içeriğin dosyaya gireceği satırlardan
-// seçilir. Veri ListStatusContext'te zaten bellekte; ek okuma yok. Ücretsiz (taşınabilirlik hakkı — plan
+// seçilir. Listeler ListStatusContext'te zaten bellekte; yalnız film/dizi YORUMLARI ekran açılınca bir kez okunur
+// (services/libraryCommentsIO). Ücretsiz (taşınabilirlik hakkı — plan
 // kapısı yok). Biçim: utils/libraryExport.js, dosya G/Ç: services/libraryExportFiles.js.
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import LensLoader from "../../../components/LensLoader";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import { intlLocaleOf } from "../../../utils/appLanguages";
+import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { useTheme } from "@context/ThemeContext";
 import { exportLibraryJson, exportLibraryZip, snapshotFromLibrary } from "@services/libraryExportFiles";
+import { readMyTitleComments } from "@services/libraryCommentsIO";
 import { isSnapshotEmpty, pickLibrarySections } from "@utils/libraryExport";
 import { SettingsSubScreen, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
 import { exportErrorMessage, getLibraryExportCopy } from "./libraryExportCopy";
@@ -42,13 +45,34 @@ export default function LibraryExportScreen() {
   const { combinedLists, activityIndex, loading, watchedTvLoaded } = useListStatusContext() || {};
   const [busy, setBusy] = useState(null); // "json" | "zip"
   const [excluded, setExcluded] = useState([]); // seçimi kaldırılan içerik kimlikleri
+  const uid = useAuth()?.user?.uid || null;
+  // Yorumlar: { status: "loading" | "ok" | "failed", list }
+  const [comments, setComments] = useState({ status: "loading", list: [] });
+
+  useEffect(() => {
+    let alive = true;
+    if (!uid) {
+      setComments({ status: "failed", list: [] });
+      return undefined;
+    }
+    readMyTitleComments(uid)
+      .then((res) => alive && setComments(res.ok ? { status: "ok", list: res.comments } : { status: "failed", list: [] }))
+      .catch(() => alive && setComments({ status: "failed", list: [] }));
+    return () => {
+      alive = false;
+    };
+  }, [uid]);
 
   // Listeler gelmeden dışa aktarmak EKSİK dosya üretir (özellikle diziler alt koleksiyondan geç gelir).
-  const ready = !loading && !!watchedTvLoaded && !!combinedLists;
+  // Yorumlar okunurken de beklenir; okunamazsa dosya yorumsuz çıkar ve ekranda yazar.
+  const ready = !loading && !!watchedTvLoaded && !!combinedLists && comments.status !== "loading";
 
   const fullSnapshot = useMemo(
-    () => (ready ? snapshotFromLibrary({ lists: combinedLists, ratings: activityIndex?.ratings }) : null),
-    [ready, combinedLists, activityIndex],
+    () =>
+      ready
+        ? snapshotFromLibrary({ lists: combinedLists, ratings: activityIndex?.ratings, comments: comments.list })
+        : null,
+    [ready, combinedLists, activityIndex, comments],
   );
   const empty = ready && isSnapshotEmpty(fullSnapshot);
   const counts = fullSnapshot?.counts;
@@ -73,6 +97,13 @@ export default function LibraryExportScreen() {
           amount: counts.customListItems,
         },
         { id: "ratings", icon: "star-outline", tone: [C.iconGreen, C.green], text: copy.ratings(counts.ratings), amount: counts.ratings },
+        {
+          id: "comments",
+          icon: "chatbubble-ellipses-outline",
+          tone: [C.iconBlue, C.blue],
+          text: copy.comments(counts.comments || 0),
+          amount: counts.comments || 0,
+        },
       ].filter((row) => row.amount > 0)
     : [];
   const largest = rows.reduce((max, row) => Math.max(max, row.amount), 1);
@@ -114,7 +145,12 @@ export default function LibraryExportScreen() {
 
   const exportJson = () => run("json", () => exportLibraryJson(snapshot, { dialogTitle: copy.title }));
   const exportZip = () =>
-    run("zip", () => exportLibraryZip(snapshot, { dialogTitle: copy.title, readme: copy.readme }));
+    run("zip", () =>
+      exportLibraryZip(snapshot, {
+        dialogTitle: copy.title,
+        readme: picked?.comments ? `${copy.readme}\n${copy.readmeComments}` : copy.readme,
+      }),
+    );
 
   const spinner = <LensLoader size="small" color={C.accent} />;
   const disabled = !ready || empty;
@@ -147,6 +183,7 @@ export default function LibraryExportScreen() {
               { id: "shows", value: picked.watchedShows, label: copy.statShows },
               { id: "episodes", value: picked.watchedEpisodes, label: copy.statEpisodes },
               { id: "ratings", value: picked.ratings, label: copy.statRatings },
+              ...(picked.comments ? [{ id: "comments", value: picked.comments, label: copy.statComments }] : []),
             ]}
           />
         </View>
@@ -156,7 +193,7 @@ export default function LibraryExportScreen() {
           <View style={s.stateRow}>
             {spinner}
             <Text allowFontScaling={false} style={[s.stateText, { color: C.muted }]}>
-              {copy.loading}
+              {comments.status === "loading" && !loading && watchedTvLoaded ? copy.commentsLoading : copy.loading}
             </Text>
           </View>
         ) : empty ? (
@@ -190,6 +227,14 @@ export default function LibraryExportScreen() {
                 last={index === rows.length - 1}
               />
             ))}
+            {comments.status === "failed" ? (
+              <View style={s.stateRow}>
+                <AppIcon family="Ionicons" name="alert-circle-outline" size={16} color={C.amber} />
+                <Text allowFontScaling={false} style={[s.stateText, { color: C.muted }]}>
+                  {copy.commentsFailed}
+                </Text>
+              </View>
+            ) : null}
           </>
         )}
       </GlassBox>

@@ -45,6 +45,16 @@ jest.mock("react-native", () => {
       Text: host("AnimatedText"),
       createAnimatedComponent: () => host("AnimatedSvgEl"),
       timing: anim,
+      spring: anim,
+      delay: () => ({ start: (cb) => cb && cb({ finished: true }), stop: () => {} }),
+      add: (a) => a,
+      parallel: (list) => ({
+        start: (cb) => {
+          list.forEach((a) => a.start());
+          if (cb) cb({ finished: true });
+        },
+        stop: () => {},
+      }),
       loop: () => ({ start: () => {}, stop: () => {} }),
       sequence: () => ({ start: () => {}, stop: () => {} }),
     },
@@ -52,7 +62,7 @@ jest.mock("react-native", () => {
     LayoutAnimation: { configureNext: jest.fn(), Presets: { easeInEaseOut: {} } },
     Pressable: host("Pressable"),
     ScrollView: host("ScrollView"),
-    StyleSheet: { create: (s) => s, hairlineWidth: 1, absoluteFill: {} },
+    StyleSheet: { create: (s) => s, hairlineWidth: 1, absoluteFill: {}, absoluteFillObject: {} },
     Text: host("Text"),
     View: host("View"),
   };
@@ -62,6 +72,8 @@ jest.mock("expo-image", () => ({ Image: "ExpoImage" }));
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 jest.mock("react-native-svg", () => ({ __esModule: true, default: "Svg", Circle: "Circle" }));
 jest.mock("../components/common/GlassTouchable", () => "GlassTouchable");
+const mockHaptic = jest.fn();
+jest.mock("../services/hapticsService", () => ({ haptic: (...a) => mockHaptic(...a) }));
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text", AnimatedAppText: "AnimatedText" }));
 jest.mock("@theme/colors", () => ({ alpha: (c) => c }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
@@ -71,6 +83,8 @@ jest.mock("../context/ListStatusContext", () => ({ useListStatusContext: () => m
 
 const TasteFitButton = require("../components/detail/TasteFitButton").default;
 const { MIN_LOADING_MS } = require("../components/detail/TasteFitButton");
+const COPY = require("../utils/titleTasteFitCopy").getTitleTasteFitCopy("tr");
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -115,6 +129,7 @@ const details = {
 };
 
 beforeEach(() => {
+  mockHaptic.mockClear();
   jest.useFakeTimers();
   jest.spyOn(console, "error").mockImplementation((msg) => {
     if (String(msg).includes("react-test-renderer is deprecated")) return;
@@ -133,18 +148,27 @@ test("düğmeye basınca yerinde yükleme, sonra yüzde + karar; ayrıntılar a�
     tree = create(<TasteFitButton theme={theme} type="movie" details={details} similar={[{ id: 1 }, { id: 2 }, { id: 50 }]} />);
   });
   const button = tree.root.findByType("GlassTouchable");
-  expect(button.props.accessibilityLabel).toMatch(/^Zevk uyumunu değerlendir/);
+  expect(button.props.accessibilityLabel.startsWith(COPY.button.title)).toBe(true);
 
   act(() => button.props.onPress());
   expect(tree.root.findAll((n) => typeof n.type === "string" && n.props.accessibilityRole === "progressbar")).toHaveLength(1);
   expect(textOf(tree)).toMatch(/İzlediklerin taranıyor/);
+  // Sayaçlar 0'dan başlar; kütüphane 12 izlenen + 12 puan.
+  act(() => {
+    jest.advanceTimersByTime(MIN_LOADING_MS - 200);
+  });
+  expect(textOf(tree)).toMatch(/12 \| 12 \| 0/);
 
   act(() => {
     jest.advanceTimersByTime(MIN_LOADING_MS + 50);
   });
   const resultRow = tree.root.find((n) => typeof n.type === "string" && n.type === "Pressable" && n.props.accessibilityState);
-  expect(resultRow.props.accessibilityLabel).toMatch(/^Zevk uyumu: %\d+\. (Çok seversin|Büyük ihtimalle beğenirsin)$/);
+  expect(resultRow.props.accessibilityLabel).toMatch(
+    new RegExp(`^${esc(COPY.title)}: %\\d+\\. (${esc(COPY.tiers.love)}|${esc(COPY.tiers.like)})$`),
+  );
   expect(textOf(tree)).toMatch(/Ayrıntılar/);
+  // Basış + patlama titreşimi (yüksek uyumda "match", değilse "success").
+  expect(mockHaptic.mock.calls.map((c) => c[0])).toEqual(["press", expect.stringMatching(/^(match|success)$/)]);
 
   act(() => resultRow.props.onPress());
   const all = textOf(tree);

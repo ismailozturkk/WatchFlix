@@ -154,6 +154,178 @@ export function mergeImportedTv(existing = {}, item = {}, options = {}) {
   };
 }
 
+const tvEpisodeKey = (season, episode) => `${Number(season)}:${Number(episode)}`;
+const safeIdPart = (value) => String(value).replace(/[^a-zA-Z0-9_-]/g, "_");
+
+/**
+ * Seelogd yedeğinden BÖLÜM BÖLÜM dizi geçmişi (item.episodes: [{ season, episode, watchedDates, minutes, name }]).
+ * Uygulamanın kendi modeliyle birebir (services/watchedTvService): sezon/bölüm iskeleti belgeye gömülür, izleme
+ * olayları üst düzeyde TEK kez durur ve episodeKeys taşır. Aynı gün aynı bölüm zaten varsa eklenmez → aynı dosya
+ * ikinci kez aktarılınca hiçbir şey değişmez. Tarihsiz bölüm (eski kayıt) dizinin ekleme gününe yazılır.
+ * Olay kapsamı "episode": tam dizi izleme sayacı (stats.tv.shows) şişmez.
+ */
+export function mergeRestoredTv(existing = {}, item = {}, options = {}) {
+  const current = materializeTvWatchState({ ...existing, id: existing?.id ?? item.id });
+  const fallbackDate = normalizeWatchDate(item.dateAdded) || normalizeWatchDate(options.fallbackDate);
+  const have = new Set();
+  current.watchEvents.forEach((event) => {
+    (event.episodeKeys || []).forEach((key) => have.add(`${key}@${event.watchedAt}`));
+  });
+
+  const seasons = new Map(
+    current.seasons.map((season) => [
+      Number(season.seasonNumber),
+      {
+        ...season,
+        episodes: new Map(
+          (season.episodes || []).map(({ watchEvents: _derived, ...episode }) => [Number(episode.episodeNumber), episode]),
+        ),
+      },
+    ]),
+  );
+
+  const byDate = new Map();
+  for (const ep of Array.isArray(item.episodes) ? item.episodes : []) {
+    const seasonNumber = Number(ep?.season);
+    const episodeNumber = Number(ep?.episode);
+    if (!Number.isInteger(seasonNumber) || !Number.isInteger(episodeNumber)) continue;
+    const key = tvEpisodeKey(seasonNumber, episodeNumber);
+    const dates = (Array.isArray(ep.watchedDates) && ep.watchedDates.length ? ep.watchedDates : [fallbackDate])
+      .map(normalizeWatchDate)
+      .filter(Boolean);
+    for (const date of [...new Set(dates)]) {
+      if (have.has(`${key}@${date}`)) continue;
+      have.add(`${key}@${date}`);
+      const list = byDate.get(date) || [];
+      list.push({ seasonNumber, episodeNumber, key });
+      byDate.set(date, list);
+    }
+    // İskelet: mevcut bölüm bilgisi (ad, süre, afiş, bölüm puanı) ezilmez, yalnız eksikler dolar.
+    if (!seasons.has(seasonNumber)) {
+      seasons.set(seasonNumber, {
+        seasonNumber,
+        seasonPosterPath: null,
+        seasonEpisodes: 0,
+        addedSeasonDate: dates.slice().sort()[0] || fallbackDate || null,
+        episodes: new Map(),
+      });
+    }
+    const season = seasons.get(seasonNumber);
+    const previous = season.episodes.get(episodeNumber);
+    const latest = dates.slice().sort().pop() || null;
+    const previousName = previous?.episodeName && previous.episodeName !== "Unknown" ? previous.episodeName : null;
+    season.episodes.set(episodeNumber, {
+      ...(previous || {}),
+      episodeNumber,
+      episodePosterPath: previous?.episodePosterPath ?? null,
+      episodeName: previousName || ep.name || "Unknown",
+      episodeRatings: previous?.episodeRatings || 0,
+      episodeMinutes: Number(previous?.episodeMinutes) || Number(ep.minutes) || 0,
+      episodeWatchTime: [previous?.episodeWatchTime, latest].filter(Boolean).sort().pop() || null,
+    });
+  }
+
+  const compactSeasons = [...seasons.values()]
+    .map((season) => {
+      const episodes = [...season.episodes.values()].sort((a, b) => Number(a.episodeNumber) - Number(b.episodeNumber));
+      return { ...season, seasonEpisodes: Math.max(Number(season.seasonEpisodes) || 0, episodes.length), episodes };
+    })
+    .sort((a, b) => Number(a.seasonNumber) - Number(b.seasonNumber));
+  const minutesByKey = new Map();
+  compactSeasons.forEach((season) =>
+    season.episodes.forEach((episode) =>
+      minutesByKey.set(tvEpisodeKey(season.seasonNumber, episode.episodeNumber), Number(episode.episodeMinutes) || 0),
+    ),
+  );
+
+  const extra = item?.importSource ? { source: item.importSource } : {};
+  const events = [...current.watchEvents];
+  const byId = new Map(events.map((event, index) => [event.id, index]));
+  let addedEpisodes = 0;
+  let addedMinutes = 0;
+  let addedSeasons = 0;
+  let addedEvents = 0;
+  for (const date of [...byDate.keys()].sort()) {
+    const targets = byDate.get(date);
+    const keys = [...new Set(targets.map((target) => target.key))];
+    const seasonNumbers = [...new Set(targets.map((target) => target.seasonNumber))];
+    const minutes = keys.reduce((sum, key) => sum + (minutesByKey.get(key) || 0), 0);
+    const id = `restore_tv_${safeIdPart(item.id)}_${date}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+    addedEpisodes += keys.length;
+    addedMinutes += minutes;
+    if (byId.has(id)) {
+      // Önceki bir geri yüklemenin aynı günkü olayı: bölümler ona eklenir (iki ayrı olay olmaz).
+      const index = byId.get(id);
+      const prev = events[index];
+      const mergedKeys = [...new Set([...(prev.episodeKeys || []), ...keys])];
+      const mergedSeasons = [...new Set([...(prev.seasonNumbers || []), ...seasonNumbers])];
+      events[index] = {
+        ...prev,
+        episodeKeys: mergedKeys,
+        seasonNumbers: mergedSeasons,
+        episodeCount: mergedKeys.length,
+        seasonCount: mergedSeasons.length,
+        minutes: mergedKeys.reduce((sum, key) => sum + (minutesByKey.get(key) || 0), 0),
+      };
+      continue;
+    }
+    addedEvents += 1;
+    addedSeasons += seasonNumbers.length;
+    byId.set(id, events.length);
+    events.push({
+      id,
+      watchedAt: date,
+      scope: "episode",
+      recordedAt: options.now || new Date().toISOString(),
+      episodeKeys: keys,
+      seasonNumbers,
+      episodeCount: keys.length,
+      seasonCount: seasonNumbers.length,
+      minutes,
+      ...extra,
+    });
+  }
+  events.sort((a, b) => String(b?.watchedAt || "").localeCompare(String(a?.watchedAt || "")));
+
+  const watchedEpisodeCount = compactSeasons.reduce((sum, season) => sum + season.episodes.length, 0);
+  const totalMinutes = compactSeasons.reduce(
+    (sum, season) => sum + season.episodes.reduce((part, episode) => part + (Number(episode.episodeMinutes) || 0), 0),
+    0,
+  );
+  const firstDate = [...byDate.keys()].sort()[0] || fallbackDate;
+  const metadata = fillMissingFields(existing, {
+    id: item.id,
+    type: "tv",
+    name: item.title || item.original_title || "",
+    imagePath: item.poster_path || null,
+    dateAdded: firstDate,
+    addedShowDate: firstDate,
+    genres: Array.isArray(item.genres) ? item.genres : [],
+  });
+  const showSeasonCount = Math.max(Number(existing.showSeasonCount) || 0, Number(item.seasonCount) || 0, compactSeasons.length);
+  const showEpisodeCount = Math.max(Number(existing.showEpisodeCount) || 0, Number(item.episodeCount) || 0, watchedEpisodeCount);
+
+  return {
+    document: {
+      ...existing,
+      ...metadata,
+      showSeasonCount,
+      showEpisodeCount,
+      seasons: compactSeasons,
+      watchEvents: events,
+      watchCount: events.length,
+      watchedSeasonCount: compactSeasons.length,
+      watchedEpisodeCount,
+      totalMinutes,
+    },
+    addedEvents,
+    wasWatched: current.watchEvents.length > 0,
+    addedEpisodes,
+    addedSeasons,
+    addedMinutes,
+  };
+}
+
 export function mergeImportedWatchlist(existing = {}, item = {}, fallbackDate) {
   const type = item.mediaType || "movie";
   return {

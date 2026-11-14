@@ -269,9 +269,45 @@ export function resolveByTitleYear(title, year = null, language = DEFAULT_LANGUA
   });
 }
 
-/** Tek öğe: önce IMDb kimliği (kesin), sonra başlık + yıl. */
+/**
+ * Seelogd yedeğindeki kayıt (TMDB kimliği KESİN): dosyada başlık + afiş varsa TMDB'ye hiç gidilmez (çevrimdışı,
+ * anında); afişsiz eski (v1) kayıtta ayrıntı çağrısı yapılır. TMDB kaydı artık yoksa (404) dosyadaki bilgiyle
+ * yine yazılır: kullanıcının kendi geçmişi TMDB'nin silmesiyle kaybolmasın.
+ */
+function localMedia(item) {
+  const tv = item.mediaType === "tv";
+  return {
+    id: Number(item.tmdbId),
+    title: item.title,
+    original_title: item.title,
+    mediaType: tv ? "tv" : "movie",
+    poster_path: item.poster_path || null,
+    backdrop_path: null,
+    release_date: null,
+    vote_average: 0,
+    overview: "",
+    minutes: !tv && Number(item.rawMinutes) > 0 ? Number(item.rawMinutes) : null,
+    episodeMinutes: null,
+    seasonCount: tv ? Number(item.seasonCount) || 1 : null,
+    episodeCount: tv ? Number(item.episodeCount) || 1 : null,
+    genres: Array.isArray(item.rawGenres) ? item.rawGenres : [],
+  };
+}
+
+async function resolveByTmdbId(item, language, signal) {
+  if (item.title && item.poster_path) return localMedia(item);
+  const mediaType = item.mediaType === "tv" ? "tv" : "movie";
+  const details = await fetchMediaDetails(item.tmdbId, mediaType, language, { signal });
+  if (!details) return item.title ? localMedia(item) : null;
+  const media = normalizeMedia({ id: Number(item.tmdbId) }, details, mediaType);
+  // Kullanıcının dosyadaki adı (kendi dilinde kaydettiği) TMDB adının önüne geçmez; yalnız boşsa kullanılır.
+  return { ...media, title: media.title || item.title };
+}
+
+/** Tek öğe: Seelogd kimliği (kesin) → IMDb kimliği (kesin) → başlık + yıl. */
 export async function resolveImportItem(item, { language = DEFAULT_LANGUAGE, signal } = {}) {
   throwIfCancelled(signal);
+  if (Number(item?.tmdbId) > 0) return resolveByTmdbId(item, language, signal);
   let media = null;
   if (item?.imdbId) media = await resolveByImdbId(item.imdbId, language, { signal });
   if (!media && item?.title) {
@@ -303,6 +339,8 @@ export function attachSourceData(media, item) {
     watchEvents: Array.isArray(item.watchEvents) ? item.watchEvents : null,
     watchDates: Array.isArray(item.watchDates) ? item.watchDates : null,
     review: item.review ?? null,
+    // Seelogd yedeği: dizide bölüm bölüm geçmiş (importMerge.mergeRestoredTv).
+    episodes: Array.isArray(item.episodes) ? item.episodes : null,
     targetList: item.targetList ?? "watchedMovies",
     customListName: item.customListName ?? null,
     importSource: item.importSource ?? null,

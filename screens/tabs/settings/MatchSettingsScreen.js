@@ -14,6 +14,7 @@ import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import BetaBadge from "../../../components/common/BetaBadge";
 import GlassBox from "../../../components/common/GlassBox";
 import GlassTouchable from "../../../components/common/GlassTouchable";
 import LensLoader from "../../../components/LensLoader";
@@ -22,6 +23,7 @@ import useMatchStrength from "../../../hooks/useMatchStrength";
 import { intlLocaleOf } from "../../../utils/appLanguages";
 import { challengeLinkLabel, getMatchCopy, stepChallengeId, stepText } from "../../../utils/matchCopy";
 import { getMatchScreenCopy } from "../../../utils/matchScreenCopy";
+import { isBetaFeature } from "../../../utils/betaFeatures";
 import { MATCH_LANES } from "../../../utils/matchFeature";
 import { PickRow, SectionHead } from "./BackupKit";
 import { SettingsSubScreen, buildUiColors, ui } from "./settingsUi";
@@ -118,6 +120,7 @@ export default function MatchSettingsScreen() {
           <Text allowFontScaling={false} style={[s.heroTitle, { color: C.text }]}>
             {copy.heroTitle}
           </Text>
+          {isBetaFeature("match") ? <BetaBadge featureId="match" style={s.heroBeta} /> : null}
           <Text style={[s.heroText, { color: C.muted }]}>{copy.heroText}</Text>
         </View>
       </GlassBox>
@@ -235,6 +238,7 @@ const s = StyleSheet.create({
   heroIcon: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   heroBody: { flex: 1, gap: 4 },
   heroTitle: { fontSize: 16, fontWeight: "800" },
+  heroBeta: { alignSelf: "flex-start" },
   heroText: { fontSize: 12.5, fontWeight: "600", lineHeight: 18 },
   hint: { fontSize: 12, fontWeight: "600", lineHeight: 17, marginTop: 8, marginHorizontal: 4 },
   consent: { borderRadius: 18, borderWidth: 1, padding: 14, gap: 9 },

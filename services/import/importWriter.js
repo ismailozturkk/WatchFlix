@@ -30,6 +30,7 @@ import {
   mergeImportedMovie,
   mergeImportedTv,
   mergeImportedWatchlist,
+  mergeRestoredTv,
 } from "./importMerge";
 import { ImportError } from "./importErrors";
 import { isOfflineFirestoreError, isTransientFirestoreError, withRetry } from "./importRetry";
@@ -148,9 +149,11 @@ export async function writeImportedCustomLists(uid, customLists = [], options = 
         const rootSnap = await tx.get(rootRef);
         const root = rootSnap.exists() ? rootSnap.data() || {} : {};
         let listName = sourceList.name.trim();
-        if (reserved.has(listName)) listName = `Letterboxd - ${listName}`;
+        // Ad çakışırsa kaynağın adıyla önek (Seelogd yedeğinden gelen liste "Letterboxd -" almasın).
+        const prefix = listSource === "seelogd" ? "Seelogd" : "Letterboxd";
+        if (reserved.has(listName)) listName = `${prefix} - ${listName}`;
         if (root[listName] !== undefined && !Array.isArray(root[listName])) {
-          listName = `Letterboxd - ${listName}`;
+          listName = `${prefix} - ${listName}`;
         }
         const current = Array.isArray(root[listName]) ? root[listName] : [];
         const merged = [...current];
@@ -370,11 +373,15 @@ export async function writeImportedItems(uid, resolvedItems, optionsOrProgress =
           }
           setNested(rootUpdates, `statusIndex.movie.${item.id}.isWatched`, true);
         } else {
-          const merged = mergeImportedTv(existing, item, { now, fallbackDate: today });
+          // Seelogd yedeği bölüm bölüm geçmiş taşır; Letterboxd/IMDb yalnız "dizi izlendi" der.
+          const restored = Array.isArray(item.episodes) && item.episodes.length > 0;
+          const merged = restored
+            ? mergeRestoredTv(existing, item, { now, fallbackDate: today })
+            : mergeImportedTv(existing, item, { now, fallbackDate: today });
           finalDocument = merged.document;
           transactionStats.addedWatchEventsCount = merged.addedEvents;
-          if (merged.addedEvents > 0) {
-            addIncrement(rootUpdates, "stats.tv.shows.total", merged.addedEvents);
+          if (merged.addedEvents > 0 || merged.addedEpisodes > 0) {
+            if (!restored) addIncrement(rootUpdates, "stats.tv.shows.total", merged.addedEvents);
             addIncrement(rootUpdates, "stats.tv.seasons.total", merged.addedSeasons);
             addIncrement(rootUpdates, "stats.tv.episodes.total", merged.addedEpisodes);
             addIncrement(rootUpdates, "stats.tv.totalMinutes", merged.addedMinutes);

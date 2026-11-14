@@ -19,6 +19,7 @@ jest.mock("../components/common/GlassTouchable", () => {
   return { __esModule: true, default: ({ children, ...props }) => React.createElement("Touch", props, children) };
 });
 jest.mock("../components/LensLoader", () => ({ __esModule: true, default: "Loader" }));
+jest.mock("../components/common/BetaBadge", () => ({ __esModule: true, default: "BetaBadge" }));
 const mockToast = { success: jest.fn(), error: jest.fn(), info: jest.fn() };
 jest.mock("@components/AppToast", () => ({ toast: mockToast }));
 const mockAlert = jest.fn();
@@ -128,6 +129,8 @@ test("açık + katılmamış: onay metni, kulvar gücü ve sonraki adım; Katıl
   expect(mockSubscribe).toHaveBeenCalledWith("u1");
   const t = texts();
   expect(t).toContain(copy.heroTitle);
+  // Beta döneminde rozet (utils/betaFeatures "match") oy kimliğiyle çizilir.
+  expect(renderer.root.findAll((n) => n.type === "BetaBadge").map((n) => n.props.featureId)).toEqual(["match"]);
   for (const point of copy.consent.points) expect(t).toContain(point);
   // 40 film, puansız: puan yolu için 20 puan eksik
   expect(t).toContain(copy.step.rate(20));

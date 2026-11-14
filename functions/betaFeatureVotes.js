@@ -5,7 +5,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const BETA_FEATURE_IDS = Object.freeze([
   "league", "challenges", "tierlist", "top100", "chain", "rating",
   "daily_frame", "film_club", "atmosphere", "profile_banner",
-  "app_icon", "streak_flame",
+  "app_icon", "streak_flame", "match",
 ]);
 
 const isValidFeature = (id) => typeof id === "string" && BETA_FEATURE_IDS.includes(id);

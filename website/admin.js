@@ -36,6 +36,7 @@ const BETA_FEATURES = [
   ["top100", "Seelogd Top 100"], ["chain", "Film Zinciri"], ["rating", "Puan yukarı-aşağı"],
   ["daily_frame", "Günün Karesi"], ["film_club", "Film Kulübü"], ["atmosphere", "Atmosfer"],
   ["profile_banner", "Profil kapağı"], ["app_icon", "Uygulama simgesi"], ["streak_flame", "Haftalık seri alevi"],
+  ["match", "Uyum Çemberleri"],
 ];
 const PAGE_SIZE = 25;
 

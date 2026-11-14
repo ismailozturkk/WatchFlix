@@ -66,6 +66,7 @@ import {
 import ImportDataModal from "../../components/import/ImportDataModal";
 import { getSettingsShareCopy } from "../../utils/settingsShareCopy";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
+import { getLibraryImportCopy } from "./settings/libraryImportCopy";
 import useMatchFeature from "../../hooks/useMatchFeature";
 import { getMatchCopy } from "../../utils/matchCopy";
 import { getFeedbackCopy } from "./settings/feedbackCopy";
@@ -375,6 +376,7 @@ export default function SettingsScreen() {
 
   const { t, language, toggleLanguage } = useLanguage();
   const copyExport = getLibraryExportCopy(language);
+  const copyRestore = getLibraryImportCopy(language);
   // Zevk Çemberleri: satır yalnız bayrak açık + 18+ kanıtlıyken (hooks/useMatchFeature).
   const matchFeature = useMatchFeature();
   const matchCopy = getMatchCopy(language);
@@ -392,7 +394,9 @@ export default function SettingsScreen() {
         pt: "Seu plano, limites e benefícios da assinatura",
         de: "Dein Plan, Kontingente und Mitgliedsvorteile",
 
-  it: "Il tuo piano, i vantaggi e i vantaggi dell'abbonamento"}),
+  it: "Il tuo piano, i vantaggi e i vantaggi dell'abbonamento",
+  fr: "Ton forfait, tes quotas et tes avantages",
+  ja: "プラン、利用枠、メンバー特典"}),
       account: pickByLanguage(language, {
         tr: "Giriş yöntemleri, gizlilik ve davetler",
         en: "Sign-in methods, privacy, and invites",
@@ -400,7 +404,9 @@ export default function SettingsScreen() {
         pt: "Métodos de acesso, privacidade e convites",
         de: "Anmeldung, Datenschutz und Einladungen",
 
-  it: "Metodi di accesso, privacy e inviti"}),
+  it: "Metodi di accesso, privacy e inviti",
+  fr: "Méthodes de connexion, confidentialité et invitations",
+  ja: "サインイン方法、プライバシー、招待"}),
       appearance: pickByLanguage(language, {
         tr: "Tema, posterler ve uygulamanın görünümü",
         en: "Theme, posters, and how the app looks",
@@ -408,7 +414,9 @@ export default function SettingsScreen() {
         pt: "Tema, pôsteres e aparência do app",
         de: "Design, Poster und App-Darstellung",
 
-  it: "Tema, poster e aspetto dell'app"}),
+  it: "Tema, poster e aspetto dell'app",
+  fr: "Thème, affiches et apparence de l'app",
+  ja: "テーマ、ポスター、アプリの見た目"}),
       content: pickByLanguage(language, {
         tr: "Dil, platformlar ve izleme tercihleri",
         en: "Language, services, and viewing preferences",
@@ -416,7 +424,9 @@ export default function SettingsScreen() {
         pt: "Idioma, serviços e preferências de conteúdo",
         de: "Sprache, Dienste und Inhaltspräferenzen",
 
-  it: "Lingua, servizi e preferenze di visualizzazione"}),
+  it: "Lingua, servizi e preferenze di visualizzazione",
+  fr: "Langue, services et préférences de visionnage",
+  ja: "言語、サービス、視聴の好み"}),
       notifications: pickByLanguage(language, {
         tr: "Hatırlatmalar ve sosyal bildirimler",
         en: "Reminders and social notifications",
@@ -424,7 +434,9 @@ export default function SettingsScreen() {
         pt: "Lembretes e notificações sociais",
         de: "Erinnerungen und soziale Mitteilungen",
 
-  it: "Promemoria e notifiche social"}),
+  it: "Promemoria e notifiche social",
+  fr: "Rappels et notifications sociales",
+  ja: "リマインダーとソーシャル通知"}),
       data: pickByLanguage(language, {
         tr: "Kalite, çevrimdışı kullanım ve aktarımlar",
         en: "Quality, offline use, and transfers",
@@ -432,7 +444,9 @@ export default function SettingsScreen() {
         pt: "Qualidade, uso offline e transferências",
         de: "Qualität, Offline-Nutzung und Übertragungen",
 
-  it: "Qualità, utilizzo offline e trasferimenti"}),
+  it: "Qualità, utilizzo offline e trasferimenti",
+  fr: "Qualité, utilisation hors ligne et transferts",
+  ja: "画質、オフライン利用、データ転送"}),
       support: pickByLanguage(language, {
         tr: "Sorun bildir veya yeni bir fikir paylaş",
         en: "Report a problem or share a new idea",
@@ -440,7 +454,9 @@ export default function SettingsScreen() {
         pt: "Relate um problema ou compartilhe uma ideia",
         de: "Problem melden oder eine Idee teilen",
 
-  it: "Segnala un problema o condividi una nuova idea"}),
+  it: "Segnala un problema o condividi una nuova idea",
+  fr: "Signale un problème ou partage une nouvelle idée",
+  ja: "問題を報告するか、新しいアイデアを共有"}),
       about: pickByLanguage(language, {
         tr: "Sürüm, kaynaklar ve uygulama bilgileri",
         en: "Version, sources, and app information",
@@ -448,7 +464,9 @@ export default function SettingsScreen() {
         pt: "Versão, fontes e informações do app",
         de: "Version, Quellen und App-Informationen",
 
-  it: "Informazioni su versione, fonti e app"}),
+  it: "Informazioni su versione, fonti e app",
+  fr: "Version, sources et informations de l'app",
+  ja: "バージョン、ソース、アプリ情報"}),
     }),
     [language],
   );
@@ -585,7 +603,9 @@ export default function SettingsScreen() {
           pt: `${streamingProviderIds.length} serviços selecionados`,
           de: `${streamingProviderIds.length} Dienste ausgewählt`,
 
-  it: `${streamingProviderIds.length} servizi selezionati`})
+  it: `${streamingProviderIds.length} servizi selezionati`,
+  fr: `${streamingProviderIds.length} services sélectionnés`,
+  ja: `${streamingProviderIds.length}件のサービスを選択中`})
     : pickByLanguage(language, {
         tr: "Henüz platform seçilmedi",
         en: "No services selected yet",
@@ -593,7 +613,9 @@ export default function SettingsScreen() {
         pt: "Você ainda não escolheu serviços",
         de: "Noch keine Dienste ausgewählt",
 
-  it: "Nessun servizio ancora selezionato"});
+  it: "Nessun servizio ancora selezionato",
+  fr: "Aucun service sélectionné",
+  ja: "まだサービスが選ばれていません"});
 
   const filteredProviders = useMemo(() => {
     const locale = intlLocaleOf(language);
@@ -735,7 +757,16 @@ export default function SettingsScreen() {
               title={matchCopy.title}
               subtitle={matchCopy.rowSub}
               onPress={() => navigation.navigate("MatchSettingsScreen")}
-              right={<Chevron color={C.muted} />}
+              right={
+                isBetaFeature("match") ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <BetaBadge featureId="match" />
+                    <Chevron color={C.muted} />
+                  </View>
+                ) : (
+                  <Chevron color={C.muted} />
+                )
+              }
             />
           ) : null}
           {/* Arkadaş daveti: plan bağımsız bir hesap/sosyal eylemidir. */}
@@ -1144,6 +1175,16 @@ export default function SettingsScreen() {
             title={copyExport.rowTitle}
             subtitle={copyExport.rowSub}
             onPress={() => navigation.navigate("LibraryExportScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="cloud-download-outline"
+            title={copyRestore.rowTitle}
+            subtitle={copyRestore.rowSub}
+            onPress={() => navigation.navigate("LibraryImportScreen")}
             right={<Chevron color={C.muted} />}
           />
           <SettingRow

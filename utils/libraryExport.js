@@ -21,7 +21,9 @@
 
 import { materializeTvWatchState, movieWatchEvents, normalizeWatchDate } from "./watchHistory";
 
-export const EXPORT_VERSION = 1;
+// v2 (13 Kas): afiş yolu, dizilerde bölüm süresi/adı ve toplam sezon/bölüm sayısı, film/dizi YORUMLARI.
+// Bunlar içe aktarmanın (utils/libraryImport.js) TMDB'ye gitmeden kaydı kurabilmesi için. v1 dosyaları da okunur.
+export const EXPORT_VERSION = 2;
 /** Letterboxd dosya başına 1 MB der; sınırın altında kalmak için 900 KB'ta böl. */
 export const LETTERBOXD_MAX_BYTES = 900 * 1024;
 
@@ -35,6 +37,12 @@ const textOf = (value) => (typeof value === "string" ? value.trim() : "");
 const genresOf = (item) => asArray(item?.genres).filter((g) => typeof g === "string" && g.trim());
 const minutesOf = (item) => (Number.isFinite(item?.minutes) && item.minutes > 0 ? item.minutes : null);
 const uniqueSorted = (dates) => [...new Set(dates.filter(Boolean))].sort();
+/** TMDB görsel yolu ("/abc.jpg"); başka bir şey (tam URL, bozuk değer) dosyaya girmez. */
+export const posterOf = (value) => (typeof value === "string" && /^\/[\w.-]{1,120}$/.test(value) ? value : null);
+const positiveInt = (value) => {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
 
 /** Puan 0–10 aralığına sıkıştırılır; geçersiz ya da 0 → null. */
 export function cleanRating(value) {
@@ -55,6 +63,7 @@ function listEntry(item, ratings) {
     type,
     title,
     genres: genresOf(item),
+    poster: posterOf(item?.imagePath || item?.poster_path || item?.posterPath),
     addedAt: normalizeWatchDate(item?.dateAdded),
     rating: ratingFor(ratings, type, tmdbId),
   };
@@ -79,15 +88,81 @@ function showEntry(show, ratings) {
     const seasonNumber = Number(season?.seasonNumber);
     for (const episode of asArray(season?.episodes)) {
       const episodeNumber = Number(episode?.episodeNumber);
+      const name = textOf(episode?.episodeName);
       episodes.push({
         season: Number.isFinite(seasonNumber) ? seasonNumber : null,
         episode: Number.isFinite(episodeNumber) ? episodeNumber : null,
         watchedDates: uniqueSorted(asArray(episode?.watchEvents).map((event) => event.watchedAt)),
+        minutes: positiveInt(episode?.episodeMinutes),
+        name: name && name !== "Unknown" ? name : null,
       });
     }
   }
   episodes.sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0));
-  return { ...base, type: "tv", episodesWatched: episodes.length, episodes };
+  return {
+    ...base,
+    type: "tv",
+    seasonCount: positiveInt(show?.showSeasonCount),
+    episodeCount: positiveInt(show?.showEpisodeCount),
+    episodesWatched: episodes.length,
+    episodes,
+  };
+}
+
+/** Yorum metni sınırı (dosya ve içe aktarma aynı sınırı kullanır). */
+export const COMMENT_TEXT_MAX = 5000;
+export const COMMENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * Film/dizi yorumu (services/libraryCommentsIO.readMyTitleComments çıktısı ya da dosya kaydı) → dosya kaydı.
+ * Yanıtlar da dosyaya girer (parentId dolu); içe aktarma yalnız üst seviye yorumları yazar.
+ */
+export function commentEntry(raw) {
+  const id = typeof raw?.id === "string" && COMMENT_ID_RE.test(raw.id) ? raw.id : null;
+  const tmdbId = idOf(raw?.targetId ?? raw?.tmdbId);
+  const kind = raw?.kind ?? raw?.type;
+  const type = kind === "tv" ? "tv" : kind === "movie" ? "movie" : null;
+  const text = textOf(raw?.text).slice(0, COMMENT_TEXT_MAX);
+  if (!id || !tmdbId || !type || !text) return null;
+  const created = raw?.createdAt ? new Date(raw.createdAt) : null;
+  const rawScope = raw?.scope && typeof raw.scope === "object" ? raw.scope : raw;
+  const scopeName = typeof rawScope?.scope === "string" ? rawScope.scope : null;
+  const scope = type === "tv" && (scopeName === "season" || scopeName === "episode")
+    ? {
+        scope: scopeName,
+        seasonNumber: Number.isInteger(rawScope?.seasonNumber) ? rawScope.seasonNumber : null,
+        episodeNumber: scopeName === "episode" && Number.isInteger(rawScope?.episodeNumber) ? rawScope.episodeNumber : null,
+        title: textOf(rawScope?.title ?? rawScope?.scopeTitle).slice(0, 200) || null,
+      }
+    : null;
+  return {
+    id,
+    type,
+    tmdbId,
+    title: textOf(raw?.title).slice(0, 300),
+    poster: posterOf(raw?.poster),
+    text,
+    isSpoiler: raw?.isSpoiler === true,
+    createdAt: created && !Number.isNaN(created.getTime()) ? created.toISOString() : null,
+    parentId: typeof raw?.parentId === "string" && COMMENT_ID_RE.test(raw.parentId) ? raw.parentId : null,
+    scope,
+  };
+}
+
+const commentSort = (a, b) =>
+  String(a.createdAt || "").localeCompare(String(b.createdAt || "")) || a.id.localeCompare(b.id);
+
+/** Kimliğe göre tekilleştirilmiş, tarihe göre sıralı yorum kayıtları. */
+export function cleanComments(list) {
+  const seen = new Set();
+  return asArray(list)
+    .map(commentEntry)
+    .filter((entry) => {
+      if (!entry || seen.has(entry.id)) return false;
+      seen.add(entry.id);
+      return true;
+    })
+    .sort(commentSort);
 }
 
 /**
@@ -100,7 +175,7 @@ function showEntry(show, ratings) {
  * @param {object} [meta] { now, appVersion, platform }
  */
 export function buildLibrarySnapshot(input, meta) {
-  const { lists, ratings } = input || {};
+  const { lists, ratings, comments: rawComments } = input || {};
   const { now = new Date(), appVersion = null, platform = null } = meta || {};
   const all = isPlainObject(lists) ? lists : {};
   const rate = isPlainObject(ratings) ? ratings : {};
@@ -124,6 +199,8 @@ export function buildLibrarySnapshot(input, meta) {
     .filter(Boolean)
     .sort((a, b) => a.type.localeCompare(b.type) || a.tmdbId - b.tmdbId);
 
+  const comments = cleanComments(rawComments);
+
   return {
     app: "seelogd",
     kind: "library-export",
@@ -140,6 +217,7 @@ export function buildLibrarySnapshot(input, meta) {
       customLists: customLists.length,
       customListItems: customLists.reduce((sum, list) => sum + list.items.length, 0),
       ratings: ratingList.length,
+      comments: comments.length,
     },
     watchedMovies,
     watchedShows,
@@ -147,6 +225,7 @@ export function buildLibrarySnapshot(input, meta) {
     favorites,
     customLists,
     ratings: ratingList,
+    comments,
   };
 }
 
@@ -155,12 +234,12 @@ export const isSnapshotEmpty = (snapshot) => {
   const c = snapshot?.counts;
   if (!c) return true;
   return (
-    c.watchedMovies + c.watchedShows + c.watchList + c.favorites + c.customListItems + c.ratings === 0
+    c.watchedMovies + c.watchedShows + c.watchList + c.favorites + c.customListItems + c.ratings + (c.comments || 0) === 0
   );
 };
 
 /** Dışa aktarma ekranında seçilebilen içerikler. */
-export const LIBRARY_SECTIONS = Object.freeze(["films", "shows", "watchList", "favorites", "customLists", "ratings"]);
+export const LIBRARY_SECTIONS = Object.freeze(["films", "shows", "watchList", "favorites", "customLists", "ratings", "comments"]);
 
 /**
  * Anlık görüntüyü seçili içeriklere indirger; sayılar yeniden hesaplanır. Puanlar
@@ -179,6 +258,7 @@ export function pickLibrarySections(snapshot, sectionIds) {
     ? snapshot.customLists.map((list) => ({ ...list, items: entries(list.items) }))
     : [];
   const ratings = withRatings ? snapshot.ratings : [];
+  const comments = keep.has("comments") ? asArray(snapshot.comments) : [];
   return {
     ...snapshot,
     counts: {
@@ -190,6 +270,7 @@ export function pickLibrarySections(snapshot, sectionIds) {
       customLists: customLists.length,
       customListItems: customLists.reduce((sum, list) => sum + list.items.length, 0),
       ratings: ratings.length,
+      comments: comments.length,
     },
     watchedMovies,
     watchedShows,
@@ -197,6 +278,7 @@ export function pickLibrarySections(snapshot, sectionIds) {
     favorites,
     customLists,
     ratings,
+    comments,
   };
 }
 
@@ -322,6 +404,24 @@ export function buildLetterboxdWatchlist(snapshot) {
   return csvChunks(["tmdbID", "Title", "Year"], rows);
 }
 
+/** comments.csv: film/dizi yorumların (Excel / Sheets; formül korumalı). */
+export function buildCommentsCsv(snapshot) {
+  const headers = ["type", "tmdb_id", "title", "date", "spoiler", "reply", "scope", "text"];
+  const rows = asArray(snapshot?.comments).map((c) => [
+    c.type,
+    c.tmdbId,
+    c.title,
+    c.createdAt ? c.createdAt.slice(0, 10) : "",
+    c.isSpoiler ? "true" : "",
+    c.parentId ? "true" : "",
+    c.scope
+      ? `${c.scope.seasonNumber != null ? `S${c.scope.seasonNumber}` : ""}${c.scope.episodeNumber != null ? `E${c.scope.episodeNumber}` : ""}`
+      : "",
+    c.text,
+  ]);
+  return "\uFEFF" + csvChunks(headers, rows, { maxBytes: Infinity, options: { guard: true } })[0];
+}
+
 /** Parçalara numara verir: tek parça "ad.csv", çoksa "ad-1.csv", "ad-2.csv"… */
 export const chunkFileNames = (base, count) =>
   count <= 1 ? [`${base}.csv`] : Array.from({ length: count }, (_, i) => `${base}-${i + 1}.csv`);
@@ -342,6 +442,7 @@ export function buildCsvBundle(snapshot, { readme = "" } = {}) {
     buildLetterboxdWatchlist(snapshot),
     snapshot.watchList.some((entry) => entry.type === "movie"),
   );
+  if (asArray(snapshot.comments).length > 0) files.push({ name: "comments.csv", text: buildCommentsCsv(snapshot) });
   if (readme) files.push({ name: "README.txt", text: readme });
   return files;
 }

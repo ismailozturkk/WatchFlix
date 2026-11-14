@@ -1,7 +1,11 @@
 // components/detail/TasteFitButton.js
 //
 // Film/dizi detayında "Zevk uyumunu değerlendir" düğmesi. Basılınca DÜĞMENİN YERİNDE:
-//   boşta → yükleniyor (dönen halka + adım adım metin + ilerleme çubuğu) → sonuç (yüzde halkası + karar).
+//   boşta (kalp atışı + ara ara ışık süpürmesi)
+//   → yükleniyor: kart "hesaplıyor" — ters dönen yaylı küre, karışan rakamlar, nefes alan çerçeve,
+//     sürekli ışık süpürmesi, adım metni + ilerleme çubuğu, kütüphane sayaçları 0'dan sayar
+//   → sıkışma (küre dolar, kart %95'e iner) → PATLAMA (parlama, iki şok dalgası, 24 parçacık, titreşim)
+//   → sonuç yaylanarak taşar: halka fırlar ve yüzdeyi sayar, karar ikonu döner, metin kayarak gelir.
 // Sonuç satırına dokununca ayrıntılar aynı kartın içinde aşağı açılır (bileşen çubukları, içgörüler,
 // izlediğin benzer yapımlar). Hesap saf modülde: utils/titleTasteFit.js; metinler utils/titleTasteFitCopy.js.
 //
@@ -23,6 +27,7 @@ import { computeTitleTasteFit } from "../../utils/titleTasteFit";
 import { getTitleTasteFitCopy, insightText } from "../../utils/titleTasteFitCopy";
 import { GENRE_LABELS } from "../../utils/genreDisplay";
 import { copyLanguage } from "../../utils/appLanguages";
+import { haptic } from "../../services/hapticsService";
 
 export const MIN_LOADING_MS = 2300;
 const STEP_MS = 420;
@@ -62,38 +67,105 @@ const PART_ICONS = Object.freeze({
 });
 export const LOW_DATA_COLOR = "#F5A524";
 
-/** Yüklenirken dönen yay + ortada nabız atan kalp. */
-function LoadingRing({ tone, track }) {
-  const spin = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
+const ORB_LOOP_MS = 2400;
+const SQUEEZE_MS = 240;
+const BURST_MS = 1000;
+// Patlama merkezi = sonuç halkasının ortası (kabuk yatay dolgusu 12 + halka yarıçapı; satır 64 yüksek).
+const BURST_X = 12 + RING / 2;
+const BURST_Y = 32;
+const SPARK_GOLD = "#FFC94D";
+
+/** Patlama parçacıkları: deterministik (her seferinde aynı desen), çoğu sağa — kart solda kırpar. */
+const PARTICLES = Array.from({ length: 24 }, (_, i) => {
+  const angle = (i / 24) * Math.PI * 2 + (((i * 37) % 11) / 11) * 0.45;
+  const dist = 38 + ((i * 53) % 8) * 17;
+  let dx = Math.cos(angle) * dist * 1.7;
+  if (dx < 0) dx *= 0.32;
+  const dy = Math.sin(angle) * Math.min(dist, 34) * 0.9;
+  return {
+    dx,
+    dy,
+    fall: 10 + (i % 4) * 5,
+    size: 4 + (i % 4) * 1.6,
+    kind: i % 6 === 0 ? "heart" : i % 6 === 3 ? "star" : i % 2 ? "dot" : "spark",
+    spin: `${(i % 2 ? 1 : -1) * (140 + ((i * 29) % 220))}deg`,
+    color: i % 4,
+    lag: (i % 3) * 0.05,
+  };
+});
+
+/** Basit zamanlayıcı: her `ms`'de bir artan sayaç (yalnız onu kullanan küçük bileşeni yeniden çizer). */
+function useTicker(ms) {
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const a = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }));
-    const b = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 520, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ]),
-    );
+    const id = setInterval(() => setTick((t) => t + 1), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return tick;
+}
+
+/** Kartın üstünden geçen çapraz ışık süpürmesi. */
+function Sheen({ width, duration, pause, strength = 0.16 }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const steps = [Animated.timing(t, { toValue: 1, duration, easing: Easing.inOut(Easing.quad), useNativeDriver: true })];
+    if (pause) steps.push(Animated.delay(pause));
+    const a = Animated.loop(Animated.sequence([Animated.timing(t, { toValue: 0, duration: 0, useNativeDriver: true }), ...steps]));
     a.start();
-    b.start();
-    return () => {
-      a.stop();
-      b.stop();
-    };
-  }, [spin, pulse]);
+    return () => a.stop();
+  }, [t, duration, pause]);
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.sheenClip]}>
+      <Animated.View
+        style={[
+          styles.sheen,
+          { transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [-110, width + 20] }) }, { skewX: "-20deg" }] },
+        ]}
+      >
+        <LinearGradient
+          colors={["rgba(255,255,255,0)", `rgba(255,255,255,${strength})`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/** Ortadaki "hesaplanan" yüzde: rakamlar slot makinesi gibi karışır. */
+function ShuffleDigits({ color }) {
+  const tick = useTicker(70);
+  const n = ((tick * 47 + 13) % 89) + 10;
+  return (
+    <Text allowFontScaling={false} style={[styles.orbDigits, { color }]}>
+      {n}
+    </Text>
+  );
+}
+
+/** Hesaplama küresi: ters dönen iki yay + yörüngede üç uydu + karışan rakamlar. */
+function ComputeOrb({ tone, alt, track, charge }) {
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const a = Animated.loop(Animated.timing(spin, { toValue: 1, duration: ORB_LOOP_MS, easing: Easing.linear, useNativeDriver: true }));
+    a.start();
+    return () => a.stop();
+  }, [spin]);
   const r = (RING - RING_STROKE) / 2;
   const c = 2 * Math.PI * r;
+  const r2 = r - 7;
+  const c2 = 2 * Math.PI * r2;
+  const rot = (deg) => ({ transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", deg] }) }] });
   return (
-    <View style={styles.ring}>
+    <Animated.View style={[styles.ring, { transform: [{ scale: charge.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] }) }] }]}>
+      <Animated.View
+        style={[styles.orbGlow, { backgroundColor: tone, opacity: charge.interpolate({ inputRange: [0, 1], outputRange: [0.12, 0.45] }) }]}
+      />
       <Svg width={RING} height={RING} style={StyleSheet.absoluteFill}>
         <Circle cx={RING / 2} cy={RING / 2} r={r} stroke={track} strokeWidth={RING_STROKE} fill="none" />
       </Svg>
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] },
-        ]}
-      >
+      <Animated.View style={[StyleSheet.absoluteFill, rot("1080deg")]}>
         <Svg width={RING} height={RING}>
           <Circle
             cx={RING / 2}
@@ -103,19 +175,149 @@ function LoadingRing({ tone, track }) {
             strokeWidth={RING_STROKE}
             strokeLinecap="round"
             fill="none"
-            strokeDasharray={`${c * 0.28} ${c}`}
+            strokeDasharray={`${c * 0.3} ${c}`}
           />
         </Svg>
       </Animated.View>
-      <Animated.View
-        style={{
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
-          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.08] }) }],
-        }}
-      >
-        <Ionicons name="heart" size={17} color={tone} />
+      <Animated.View style={[StyleSheet.absoluteFill, rot("-540deg")]}>
+        <Svg width={RING} height={RING}>
+          <Circle
+            cx={RING / 2}
+            cy={RING / 2}
+            r={r2}
+            stroke={alt}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            fill="none"
+            strokeDasharray={`${c2 * 0.18} ${c2 * 0.12}`}
+          />
+        </Svg>
       </Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, rot("360deg")]}>
+        {[0, 120, 240].map((deg, i) => (
+          <View key={deg} style={[StyleSheet.absoluteFill, { transform: [{ rotate: `${deg}deg` }] }]}>
+            <View style={[styles.satellite, { backgroundColor: i === 0 ? SPARK_GOLD : i === 1 ? alt : tone }]} />
+          </View>
+        ))}
+      </Animated.View>
+      <ShuffleDigits color={tone} />
+    </Animated.View>
+  );
+}
+
+/** Yükleme sırasında kütüphane sayılarını 0'dan sayarak "tarar". */
+function ScanCounters({ watched, rated, likes, color, muted }) {
+  const startedAt = useRef(Date.now()).current;
+  useTicker(80);
+  const p = Math.min(1, Math.max(0, (Date.now() - startedAt) / (MIN_LOADING_MS * 0.85)));
+  const e = 1 - Math.pow(1 - p, 3);
+  const items = [
+    ["film", Math.round(watched * e)],
+    ["star", Math.round(rated * e)],
+    ["heart", Math.round(likes * e)],
+  ];
+  return (
+    <View style={styles.counters}>
+      {items.map(([icon, n]) => (
+        <View key={icon} style={styles.counter}>
+          <Ionicons name={icon} size={9} color={muted} />
+          <Text allowFontScaling={false} style={[styles.counterText, { color }]}>
+            {n}
+          </Text>
+        </View>
+      ))}
     </View>
+  );
+}
+
+/** Sonuç anındaki patlama: parlama + iki şok dalgası + yıldız çakması + saçılan parçacıklar. */
+function BurstLayer({ tone, palette, onDone }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const a = Animated.timing(t, { toValue: 1, duration: BURST_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+    a.start(({ finished }) => {
+      if (finished) onDone?.();
+    });
+    return () => a.stop();
+  }, [t, onDone]);
+  const wave = (from, to, peak) => ({
+    opacity: t.interpolate({ inputRange: [from, from + 0.02, to], outputRange: [0, peak, 0], extrapolate: "clamp" }),
+    transform: [{ scale: t.interpolate({ inputRange: [from, to], outputRange: [0.3, 8], extrapolate: "clamp" }) }],
+  });
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: tone, opacity: t.interpolate({ inputRange: [0, 0.06, 0.4], outputRange: [0.5, 0.28, 0], extrapolate: "clamp" }) },
+        ]}
+      />
+      <Animated.View style={[styles.wave, { borderColor: tone }, wave(0, 0.55, 0.95)]} />
+      <Animated.View style={[styles.wave, styles.waveThin, { borderColor: "#FFFFFF" }, wave(0.08, 0.7, 0.6)]} />
+      <Animated.View
+        style={[
+          styles.flare,
+          {
+            opacity: t.interpolate({ inputRange: [0, 0.12, 0.45], outputRange: [0, 1, 0], extrapolate: "clamp" }),
+            transform: [
+              { scale: t.interpolate({ inputRange: [0, 0.15, 0.45], outputRange: [0.2, 1.7, 0.4], extrapolate: "clamp" }) },
+              { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "200deg"] }) },
+            ],
+          },
+        ]}
+      >
+        <Ionicons name="sparkles" size={30} color="#FFFFFF" />
+      </Animated.View>
+      {PARTICLES.map((pt, i) => {
+        const s = pt.lag;
+        const color = palette[pt.color % palette.length];
+        return (
+          <Animated.View
+            key={i}
+            style={[
+              styles.particle,
+              {
+                opacity: t.interpolate({ inputRange: [s, s + 0.04, 0.72, 1], outputRange: [0, 1, 0.9, 0], extrapolate: "clamp" }),
+                transform: [
+                  { translateX: t.interpolate({ inputRange: [s, 0.75], outputRange: [0, pt.dx], extrapolate: "clamp" }) },
+                  { translateY: t.interpolate({ inputRange: [s, 0.6, 1], outputRange: [0, pt.dy, pt.dy + pt.fall], extrapolate: "clamp" }) },
+                  { scale: t.interpolate({ inputRange: [s, s + 0.12, 1], outputRange: [0.2, 1.3, 0.5], extrapolate: "clamp" }) },
+                  { rotate: t.interpolate({ inputRange: [0, 1], outputRange: ["0deg", pt.spin] }) },
+                ],
+              },
+            ]}
+          >
+            {pt.kind === "heart" || pt.kind === "star" ? (
+              <Ionicons name={pt.kind} size={pt.size + 5} color={color} />
+            ) : (
+              <View
+                style={
+                  pt.kind === "dot"
+                    ? { width: pt.size, height: pt.size, borderRadius: pt.size / 2, backgroundColor: color }
+                    : { width: pt.size * 2.2, height: 2.2, borderRadius: 1.1, backgroundColor: color }
+                }
+              />
+            )}
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Boştaki düğmenin ikonunda çift vuruşlu kalp atışı. */
+function HeartBeat({ color }) {
+  const beat = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const up = (v, d) => Animated.timing(beat, { toValue: v, duration: d, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    const a = Animated.loop(Animated.sequence([up(1, 140), up(0.3, 120), up(1, 140), up(0, 260), Animated.delay(1700)]));
+    a.start();
+    return () => a.stop();
+  }, [beat]);
+  return (
+    <Animated.View style={{ transform: [{ scale: beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }] }}>
+      <Ionicons name="heart-half" size={20} color={color} />
+    </Animated.View>
   );
 }
 
@@ -198,7 +400,7 @@ function PartBar({ label, icon, value, tone, theme }) {
 function TasteFitButton({ theme, type, details, similar }) {
   const { language } = useLanguage();
   const copy = getTitleTasteFitCopy(language);
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const lists = useListStatusContext() || {};
   const posterUri = usePosterUri();
 
@@ -207,9 +409,23 @@ function TasteFitButton({ theme, type, details, similar }) {
   const [result, setResult] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
+  const [bursting, setBursting] = useState(false);
+  const [cardWidth, setCardWidth] = useState(320);
   const progress = useRef(new Animated.Value(0)).current;
   const stepFade = useRef(new Animated.Value(1)).current;
   const reveal = useRef(new Animated.Value(1)).current;
+  // squeeze: kart ölçeği (yükleme sonunda sıkışır, sonuçta yaylanarak taşar); pop: halka + karar ikonu fırlaması;
+  // charge: sonuçtan hemen önce kürenin "dolması".
+  const squeeze = useRef(new Animated.Value(1)).current;
+  const pop = useRef(new Animated.Value(1)).current;
+  const charge = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+  const finishing = useRef(false);
+  const onLayout = useCallback((e) => {
+    const w = Math.round(e?.nativeEvent?.layout?.width || 0);
+    if (w > 0) setCardWidth((prev) => (prev === w ? prev : w));
+  }, []);
+  const endBurst = useCallback(() => setBursting(false), []);
 
   const dataReady = !lists.loading && lists.watchedTvLoaded !== false;
   const accent = theme.colors?.pink || "#FF4D8D";
@@ -220,7 +436,17 @@ function TasteFitButton({ theme, type, details, similar }) {
     setPhase("idle");
     setResult(null);
     setExpanded(false);
+    setBursting(false);
   }, [mediaId, type]);
+
+  const libCounts = useMemo(
+    () => ({
+      watched: (lists.watchedMoviesItems || []).length + Object.keys(lists.watchedTvMap || {}).length,
+      rated: Object.keys(lists.activityIndex?.ratings || {}).length,
+      likes: (lists.favoritesItems || []).length,
+    }),
+    [lists.watchedMoviesItems, lists.watchedTvMap, lists.activityIndex, lists.favoritesItems],
+  );
 
   const compute = useCallback(() => {
     const runtime = type === "movie" ? details?.runtime : (details?.episode_run_time || [])[0];
@@ -249,8 +475,17 @@ function TasteFitButton({ theme, type, details, similar }) {
     if (phase !== "loading") return undefined;
     setStep(0);
     progress.setValue(0);
+    charge.setValue(0);
+    glow.setValue(0);
     const bar = Animated.timing(progress, { toValue: 1, duration: MIN_LOADING_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: false });
     bar.start();
+    const breathe = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]),
+    );
+    breathe.start();
     const timer = setTimeout(() => setMinElapsed(true), MIN_LOADING_MS);
     const ticker = setInterval(() => {
       Animated.sequence([
@@ -261,27 +496,55 @@ function TasteFitButton({ theme, type, details, similar }) {
     }, STEP_MS);
     return () => {
       bar.stop();
+      breathe.stop();
       clearTimeout(timer);
       clearInterval(ticker);
     };
-  }, [phase, progress, stepFade, copy.loading.length]);
+  }, [phase, progress, stepFade, charge, glow, copy.loading.length]);
 
+  // Süre doldu + veri hazır → küre dolar, kart sıkışır; ardından PATLAMA ve sonuç yaylanarak açılır.
   useEffect(() => {
-    if (phase !== "loading" || !minElapsed || !dataReady) return;
-    setResult(compute());
-    reveal.setValue(0);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setPhase("result");
-    Animated.timing(reveal, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [phase, minElapsed, dataReady, compute, reveal]);
+    if (phase !== "loading" || !minElapsed || !dataReady || finishing.current) return undefined;
+    finishing.current = true;
+    const next = compute();
+    const windUp = Animated.parallel([
+      Animated.timing(charge, { toValue: 1, duration: SQUEEZE_MS, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(squeeze, { toValue: 0.95, duration: SQUEEZE_MS, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]);
+    windUp.start(({ finished } = {}) => {
+      // Yarıda durdurulduysa (bağımlılık değişti / ekran kapandı) sonucu basma; etki yeniden kurulur.
+      if (!finished) return;
+      finishing.current = false;
+      const okNext = next?.state === "ok";
+      setResult(next);
+      reveal.setValue(0);
+      pop.setValue(okNext ? 0 : 1);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setPhase("result");
+      setBursting(okNext);
+      if (okNext) haptic(next.tier === "love" ? "match" : "success");
+      Animated.parallel([
+        Animated.spring(squeeze, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
+        Animated.spring(pop, { toValue: 1, friction: 4.5, tension: 120, useNativeDriver: true }),
+        Animated.timing(reveal, { toValue: 1, duration: 420, delay: 120, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    });
+    return () => {
+      windUp.stop();
+      finishing.current = false;
+    };
+  }, [phase, minElapsed, dataReady, compute, reveal, charge, squeeze, pop]);
 
   const start = useCallback(() => {
+    haptic("press");
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(false);
+    setBursting(false);
+    squeeze.setValue(1);
     // Önceki turdan kalan "süre doldu" bayrağı aynı commit'te sonucu hemen getirmesin.
     setMinElapsed(false);
     setPhase("loading");
-  }, []);
+  }, [squeeze]);
 
   const toggle = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -299,9 +562,16 @@ function TasteFitButton({ theme, type, details, similar }) {
     [ok, result, copy, genreLabel],
   );
 
-  // ── Boşta: eski "İnceleme" düğmesiyle aynı ölçüde öne çıkan düğme ──
+  const purple = theme.colors?.purple || "#A77BFF";
+  const wrap = (body) => (
+    <Animated.View onLayout={onLayout} style={{ transform: [{ scale: squeeze }] }}>
+      {body}
+    </Animated.View>
+  );
+
+  // ── Boşta: eski "İnceleme" düğmesiyle aynı ölçüde öne çıkan düğme; ara ara üstünden ışık geçer ──
   if (phase === "idle") {
-    return (
+    return wrap(
       <GlassTouchable
         activeOpacity={0.88}
         onPress={start}
@@ -309,14 +579,15 @@ function TasteFitButton({ theme, type, details, similar }) {
         accessibilityLabel={`${copy.button.title}. ${copy.button.subtitle}`}
         style={[styles.shell, { backgroundColor: alpha(accent, 0.1), borderColor: alpha(accent, 0.38) }]}
       >
+        <Sheen width={cardWidth} duration={1100} pause={2600} strength={0.13} />
         <View style={styles.row}>
           <LinearGradient
-            colors={[alpha(accent, 0.32), alpha(theme.colors?.purple || "#A77BFF", 0.26)]}
+            colors={[alpha(accent, 0.32), alpha(purple, 0.26)]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.iconBox}
           >
-            <Ionicons name="heart-half" size={20} color={accent} />
+            <HeartBeat color={accent} />
           </LinearGradient>
           <View style={styles.copy}>
             <Text allowFontScaling={false} numberOfLines={1} style={[styles.title, { color: theme.text.primary }]}>
@@ -328,21 +599,42 @@ function TasteFitButton({ theme, type, details, similar }) {
           </View>
           <Ionicons name="arrow-forward" size={17} color={accent} />
         </View>
-      </GlassTouchable>
+      </GlassTouchable>,
     );
   }
 
-  // ── Yükleniyor ──
+  // ── Yükleniyor: kart "hesap makinesine" döner — küre, ışık süpürmesi, nefes alan çerçeve, sayaçlar ──
   if (phase === "loading") {
-    return (
+    return wrap(
       <View
         accessible
         accessibilityRole="progressbar"
         accessibilityLabel={copy.loading[step]}
         style={[styles.shell, styles.clip, { backgroundColor: alpha(accent, 0.08), borderColor: alpha(accent, 0.3) }]}
       >
+        <LinearGradient
+          pointerEvents="none"
+          colors={[alpha(accent, 0.16), alpha(purple, 0.1), alpha(theme.colors?.blue || "#5A9CF8", 0.06)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <Sheen width={cardWidth} duration={900} pause={150} strength={0.2} />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.glowFrame,
+            {
+              borderColor: accent,
+              opacity: Animated.add(
+                glow.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.75] }),
+                charge.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] }),
+              ),
+            },
+          ]}
+        />
         <View style={styles.row}>
-          <LoadingRing tone={accent} track={track} />
+          <ComputeOrb tone={accent} alt={purple} track={track} charge={charge} />
           <View style={styles.copy}>
             <Animated.Text
               allowFontScaling={false}
@@ -353,36 +645,47 @@ function TasteFitButton({ theme, type, details, similar }) {
             </Animated.Text>
             <View style={[styles.loadTrack, { backgroundColor: track }]}>
               <Animated.View
-                style={[
-                  styles.loadFill,
-                  { width: progress.interpolate({ inputRange: [0, 1], outputRange: ["4%", "100%"] }) },
-                ]}
+                style={[styles.loadFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ["4%", "100%"] }) }]}
               >
                 <LinearGradient
-                  colors={[accent, theme.colors?.purple || "#A77BFF", theme.colors?.blue || "#5A9CF8"]}
+                  colors={[accent, purple, theme.colors?.blue || "#5A9CF8"]}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
                   style={StyleSheet.absoluteFill}
                 />
+                <View style={[styles.loadHead, { backgroundColor: "#FFFFFF" }]} />
               </Animated.View>
             </View>
-            <View style={styles.dots}>
-              {copy.loading.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, { backgroundColor: i <= step ? accent : alpha(theme.text.muted, 0.35) }]}
-                />
-              ))}
+            <View style={styles.loadFoot}>
+              <View style={styles.dots}>
+                {copy.loading.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.dot,
+                      i === step && styles.dotActive,
+                      { backgroundColor: i <= step ? accent : alpha(theme.text.muted, 0.35) },
+                    ]}
+                  />
+                ))}
+              </View>
+              <ScanCounters
+                watched={libCounts.watched}
+                rated={libCounts.rated}
+                likes={libCounts.likes}
+                color={theme.text.primary}
+                muted={theme.text.muted}
+              />
             </View>
           </View>
         </View>
-      </View>
+      </View>,
     );
   }
 
   // ── Sonuç: veri yetersiz ──
   if (!ok) {
-    return (
+    return wrap(
       <View style={[styles.shell, { backgroundColor: alpha(theme.secondary, 0.6), borderColor: theme.border }]}>
         <View style={styles.row}>
           <View style={[styles.iconBox, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
@@ -395,25 +698,27 @@ function TasteFitButton({ theme, type, details, similar }) {
             <Ionicons name="refresh" size={18} color={theme.text.muted} />
           </Pressable>
         </View>
-      </View>
+      </View>,
     );
   }
 
-  // ── Sonuç ──
-  return (
-    <Animated.View
+  // ── Sonuç: patlama katmanı + yaylanan halka, fırlayan karar ikonu, kayarak gelen metin ──
+  return wrap(
+    <View
       style={[
         styles.shell,
         styles.resultShell,
         styles.clip,
-        {
-          backgroundColor: alpha(tone, 0.09),
-          borderColor: alpha(tone, 0.42),
-          opacity: reveal,
-          transform: [{ scale: reveal.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }],
-        },
+        { backgroundColor: alpha(tone, 0.09), borderColor: alpha(tone, 0.42) },
       ]}
     >
+      <LinearGradient
+        pointerEvents="none"
+        colors={[alpha(tone, 0.2), alpha(tone, 0)]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 0.75, y: 0.5 }}
+        style={styles.resultTint}
+      />
       <Pressable
         onPress={toggle}
         accessibilityRole="button"
@@ -421,10 +726,19 @@ function TasteFitButton({ theme, type, details, similar }) {
         accessibilityLabel={`${copy.title}: ${copy.pct(result.score)}. ${copy.tiers[result.tier]}`}
         style={styles.row}
       >
-        <ScoreRing score={result.score} tone={tone} track={track} pct={copy.pct} />
-        <View style={styles.copy}>
+        <Animated.View style={{ transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }) }] }}>
+          <ScoreRing score={result.score} tone={tone} track={track} pct={copy.pct} />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.copy,
+            { opacity: reveal, transform: [{ translateX: reveal.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] },
+          ]}
+        >
           <View style={styles.verdictRow}>
-            <Ionicons name={TIER_ICONS[result.tier]} size={14} color={tone} />
+            <Animated.View style={{ transform: [{ scale: pop }, { rotate: pop.interpolate({ inputRange: [0, 1], outputRange: ["-40deg", "0deg"] }) }] }}>
+              <Ionicons name={TIER_ICONS[result.tier]} size={14} color={tone} />
+            </Animated.View>
             <Text allowFontScaling={false} numberOfLines={1} style={[styles.verdict, { color: theme.text.primary }]}>
               {copy.tiers[result.tier]}
             </Text>
@@ -441,13 +755,13 @@ function TasteFitButton({ theme, type, details, similar }) {
               {copy.tierHints[result.tier]} · {copy.confidence[result.confidence]}
             </Text>
           )}
-        </View>
-        <View style={[styles.toggleChip, { backgroundColor: alpha(tone, 0.14) }]}>
+        </Animated.View>
+        <Animated.View style={[styles.toggleChip, { backgroundColor: alpha(tone, 0.14), opacity: reveal }]}>
           <Text allowFontScaling={false} style={[styles.toggleText, { color: tone }]}>
             {expanded ? copy.hide : copy.details}
           </Text>
           <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={13} color={tone} />
-        </View>
+        </Animated.View>
       </Pressable>
 
       {expanded ? (
@@ -554,7 +868,9 @@ function TasteFitButton({ theme, type, details, similar }) {
           </Pressable>
         </View>
       ) : null}
-    </Animated.View>
+
+      {bursting ? <BurstLayer tone={tone} palette={[tone, accent, SPARK_GOLD, "#FFFFFF"]} onDone={endBurst} /> : null}
+    </View>,
   );
 }
 
@@ -575,8 +891,25 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 13.5, fontWeight: "800", letterSpacing: -0.1 },
   loadTrack: { height: 5, borderRadius: 3, marginTop: 7, overflow: "hidden" },
   loadFill: { height: 5, borderRadius: 3, overflow: "hidden" },
-  dots: { flexDirection: "row", gap: 4, marginTop: 6 },
+  loadHead: { position: "absolute", right: 0, top: 0, bottom: 0, width: 6, borderRadius: 3, opacity: 0.85 },
+  loadFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6, gap: 8 },
+  dots: { flexDirection: "row", alignItems: "center", gap: 4 },
   dot: { width: 5, height: 5, borderRadius: 3 },
+  dotActive: { width: 12 },
+  counters: { flexDirection: "row", alignItems: "center", gap: 8 },
+  counter: { flexDirection: "row", alignItems: "center", gap: 2.5 },
+  counterText: { fontSize: 10, fontWeight: "800", fontVariant: ["tabular-nums"], minWidth: 12 },
+  orbDigits: { fontSize: 12.5, fontWeight: "900", letterSpacing: -0.4, fontVariant: ["tabular-nums"] },
+  orbGlow: { position: "absolute", width: RING - 12, height: RING - 12, borderRadius: (RING - 12) / 2 },
+  satellite: { position: "absolute", top: -1.5, left: RING / 2 - 2.5, width: 5, height: 5, borderRadius: 2.5 },
+  glowFrame: { ...StyleSheet.absoluteFillObject, borderRadius: 20, borderWidth: 1.5 },
+  sheenClip: { borderRadius: 20, overflow: "hidden" },
+  sheen: { position: "absolute", top: -10, bottom: -10, width: 80 },
+  resultTint: { position: "absolute", left: 0, top: 0, width: 160, height: 64 },
+  wave: { position: "absolute", left: BURST_X - 22, top: BURST_Y - 22, width: 44, height: 44, borderRadius: 22, borderWidth: 3 },
+  waveThin: { borderWidth: 1.5 },
+  flare: { position: "absolute", left: BURST_X - 15, top: BURST_Y - 15, width: 30, height: 30, alignItems: "center", justifyContent: "center" },
+  particle: { position: "absolute", left: BURST_X - 8, top: BURST_Y - 8, width: 16, height: 16, alignItems: "center", justifyContent: "center" },
   verdictRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   verdict: { flexShrink: 1, fontSize: 15.5, fontWeight: "900", letterSpacing: -0.3 },
   toggleChip: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 11 },
