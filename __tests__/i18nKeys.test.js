@@ -52,6 +52,11 @@ const DINAMIK_YERLER = [
     desenler: [/^ {2}([A-Za-z0-9_]+):\s*\{\s*tr:/gm],
     onek: "cache_",
   },
+  {
+    dosya: "components/common/BetaBadge.js",
+    // Oy düğmeleri tablosu: [değer, ikon, dolu ikon, ANAHTAR, yedek] → `autoI18n.${key}`.
+    desenler: [/"(beta_oy_[A-Za-z0-9_]+)"/g],
+  },
 ];
 
 function jsDosyalari(klasor, toplam = []) {

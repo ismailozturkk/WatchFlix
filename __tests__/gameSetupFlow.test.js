@@ -11,6 +11,8 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
 
+// BetaBadge oy denetimi AuthContext + Firestore yükler; ekran testleri rozeti yalnız yer tutucu olarak çizer.
+jest.mock("../components/common/BetaBadge", () => ({ __esModule: true, default: "BetaBadge", DevBadge: "DevBadge", BETA_COLOR: "#F59E0B", DEV_COLOR: "#8B5CF6" }));
 jest.mock("react-native", () => ({
   StyleSheet: { create: (s) => s, absoluteFill: {}, absoluteFillObject: {}, hairlineWidth: 1 },
   View: "View",

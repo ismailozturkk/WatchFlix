@@ -9,6 +9,8 @@ import { act, create } from "react-test-renderer";
 
 // Haftalık Lig bildirimi (services/leagueService → firebase) bu testin konusu değil.
 // Afiş köşesi (Ayarlar > Poster görünümü) burada sınanmıyor: taban köşe aynen döner.
+// BetaBadge oy denetimi AuthContext + Firestore yükler; ekran testleri rozeti yalnız yer tutucu olarak çizer.
+jest.mock("../components/common/BetaBadge", () => ({ __esModule: true, default: "BetaBadge", DevBadge: "DevBadge", BETA_COLOR: "#F59E0B", DEV_COLOR: "#8B5CF6" }));
 jest.mock("../hooks/usePosterCorner", () => () => (base) => base);
 jest.mock("../services/leagueService", () => ({
   awardGameXp: jest.fn(),

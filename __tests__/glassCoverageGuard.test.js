@@ -32,6 +32,10 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/friends/PillButton.js": 1,
   // Basılı-tut onay düğmesi: yüzeyi soldan sağa dolan bir ilerleme çubuğu — cam bu dolguyu bozar.
   "components/profile/HoldToConfirmButton.js": 1,
+  "components/common/HoldToConfirmButton.js": 1, // aynı dolgu düzeni, ortak sürüm (grubu sil vb.)
+  // Beta rozetinin yanındaki 22–25 px beğen/beğenme düğmeleri: hap ölçüsünde, kart/başlık
+  // içinde onlarca yerde çizilir; cam katmanı hem pahalı hem kehribar seçili tonu bozar.
+  "components/common/BetaBadge.js": 1,
   "components/friends/RoundIconButton.js": 1,
   "components/lists/GlobalSearchResults.js": 1,
   "components/modals/createPost/DraftCard.js": 2,
