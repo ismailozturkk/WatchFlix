@@ -155,7 +155,7 @@ export function CountdownBadge({ date, days: daysProp, corner, style, scale, pos
   const { posterBadges } = useListLayoutSettings();
   const { language } = useLanguage();
   const { s, r, box } = usePillMetrics(scale, posterWidth);
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
 
   if (posterBadges?.countdown === false) return null;
   const days = daysProp != null ? Number(daysProp) : daysUntil(date);
@@ -164,10 +164,10 @@ export function CountdownBadge({ date, days: daysProp, corner, style, scale, pos
   const bg = days <= 7 ? "#ff7a45" : "#22b866";
   const label =
     days === 0
-      ? { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" , it: "Oggi"}[lang]
+      ? { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" , it: "Oggi", fr: "Aujourd'hui", ja: "今日"}[lang]
       : days === 1
-        ? { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" , it: "Domani"}[lang]
-        : `${days} ${{ tr: "gün", en: "d", es: "d", pt: "d", de: "d" , it: "d"}[lang]}`;
+        ? { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" , it: "Domani", fr: "Demain", ja: "明日"}[lang]
+        : `${days} ${{ tr: "gün", en: "d", es: "d", pt: "d", de: "d" , it: "d", fr: "j", ja: "日"}[lang]}`;
 
   return (
     <View style={[styles.solidPill, box, { backgroundColor: bg }, cornerStyle(corner, s), style]}>

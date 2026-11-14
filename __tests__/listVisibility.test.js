@@ -147,7 +147,7 @@ describe("effectiveListAudience", () => {
 
 describe("metin", () => {
   test("bilinmeyen dil İngilizceye düşer", () => {
-    expect(getListVisibilityCopy("fr")).toBe(LIST_VISIBILITY_COPY.en);
+    expect(getListVisibilityCopy("ko")).toBe(LIST_VISIBILITY_COPY.en);
     expect(getListVisibilityCopy("tr")).toBe(LIST_VISIBILITY_COPY.tr);
   });
 

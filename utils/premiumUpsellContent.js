@@ -68,7 +68,7 @@ export const PERK_CANDIDATES = Object.freeze([
 export const MAX_PERKS = 2;
 
 const pick = (copy, language) =>
-  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"])] ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])] ?? copy?.en ?? copy?.tr ?? "";
 
 const categoryOf = (definition) =>
   FEATURE_CATEGORIES.find((category) => category.id === definition?.category) || null;
@@ -95,9 +95,9 @@ function eyebrowFor(kind, language) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : pt ? "RECURSO PREMIUM" : de ? "PREMIUM-FUNKTION" : language === "it" ? "FUNZIONE PREMIUM" : "PREMIUM FEATURE";
-  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : pt ? "LIMITE ATINGIDO" : de ? "LIMIT ERREICHT" : language === "it" ? "LIMITE RAGGIUNTO" : "LIMIT REACHED";
-  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : pt ? "LIMITE DIÁRIO ATINGIDO" : de ? "TAGESLIMIT ERREICHT" : language === "it" ? "LIMITE GIORNALIERO RAGGIUNTO" : "DAILY LIMIT REACHED";
+  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : pt ? "RECURSO PREMIUM" : de ? "PREMIUM-FUNKTION" : language === "it" ? "FUNZIONE PREMIUM" : language === "fr" ? "FONCTIONNALITÉ PREMIUM" : language === "ja" ? "PREMIUM機能" : "PREMIUM FEATURE";
+  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : pt ? "LIMITE ATINGIDO" : de ? "LIMIT ERREICHT" : language === "it" ? "LIMITE RAGGIUNTO" : language === "fr" ? "LIMITE ATTEINTE" : language === "ja" ? "上限に達しました" : "LIMIT REACHED";
+  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : pt ? "LIMITE DIÁRIO ATINGIDO" : de ? "TAGESLIMIT ERREICHT" : language === "it" ? "LIMITE GIORNALIERO RAGGIUNTO" : language === "fr" ? "LIMITE QUOTIDIENNE ATTEINTE" : language === "ja" ? "1日の上限に達しました" : "DAILY LIMIT REACHED";
 }
 
 /**
@@ -155,7 +155,7 @@ export function splitTierValue(featureId, plan, language = "en") {
   const countable = definition && (definition.kind === COUNT || definition.kind === DAILY);
   if (countable && !definition.planValue?.[plan] && !Number.isFinite(getFeatureLimit(featureId, plan))) {
     const unit = unitLabel(definition, Infinity, language);
-    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día", pt: "dia", de: "Tag" , it: "giorno"})}` : unit;
+    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día", pt: "dia", de: "Tag" , it: "giorno", fr: "jour", ja: "日"})}` : unit;
     return { main: value, sub: sub || null, figure: true };
   }
 
@@ -307,8 +307,8 @@ export function pickPerks(featureId, current, targetPlan, language = "en") {
 // ── Seçim önizlemesi (özel afiş / arka plan) ────────────────────────────────
 
 const PREVIEW_LABELS = Object.freeze({
-  from: { tr: "Şimdi", en: "Now", es: "Ahora", pt: "Agora", de: "Jetzt" , it: "Ora"},
-  to: { tr: "Seçtiğin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" , it: "La tua scelta"},
+  from: { tr: "Şimdi", en: "Now", es: "Ahora", pt: "Agora", de: "Jetzt" , it: "Ora", fr: "Maintenant", ja: "現在"},
+  to: { tr: "Seçtiğin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" , it: "La tua scelta", fr: "Ton choix", ja: "あなたの選択"},
 });
 const PREVIEW_URI = /^https:\/\/image\.tmdb\.org\//;
 
@@ -341,8 +341,8 @@ export function buildChoicePreview(preview, language = "en") {
 // ── Hatırlatıcı önizlemesi (not hatırlatıcısı) ──────────────────────────────
 
 const REMINDER_COPY = Object.freeze({
-  today: { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" , it: "Oggi"},
-  tomorrow: { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" , it: "Domani"},
+  today: { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" , it: "Oggi", fr: "Aujourd'hui", ja: "今日"},
+  tomorrow: { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" , it: "Domani", fr: "Demain", ja: "明日"},
   anyDay: {
     tr: "Seçtiğin gün ve saatte",
     en: "On the day and time you pick",
@@ -350,7 +350,9 @@ const REMINDER_COPY = Object.freeze({
     pt: "No dia e horário que você escolher",
     de: "An dem Tag und zur Uhrzeit deiner Wahl",
 
-  it: "Nel giorno e all'ora che scegli"},
+  it: "Nel giorno e all'ora che scegli",
+  fr: "Au jour et à l'heure que tu choisis",
+  ja: "選んだ日時に"},
 });
 const REMINDER_TITLE_MAX = 80;
 
@@ -464,7 +466,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
       icon: "diamond",
       eyebrow: eyebrowFor(ACCESS, lang),
       featureTitle: "",
-      title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : de ? "Premium-Funktion" : lang === "it" ? "Funzionalità Premium" : "Premium feature",
+      title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : de ? "Premium-Funktion" : lang === "it" ? "Funzionalità Premium" : lang === "fr" ? "Fonctionnalité Premium" : lang === "ja" ? "Premium機能" : "Premium feature",
       message: "",
       meter: null,
       preview: null,
@@ -476,7 +478,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
       targetPlan: null,
       targetName: null,
       canUpgrade: false,
-      cta: { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : lang === "it" ? "Capito" : "Got it", secondary: null },
+      cta: { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : lang === "it" ? "Capito" : lang === "fr" ? "Compris" : lang === "ja" ? "わかりました" : "Got it", secondary: null },
     };
   }
 
@@ -524,7 +526,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
     renew:
       definition.kind === COUNT || isAccess
         ? null
-        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : pt ? "Seu limite é redefinido amanhã" : de ? "Dein Limit wird morgen zurückgesetzt" : lang === "it" ? "Il tuo limite viene reimpostato domani" : "Your limit resets tomorrow",
+        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : pt ? "Seu limite é redefinido amanhã" : de ? "Dein Limit wird morgen zurückgesetzt" : lang === "it" ? "Il tuo limite viene reimpostato domani" : lang === "fr" ? "Ta limite se réinitialise demain" : lang === "ja" ? "上限は明日リセットされます" : "Your limit resets tomorrow",
     // Üst plan yoksa karşılaştırma ve fayda satırı anlamsız: yalnız bilgi.
     tiers,
     tierMode: pickTierMode(tiers),
@@ -537,9 +539,9 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
     cta: canUpgrade
       ? {
           primary: ctaLabel(targetPlan, lang),
-          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : pt ? "Agora não" : de ? "Nicht jetzt" : lang === "it" ? "Non ora" : "Not now",
+          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : pt ? "Agora não" : de ? "Nicht jetzt" : lang === "it" ? "Non ora" : lang === "fr" ? "Pas maintenant" : lang === "ja" ? "今はしない" : "Not now",
         }
-      : { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : lang === "it" ? "Capito" : "Got it", secondary: null },
+      : { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : lang === "it" ? "Capito" : lang === "fr" ? "Compris" : lang === "ja" ? "わかりました" : "Got it", secondary: null },
   };
 }
 
@@ -577,9 +579,9 @@ function offerLabel(offer, language) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : pt ? `${duration} grátis` : de ? `${duration} kostenlos` : language === "it" ? `${duration} gratis` : `${duration} free`;
+  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : pt ? `${duration} grátis` : de ? `${duration} kostenlos` : language === "it" ? `${duration} gratis` : language === "fr" ? `${duration} offert` : language === "ja" ? `${duration}無料` : `${duration} free`;
   if (!Number.isFinite(offer.percent) || offer.percent <= 0) return null;
-  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : pt ? `${duration} com ${offer.percent}% de desconto` : de ? `${duration} ${offer.percent} % Rabatt` : language === "it" ? `${duration} ${offer.percent}% di sconto` : `${duration} ${offer.percent}% off`;
+  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : pt ? `${duration} com ${offer.percent}% de desconto` : de ? `${duration} ${offer.percent} % Rabatt` : language === "it" ? `${duration} ${offer.percent}% di sconto` : language === "fr" ? `${duration} -${offer.percent} %` : language === "ja" ? `${duration} ${offer.percent}%オフ` : `${duration} ${offer.percent}% off`;
 }
 
 function periodLabel(aPackage, language) {
@@ -588,9 +590,9 @@ function periodLabel(aPackage, language) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : language === "it" ? "/anno" : "/ year";
-  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : language === "it" ? "/mese" : "/ month";
-  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : language === "it" ? "/settimana" : "/ week";
+  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : language === "it" ? "/anno" : language === "fr" ? "/ an" : language === "ja" ? "/ 年" : "/ year";
+  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : language === "it" ? "/mese" : language === "fr" ? "/ mois" : language === "ja" ? "/ 月" : "/ month";
+  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : language === "it" ? "/settimana" : language === "fr" ? "/ semaine" : language === "ja" ? "/ 週" : "/ week";
   return "";
 }
 

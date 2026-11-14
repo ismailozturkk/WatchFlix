@@ -221,11 +221,52 @@ const GENRE_ALIASES = {
   fantascienza: "sci-fi",
   storia: "history",
   "film tv": "tvmovie",
+  // Fransızca TMDB türleri (katlanmış, aksansız)
+  aventure: "adventure",
+  comedie: "comedy",
+  documentaire: "documentary",
+  drame: "drama",
+  familial: "family",
+  fantastique: "fantasy",
+  histoire: "history",
+  horreur: "horror",
+  musique: "music",
+  mystere: "mystery",
+  "science-fiction": "sci-fi",
+  telefilm: "tvmovie",
 };
+
+// Japonca TMDB türleri: anahtarlar foldForSearch ile katlanır (NFD katakana dakuten işaretini ayırır).
+const JA_GENRE_ALIASES = {
+  アクション: "action",
+  アドベンチャー: "adventure",
+  アニメーション: "animation",
+  コメディ: "comedy",
+  犯罪: "crime",
+  ドキュメンタリー: "documentary",
+  ドラマ: "drama",
+  ファミリー: "family",
+  ファンタジー: "fantasy",
+  歴史: "history",
+  履歴: "history",
+  ホラー: "horror",
+  音楽: "music",
+  ミステリー: "mystery",
+  謎: "mystery",
+  ロマンス: "romance",
+  sf: "sci-fi",
+  サイエンスフィクション: "sci-fi",
+  スリラー: "thriller",
+  戦争: "war",
+  西部劇: "western",
+  西洋: "western",
+  テレビ映画: "tvmovie",
+};
+for (const [name, id] of Object.entries(JA_GENRE_ALIASES)) GENRE_ALIASES[foldForSearch(name)] = id;
 
 function genreTokens(value) {
   return foldForSearch(toStr(value))
-    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+|\s+e\s+|\s+und\s+/)
+    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+|\s+e\s+|\s+und\s+|\s+et\s+|[・＆]/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => GENRE_ALIASES[part] || part);
@@ -442,7 +483,9 @@ export function formatDuration(minutes, language = "en") {
   it: {
   hour: "h",
   minute: "M"
-}});
+},
+  fr: { hour: "h", minute: "min" },
+  ja: { hour: "時間", minute: "分" }});
   if (h === 0) return `${m} ${minUnit}`;
   return m === 0 ? `${h} ${hourUnit}` : `${h} ${hourUnit} ${m} ${minUnit}`;
 }
@@ -595,7 +638,47 @@ const FOLLOW_UP_COPY = {
   versus: "Confronta con {a}",
   movies: "Suggerisci film",
   series: "Suggerisci serie"
-}};
+},
+  fr: {
+    different: "Montre-m'en d'autres",
+    pickOne: "Lequel devrais-je regarder ?",
+    shorter: "Options plus courtes",
+    similarTo: "Plus dans le genre de {title}",
+    watchFirst: "Lequel en premier ?",
+    third: "Une troisième option",
+    makePlan: "Faire un programme",
+    shortenPlan: "Raccourcir le programme",
+    weekend: "Le faire tenir en un week-end",
+    swapOne: "En remplacer un",
+    moreLikeThis: "Plus dans ce genre",
+    hiddenGems: "Uniquement des pépites cachées",
+    toPlan: "En faire un programme",
+    similar: "Suggérer des titres similaires",
+    pitch: "Pitch sans spoiler",
+    versus: "Comparer avec {a}",
+    movies: "Suggérer des films",
+    series: "Suggérer des séries",
+  },
+  ja: {
+    different: "別のを見せて",
+    pickOne: "どれを観るべき?",
+    shorter: "もっと短いもの",
+    similarTo: "{title}みたいな作品をもっと",
+    watchFirst: "どれから観る?",
+    third: "3つ目の選択肢",
+    makePlan: "視聴プランを作って",
+    shortenPlan: "プランを短くして",
+    weekend: "週末に収めて",
+    swapOne: "1つ入れ替えて",
+    moreLikeThis: "これに似たものをもっと",
+    hiddenGems: "隠れた名作だけ",
+    toPlan: "プランにして",
+    similar: "似た作品をおすすめ",
+    pitch: "ネタバレなしの紹介",
+    versus: "{a}と比較",
+    movies: "映画をおすすめ",
+    series: "ドラマをおすすめ",
+  }};
 
 const fill = (template, values) =>
   template.replace(/\{(\w+)\}/g, (_, key) => (values[key] != null ? values[key] : ""));
@@ -729,7 +812,9 @@ export function buildShareText(response, posterMap, { language = "en", appName =
     pt: `${appName} · recomendações do CineMatch`,
     de: `${appName} · CineMatch-Tipps`,
 
-  it: `${appName} · Scelti CineMatch`});
+  it: `${appName} · Scelti CineMatch`,
+  fr: `${appName} · Choix CineMatch`,
+  ja: `${appName} · CineMatchのおすすめ`});
   return [head, "", ...lines].join("\n");
 }
 
@@ -902,7 +987,9 @@ export function formatRelativeTime(timestamp, language = "en", now = Date.now())
   hour: "h",
   yesterday: "1d",
   day: "d"
-}});
+},
+  fr: { minute: "min", hour: "h", yesterday: "1 j", day: "j" },
+  ja: { minute: "分", hour: "時間", yesterday: "1日", day: "日" }});
   const minutes = Math.floor((now - timestamp) / 60000);
   if (minutes < 1) return "•";
   if (minutes < 60) return `${minutes} ${u.minute}`;

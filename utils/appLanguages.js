@@ -111,6 +111,30 @@ export const APP_LANGUAGES = Object.freeze([
     legalLang: "en",
     aiPromptName: "Italian (it)",
   },
+  {
+    code: "fr",
+    name: "French",
+    nativeName: "Français",
+    flag: "fr",
+    intlLocale: "fr-FR",
+    tmdbLanguage: "fr-FR",
+    tmdbRegion: "FR",
+    tmdbImageLanguages: ["fr", "en"],
+    legalLang: "en",
+    aiPromptName: "French (fr)",
+  },
+  {
+    code: "ja",
+    name: "Japanese",
+    nativeName: "日本語",
+    flag: "jp",
+    intlLocale: "ja-JP",
+    tmdbLanguage: "ja-JP",
+    tmdbRegion: "JP",
+    tmdbImageLanguages: ["ja", "en"],
+    legalLang: "en",
+    aiPromptName: "Japanese (ja)",
+  },
 ]);
 
 /**
@@ -123,8 +147,6 @@ export const APP_LANGUAGES = Object.freeze([
  * @type {ReadonlyArray<{code: string, name: string, nativeName: string, flag: string}>}
  */
 export const COMING_SOON_LANGUAGES = Object.freeze([
-  { code: "fr", name: "French", nativeName: "Français", flag: "fr" },
-  { code: "ja", name: "Japanese", nativeName: "日本語", flag: "jp" },
   { code: "ko", name: "Korean", nativeName: "한국어", flag: "kr" },
   { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "id" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "in" },

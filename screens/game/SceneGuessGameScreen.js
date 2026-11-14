@@ -498,7 +498,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
         message: copy.message,
         retryable: false,
         upgrade: copy.canUpgrade,
-        upgradeLabel: language === "tr" ? "Planları gör" : language === "es" ? "Ver planes" : language === "pt" ? "Ver planos" : language === "de" ? "Pläne ansehen" : language === "it" ? "Vedi i piani" : "See plans",
+        upgradeLabel: language === "tr" ? "Planları gör" : language === "es" ? "Ver planes" : language === "pt" ? "Ver planos" : language === "de" ? "Pläne ansehen" : language === "it" ? "Vedi i piani" : language === "fr" ? "Voir les forfaits" : language === "ja" ? "プランを見る" : "See plans",
       };
     }
     if (error?.code === "insufficient_personal_source") {

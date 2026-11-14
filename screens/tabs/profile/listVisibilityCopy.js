@@ -35,7 +35,7 @@ const tr = {
   emptySub: "Boş · içerik ekleyince profilinde görünür",
   hiddenSub: (n) => `${n} içerik · yalnız sen görürsün`,
   footer:
-    "Yeni oluşturduğun listeler açık başlar. Kapattığın listeler, arkadaşlarının seninle zevk uyumu hesabına da girmez. Hiçbir listenin görünmesini istemiyorsan yukarıdan “Yalnız ben”i seç.",
+    "Yeni oluşturduğun listeler açık başlar. Kapattığın listeler, arkadaşlarının seninle izleme uyumu hesabına da girmez. Hiçbir listenin görünmesini istemiyorsan yukarıdan “Yalnız ben”i seç.",
   saveFailed: "Ayar kaydedilemedi",
 };
 
@@ -184,9 +184,67 @@ const it = {
   footer: "I nuovi elenchi iniziano a essere visibili. Anche le liste che disattivi verranno escluse dalla corrispondenza dei gusti dei tuoi amici con te. Se non vuoi che nessun elenco sia visibile, scegli “Solo io” qui sopra.",
   saveFailed: "Impossibile salvare l'impostazione"
 };
+const fr = {
+  title: "Listes visibles",
+  rowTitle: "Listes sur ton profil",
+  rowSub: (shown, total) => `${shown} ${total === 1 ? "liste" : "listes"} affichées sur ${total}`,
+  intro:
+    "Choisis lesquelles de tes listes les autres peuvent voir en ouvrant ton profil. Une liste désactivée n'apparaît pas sur ton profil ; toi, tu vois toujours toutes tes listes.",
+  whoLabel: "QUI PEUT LES VOIR ?",
+  audience: { public: "Tout le monde", friends: "Amis", private: "Moi uniquement" },
+  audienceNote: {
+    public: "Les listes activées sont visibles par toute personne qui consulte ton profil.",
+    friends: "Les listes activées ne sont visibles que par tes amis.",
+    private: "Pour l'instant, personne ne peut voir tes listes. Tes choix ci-dessous s'appliqueront dès que tu changeras ce réglage.",
+  },
+  limitedNote: {
+    friends: "Ton profil n'est visible que par tes amis, tes listes aussi.",
+    private: "Ton profil est privé, donc personne ne peut voir tes listes.",
+  },
+  whichLabel: "QUELLES LISTES ?",
+  shownCount: (shown, total) => `${shown} sur ${total} activées`,
+  showAll: "Tout activer",
+  hideAll: "Tout désactiver",
+  shownSub: (n) => `${n} ${n === 1 ? "titre" : "titres"} · affichée sur ton profil`,
+  emptySub: "Vide · apparaîtra sur ton profil dès que tu ajouteras des titres",
+  hiddenSub: (n) => `${n} ${n === 1 ? "titre" : "titres"} · toi seul peux la voir`,
+  footer:
+    "Les nouvelles listes sont visibles par défaut. Les listes désactivées sont aussi exclues de l'affinité de tes amis avec toi. Si tu ne veux aucune liste visible, choisis « Moi uniquement » ci-dessus.",
+  saveFailed: "Impossible d'enregistrer le réglage",
+};
+const ja = {
+  title: "表示するリスト",
+  rowTitle: "プロフィールのリスト",
+  rowSub: (shown, total) => `${total}件の${total === 1 ? "リスト" : "リスト"}のうち${shown}件を表示`,
+  intro:
+    "プロフィールを開いた人に見せるリストを選んでください。オフにしたリストはプロフィールに表示されません。あなたには常にすべてのリストが表示されます。",
+  whoLabel: "誰が見られる?",
+  audience: { public: "全員", friends: "フレンド", private: "自分のみ" },
+  audienceNote: {
+    public: "オンにしたリストは、プロフィールを見た人全員に表示されます。",
+    friends: "オンにしたリストは、友だちだけに表示されます。",
+    private: "現在、誰もあなたのリストを見られません。この設定を変えると、下の選択が反映されます。",
+  },
+  limitedNote: {
+    friends: "プロフィールが友だちのみに公開されているため、リストも同様です。",
+    private: "プロフィールが非公開のため、誰もリストを見られません。",
+  },
+  whichLabel: "どのリスト?",
+  shownCount: (shown, total) => `${total}件中${shown}件オン`,
+  showAll: "すべてオン",
+  hideAll: "すべてオフ",
+  shownSub: (n) => `${n}${n === 1 ? "作品" : "作品"} · プロフィールに表示`,
+  emptySub: "空 · 作品を追加するとプロフィールに表示されます",
+  hiddenSub: (n) => `${n}${n === 1 ? "作品" : "作品"} · あなただけが見られます`,
+  footer:
+    "新しいリストは最初は表示されます。オフにしたリストは、友だちとの好みの一致からも除外されます。どのリストも見せたくない場合は、上で「自分のみ」を選んでください。",
+  saveFailed: "設定を保存できませんでした",
+};
 
 export const LIST_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getListVisibilityCopy = (language) =>

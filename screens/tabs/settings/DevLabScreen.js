@@ -491,7 +491,7 @@ export default function DevLabScreen() {
       <SectionLabel color={C.muted}>Zevk uyumu: eski / yeni (gölge mod)</SectionLabel>
       <DevTasteShadowCard C={C} />
 
-      <SectionLabel color={C.muted}>Zevk Çemberleri: öneri durumları (sahte veri)</SectionLabel>
+      <SectionLabel color={C.muted}>Uyum Çemberleri: öneri durumları (sahte veri)</SectionLabel>
       <DevMatchLab C={C} language={language} />
 
       <SectionLabel color={C.muted}>Diğer</SectionLabel>

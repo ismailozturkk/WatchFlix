@@ -40,7 +40,7 @@ export const TILE_YUKSEKLIK = 164;
 function WatchBadgeTile({ badge, onPress, onLongPress, vitrinde = false, secimModu = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const copy = getBadgeShowcaseCopy(lang);
 
   const acik = badge.acik;

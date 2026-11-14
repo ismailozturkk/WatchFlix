@@ -82,49 +82,49 @@ export const FEATURE_CATEGORIES = Object.freeze([
     id: "ai",
     icon: "sparkles",
     color: "#8B5CF6",
-    title: { tr: "CineMatch AI", en: "CineMatch AI", es: "CineMatch IA", pt: "CineMatch IA", de: "CineMatch KI" , it: "CineMatch AI"},
+    title: { tr: "CineMatch AI", en: "CineMatch AI", es: "CineMatch IA", pt: "CineMatch IA", de: "CineMatch KI" , it: "CineMatch AI", fr: "CineMatch AI", ja: "CineMatch AI"},
   },
   {
     id: "social",
     icon: "people",
     color: "#EC4899",
-    title: { tr: "Sosyal", en: "Social", es: "Social", pt: "Social", de: "Soziales" , it: "Social"},
+    title: { tr: "Sosyal", en: "Social", es: "Social", pt: "Social", de: "Soziales" , it: "Social", fr: "Social", ja: "ソーシャル"},
   },
   {
     id: "library",
     icon: "albums",
     color: "#10B981",
-    title: { tr: "Kütüphane", en: "Library", es: "Biblioteca", pt: "Biblioteca", de: "Bibliothek" , it: "La mia libreria"},
+    title: { tr: "Kütüphane", en: "Library", es: "Biblioteca", pt: "Biblioteca", de: "Bibliothek" , it: "La mia libreria", fr: "Bibliothèque", ja: "ライブラリ"},
   },
   {
     id: "notes",
     icon: "document-text",
     color: "#14B8A6",
-    title: { tr: "Notlar", en: "Notes", es: "Notas", pt: "Notas", de: "Notizen" , it: "Note"},
+    title: { tr: "Notlar", en: "Notes", es: "Notas", pt: "Notas", de: "Notizen" , it: "Note", fr: "Notes", ja: "メモ"},
   },
   {
     id: "play",
     icon: "game-controller",
     color: "#3B82F6",
-    title: { tr: "Oyun, CineSwipe & Turnuva", en: "Games, CineSwipe & Tournament", es: "Juegos, CineSwipe y torneo", pt: "Jogos, CineSwipe e torneio", de: "Spiele, CineSwipe & Turnier" , it: "Giochi, CineSwipe e tornei"},
+    title: { tr: "Oyun, CineSwipe & Turnuva", en: "Games, CineSwipe & Tournament", es: "Juegos, CineSwipe y torneo", pt: "Jogos, CineSwipe e torneio", de: "Spiele, CineSwipe & Turnier" , it: "Giochi, CineSwipe e tornei", fr: "Jeux, CineSwipe et Tournoi", ja: "ゲーム、CineSwipe、トーナメント"},
   },
   {
     id: "personal",
     icon: "color-palette",
     color: "#F59E0B",
-    title: { tr: "Kişiselleştirme", en: "Personalization", es: "Personalización", pt: "Personalização", de: "Personalisierung" , it: "Personalizzazione"},
+    title: { tr: "Kişiselleştirme", en: "Personalization", es: "Personalización", pt: "Personalização", de: "Personalisierung" , it: "Personalizzazione", fr: "Personnalisation", ja: "カスタマイズ"},
   },
   {
     id: "alerts",
     icon: "notifications",
     color: "#06B6D4",
-    title: { tr: "Bildirim & Arşiv", en: "Alerts & Archive", es: "Avisos y archivo", pt: "Avisos e arquivo", de: "Benachrichtigungen & Archiv" , it: "Avvisi e archivio"},
+    title: { tr: "Bildirim & Arşiv", en: "Alerts & Archive", es: "Avisos y archivo", pt: "Avisos e arquivo", de: "Benachrichtigungen & Archiv" , it: "Avvisi e archivio", fr: "Alertes et archive", ja: "通知とアーカイブ"},
   },
   {
     id: "support",
     icon: "chatbubble-ellipses",
     color: "#EF4444",
-    title: { tr: "Destek & Geri bildirim", en: "Support & Feedback", es: "Soporte y comentarios", pt: "Suporte e feedback", de: "Support & Feedback" , it: "Supporto e feedback"},
+    title: { tr: "Destek & Geri bildirim", en: "Support & Feedback", es: "Soporte y comentarios", pt: "Suporte e feedback", de: "Support & Feedback" , it: "Supporto e feedback", fr: "Aide et avis", ja: "サポートとフィードバック"},
   },
 ]);
 
@@ -183,9 +183,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "sparkles",
     enforcedBy: "server",
     limits: AI_PLAN_LIMITS,
-    title: { tr: "CineMatch AI mesajı", en: "CineMatch AI messages", es: "Mensajes de CineMatch IA", pt: "Mensagens do CineMatch IA", de: "CineMatch-KI-Nachrichten" , it: "Messaggi CineMatch AI"},
+    title: { tr: "CineMatch AI mesajı", en: "CineMatch AI messages", es: "Mensajes de CineMatch IA", pt: "Mensagens do CineMatch IA", de: "CineMatch-KI-Nachrichten" , it: "Messaggi CineMatch AI", fr: "Messages CineMatch AI", ja: "CineMatch AIメッセージ"},
     upsell: {
-      title: { tr: "Bugünkü AI mesaj hakkın bitti", en: "You're out of AI messages for today", es: "Se te han acabado los mensajes de IA de hoy", pt: "Suas mensagens de IA de hoje acabaram", de: "Du hast keine KI-Nachrichten mehr für heute" , it: "Hai esaurito i messaggi AI per oggi"},
+      title: { tr: "Bugünkü AI mesaj hakkın bitti", en: "You're out of AI messages for today", es: "Se te han acabado los mensajes de IA de hoy", pt: "Suas mensagens de IA de hoje acabaram", de: "Du hast keine KI-Nachrichten mehr für heute" , it: "Hai esaurito i messaggi AI per oggi", fr: "Tu n'as plus de messages IA pour aujourd'hui", ja: "今日のAIメッセージを使い切りました"},
     },
     detail: {
       tr: "Ruh haline ve izleme geçmişine göre film/dizi önerileri",
@@ -194,7 +194,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Recomendações de filmes e séries de acordo com o seu humor e o seu histórico",
       de: "Film- und Serientipps nach deiner Stimmung und deinem Sehverlauf",
 
-  it: "Scelte di film e TV in base al tuo umore e alla cronologia visualizzazioni"},
+  it: "Scelte di film e TV in base al tuo umore e alla cronologia visualizzazioni",
+  fr: "Des films et séries choisis selon ton humeur et ton historique",
+  ja: "気分と視聴履歴に基づく映画とTVのおすすめ"},
     phrase: {
       tr: (n) => `günde ${n} CineMatch AI mesajı gönderebilirsin`,
       en: (n) => `you can send ${n} CineMatch AI messages per day`,
@@ -202,7 +204,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode enviar ${n} mensagens de IA do CineMatch por dia`,
       de: (n) => `du kannst ${n} CineMatch-KI-Nachrichten pro Tag senden`,
 
-  it: n => `puoi inviare ${n} messaggi AI CineMatch al giorno`},
+  it: n => `puoi inviare ${n} messaggi AI CineMatch al giorno`,
+  fr: (n) => `tu peux envoyer ${n} messages CineMatch AI par jour`,
+  ja: (n) => `CineMatch AIメッセージを1日${n}件送れます`},
   }),
   identity_badge: feature({
     id: "identity_badge",
@@ -211,9 +215,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "diamond",
     enforcedBy: "server",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Profil kimlik rozeti", en: "Profile identity badge", es: "Insignia de identidad del perfil", pt: "Emblema de identidade do perfil", de: "Profil-Identitätsabzeichen" , it: "Badge identità del profilo"},
+    title: { tr: "Profil kimlik rozeti", en: "Profile identity badge", es: "Insignia de identidad del perfil", pt: "Emblema de identidade do perfil", de: "Profil-Identitätsabzeichen" , it: "Badge identità del profilo", fr: "Badge d'identité du profil", ja: "プロフィールのアイデンティティバッジ"},
     upsell: {
-      title: { tr: "Profil rozeti Premium'da", en: "The profile badge is a Premium perk", es: "La insignia del perfil es una ventaja Premium", pt: "O emblema do perfil é um benefício Premium", de: "Das Profilabzeichen ist ein Premium-Vorteil" , it: "Il badge del profilo è un vantaggio Premium"},
+      title: { tr: "Profil rozeti Premium'da", en: "The profile badge is a Premium perk", es: "La insignia del perfil es una ventaja Premium", pt: "O emblema do perfil é um benefício Premium", de: "Das Profilabzeichen ist ein Premium-Vorteil" , it: "Il badge del profilo è un vantaggio Premium", fr: "Le badge de profil est un avantage Premium", ja: "プロフィールバッジはPremium特典です"},
       message: {
         tr: "Profilinde ve arkadaşlarının gördüğü sayfada parlayan bir kimlik rozeti kazan.",
         en: "Get a badge that shines on your profile and on the page your friends see.",
@@ -221,7 +225,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Ganhe um emblema que brilha no seu perfil e na página que seus amigos veem.",
         de: "Hol dir ein Abzeichen, das in deinem Profil und auf der Seite deiner Freunde glänzt.",
 
-  it: "Ricevi un badge che risalta sul tuo profilo e sulla pagina visualizzata dai tuoi amici."},
+  it: "Ricevi un badge che risalta sul tuo profilo e sulla pagina visualizzata dai tuoi amici.",
+  fr: "Obtiens un badge qui brille sur ton profil et sur la page que voient tes amis.",
+  ja: "プロフィールと友だちが見るページで輝くバッジを手に入れよう。"},
     },
     detail: {
       tr: "Profilinde ve arkadaşlarının gördüğü profil sayfanda",
@@ -230,10 +236,12 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "No seu perfil e no perfil que seus amigos veem",
       de: "In deinem Profil und auf dem Profil, das deine Freunde sehen",
 
-  it: "Sul tuo profilo e sul profilo visualizzato dai tuoi amici"},
+  it: "Sul tuo profilo e sul profilo visualizzato dai tuoi amici",
+  fr: "Sur ton profil et sur le profil que voient tes amis",
+  ja: "あなたのプロフィールと友だちが見るプロフィールに表示"},
     planValue: {
-      [PREMIUM_PLAN.PREMIUM]: { tr: "Epik rozet", en: "Epic badge", es: "Insignia épica", pt: "Emblema épico", de: "Episches Abzeichen" , it: "Badge Epic"},
-      [PREMIUM_PLAN.UNLIMITED]: { tr: "Efsanevi rozet", en: "Legendary badge", es: "Insignia legendaria", pt: "Emblema lendário", de: "Legendäres Abzeichen" , it: "Badge leggendario"},
+      [PREMIUM_PLAN.PREMIUM]: { tr: "Epik rozet", en: "Epic badge", es: "Insignia épica", pt: "Emblema épico", de: "Episches Abzeichen" , it: "Badge Epic", fr: "Badge épique", ja: "エピックバッジ"},
+      [PREMIUM_PLAN.UNLIMITED]: { tr: "Efsanevi rozet", en: "Legendary badge", es: "Insignia legendaria", pt: "Emblema lendário", de: "Legendäres Abzeichen" , it: "Badge leggendario", fr: "Badge légendaire", ja: "レジェンダリーバッジ"},
     },
   }),
   friends: feature({
@@ -242,11 +250,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "social",
     icon: "person-add",
     limits: { free: 2, premium: 150, unlimited: UNLIMITED },
-    title: { tr: "Arkadaş", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde" , it: "Amici"},
+    title: { tr: "Arkadaş", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde" , it: "Amici", fr: "Amis", ja: "フレンド"},
     upsell: {
-      title: { tr: "Arkadaş listen doldu", en: "Your friends list is full", es: "Tu lista de amigos está llena", pt: "Sua lista de amigos está cheia", de: "Deine Freundesliste ist voll" , it: "La tua lista di amici è piena"},
+      title: { tr: "Arkadaş listen doldu", en: "Your friends list is full", es: "Tu lista de amigos está llena", pt: "Sua lista de amigos está cheia", de: "Deine Freundesliste ist voll" , it: "La tua lista di amici è piena", fr: "Ta liste d'amis est pleine", ja: "フレンドリストがいっぱいです"},
     },
-    unit: { tr: "arkadaş", en: "friends", es: "amigos", pt: "amigos", de: "Freunde" , it: "amici"},
+    unit: { tr: "arkadaş", en: "friends", es: "amigos", pt: "amigos", de: "Freunde" , it: "amici", fr: "amis", ja: "フレンド"},
     note: {
       tr: "Gelen istekleri kabul etmek her zaman serbest",
       en: "Accepting incoming requests is always free",
@@ -254,7 +262,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Aceitar os pedidos recebidos é sempre grátis",
       de: "Eingehende Anfragen anzunehmen ist immer kostenlos",
 
-  it: "Accettare le richieste in arrivo è sempre gratuito"},
+  it: "Accettare le richieste in arrivo è sempre gratuito",
+  fr: "Accepter les demandes reçues est toujours gratuit",
+  ja: "届いた申請の承認はいつでも無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} arkadaş ekleyebilirsin`,
       en: (n) => `you can add up to ${n} friends`,
@@ -262,7 +272,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode adicionar até ${n} amigos`,
       de: (n) => `du kannst bis zu ${n} Freunde hinzufügen`,
 
-  it: n => `puoi aggiungere fino a ${n} amici`},
+  it: n => `puoi aggiungere fino a ${n} amici`,
+  fr: (n) => `tu peux ajouter jusqu'à ${n} amis`,
+  ja: (n) => `フレンドを最大${n}人追加できます`},
   }),
   chat_groups: feature({
     id: "chat_groups",
@@ -270,11 +282,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "social",
     icon: "chatbubbles",
     limits: { free: 1, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "Kurduğun sohbet grubu", en: "Group chats you create", es: "Chats de grupo que creas", pt: "Conversas em grupo que você cria", de: "Von dir erstellte Gruppenchats" , it: "Chat di gruppo create da te"},
+    title: { tr: "Kurduğun sohbet grubu", en: "Group chats you create", es: "Chats de grupo que creas", pt: "Conversas em grupo que você cria", de: "Von dir erstellte Gruppenchats" , it: "Chat di gruppo create da te", fr: "Discussions de groupe que tu crées", ja: "作成したグループチャット"},
     upsell: {
-      title: { tr: "Grup kurma limitin doldu", en: "You've reached your group limit", es: "Has alcanzado tu límite de grupos", pt: "Você atingiu seu limite de grupos", de: "Du hast dein Gruppenlimit erreicht" , it: "Hai raggiunto il limite del tuo gruppo"},
+      title: { tr: "Grup kurma limitin doldu", en: "You've reached your group limit", es: "Has alcanzado tu límite de grupos", pt: "Você atingiu seu limite de grupos", de: "Du hast dein Gruppenlimit erreicht" , it: "Hai raggiunto il limite del tuo gruppo", fr: "Tu as atteint ta limite de groupes", ja: "グループの上限に達しました"},
     },
-    unit: { tr: "grup", en: "groups", es: "grupos", pt: "grupos", de: "Gruppen" , it: "gruppi"},
+    unit: { tr: "grup", en: "groups", es: "grupos", pt: "grupos", de: "Gruppen" , it: "gruppi", fr: "groupes", ja: "グループ"},
     note: {
       tr: "Birebir mesajlaşmak ve gruplara katılmak serbest",
       en: "Direct messages and joining groups are free",
@@ -282,7 +294,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Mensagens diretas e entrar em grupos são grátis",
       de: "Direktnachrichten und das Beitreten zu Gruppen sind kostenlos",
 
-  it: "I messaggi diretti e l'iscrizione ai gruppi sono gratuiti"},
+  it: "I messaggi diretti e l'iscrizione ai gruppi sono gratuiti",
+  fr: "Les messages privés et rejoindre des groupes sont gratuits",
+  ja: "ダイレクトメッセージとグループへの参加は無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} sohbet grubu kurabilirsin`,
       en: (n) => `you can create up to ${n} group chat${n === 1 ? "" : "s"}`,
@@ -290,7 +304,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode criar até ${n} ${n === 1 ? "conversa em grupo" : "conversas em grupo"}`,
       de: (n) => `du kannst bis zu ${n} ${n === 1 ? "Gruppenchat" : "Gruppenchats"} erstellen`,
 
-  it: n => `puoi creare fino a ${n} chat di gruppo${n === 1 ? "" : "s"}`},
+  it: n => `puoi creare fino a ${n} chat di gruppo${n === 1 ? "" : "s"}`,
+  fr: (n) => `tu peux créer jusqu'à ${n} discussion${n === 1 ? "" : "s"} de groupe`,
+  ja: (n) => `グループチャットを最大${n}個作成できます${n === 1 ? "" : ""}`},
   }),
   // Film Kulübü (docs/ozellikler/FILM_KULUBU.md) — 30 Eki kullanıcı kararı: kulüp KURMAK Premium; katılmak, oy
   // vermek, izledim/puan ve tartışma herkese açık (KURAL: işi başlatan sayılır). Kurulu kulübün turları kurucunun
@@ -302,9 +318,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "social",
     icon: "ticket",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Film Kulübü", en: "Film Club", es: "Club de Cine", pt: "Clube de Cinema", de: "Filmclub" , it: "Film Club"},
+    title: { tr: "Film Kulübü", en: "Film Club", es: "Club de Cine", pt: "Clube de Cinema", de: "Filmclub" , it: "Film Club", fr: "Ciné-club", ja: "フィルムクラブ"},
     upsell: {
-      title: { tr: "Film Kulübü Premium'da", en: "Film Club is a Premium perk", es: "Club de Cine es una ventaja Premium", pt: "O Clube de Cinema é um benefício Premium", de: "Filmclub ist ein Premium-Vorteil" , it: "Film Club è un vantaggio Premium"},
+      title: { tr: "Film Kulübü Premium'da", en: "Film Club is a Premium perk", es: "Club de Cine es una ventaja Premium", pt: "O Clube de Cinema é um benefício Premium", de: "Filmclub ist ein Premium-Vorteil" , it: "Film Club è un vantaggio Premium", fr: "Le Ciné-club est un avantage Premium", ja: "フィルムクラブはPremium特典です"},
       message: {
         tr: "Grubunu kulübe çevir: her tur adayları oylayın, kazanan filmi izleyin, izleyenler spoiler'sız tartışsın. Üyeler ücretsiz katılır.",
         en: "Turn your group into a club: vote on picks each round, watch the winner and discuss it spoiler-free. Members join for free.",
@@ -312,7 +328,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Transforme seu grupo num clube: votem nos indicados a cada rodada, assistam ao vencedor e debatam sem spoiler. Membros entram de graça.",
         de: "Mach deine Gruppe zum Club: Stimmt jede Runde ab, schaut den Gewinner und diskutiert spoilerfrei. Mitglieder machen kostenlos mit.",
 
-  it: "Trasforma il tuo gruppo in un club: vota le scelte a ogni turno, guarda il vincitore e discuti senza spoiler. I membri si iscrivono gratuitamente."},
+  it: "Trasforma il tuo gruppo in un club: vota le scelte a ogni turno, guarda il vincitore e discuti senza spoiler. I membri si iscrivono gratuitamente.",
+  fr: "Transforme ton groupe en club : votez parmi des propositions à chaque tour, regardez le gagnant et parlez-en sans spoilers. Les membres rejoignent gratuitement.",
+  ja: "グループをクラブにしよう:毎ラウンド候補に投票し、勝った作品を観て、ネタバレに配慮して語り合います。メンバーは無料で参加できます。"},
     },
     detail: {
       tr: "Grup için oylama, izleme turu, puan ve tartışma",
@@ -321,9 +339,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Votações em grupo, rodadas, notas e debate",
       de: "Gruppenabstimmung, Filmrunden, Bewertungen und Diskussion",
 
-  it: "Votazioni di gruppo, turni di visione, valutazioni e discussioni"},
-    freeValue: { tr: "Katılım", en: "Join only", es: "Solo unirse", pt: "Só participar", de: "Nur mitmachen" , it: "Solo iscrizione"},
-    paidValue: { tr: "Kulüp kur", en: "Start clubs", es: "Crear clubes", pt: "Criar clubes", de: "Clubs gründen" , it: "Crea club"},
+  it: "Votazioni di gruppo, turni di visione, valutazioni e discussioni",
+  fr: "Votes de groupe, tours de visionnage, notes et discussion",
+  ja: "グループ投票、視聴ラウンド、評価、ディスカッション"},
+    freeValue: { tr: "Katılım", en: "Join only", es: "Solo unirse", pt: "Só participar", de: "Nur mitmachen" , it: "Solo iscrizione", fr: "Rejoindre seulement", ja: "参加のみ"},
+    paidValue: { tr: "Kulüp kur", en: "Start clubs", es: "Crear clubes", pt: "Criar clubes", de: "Clubs gründen" , it: "Crea club", fr: "Lancer des clubs", ja: "クラブを始める"},
   }),
   custom_lists: feature({
     id: "custom_lists",
@@ -331,11 +351,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "library",
     icon: "list",
     limits: { free: 1, premium: 25, unlimited: UNLIMITED },
-    title: { tr: "Özel liste", en: "Custom lists", es: "Listas personalizadas", pt: "Listas personalizadas", de: "Eigene Listen" , it: "Elenchi personalizzati"},
+    title: { tr: "Özel liste", en: "Custom lists", es: "Listas personalizadas", pt: "Listas personalizadas", de: "Eigene Listen" , it: "Elenchi personalizzati", fr: "Listes perso", ja: "カスタムリスト"},
     upsell: {
-      title: { tr: "Liste limitin doldu", en: "You've reached your list limit", es: "Has alcanzado tu límite de listas", pt: "Você atingiu seu limite de listas", de: "Du hast dein Listenlimit erreicht" , it: "Hai raggiunto il limite della tua lista"},
+      title: { tr: "Liste limitin doldu", en: "You've reached your list limit", es: "Has alcanzado tu límite de listas", pt: "Você atingiu seu limite de listas", de: "Du hast dein Listenlimit erreicht" , it: "Hai raggiunto il limite della tua lista", fr: "Tu as atteint ta limite de listes", ja: "リストの上限に達しました"},
     },
-    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi"},
+    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi", fr: "listes", ja: "リスト"},
     note: {
       tr: "İzleme listesi, izlenenler (film/dizi) ve favoriler her planda sınırsız",
       en: "Watchlist, watched (movies/shows) and favorites are unlimited on every plan",
@@ -343,7 +363,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "A lista para assistir, os assistidos (filmes e séries) e os favoritos são ilimitados em todos os planos",
       de: "Merkliste, Gesehenes (Filme/Serien) und Favoriten sind in jedem Plan unbegrenzt",
 
-  it: "Lista di titoli, guardati (film/serie TV) e preferiti sono illimitati su ogni piano"},
+  it: "Lista di titoli, guardati (film/serie TV) e preferiti sono illimitati su ogni piano",
+  fr: "La liste à voir, les vus (films/séries) et les favoris sont illimités dans toutes les formules",
+  ja: "ウォッチリスト、視聴済み(映画/番組)、お気に入りはすべてのプランで無制限です"},
     phrase: {
       tr: (n) => `en fazla ${n} özel liste oluşturabilirsin`,
       en: (n) => `you can create up to ${n} custom list${n === 1 ? "" : "s"}`,
@@ -351,7 +373,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode criar até ${n} ${n === 1 ? "lista personalizada" : "listas personalizadas"}`,
       de: (n) => `du kannst bis zu ${n} ${n === 1 ? "eigene Liste" : "eigene Listen"} erstellen`,
 
-  it: n => `puoi creare fino a ${n} elenco personalizzato${n === 1 ? "" : "s"}`},
+  it: n => `puoi creare fino a ${n} elenco personalizzato${n === 1 ? "" : "s"}`,
+  fr: (n) => `tu peux créer jusqu'à ${n} liste${n === 1 ? "" : "s"} sur mesure`,
+  ja: (n) => `カスタムリストを最大${n}個作成できます${n === 1 ? "" : ""}`},
   }),
   shared_lists: feature({
     id: "shared_lists",
@@ -359,11 +383,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "library",
     icon: "people-circle",
     limits: { free: 2, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "Kurduğun ortak liste", en: "Shared lists you create", es: "Listas compartidas que creas", pt: "Listas compartilhadas que você cria", de: "Von dir erstellte gemeinsame Listen" , it: "Elenchi condivisi creati da te"},
+    title: { tr: "Kurduğun ortak liste", en: "Shared lists you create", es: "Listas compartidas que creas", pt: "Listas compartilhadas que você cria", de: "Von dir erstellte gemeinsame Listen" , it: "Elenchi condivisi creati da te", fr: "Listes partagées que tu crées", ja: "作成した共有リスト"},
     upsell: {
-      title: { tr: "Ortak liste limitin doldu", en: "You've reached your shared list limit", es: "Has alcanzado tu límite de listas compartidas", pt: "Você atingiu seu limite de listas compartilhadas", de: "Du hast dein Limit für gemeinsame Listen erreicht" , it: "Hai raggiunto il limite di elenchi condivisi"},
+      title: { tr: "Ortak liste limitin doldu", en: "You've reached your shared list limit", es: "Has alcanzado tu límite de listas compartidas", pt: "Você atingiu seu limite de listas compartilhadas", de: "Du hast dein Limit für gemeinsame Listen erreicht" , it: "Hai raggiunto il limite di elenchi condivisi", fr: "Tu as atteint ta limite de listes partagées", ja: "共有リストの上限に達しました"},
     },
-    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi"},
+    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi", fr: "listes", ja: "リスト"},
     note: {
       tr: "Davet edildiğin listelere katılmak serbest",
       en: "Joining lists you're invited to is free",
@@ -371,7 +395,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Entrar nas listas para as quais você é convidado é grátis",
       de: "Das Beitreten zu Listen, zu denen du eingeladen wirst, ist kostenlos",
 
-  it: "La partecipazione agli elenchi a cui sei stato invitato è gratuita"},
+  it: "La partecipazione agli elenchi a cui sei stato invitato è gratuita",
+  fr: "Rejoindre les listes auxquelles tu es invité est gratuit",
+  ja: "招待されたリストへの参加は無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} ortak liste kurabilirsin`,
       en: (n) => `you can create up to ${n} shared lists`,
@@ -379,7 +405,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode criar até ${n} listas compartilhadas`,
       de: (n) => `du kannst bis zu ${n} gemeinsame Listen erstellen`,
 
-  it: n => `puoi creare fino a ${n} elenchi condivisi`},
+  it: n => `puoi creare fino a ${n} elenchi condivisi`,
+  fr: (n) => `tu peux créer jusqu'à ${n} listes partagées`,
+  ja: (n) => `共有リストを最大${n}個作成できます`},
   }),
   notes: feature({
     id: "notes",
@@ -387,11 +415,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "document-text",
     limits: { free: 5, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Not", en: "Notes", es: "Notas", pt: "Notas", de: "Notizen" , it: "Note"},
+    title: { tr: "Not", en: "Notes", es: "Notas", pt: "Notas", de: "Notizen" , it: "Note", fr: "Notes", ja: "メモ"},
     upsell: {
-      title: { tr: "Not limitin doldu", en: "You've reached your notes limit", es: "Has alcanzado tu límite de notas", pt: "Você atingiu seu limite de notas", de: "Du hast dein Notizen-Limit erreicht" , it: "Hai raggiunto il limite di note"},
+      title: { tr: "Not limitin doldu", en: "You've reached your notes limit", es: "Has alcanzado tu límite de notas", pt: "Você atingiu seu limite de notas", de: "Du hast dein Notizen-Limit erreicht" , it: "Hai raggiunto il limite di note", fr: "Tu as atteint ta limite de notes", ja: "メモの上限に達しました"},
     },
-    unit: { tr: "not", en: "notes", es: "notas", pt: "notas", de: "Notizen" , it: "note"},
+    unit: { tr: "not", en: "notes", es: "notas", pt: "notas", de: "Notizen" , it: "note", fr: "notes", ja: "メモ"},
     note: {
       tr: "Mevcut notlarını düzenlemek ve silmek her zaman serbest",
       en: "Editing and deleting your notes is always free",
@@ -399,7 +427,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Editar e excluir suas notas é sempre grátis",
       de: "Das Bearbeiten und Löschen deiner Notizen ist immer kostenlos",
 
-  it: "La modifica e l'eliminazione delle tue note sono sempre gratuite"},
+  it: "La modifica e l'eliminazione delle tue note sono sempre gratuite",
+  fr: "Modifier et supprimer tes notes est toujours gratuit",
+  ja: "メモの編集と削除はいつでも無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} not tutabilirsin`,
       en: (n) => `you can keep up to ${n} notes`,
@@ -407,7 +437,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode guardar até ${n} notas`,
       de: (n) => `du kannst bis zu ${n} Notizen behalten`,
 
-  it: n => `puoi conservare fino a ${n} note`},
+  it: n => `puoi conservare fino a ${n} note`,
+  fr: (n) => `tu peux garder jusqu'à ${n} notes`,
+  ja: (n) => `メモを最大${n}件保存できます`},
   }),
   todos: feature({
     id: "todos",
@@ -415,11 +447,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "checkbox",
     limits: { free: 5, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Yapılacaklar listesi", en: "To-do lists", es: "Listas de tareas", pt: "Listas de tarefas", de: "Aufgabenlisten" , it: "elenchi di cose da fare"},
+    title: { tr: "Yapılacaklar listesi", en: "To-do lists", es: "Listas de tareas", pt: "Listas de tarefas", de: "Aufgabenlisten" , it: "elenchi di cose da fare", fr: "Listes de tâches", ja: "ToDoリスト"},
     upsell: {
-      title: { tr: "Yapılacaklar limitin doldu", en: "You've reached your to-do limit", es: "Has alcanzado tu límite de tareas", pt: "Você atingiu seu limite de tarefas", de: "Du hast dein Aufgaben-Limit erreicht" , it: "Hai raggiunto il limite di cose da fare"},
+      title: { tr: "Yapılacaklar limitin doldu", en: "You've reached your to-do limit", es: "Has alcanzado tu límite de tareas", pt: "Você atingiu seu limite de tarefas", de: "Du hast dein Aufgaben-Limit erreicht" , it: "Hai raggiunto il limite di cose da fare", fr: "Tu as atteint ta limite de tâches", ja: "ToDoの上限に達しました"},
     },
-    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi"},
+    unit: { tr: "liste", en: "lists", es: "listas", pt: "listas", de: "Listen" , it: "elenchi", fr: "listes", ja: "リスト"},
     note: {
       tr: "Bir listedeki madde sayısı sınırsız",
       en: "The number of items inside a list is unlimited",
@@ -427,7 +459,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "O número de itens dentro de uma lista é ilimitado",
       de: "Die Anzahl der Einträge in einer Liste ist unbegrenzt",
 
-  it: "Il numero di elementi all'interno di un elenco è illimitato"},
+  it: "Il numero di elementi all'interno di un elenco è illimitato",
+  fr: "Le nombre d'éléments dans une liste est illimité",
+  ja: "リスト内の項目数は無制限です"},
     phrase: {
       tr: (n) => `en fazla ${n} yapılacaklar listesi tutabilirsin`,
       en: (n) => `you can keep up to ${n} to-do lists`,
@@ -435,7 +469,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode ter até ${n} listas de tarefas`,
       de: (n) => `du kannst bis zu ${n} Aufgabenlisten behalten`,
 
-  it: n => `puoi conservare fino a ${n} elenchi di cose da fare`},
+  it: n => `puoi conservare fino a ${n} elenchi di cose da fare`,
+  fr: (n) => `tu peux garder jusqu'à ${n} listes de tâches`,
+  ja: (n) => `ToDoリストを最大${n}件保存できます`},
   }),
   // Harf sınırları: TEK notun metni ve TEK yapılacak maddesi (başlık her planda 120).
   // Sınır yalnız büyümeyi durdurur; plan düşünce daha uzun eski kayıtlar kısalmaz
@@ -448,11 +484,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "reader",
     limits: { free: 500, premium: 2000, unlimited: 20000 },
-    title: { tr: "Not uzunluğu", en: "Note length", es: "Longitud de la nota", pt: "Tamanho da nota", de: "Notizlänge" , it: "Lunghezza della nota"},
+    title: { tr: "Not uzunluğu", en: "Note length", es: "Longitud de la nota", pt: "Tamanho da nota", de: "Notizlänge" , it: "Lunghezza della nota", fr: "Longueur des notes", ja: "メモの長さ"},
     upsell: {
-      title: { tr: "Not uzunluk sınırına ulaştın", en: "You've reached the note length limit", es: "Has alcanzado el límite de longitud de la nota", pt: "Você atingiu o limite de tamanho da nota", de: "Du hast die maximale Notizlänge erreicht" , it: "Hai raggiunto il limite di lunghezza della nota"},
+      title: { tr: "Not uzunluk sınırına ulaştın", en: "You've reached the note length limit", es: "Has alcanzado el límite de longitud de la nota", pt: "Você atingiu o limite de tamanho da nota", de: "Du hast die maximale Notizlänge erreicht" , it: "Hai raggiunto il limite di lunghezza della nota", fr: "Tu as atteint la longueur maximale d'une note", ja: "メモの文字数の上限に達しました"},
     },
-    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" , it: "caratteri"},
+    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" , it: "caratteri", fr: "caractères", ja: "文字"},
     note: {
       tr: "Daha uzun eski notların kısaltılmaz; düzenlemek her zaman serbest",
       en: "Longer existing notes are never cut; editing them is always free",
@@ -460,7 +496,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Notas existentes mais longas nunca são cortadas; editá-las é sempre grátis",
       de: "Längere vorhandene Notizen werden nie gekürzt; sie zu bearbeiten ist immer kostenlos",
 
-  it: "Le note esistenti più lunghe non vengono mai tagliate; modificarli è sempre gratuito"},
+  it: "Le note esistenti più lunghe non vengono mai tagliate; modificarli è sempre gratuito",
+  fr: "Les notes existantes plus longues ne sont jamais coupées ; les modifier est toujours gratuit",
+  ja: "既存の長いメモが削られることはなく、編集はいつでも無料です"},
     phrase: {
       tr: (n) => `bir not en fazla ${grouped(n, "tr")} karakter olabilir`,
       en: (n) => `a note can be up to ${grouped(n, "en")} characters long`,
@@ -468,7 +506,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `uma nota pode ter até ${grouped(n, "pt")} caracteres`,
       de: (n) => `eine Notiz kann bis zu ${grouped(n, "de")} Zeichen lang sein`,
 
-  it: n => `una nota può contenere fino a ${grouped(n, "en")} caratteri`},
+  it: n => `una nota può contenere fino a ${grouped(n, "en")} caratteri`,
+  fr: (n) => `une note peut contenir jusqu'à ${grouped(n, "fr")} caractères`,
+  ja: (n) => `メモは最大${grouped(n, "ja")}文字まで書けます`},
   }),
   todo_item_length: feature({
     id: "todo_item_length",
@@ -477,11 +517,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "create",
     limits: { free: 180, premium: 360, unlimited: 1000 },
-    title: { tr: "Yapılacak maddesi uzunluğu", en: "To-do item length", es: "Longitud de cada tarea", pt: "Tamanho de cada item", de: "Länge eines Aufgabeneintrags" , it: "Lunghezza elemento Cose da fare"},
+    title: { tr: "Yapılacak maddesi uzunluğu", en: "To-do item length", es: "Longitud de cada tarea", pt: "Tamanho de cada item", de: "Länge eines Aufgabeneintrags" , it: "Lunghezza elemento Cose da fare", fr: "Longueur des tâches", ja: "ToDo項目の長さ"},
     upsell: {
-      title: { tr: "Madde uzunluk sınırına ulaştın", en: "You've reached the item length limit", es: "Has alcanzado el límite de longitud de la tarea", pt: "Você atingiu o limite de tamanho do item", de: "Du hast die maximale Eintragslänge erreicht" , it: "Hai raggiunto il limite di lunghezza dell'elemento"},
+      title: { tr: "Madde uzunluk sınırına ulaştın", en: "You've reached the item length limit", es: "Has alcanzado el límite de longitud de la tarea", pt: "Você atingiu o limite de tamanho do item", de: "Du hast die maximale Eintragslänge erreicht" , it: "Hai raggiunto il limite di lunghezza dell'elemento", fr: "Tu as atteint la longueur maximale d'une tâche", ja: "項目の文字数の上限に達しました"},
     },
-    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" , it: "caratteri"},
+    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" , it: "caratteri", fr: "caractères", ja: "文字"},
     note: {
       tr: "Daha uzun eski maddeler kısaltılmaz; düzenlemek her zaman serbest",
       en: "Longer existing items are never cut; editing them is always free",
@@ -489,7 +529,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Itens existentes mais longos nunca são cortados; editá-los é sempre grátis",
       de: "Längere vorhandene Einträge werden nie gekürzt; sie zu bearbeiten ist immer kostenlos",
 
-  it: "Gli elementi esistenti più lunghi non vengono mai tagliati; modificarli è sempre gratuito"},
+  it: "Gli elementi esistenti più lunghi non vengono mai tagliati; modificarli è sempre gratuito",
+  fr: "Les tâches existantes plus longues ne sont jamais coupées ; les modifier est toujours gratuit",
+  ja: "既存の長い項目が削られることはなく、編集はいつでも無料です"},
     phrase: {
       tr: (n) => `bir yapılacak maddesi en fazla ${grouped(n, "tr")} karakter olabilir`,
       en: (n) => `a to-do item can be up to ${grouped(n, "en")} characters long`,
@@ -497,7 +539,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `cada item da lista pode ter até ${grouped(n, "pt")} caracteres`,
       de: (n) => `ein Aufgabeneintrag kann bis zu ${grouped(n, "de")} Zeichen lang sein`,
 
-  it: n => `una cosa da fare può contenere fino a ${grouped(n, "en")} caratteri`},
+  it: n => `una cosa da fare può contenere fino a ${grouped(n, "en")} caratteri`,
+  fr: (n) => `une tâche peut contenir jusqu'à ${grouped(n, "fr")} caractères`,
+  ja: (n) => `ToDo項目は最大${grouped(n, "ja")}文字まで書けます`},
   }),
   // Not / yapılacak HATIRLATICISI (gün + saat, cihaz bildirimi, yüzen bildirim, kutu).
   // Kapı yalnız KURMAYI durdurur: yeni hatırlatıcı, günü/saati değiştirmek ve
@@ -509,9 +553,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "alarm",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Not hatırlatıcısı", en: "Note reminders", es: "Recordatorios de notas", pt: "Lembretes de notas", de: "Notiz-Erinnerungen" , it: "Promemoria note"},
+    title: { tr: "Not hatırlatıcısı", en: "Note reminders", es: "Recordatorios de notas", pt: "Lembretes de notas", de: "Notiz-Erinnerungen" , it: "Promemoria note", fr: "Rappels de notes", ja: "メモのリマインダー"},
     upsell: {
-      title: { tr: "Hatırlatıcılar Premium'da", en: "Reminders are a Premium perk", es: "Los recordatorios son una ventaja Premium", pt: "Os lembretes são um benefício Premium", de: "Erinnerungen sind ein Premium-Vorteil" , it: "I promemoria sono un vantaggio Premium"},
+      title: { tr: "Hatırlatıcılar Premium'da", en: "Reminders are a Premium perk", es: "Los recordatorios son una ventaja Premium", pt: "Os lembretes são um benefício Premium", de: "Erinnerungen sind ein Premium-Vorteil" , it: "I promemoria sono un vantaggio Premium", fr: "Les rappels sont un avantage Premium", ja: "リマインダーはPremium特典です"},
       message: {
         tr: "Notlarına ve yapılacak listelerine gün ve saat seç; zamanı gelince yüzen bildirimde ve bildirim kutunda görünsün.",
         en: "Pick a day and time for your notes and to-do lists; see reminders in a floating notification and your inbox.",
@@ -519,7 +563,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Escolha dia e horário para suas notas e listas de tarefas; veja os lembretes em um aviso flutuante e na sua caixa de entrada.",
         de: "Wähle Tag und Uhrzeit für deine Notizen und Aufgabenlisten; sieh Erinnerungen als schwebende Benachrichtigung und im Posteingang.",
 
-  it: "Scegli un giorno e un'ora per le tue note e le tue liste di cose da fare; visualizza i promemoria in una notifica mobile e nella tua casella di posta."},
+  it: "Scegli un giorno e un'ora per le tue note e le tue liste di cose da fare; visualizza i promemoria in una notifica mobile e nella tua casella di posta.",
+  fr: "Choisis un jour et une heure pour tes notes et listes de tâches ; vois les rappels dans une notification flottante et ta boîte de réception.",
+  ja: "メモやToDoリストに日時を設定して、フローティング通知と受信箱でリマインダーを確認できます。"},
     },
     detail: {
       tr: "Notlara ve yapılacaklara gün + saatli bildirim",
@@ -528,7 +574,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Avisos com dia e horário para notas e tarefas",
       de: "Benachrichtigungen mit Tag und Uhrzeit für Notizen und Aufgaben",
 
-  it: "Notifiche su giorno e ora per note e cose da fare"},
+  it: "Notifiche su giorno e ora per note e cose da fare",
+  fr: "Notifications à un jour et une heure pour les notes et tâches",
+  ja: "メモとToDoに日時指定の通知"},
     note: {
       tr: "Kurduğun hatırlatıcılar abonelik bitince de çalar; kaldırmak her zaman serbest",
       en: "Reminders you've set still go off if your subscription ends; removing them is always free",
@@ -536,9 +584,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Os lembretes que você criou continuam tocando se a assinatura acabar; removê-los é sempre grátis",
       de: "Gesetzte Erinnerungen bleiben aktiv, wenn dein Abo endet; sie zu entfernen ist immer kostenlos",
 
-  it: "I promemoria che hai impostato si attivano anche se l'abbonamento scade; rimuoverli è sempre gratuito"},
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "Gün ve saatle", en: "Day and time", es: "Día y hora", pt: "Dia e horário", de: "Tag und Uhrzeit" , it: "Giorno e ora"},
+  it: "I promemoria che hai impostato si attivano anche se l'abbonamento scade; rimuoverli è sempre gratuito",
+  fr: "Les rappels déjà programmés sonnent même si ton abonnement prend fin ; les supprimer est toujours gratuit",
+  ja: "設定済みのリマインダーはサブスクリプション終了後も通知されます。削除はいつでも無料です"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "Gün ve saatle", en: "Day and time", es: "Día y hora", pt: "Dia e horário", de: "Tag und Uhrzeit" , it: "Giorno e ora", fr: "Jour et heure", ja: "日時"},
   }),
   movie_notes: feature({
     id: "movie_notes",
@@ -546,11 +596,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "film",
     limits: { free: 20, premium: 200, unlimited: UNLIMITED },
-    title: { tr: "Film notu", en: "Movie notes", es: "Notas de películas", pt: "Notas de filmes", de: "Film-Notizen" , it: "Appunti sul film"},
+    title: { tr: "Film notu", en: "Movie notes", es: "Notas de películas", pt: "Notas de filmes", de: "Film-Notizen" , it: "Appunti sul film", fr: "Notes de films", ja: "映画のメモ"},
     upsell: {
-      title: { tr: "Film notu limitin doldu", en: "You've reached your movie notes limit", es: "Has alcanzado tu límite de notas de películas", pt: "Você atingiu seu limite de notas de filmes", de: "Du hast dein Limit für Film-Notizen erreicht" , it: "Hai raggiunto il limite delle note sul film"},
+      title: { tr: "Film notu limitin doldu", en: "You've reached your movie notes limit", es: "Has alcanzado tu límite de notas de películas", pt: "Você atingiu seu limite de notas de filmes", de: "Du hast dein Limit für Film-Notizen erreicht" , it: "Hai raggiunto il limite delle note sul film", fr: "Tu as atteint ta limite de notes de films", ja: "映画メモの上限に達しました"},
     },
-    unit: { tr: "film", en: "movies", es: "películas", pt: "filmes", de: "Filme" , it: "film"},
+    unit: { tr: "film", en: "movies", es: "películas", pt: "filmes", de: "Filme" , it: "film", fr: "films", ja: "映画"},
     note: {
       tr: "Her film için tek not; mevcut notu düzenlemek serbest",
       en: "One note per movie; editing an existing note is free",
@@ -558,7 +608,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Uma nota por filme; editar uma nota existente é grátis",
       de: "Eine Notiz pro Film; das Bearbeiten einer vorhandenen Notiz ist kostenlos",
 
-  it: "Una nota per film; la modifica di una nota esistente è gratuita"},
+  it: "Una nota per film; la modifica di una nota esistente è gratuita",
+  fr: "Une note par film ; modifier une note existante est gratuit",
+  ja: "映画1本につきメモ1件。既存のメモの編集は無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} filme not yazabilirsin`,
       en: (n) => `you can write notes for up to ${n} movies`,
@@ -566,7 +618,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode escrever notas para até ${n} filmes`,
       de: (n) => `du kannst Notizen für bis zu ${n} Filme schreiben`,
 
-  it: n => `puoi scrivere note per un massimo di ${n} film`},
+  it: n => `puoi scrivere note per un massimo di ${n} film`,
+  fr: (n) => `tu peux écrire des notes pour jusqu'à ${n} films`,
+  ja: (n) => `最大${n}本の映画にメモを書けます`},
   }),
   tv_notes: feature({
     id: "tv_notes",
@@ -574,11 +628,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "tv",
     limits: { free: 20, premium: 200, unlimited: UNLIMITED },
-    title: { tr: "Dizi notu", en: "Show notes", es: "Notas de series", pt: "Notas de séries", de: "Serien-Notizen" , it: "Mostra note"},
+    title: { tr: "Dizi notu", en: "Show notes", es: "Notas de series", pt: "Notas de séries", de: "Serien-Notizen" , it: "Mostra note", fr: "Notes de séries", ja: "番組のメモ"},
     upsell: {
-      title: { tr: "Dizi notu limitin doldu", en: "You've reached your show notes limit", es: "Has alcanzado tu límite de notas de series", pt: "Você atingiu seu limite de notas de séries", de: "Du hast dein Limit für Serien-Notizen erreicht" , it: "Hai raggiunto il limite di note dello serie TV"},
+      title: { tr: "Dizi notu limitin doldu", en: "You've reached your show notes limit", es: "Has alcanzado tu límite de notas de series", pt: "Você atingiu seu limite de notas de séries", de: "Du hast dein Limit für Serien-Notizen erreicht" , it: "Hai raggiunto il limite di note dello serie TV", fr: "Tu as atteint ta limite de notes de séries", ja: "番組メモの上限に達しました"},
     },
-    unit: { tr: "dizi", en: "shows", es: "series", pt: "séries", de: "Serien" , it: "serie TV"},
+    unit: { tr: "dizi", en: "shows", es: "series", pt: "séries", de: "Serien" , it: "serie TV", fr: "séries", ja: "番組"},
     note: {
       tr: "Her dizi için tek not; mevcut notu düzenlemek serbest",
       en: "One note per show; editing an existing note is free",
@@ -586,7 +640,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Uma nota por série; editar uma nota existente é grátis",
       de: "Eine Notiz pro Serie; das Bearbeiten einer vorhandenen Notiz ist kostenlos",
 
-  it: "Una nota per serie TV; la modifica di una nota esistente è gratuita"},
+  it: "Una nota per serie TV; la modifica di una nota esistente è gratuita",
+  fr: "Une note par série ; modifier une note existante est gratuit",
+  ja: "番組1本につきメモ1件。既存のメモの編集は無料です"},
     phrase: {
       tr: (n) => `en fazla ${n} diziye not yazabilirsin`,
       en: (n) => `you can write notes for up to ${n} shows`,
@@ -594,7 +650,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode escrever notas para até ${n} séries`,
       de: (n) => `du kannst Notizen für bis zu ${n} Serien schreiben`,
 
-  it: n => `puoi scrivere note per un massimo di ${n} serie TV`},
+  it: n => `puoi scrivere note per un massimo di ${n} serie TV`,
+  fr: (n) => `tu peux écrire des notes pour jusqu'à ${n} séries`,
+  ja: (n) => `最大${n}本の番組にメモを書けます`},
   }),
   games: feature({
     id: "games",
@@ -602,12 +660,12 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "game-controller",
     limits: { free: 0, premium: 20, unlimited: UNLIMITED },
-    title: { tr: "Sahne tahmin oyunu", en: "Scene guess games", es: "Juegos de adivinar escenas", pt: "Jogos de adivinhar cenas", de: "Szenenraten-Spiele" , it: "Giochi di ipotesi di scene"},
+    title: { tr: "Sahne tahmin oyunu", en: "Scene guess games", es: "Juegos de adivinar escenas", pt: "Jogos de adivinhar cenas", de: "Szenenraten-Spiele" , it: "Giochi di ipotesi di scene", fr: "Jeux Devine la scène", ja: "シーン当てゲーム"},
     upsell: {
       // `title`: limit dolunca (Premium'da günlük hak bitti); `lockedTitle` +
       // `message`: planda hiç yokken (Free). Bkz. utils/premiumUpsellContent.js.
-      title: { tr: "Bugünkü oyun hakkın bitti", en: "You're out of games for today", es: "Se te han acabado las partidas de hoy", pt: "Suas partidas de hoje acabaram", de: "Du hast keine Spiele mehr für heute" , it: "Per oggi hai finito i giochi"},
-      lockedTitle: { tr: "Oyunlar Premium'da", en: "Games are a Premium perk", es: "Los juegos son una ventaja Premium", pt: "Os jogos são um benefício Premium", de: "Spiele sind ein Premium-Vorteil" , it: "I giochi sono un vantaggio Premium"},
+      title: { tr: "Bugünkü oyun hakkın bitti", en: "You're out of games for today", es: "Se te han acabado las partidas de hoy", pt: "Suas partidas de hoje acabaram", de: "Du hast keine Spiele mehr für heute" , it: "Per oggi hai finito i giochi", fr: "Tu n'as plus de parties pour aujourd'hui", ja: "今日のゲームを使い切りました"},
+      lockedTitle: { tr: "Oyunlar Premium'da", en: "Games are a Premium perk", es: "Los juegos son una ventaja Premium", pt: "Os jogos são um benefício Premium", de: "Spiele sind ein Premium-Vorteil" , it: "I giochi sono un vantaggio Premium", fr: "Les jeux sont un avantage Premium", ja: "ゲームはPremium特典です"},
       message: {
         tr: "Sahne tahmin oyunlarını, liderlik tablosunu ve istatistiklerini Premium ile aç.",
         en: "Unlock the scene guess games, leaderboards and stats with Premium.",
@@ -615,9 +673,11 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Desbloqueie os jogos de adivinhar cenas, os rankings e as estatísticas com o Premium.",
         de: "Schalte mit Premium die Szenenraten-Spiele, Bestenlisten und Statistiken frei.",
 
-  it: "Sblocca i giochi di ipotesi, le classifiche e le statistiche della scena con Premium."},
+  it: "Sblocca i giochi di ipotesi, le classifiche e le statistiche della scena con Premium.",
+  fr: "Débloque les jeux Devine la scène, les classements et les statistiques avec Premium.",
+  ja: "Premiumでシーン当てゲーム、ランキング、統計を解放しよう。"},
     },
-    unit: { tr: "oyun", en: "games", es: "partidas", pt: "partidas", de: "Spiele" , it: "giochi"},
+    unit: { tr: "oyun", en: "games", es: "partidas", pt: "partidas", de: "Spiele" , it: "giochi", fr: "parties", ja: "ゲーム"},
     phrase: {
       tr: (n) => `günde ${n} oyun oynayabilirsin`,
       en: (n) => `you can play ${n} games per day`,
@@ -625,7 +685,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode jogar ${n} partidas por dia`,
       de: (n) => `du kannst ${n} Spiele pro Tag spielen`,
 
-  it: n => `puoi giocare a ${n} giochi al giorno`},
+  it: n => `puoi giocare a ${n} giochi al giorno`,
+  fr: (n) => `tu peux jouer ${n} parties par jour`,
+  ja: (n) => `1日${n}ゲームプレイできます`},
   }),
   cineswipe_rooms: feature({
     id: "cineswipe_rooms",
@@ -633,10 +695,10 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "people",
     limits: { free: 0, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "CineSwipe odası kurma", en: "CineSwipe rooms you host", es: "Salas de CineSwipe que creas", pt: "Salas do CineSwipe que você cria", de: "CineSwipe-Räume, die du hostest" , it: "Stanze CineSwipe che ospiti"},
+    title: { tr: "CineSwipe odası kurma", en: "CineSwipe rooms you host", es: "Salas de CineSwipe que creas", pt: "Salas do CineSwipe que você cria", de: "CineSwipe-Räume, die du hostest" , it: "Stanze CineSwipe che ospiti", fr: "Salons CineSwipe que tu organises", ja: "ホストするCineSwipeルーム"},
     upsell: {
-      title: { tr: "Bugünkü oda hakkın bitti", en: "You've hosted all of today's rooms", es: "Has creado todas las salas de hoy", pt: "Você criou todas as salas de hoje", de: "Du hast alle heutigen Räume gehostet" , it: "Hai ospitato tutte le stanze di oggi"},
-      lockedTitle: { tr: "Arkadaşınla CineSwipe Premium'da", en: "CineSwipe with friends is a Premium perk", es: "CineSwipe con amigos es una ventaja Premium", pt: "O CineSwipe com amigos é um benefício Premium", de: "CineSwipe mit Freunden ist ein Premium-Vorteil" , it: "CineSwipe con gli amici è un vantaggio Premium"},
+      title: { tr: "Bugünkü oda hakkın bitti", en: "You've hosted all of today's rooms", es: "Has creado todas las salas de hoy", pt: "Você criou todas as salas de hoje", de: "Du hast alle heutigen Räume gehostet" , it: "Hai ospitato tutte le stanze di oggi", fr: "Tu as organisé tous les salons du jour", ja: "今日のルームをすべてホストしました"},
+      lockedTitle: { tr: "Arkadaşınla CineSwipe Premium'da", en: "CineSwipe with friends is a Premium perk", es: "CineSwipe con amigos es una ventaja Premium", pt: "O CineSwipe com amigos é um benefício Premium", de: "CineSwipe mit Freunden ist ein Premium-Vorteil" , it: "CineSwipe con gli amici è un vantaggio Premium", fr: "CineSwipe entre amis est un avantage Premium", ja: "友だちとのCineSwipeはPremium特典です"},
       message: {
         tr: "Arkadaşınla ortak oda kur, kaydırdıkça eşleşin ve bu akşamki filmi birlikte seçin.",
         en: "Host a shared room with a friend, match as you swipe and pick tonight's movie together.",
@@ -644,9 +706,11 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Crie uma sala compartilhada com um amigo, deem match enquanto deslizam e escolham juntos o filme da noite.",
         de: "Hoste einen gemeinsamen Raum mit einem Freund, matche beim Wischen und wähle gemeinsam den Film für heute Abend.",
 
-  it: "Ospita una stanza condivisa con un amico, abbina mentre scorri e scegli insieme il film di stasera."},
+  it: "Ospita una stanza condivisa con un amico, abbina mentre scorri e scegli insieme il film di stasera.",
+  fr: "Organise un salon partagé avec un ami, trouvez des correspondances en swipant et choisissez ensemble le film de ce soir.",
+  ja: "友だちと共有ルームを開き、スワイプしながらマッチして、今夜の映画を一緒に決めよう。"},
     },
-    unit: { tr: "oda", en: "rooms", es: "salas", pt: "salas", de: "Räume" , it: "stanze"},
+    unit: { tr: "oda", en: "rooms", es: "salas", pt: "salas", de: "Räume" , it: "stanze", fr: "salons", ja: "ルーム"},
     phrase: {
       tr: (n) => `günde ${n} CineSwipe odası kurabilirsin`,
       en: (n) => `you can host ${n} CineSwipe rooms per day`,
@@ -654,7 +718,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode criar ${n} salas do CineSwipe por dia`,
       de: (n) => `du kannst ${n} CineSwipe-Räume pro Tag hosten`,
 
-  it: n => `puoi ospitare ${n} stanze CineSwipe al giorno`},
+  it: n => `puoi ospitare ${n} stanze CineSwipe al giorno`,
+  fr: (n) => `tu peux organiser ${n} salons CineSwipe par jour`,
+  ja: (n) => `CineSwipeルームを1日${n}個ホストできます`},
   }),
   cineswipe_swipes: feature({
     id: "cineswipe_swipes",
@@ -662,10 +728,10 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "swap-horizontal",
     limits: { free: 0, premium: 300, unlimited: UNLIMITED },
-    title: { tr: "Tek başına CineSwipe", en: "Solo CineSwipe", es: "CineSwipe en solitario", pt: "CineSwipe solo", de: "Solo-CineSwipe" , it: "Solo CineSwipe"},
+    title: { tr: "Tek başına CineSwipe", en: "Solo CineSwipe", es: "CineSwipe en solitario", pt: "CineSwipe solo", de: "Solo-CineSwipe" , it: "Solo CineSwipe", fr: "CineSwipe en solo", ja: "ひとりでCineSwipe"},
     upsell: {
-      title: { tr: "Bugünkü kaydırma hakkın bitti", en: "You're out of swipes for today", es: "Se te han acabado los deslizamientos de hoy", pt: "Seus deslizes de hoje acabaram", de: "Du hast keine Swipes mehr für heute" , it: "Hai finito i passaggi per oggi"},
-      lockedTitle: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium", pt: "O CineSwipe é um benefício Premium", de: "CineSwipe ist ein Premium-Vorteil" , it: "CineSwipe è un vantaggio Premium"},
+      title: { tr: "Bugünkü kaydırma hakkın bitti", en: "You're out of swipes for today", es: "Se te han acabado los deslizamientos de hoy", pt: "Seus deslizes de hoje acabaram", de: "Du hast keine Swipes mehr für heute" , it: "Hai finito i passaggi per oggi", fr: "Tu n'as plus de swipes pour aujourd'hui", ja: "今日のスワイプを使い切りました"},
+      lockedTitle: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium", pt: "O CineSwipe é um benefício Premium", de: "CineSwipe ist ein Premium-Vorteil" , it: "CineSwipe è un vantaggio Premium", fr: "CineSwipe est un avantage Premium", ja: "CineSwipeはPremium特典です"},
       message: {
         tr: "Kartları kaydırarak sana uygun film ve dizileri keşfet.",
         en: "Swipe through cards to discover movies and shows you'll like.",
@@ -673,9 +739,11 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Deslize cards para descobrir filmes e séries de que você vai gostar.",
         de: "Wische durch Karten, um Filme und Serien zu entdecken, die dir gefallen.",
 
-  it: "Scorri le carte per scoprire film e programmi che ti piaceranno."},
+  it: "Scorri le carte per scoprire film e programmi che ti piaceranno.",
+  fr: "Fais défiler des cartes pour découvrir des films et séries qui te plairont.",
+  ja: "カードをスワイプして、好きになりそうな映画や番組を見つけよう。"},
     },
-    unit: { tr: "kart", en: "cards", es: "tarjetas", pt: "cards", de: "Karten" , it: "carte"},
+    unit: { tr: "kart", en: "cards", es: "tarjetas", pt: "cards", de: "Karten" , it: "carte", fr: "cartes", ja: "枚"},
     phrase: {
       tr: (n) => `günde ${n} kart kaydırabilirsin`,
       en: (n) => `you can swipe ${n} cards per day`,
@@ -683,7 +751,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode deslizar ${n} cards por dia`,
       de: (n) => `du kannst ${n} Karten pro Tag wischen`,
 
-  it: n => `puoi scorrere ${n} carte al giorno`},
+  it: n => `puoi scorrere ${n} carte al giorno`,
+  fr: (n) => `tu peux faire défiler ${n} cartes par jour`,
+  ja: (n) => `1日${n}枚のカードをスワイプできます`},
   }),
   tournament_vote: feature({
     id: "tournament_vote",
@@ -691,9 +761,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "trophy",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Turnuvada oy kullanma", en: "Voting in the tournament", es: "Votar en el torneo", pt: "Votar no torneio", de: "Abstimmen im Turnier" , it: "Votazione nel torneo"},
+    title: { tr: "Turnuvada oy kullanma", en: "Voting in the tournament", es: "Votar en el torneo", pt: "Votar no torneio", de: "Abstimmen im Turnier" , it: "Votazione nel torneo", fr: "Voter dans le tournoi", ja: "トーナメントでの投票"},
     upsell: {
-      title: { tr: "Turnuvada oy Premium'da", en: "Tournament voting is a Premium perk", es: "Votar en el torneo es una ventaja Premium", pt: "Votar no torneio é um benefício Premium", de: "Das Abstimmen im Turnier ist ein Premium-Vorteil" , it: "Il voto nei tornei è un vantaggio Premium"},
+      title: { tr: "Turnuvada oy Premium'da", en: "Tournament voting is a Premium perk", es: "Votar en el torneo es una ventaja Premium", pt: "Votar no torneio é um benefício Premium", de: "Das Abstimmen im Turnier ist ein Premium-Vorteil" , it: "Il voto nei tornei è un vantaggio Premium", fr: "Le vote du tournoi est un avantage Premium", ja: "トーナメントの投票はPremium特典です"},
       message: {
         tr: "Turnuvayı herkes izleyebilir; aday gösterme ve maç oyları Premium'a özel.",
         en: "Anyone can follow the tournament; nominating and voting on matches is for Premium.",
@@ -701,10 +771,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Qualquer pessoa pode acompanhar o torneio; indicar e votar nas partidas é só para o Premium.",
         de: "Jeder kann das Turnier verfolgen; Nominieren und Abstimmen bei Duellen ist Premium vorbehalten.",
 
-  it: "Chiunque può seguire il torneo; nominare e votare le partite è per Premium."},
+  it: "Chiunque può seguire il torneo; nominare e votare le partite è per Premium.",
+  fr: "Tout le monde peut suivre le tournoi ; proposer et voter pour les matchs est réservé à Premium.",
+  ja: "トーナメントは誰でも観戦できます。候補の推薦と試合への投票はPremium向けです。"},
     },
-    freeValue: { tr: "Yalnız izleyici", en: "Spectator only", es: "Solo espectador", pt: "Somente espectador", de: "Nur Zuschauer" , it: "Solo spettatore"},
-    paidValue: { tr: "Oy kullanabilir", en: "Can vote", es: "Puede votar", pt: "Pode votar", de: "Darf abstimmen" , it: "Può votare"},
+    freeValue: { tr: "Yalnız izleyici", en: "Spectator only", es: "Solo espectador", pt: "Somente espectador", de: "Nur Zuschauer" , it: "Solo spettatore", fr: "Spectateur seulement", ja: "観戦のみ"},
+    paidValue: { tr: "Oy kullanabilir", en: "Can vote", es: "Puede votar", pt: "Pode votar", de: "Darf abstimmen" , it: "Può votare", fr: "Peut voter", ja: "投票可能"},
   }),
   // Seelogd Top 100'de oy (hype) — AKTİF oy hakkı: Free 0, Premium 10, Max 20 (29 Eki kullanıcı kararı:
   // sınırlı hak; herkes her yapıma oy verseydi oy sırayı oynatmazdı). Listeyi görmek, aramak, liste olarak
@@ -717,10 +789,10 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "flame",
     limits: { free: 0, premium: 10, unlimited: 20 },
-    title: { tr: "Top 100 oy hakkı", en: "Top 100 votes", es: "Votos en el Top 100", pt: "Votos no Top 100", de: "Stimmen in den Top 100" , it: "I primi 100 voti"},
+    title: { tr: "Top 100 oy hakkı", en: "Top 100 votes", es: "Votos en el Top 100", pt: "Votos no Top 100", de: "Stimmen in den Top 100" , it: "I primi 100 voti", fr: "Votes du Top 100", ja: "トップ100の投票"},
     upsell: {
-      title: { tr: "Oy hakkın doldu", en: "You've used all your votes", es: "Has usado todos tus votos", pt: "Você usou todos os seus votos", de: "Du hast alle Stimmen vergeben" , it: "Hai usato tutti i tuoi voti"},
-      lockedTitle: { tr: "Top 100'de oy Premium'da", en: "Top 100 voting is a Premium perk", es: "Votar en el Top 100 es una ventaja Premium", pt: "Votar no Top 100 é um benefício Premium", de: "Abstimmen in den Top 100 ist ein Premium-Vorteil" , it: "Il voto tra i primi 100 è un vantaggio Premium"},
+      title: { tr: "Oy hakkın doldu", en: "You've used all your votes", es: "Has usado todos tus votos", pt: "Você usou todos os seus votos", de: "Du hast alle Stimmen vergeben" , it: "Hai usato tutti i tuoi voti", fr: "Tu as utilisé tous tes votes", ja: "投票をすべて使いました"},
+      lockedTitle: { tr: "Top 100'de oy Premium'da", en: "Top 100 voting is a Premium perk", es: "Votar en el Top 100 es una ventaja Premium", pt: "Votar no Top 100 é um benefício Premium", de: "Abstimmen in den Top 100 ist ein Premium-Vorteil" , it: "Il voto tra i primi 100 è un vantaggio Premium", fr: "Voter au Top 100 est un avantage Premium", ja: "トップ100の投票はPremium特典です"},
       message: {
         tr: "Listeyi herkes görebilir, kaydedip paylaşabilir; sıralamayı oyunla değiştirmek Premium'a özel. Her Seelogd oyu 100 TMDB değerlendirmesi değerinde.",
         en: "Anyone can browse, save and share the list; moving the ranking with your vote is for Premium. Each Seelogd vote is worth 100 TMDB ratings.",
@@ -728,7 +800,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Qualquer pessoa pode ver, salvar e compartilhar a lista; mudar o ranking com seu voto é só para o Premium. Cada voto do Seelogd vale 100 avaliações do TMDB.",
         de: "Jeder kann die Liste ansehen, speichern und teilen; das Ranking mit deiner Stimme zu bewegen ist Premium vorbehalten. Jede Seelogd-Stimme zählt wie 100 TMDB-Bewertungen.",
 
-  it: "Chiunque può sfogliare, salvare e condividere l'elenco; spostare la classifica con il tuo voto è per Premium. Ogni voto Seelogd vale 100 valutazioni TMDB."},
+  it: "Chiunque può sfogliare, salvare e condividere l'elenco; spostare la classifica con il tuo voto è per Premium. Ogni voto Seelogd vale 100 valutazioni TMDB.",
+  fr: "Tout le monde peut parcourir, enregistrer et partager la liste ; faire bouger le classement avec ton vote est réservé à Premium. Chaque vote Seelogd vaut 100 notes TMDB.",
+  ja: "リストの閲覧、保存、シェアは誰でもできます。投票でランキングを動かすのはPremium向けです。Seelogdの1票はTMDBの評価100件分の重みがあります。"},
     },
     detail: {
       tr: "Seelogd Top 100 sıralamasına oy ver",
@@ -737,8 +811,10 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Vote no ranking Seelogd Top 100",
       de: "Stimme im Seelogd-Top-100-Ranking ab",
 
-  it: "Vota nella classifica Seelogd Top 100"},
-    unit: { tr: "oy", en: "votes", es: "votos", pt: "votos", de: "Stimmen" , it: "voti"},
+  it: "Vota nella classifica Seelogd Top 100",
+  fr: "Vote dans le classement Top 100 Seelogd",
+  ja: "Seelogd トップ100のランキングに投票"},
+    unit: { tr: "oy", en: "votes", es: "votos", pt: "votos", de: "Stimmen" , it: "voti", fr: "votes", ja: "票"},
     note: {
       tr: "Oyu geri alınca hakkın geri gelir; verdiğin oylar abonelik bitince de sayılır",
       en: "Taking a vote back returns it to you; votes you've cast still count if your subscription ends",
@@ -746,7 +822,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Ao retirar um voto você o recupera; seus votos continuam contando se a assinatura acabar",
       de: "Ziehst du eine Stimme zurück, bekommst du sie wieder; abgegebene Stimmen zählen weiter, wenn dein Abo endet",
 
-  it: "Riprendere un voto te lo restituisce; i voti che hai espresso contano comunque se il tuo abbonamento scade"},
+  it: "Riprendere un voto te lo restituisce; i voti che hai espresso contano comunque se il tuo abbonamento scade",
+  fr: "Retirer un vote te le rend ; les votes émis comptent toujours si ton abonnement prend fin",
+  ja: "投票を取り消すと票は戻ります。投じた票はサブスクリプション終了後もカウントされます"},
     phrase: {
       tr: (n) => `aynı anda ${n} yapıma oy verebilirsin`,
       en: (n) => `you can back up to ${n} titles at once`,
@@ -754,7 +832,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode votar em até ${n} títulos ao mesmo tempo`,
       de: (n) => `du kannst bis zu ${n} Titel gleichzeitig unterstützen`,
 
-  it: n => `puoi eseguire il backup di ${n} titoli contemporaneamente`},
+  it: n => `puoi eseguire il backup di ${n} titoli contemporaneamente`,
+  fr: (n) => `tu peux soutenir jusqu'à ${n} titres à la fois`,
+  ja: (n) => `一度に最大${n}作品を応援できます`},
   }),
   // Film Zinciri (docs/ozellikler/FILM_ZINCIRI.md) — 30 Eki kullanıcı kararı: oyunun tamamı Premium (günlük +
   // serbest + sohbetten gelen meydan okuma). Free'de Oyunlar rayında kart "Premium" yazar, dokununca yükseltme;
@@ -766,9 +846,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "git-network",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Film Zinciri", en: "Film Chain", es: "Cadena de Cine", pt: "Corrente de Cinema", de: "Filmkette" , it: "Film Chain"},
+    title: { tr: "Film Zinciri", en: "Film Chain", es: "Cadena de Cine", pt: "Corrente de Cinema", de: "Filmkette" , it: "Film Chain", fr: "Chaîne de films", ja: "フィルムチェーン"},
     upsell: {
-      title: { tr: "Film Zinciri Premium'da", en: "Film Chain is a Premium perk", es: "Cadena de Cine es una ventaja Premium", pt: "A Corrente de Cinema é um benefício Premium", de: "Filmkette ist ein Premium-Vorteil" , it: "Film Chain è un vantaggio Premium"},
+      title: { tr: "Film Zinciri Premium'da", en: "Film Chain is a Premium perk", es: "Cadena de Cine es una ventaja Premium", pt: "A Corrente de Cinema é um benefício Premium", de: "Filmkette ist ein Premium-Vorteil" , it: "Film Chain è un vantaggio Premium", fr: "La Chaîne de films est un avantage Premium", ja: "フィルムチェーンはPremium特典です"},
       message: {
         tr: "İki oyuncuyu ortak filmlerle bağla: her gün yeni bir zincir, sınırsız serbest mod ve arkadaşlarına spoiler'sız meydan okuma.",
         en: "Connect two actors through shared films: a new chain every day, unlimited free play and spoiler-free challenges for your friends.",
@@ -776,7 +856,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Ligue dois atores por filmes em comum: uma corrente nova por dia, modo livre ilimitado e desafios sem spoiler para seus amigos.",
         de: "Verbinde zwei Stars über gemeinsame Filme: jeden Tag eine neue Kette, unbegrenztes freies Spiel und spoilerfreie Challenges für Freunde.",
 
-  it: "Connetti due attori attraverso film condivisi: una nuova catena ogni giorno, gioco gratuito illimitato e sfide senza spoiler per i tuoi amici."},
+  it: "Connetti due attori attraverso film condivisi: una nuova catena ogni giorno, gioco gratuito illimitato e sfide senza spoiler per i tuoi amici.",
+  fr: "Relie deux acteurs par des films en commun : une nouvelle chaîne chaque jour, des parties libres illimitées et des défis sans spoilers pour tes amis.",
+  ja: "共演作を通じて2人の俳優をつなごう:毎日新しいチェーン、無制限のフリープレイ、友だちへのネタバレなしの挑戦。"},
     },
     detail: {
       tr: "Günlük zincir, serbest mod ve arkadaşa meydan okuma",
@@ -785,9 +867,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Corrente diária, modo livre e desafios a amigos",
       de: "Tägliche Kette, freies Spiel und Challenges für Freunde",
 
-  it: "Catena quotidiana, gioco gratuito e sfide con gli amici"},
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "Günlük + serbest", en: "Daily + free play", es: "Diaria + libre", pt: "Diária + livre", de: "Täglich + frei" , it: "Giorno quotidiano + gioco gratuito"},
+  it: "Catena quotidiana, gioco gratuito e sfide con gli amici",
+  fr: "Chaîne quotidienne, partie libre et défis entre amis",
+  ja: "デイリーチェーン、フリープレイ、友だちへの挑戦"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "Günlük + serbest", en: "Daily + free play", es: "Diaria + libre", pt: "Diária + livre", de: "Täglich + frei" , it: "Giorno quotidiano + gioco gratuito", fr: "Quotidien + partie libre", ja: "デイリー+フリープレイ"},
   }),
   // Günün Karesi (screens/game/DailyFrameScreen): Framed tarzı günlük film. 30 Eki kararı: Premium. Free kullanıcı
   // Eğlence kartını ve sohbetteki sonuç kartını GÖRÜR (kilitli), oynamak yükseltme sayfasını açar.
@@ -797,9 +881,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "aperture",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Günün Karesi", en: "Frame of the Day", es: "Fotograma del Día", pt: "Quadro do Dia", de: "Bild des Tages" , it: "Frame del giorno"},
+    title: { tr: "Günün Karesi", en: "Frame of the Day", es: "Fotograma del Día", pt: "Quadro do Dia", de: "Bild des Tages" , it: "Frame del giorno", fr: "Image du jour", ja: "今日の一枚"},
     upsell: {
-      title: { tr: "Günün Karesi Premium'da", en: "Frame of the Day is a Premium perk", es: "Fotograma del Día es una ventaja Premium", pt: "O Quadro do Dia é um benefício Premium", de: "Bild des Tages ist ein Premium-Vorteil" , it: "Frame of the Day è un vantaggio Premium"},
+      title: { tr: "Günün Karesi Premium'da", en: "Frame of the Day is a Premium perk", es: "Fotograma del Día es una ventaja Premium", pt: "O Quadro do Dia é um benefício Premium", de: "Bild des Tages ist ein Premium-Vorteil" , it: "Frame of the Day è un vantaggio Premium", fr: "L'Image du jour est un avantage Premium", ja: "今日の一枚はPremium特典です"},
       message: {
         tr: "Her gün herkese aynı film: sahneden bul, 6 karede ipuçlarıyla daralt, sonucunu arkadaşlarınla paylaş.",
         en: "The same movie for everyone each day: name it from a still, narrow it down over 6 frames with hints and share your result.",
@@ -807,7 +891,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "O mesmo filme para todos a cada dia: descubra pela cena, afunile com dicas em 6 quadros e compartilhe seu resultado.",
         de: "Jeden Tag derselbe Film für alle: Errate ihn anhand einer Szene, grenze ihn in 6 Bildern mit Hinweisen ein und teile dein Ergebnis.",
 
-  it: "Lo stesso film per tutti ogni giorno: assegnagli un nome da un'immagine, restringi il campo a 6 fotogrammi con suggerimenti e condividi il risultato."},
+  it: "Lo stesso film per tutti ogni giorno: assegnagli un nome da un'immagine, restringi il campo a 6 fotogrammi con suggerimenti e condividi il risultato.",
+  fr: "Le même film pour tout le monde chaque jour : trouve-le à partir d'une image, affine en 6 images avec des indices et partage ton résultat.",
+  ja: "毎日全員共通の映画:1枚のスチールから当て、ヒント付きの6フレームで絞り込み、結果をシェアしよう。"},
     },
     detail: {
       tr: "Günlük film tahmini, ipuçları, seri ve paylaşım",
@@ -816,9 +902,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Palpite diário, dicas, sequências e compartilhamento",
       de: "Tägliches Filmraten, Hinweise, Serien und Teilen",
 
-  it: "Ipotesi, suggerimenti, sequenze e condivisione quotidiana del film"},
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "Her gün", en: "Every day", es: "Cada día", pt: "Todo dia", de: "Jeden Tag" , it: "Ogni giorno"},
+  it: "Ipotesi, suggerimenti, sequenze e condivisione quotidiana del film",
+  fr: "Devinette de film quotidienne, indices, séries et partage",
+  ja: "毎日の映画当て、ヒント、連続記録、シェア"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "Her gün", en: "Every day", es: "Cada día", pt: "Todo dia", de: "Jeden Tag" , it: "Ogni giorno", fr: "Chaque jour", ja: "毎日"},
   }),
   custom_themes: feature({
     id: "custom_themes",
@@ -826,9 +914,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "color-palette",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Kendi temanı oluştur", en: "Create your own themes", es: "Crea tus propios temas", pt: "Crie seus próprios temas", de: "Eigene Designs erstellen" , it: "Crea i tuoi temi"},
+    title: { tr: "Kendi temanı oluştur", en: "Create your own themes", es: "Crea tus propios temas", pt: "Crie seus próprios temas", de: "Eigene Designs erstellen" , it: "Crea i tuoi temi", fr: "Crée tes propres thèmes", ja: "オリジナルテーマを作る"},
     upsell: {
-      title: { tr: "Kendi temanı tasarla", en: "Design your own theme", es: "Diseña tu propio tema", pt: "Desenhe seu próprio tema", de: "Gestalte dein eigenes Design" , it: "Progetta il tuo tema"},
+      title: { tr: "Kendi temanı tasarla", en: "Design your own theme", es: "Diseña tu propio tema", pt: "Desenhe seu próprio tema", de: "Gestalte dein eigenes Design" , it: "Progetta il tuo tema", fr: "Conçois ton propre thème", ja: "自分だけのテーマをデザイン"},
       message: {
         tr: "Renkleri sen seç, temanı kaydet ve istediğin an değiştir.",
         en: "Pick your own colors, save your theme and switch whenever you like.",
@@ -836,7 +924,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Escolha suas cores, salve seu tema e troque quando quiser.",
         de: "Wähle deine eigenen Farben, speichere dein Design und wechsle, wann du willst.",
 
-  it: "Scegli i tuoi colori, salva il tema e cambia quando vuoi."},
+  it: "Scegli i tuoi colori, salva il tema e cambia quando vuoi.",
+  fr: "Choisis tes couleurs, enregistre ton thème et change quand tu veux.",
+  ja: "好きな色を選んでテーマを保存し、いつでも切り替えられます。"},
     },
     freeValue: {
       tr: `${PRESET_THEME_COUNT} hazır tema`,
@@ -845,8 +935,10 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: `${PRESET_THEME_COUNT} temas predefinidos`,
       de: `${PRESET_THEME_COUNT} Vorlagen-Designs`,
 
-  it: `${PRESET_THEME_COUNT} temi preimpostati`},
-    paidValue: { tr: "Sınırsız özel tema", en: "Unlimited custom themes", es: "Temas personalizados ilimitados", pt: "Temas personalizados ilimitados", de: "Unbegrenzt eigene Designs" , it: "Temi personalizzati illimitati"},
+  it: `${PRESET_THEME_COUNT} temi preimpostati`,
+  fr: `${PRESET_THEME_COUNT} thèmes prédéfinis`,
+  ja: `${PRESET_THEME_COUNT}種類のプリセットテーマ`},
+    paidValue: { tr: "Sınırsız özel tema", en: "Unlimited custom themes", es: "Temas personalizados ilimitados", pt: "Temas personalizados ilimitados", de: "Unbegrenzt eigene Designs" , it: "Temi personalizzati illimitati", fr: "Thèmes personnalisés illimités", ja: "カスタムテーマ無制限"},
   }),
   font_catalog: feature({
     id: "font_catalog",
@@ -854,9 +946,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "text",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Yazı tipi kataloğu", en: "Font catalog", es: "Catálogo de fuentes", pt: "Catálogo de fontes", de: "Schriftkatalog" , it: "Catalogo dei caratteri"},
+    title: { tr: "Yazı tipi kataloğu", en: "Font catalog", es: "Catálogo de fuentes", pt: "Catálogo de fontes", de: "Schriftkatalog" , it: "Catalogo dei caratteri", fr: "Catalogue de polices", ja: "フォントカタログ"},
     upsell: {
-      title: { tr: `${FONT_CATALOG_SIZE} yazı tipinin kilidini aç`, en: `Unlock all ${FONT_CATALOG_SIZE} fonts`, es: `Desbloquea las ${FONT_CATALOG_SIZE} fuentes`, pt: `Desbloqueie as ${FONT_CATALOG_SIZE} fontes`, de: `Alle ${FONT_CATALOG_SIZE} Schriften freischalten` , it: `Sblocca tutti i caratteri ${FONT_CATALOG_SIZE}`},
+      title: { tr: `${FONT_CATALOG_SIZE} yazı tipinin kilidini aç`, en: `Unlock all ${FONT_CATALOG_SIZE} fonts`, es: `Desbloquea las ${FONT_CATALOG_SIZE} fuentes`, pt: `Desbloqueie as ${FONT_CATALOG_SIZE} fontes`, de: `Alle ${FONT_CATALOG_SIZE} Schriften freischalten` , it: `Sblocca tutti i caratteri ${FONT_CATALOG_SIZE}`, fr: `Débloque les ${FONT_CATALOG_SIZE} polices`, ja: `${FONT_CATALOG_SIZE}種類のフォントをすべて解放`},
       message: {
         tr: "Başlık, gövde ve rakamlar için istediğin yazı tipini seç.",
         en: "Pick the font you like for headings, body text and numbers.",
@@ -864,7 +956,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Escolha a fonte que preferir para títulos, textos e números.",
         de: "Wähle die Schrift, die dir für Überschriften, Fließtext und Zahlen gefällt.",
 
-  it: "Scegli il carattere che preferisci per intestazioni, corpo del testo e numeri."},
+  it: "Scegli il carattere che preferisci per intestazioni, corpo del testo e numeri.",
+  fr: "Choisis la police que tu aimes pour les titres, le texte et les chiffres.",
+  ja: "見出し、本文、数字に好きなフォントを選べます。"},
     },
     freeValue: {
       tr: `${FREE_FONT_PRESET_IDS.length} yazı tipi`,
@@ -873,7 +967,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: `${FREE_FONT_PRESET_IDS.length} fontes`,
       de: `${FREE_FONT_PRESET_IDS.length} Schriften`,
 
-  it: `Caratteri ${FREE_FONT_PRESET_IDS.length}`},
+  it: `Caratteri ${FREE_FONT_PRESET_IDS.length}`,
+  fr: `${FREE_FONT_PRESET_IDS.length} polices`,
+  ja: `${FREE_FONT_PRESET_IDS.length}種類のフォント`},
     paidValue: {
       tr: `${FONT_CATALOG_SIZE} yazı tipi`,
       en: `${FONT_CATALOG_SIZE} fonts`,
@@ -881,7 +977,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: `${FONT_CATALOG_SIZE} fontes`,
       de: `${FONT_CATALOG_SIZE} Schriften`,
 
-  it: `Caratteri ${FONT_CATALOG_SIZE}`},
+  it: `Caratteri ${FONT_CATALOG_SIZE}`,
+  fr: `${FONT_CATALOG_SIZE} polices`,
+  ja: `${FONT_CATALOG_SIZE}種類のフォント`},
   }),
   app_icon: feature({
     id: "app_icon",
@@ -889,9 +987,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "apps",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Uygulama simgesi", en: "App icon", es: "Icono de la app", pt: "Ícone do app", de: "App-Symbol" , it: "Icona dell'app"},
+    title: { tr: "Uygulama simgesi", en: "App icon", es: "Icono de la app", pt: "Ícone do app", de: "App-Symbol" , it: "Icona dell'app", fr: "Icône de l'app", ja: "アプリアイコン"},
     upsell: {
-      title: { tr: "Simgeyi değiştir", en: "Change your app icon", es: "Cambia el icono de la app", pt: "Mude o ícone do app", de: "App-Symbol ändern" , it: "Cambia l'icona dell'app"},
+      title: { tr: "Simgeyi değiştir", en: "Change your app icon", es: "Cambia el icono de la app", pt: "Mude o ícone do app", de: "App-Symbol ändern" , it: "Cambia l'icona dell'app", fr: "Change l'icône de l'app", ja: "アプリアイコンを変更"},
       message: {
         tr: "Altın, Gece, Gün Batımı, Aurora ve daha fazlası: ana ekranındaki Seelogd simgesini kendin seç.",
         en: "Gold, Midnight, Sunset, Aurora and more: pick the Seelogd icon on your home screen.",
@@ -899,10 +997,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Ouro, Meia-noite, Pôr do sol, Aurora e mais: escolha o ícone do Seelogd na sua tela inicial.",
         de: "Gold, Mitternacht, Sonnenuntergang, Polarlicht und mehr: Wähle dein Seelogd-Symbol für den Startbildschirm.",
 
-  it: "Gold, Midnight, Sunset, Aurora e altro: scegli l'icona Seelogd sulla schermata iniziale."},
+  it: "Gold, Midnight, Sunset, Aurora e altro: scegli l'icona Seelogd sulla schermata iniziale.",
+  fr: "Or, Minuit, Coucher de soleil, Aurore et plus : choisis l'icône Seelogd de ton écran d'accueil.",
+  ja: "ゴールド、ミッドナイト、サンセット、オーロラなど:ホーム画面のSeelogdアイコンを選ぼう。"},
     },
-    freeValue: { tr: "Varsayılan simge", en: "Default icon", es: "Icono predeterminado", pt: "Ícone padrão", de: "Standardsymbol" , it: "Icona predefinita"},
-    paidValue: { tr: "Özel simgeler", en: "Exclusive icons", es: "Iconos exclusivos", pt: "Ícones exclusivos", de: "Exklusive Symbole" , it: "Icone esclusive"},
+    freeValue: { tr: "Varsayılan simge", en: "Default icon", es: "Icono predeterminado", pt: "Ícone padrão", de: "Standardsymbol" , it: "Icona predefinita", fr: "Icône par défaut", ja: "デフォルトのアイコン"},
+    paidValue: { tr: "Özel simgeler", en: "Exclusive icons", es: "Iconos exclusivos", pt: "Ícones exclusivos", de: "Exklusive Symbole" , it: "Icone esclusive", fr: "Icônes exclusives", ja: "限定アイコン"},
   }),
   snow_effect: feature({
     id: "snow_effect",
@@ -911,9 +1011,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "snow",
     minPlan: PREMIUM_PLAN.PREMIUM,
     // Kimlik tarihsel olarak "snow_effect"; kapsamı artık tüm atmosfer efektleri.
-    title: { tr: "Atmosfer efektleri", en: "Atmosphere effects", es: "Efectos de atmósfera", pt: "Efeitos de atmosfera", de: "Atmosphäre-Effekte" , it: "Effetti di atmosfera"},
+    title: { tr: "Atmosfer efektleri", en: "Atmosphere effects", es: "Efectos de atmósfera", pt: "Efeitos de atmosfera", de: "Atmosphäre-Effekte" , it: "Effetti di atmosfera", fr: "Effets d'atmosphère", ja: "アトモスフィアエフェクト"},
     upsell: {
-      title: { tr: "Atmosfer efektleri Premium'da", en: "Atmosphere effects are a Premium perk", es: "Los efectos de atmósfera son una ventaja Premium", pt: "Os efeitos de atmosfera são um benefício Premium", de: "Atmosphäre-Effekte sind ein Premium-Vorteil" , it: "Gli effetti di atmosfera sono un vantaggio Premium"},
+      title: { tr: "Atmosfer efektleri Premium'da", en: "Atmosphere effects are a Premium perk", es: "Los efectos de atmósfera son una ventaja Premium", pt: "Os efeitos de atmosfera são um benefício Premium", de: "Atmosphäre-Effekte sind ein Premium-Vorteil" , it: "Gli effetti di atmosfera sono un vantaggio Premium", fr: "Les effets d'atmosphère sont un avantage Premium", ja: "アトモスフィアエフェクトはPremium特典です"},
       message: {
         tr: "Kar, fırtına, kuzey ışıkları, patlamış mısır, kelebek ve daha fazlası ekranlarının arkasında; detaylarda yapımın türüne göre.",
         en: "Snow, storms, northern lights, popcorn, butterflies and more behind your screens, matched to the genre on details.",
@@ -921,10 +1021,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Neve, tempestades, aurora boreal, pipoca, borboletas e mais atrás das suas telas, conforme o gênero nos detalhes.",
         de: "Schnee, Gewitter, Polarlichter, Popcorn, Schmetterlinge und mehr hinter deinen Bildschirmen, in Details passend zum Genre.",
 
-  it: "Neve, tempeste, aurora boreale, popcorn, farfalle e altro ancora dietro i tuoi schermi, abbinati al genere nei dettagli."},
+  it: "Neve, tempeste, aurora boreale, popcorn, farfalle e altro ancora dietro i tuoi schermi, abbinati al genere nei dettagli.",
+  fr: "Neige, orages, aurores boréales, pop-corn, papillons et plus derrière tes écrans, assortis au genre sur les fiches.",
+  ja: "雪、嵐、オーロラ、ポップコーン、蝶などを画面の背景に。詳細ページではジャンルに合わせて表示。"},
     },
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "20 atmosfer efekti + türe göre", en: "20 atmosphere effects + by genre", es: "20 efectos de atmósfera + por género", pt: "20 efeitos de atmosfera + por gênero", de: "20 Atmosphäre-Effekte + nach Genre" , it: "20 effetti di atmosfera + per genere"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "20 atmosfer efekti + türe göre", en: "20 atmosphere effects + by genre", es: "20 efectos de atmósfera + por género", pt: "20 efeitos de atmosfera + por gênero", de: "20 Atmosphäre-Effekte + nach Genre" , it: "20 effetti di atmosfera + per genere", fr: "20 effets d'atmosphère + par genre", ja: "20種類のアトモスフィアエフェクト+ジャンル別"},
   }),
   ambient_background: feature({
     id: "ambient_background",
@@ -932,9 +1034,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "prism",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Ambiyans arka planı", en: "Ambient background", es: "Fondo ambiental", pt: "Fundo ambiente", de: "Ambiente-Hintergrund" , it: "Sfondo ambientale"},
+    title: { tr: "Ambiyans arka planı", en: "Ambient background", es: "Fondo ambiental", pt: "Fundo ambiente", de: "Ambiente-Hintergrund" , it: "Sfondo ambientale", fr: "Fond d'ambiance", ja: "アンビエント背景"},
     upsell: {
-      title: { tr: "Ambiyans Premium'da", en: "Ambient background is a Premium perk", es: "El fondo ambiental es una ventaja Premium", pt: "O fundo ambiente é um benefício Premium", de: "Der Ambiente-Hintergrund ist ein Premium-Vorteil" , it: "Lo sfondo ambientale è un vantaggio Premium"},
+      title: { tr: "Ambiyans Premium'da", en: "Ambient background is a Premium perk", es: "El fondo ambiental es una ventaja Premium", pt: "O fundo ambiente é um benefício Premium", de: "Der Ambiente-Hintergrund ist ein Premium-Vorteil" , it: "Lo sfondo ambientale è un vantaggio Premium", fr: "Le fond d'ambiance est un avantage Premium", ja: "アンビエント背景はPremium特典です"},
       message: {
         tr: "Ekranlarının arkasında bulanık, rengârenk ışıklar süzülsün.",
         en: "Let soft, colorful lights drift behind your screens.",
@@ -942,10 +1044,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Deixe luzes suaves e coloridas flutuarem atrás das suas telas.",
         de: "Lass weiche, bunte Lichter hinter deinen Bildschirmen treiben.",
 
-  it: "Lascia che luci morbide e colorate vadano alla deriva dietro i tuoi schermi."},
+  it: "Lascia che luci morbide e colorate vadano alla deriva dietro i tuoi schermi.",
+  fr: "Laisse des lumières douces et colorées flotter derrière tes écrans.",
+  ja: "やわらかくカラフルな光を画面の背景に漂わせよう。"},
     },
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights", es: "Luces flotantes", pt: "Luzes flutuantes", de: "Treibende Lichter" , it: "Luci fluttuanti"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights", es: "Luces flotantes", pt: "Luzes flutuantes", de: "Treibende Lichter" , it: "Luci fluttuanti", fr: "Lumières flottantes", ja: "漂う光"},
   }),
   // Film/dizi başına TMDB'deki alternatif afiş ve arka planlardan biri (utils/posterChoices.js).
   // Abonelik bitince seçimler SİLİNMEZ, varsayılan görsel çizilir (diğer kozmetiklerle
@@ -958,14 +1062,14 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "images",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Özel afiş ve arka planlar", en: "Custom posters and backdrops", es: "Pósteres y fondos personalizados", pt: "Pôsteres e fundos personalizados", de: "Eigene Poster und Hintergründe" , it: "Poster e sfondi personalizzati"},
+    title: { tr: "Özel afiş ve arka planlar", en: "Custom posters and backdrops", es: "Pósteres y fondos personalizados", pt: "Pôsteres e fundos personalizados", de: "Eigene Poster und Hintergründe" , it: "Poster e sfondi personalizzati", fr: "Affiches et fonds personnalisés", ja: "カスタムポスターと背景画像"},
     // Yükseltme sayfası galeriden açılınca seçmeye çalışılan görseli de gösterir
     // ("Şimdi" → "Seçtiğin"; utils/premiumUpsellContent buildChoicePreview). Başlık o
     // an seçilen türe göre: `titleByPreview.backdrop` arka plan galerisinden gelince.
     upsell: {
-      title: { tr: "Afişi sen seç", en: "You pick the poster", es: "Tú eliges el póster", pt: "Você escolhe o pôster", de: "Du wählst das Poster" , it: "Sei tu a scegliere il poster"},
+      title: { tr: "Afişi sen seç", en: "You pick the poster", es: "Tú eliges el póster", pt: "Você escolhe o pôster", de: "Du wählst das Poster" , it: "Sei tu a scegliere il poster", fr: "Tu choisis l'affiche", ja: "ポスターを選べる"},
       titleByPreview: {
-        backdrop: { tr: "Arka planı sen seç", en: "You pick the backdrop", es: "Tú eliges el fondo", pt: "Você escolhe o fundo", de: "Du wählst den Hintergrund" , it: "Sei tu a scegliere lo sfondo"},
+        backdrop: { tr: "Arka planı sen seç", en: "You pick the backdrop", es: "Tú eliges el fondo", pt: "Você escolhe o fundo", de: "Du wählst den Hintergrund" , it: "Sei tu a scegliere lo sfondo", fr: "Tu choisis le fond", ja: "背景画像を選べる"},
       },
       message: {
         tr: "Seçtiğin afiş ve arka plan her yerde görünür, arkadaşların da görür.",
@@ -974,10 +1078,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Seus pôsteres e fundos escolhidos aparecem em todo lugar, e seus amigos também veem.",
         de: "Deine Poster und Hintergründe erscheinen überall, und deine Freunde sehen sie auch.",
 
-  it: "Il tuo poster e i tuoi sfondi vengono visualizzati ovunque e anche i tuoi amici li vedono."},
+  it: "Il tuo poster e i tuoi sfondi vengono visualizzati ovunque e anche i tuoi amici li vedono.",
+  fr: "Tes choix d'affiche et de fond s'affichent partout, et tes amis les voient aussi.",
+  ja: "選んだポスターと背景画像はどこにでも表示され、友だちにも見えます。"},
     },
-    freeValue: { tr: "Varsayılan", en: "Default", es: "Predeterminado", pt: "Padrão", de: "Standard" , it: "Predefinito"},
-    paidValue: { tr: "Senin seçimin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" , it: "La tua scelta"},
+    freeValue: { tr: "Varsayılan", en: "Default", es: "Predeterminado", pt: "Padrão", de: "Standard" , it: "Predefinito", fr: "Par défaut", ja: "デフォルト"},
+    paidValue: { tr: "Senin seçimin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" , it: "La tua scelta", fr: "Ton choix", ja: "あなたの選択"},
   }),
   icon_background: feature({
     id: "icon_background",
@@ -985,9 +1091,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "image",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "İkon arka planı", en: "Icon background", es: "Fondo de iconos", pt: "Fundo de ícones", de: "Symbolhintergrund" , it: "Sfondo delle icone"},
+    title: { tr: "İkon arka planı", en: "Icon background", es: "Fondo de iconos", pt: "Fundo de ícones", de: "Symbolhintergrund" , it: "Sfondo delle icone", fr: "Fond d'icônes", ja: "アイコン背景"},
     upsell: {
-      title: { tr: "İkon arka planı Premium'da", en: "Icon background is a Premium perk", es: "El fondo de iconos es una ventaja Premium", pt: "O fundo de ícones é um benefício Premium", de: "Der Symbolhintergrund ist ein Premium-Vorteil" , it: "Lo sfondo delle icone è un vantaggio Premium"},
+      title: { tr: "İkon arka planı Premium'da", en: "Icon background is a Premium perk", es: "El fondo de iconos es una ventaja Premium", pt: "O fundo de ícones é um benefício Premium", de: "Der Symbolhintergrund ist ein Premium-Vorteil" , it: "Lo sfondo delle icone è un vantaggio Premium", fr: "Le fond d'icônes est un avantage Premium", ja: "アイコン背景はPremium特典です"},
       message: {
         tr: "Ekran arka planlarına desen ekle; saydamlığını ve düzenini ayarla.",
         en: "Add a pattern behind your screens and tune its opacity and layout.",
@@ -995,10 +1101,12 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Adicione um padrão atrás das suas telas e ajuste a opacidade e a disposição.",
         de: "Füge hinter deinen Bildschirmen ein Muster hinzu und passe Deckkraft und Anordnung an.",
 
-  it: "Aggiungi un motivo dietro i tuoi schermi e ottimizzane l'opacità e il layout."},
+  it: "Aggiungi un motivo dietro i tuoi schermi e ottimizzane l'opacità e il layout.",
+  fr: "Ajoute un motif derrière tes écrans et règle son opacité et sa disposition.",
+  ja: "画面の背景に模様を加え、不透明度と配置を調整できます。"},
     },
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento"},
-    paidValue: { tr: "Desenli arka plan", en: "Patterned background", es: "Fondo con patrón", pt: "Fundo com padrão", de: "Hintergrund mit Muster" , it: "Sfondo con motivi"},
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" , it: "Spento", fr: "Désactivé", ja: "オフ"},
+    paidValue: { tr: "Desenli arka plan", en: "Patterned background", es: "Fondo con patrón", pt: "Fundo com padrão", de: "Hintergrund mit Muster" , it: "Sfondo con motivi", fr: "Fond à motif", ja: "模様のある背景"},
   }),
   streaming_alerts: feature({
     id: "streaming_alerts",
@@ -1007,11 +1115,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "notifications",
     enforcedBy: "server",
     limits: { free: 10, premium: 100, unlimited: 100 },
-    title: { tr: "Platform bildirimi", en: "Streaming alerts", es: "Avisos de streaming", pt: "Avisos de streaming", de: "Streaming-Benachrichtigungen" , it: "Avvisi di streaming"},
+    title: { tr: "Platform bildirimi", en: "Streaming alerts", es: "Avisos de streaming", pt: "Avisos de streaming", de: "Streaming-Benachrichtigungen" , it: "Avvisi di streaming", fr: "Alertes streaming", ja: "配信通知"},
     upsell: {
-      title: { tr: "Takip limitin doldu", en: "Tracking limit reached", es: "Has alcanzado el límite de seguimiento", pt: "Você atingiu o limite de acompanhamento", de: "Verfolgungslimit erreicht" , it: "Limite di monitoraggio raggiunto"},
+      title: { tr: "Takip limitin doldu", en: "Tracking limit reached", es: "Has alcanzado el límite de seguimiento", pt: "Você atingiu o limite de acompanhamento", de: "Verfolgungslimit erreicht" , it: "Limite di monitoraggio raggiunto", fr: "Limite de suivi atteinte", ja: "追跡の上限に達しました"},
     },
-    unit: { tr: "başlık", en: "titles", es: "títulos", pt: "títulos", de: "Titel" , it: "titoli"},
+    unit: { tr: "başlık", en: "titles", es: "títulos", pt: "títulos", de: "Titel" , it: "titoli", fr: "titres", ja: "作品"},
     detail: {
       tr: "İzleme listene son eklediğin yapımlar bir platforma gelince haber verir",
       en: "Tells you when your latest watchlist titles start streaming",
@@ -1019,7 +1127,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Avisa quando os últimos títulos da sua lista para assistir chegam a um serviço de streaming",
       de: "Sagt dir Bescheid, wenn deine neuesten Merklisten-Titel zu streamen beginnen",
 
-  it: "Ti informa quando inizia lo streaming dei titoli della tua lista di titoli più recenti"},
+  it: "Ti informa quando inizia lo streaming dei titoli della tua lista di titoli più recenti",
+  fr: "Te prévient quand les derniers titres de ta liste à voir arrivent en streaming",
+  ja: "ウォッチリストの最新作品が配信開始されたらお知らせします"},
     phrase: {
       tr: (n) => `izleme listene son eklediğin ${n} başlık takip edilir`,
       en: (n) => `your ${n} most recent watchlist titles are tracked`,
@@ -1027,7 +1137,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `seus ${n} títulos mais recentes da lista para assistir são acompanhados`,
       de: (n) => `deine ${n} neuesten Merklisten-Titel werden verfolgt`,
 
-  it: n => `i tuoi ${n} titoli della lista Da vedere più recenti vengono tracciati`},
+  it: n => `i tuoi ${n} titoli della lista Da vedere più recenti vengono tracciati`,
+  fr: (n) => `tes ${n} titres les plus récents de la liste à voir sont suivis`,
+  ja: (n) => `ウォッチリストの最新${n}作品を追跡します`},
   }),
   movie_reminders: feature({
     id: "movie_reminders",
@@ -1035,11 +1147,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "alerts",
     icon: "film",
     limits: { free: 10, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Film hatırlatması", en: "Movie reminders", es: "Recordatorios de películas", pt: "Lembretes de filmes", de: "Filmerinnerungen" , it: "Promemoria film"},
+    title: { tr: "Film hatırlatması", en: "Movie reminders", es: "Recordatorios de películas", pt: "Lembretes de filmes", de: "Filmerinnerungen" , it: "Promemoria film", fr: "Rappels de films", ja: "映画のリマインダー"},
     upsell: {
-      title: { tr: "Film hatırlatma limitin doldu", en: "You've reached your movie reminder limit", es: "Has alcanzado tu límite de recordatorios de películas", pt: "Você atingiu seu limite de lembretes de filmes", de: "Du hast dein Limit für Filmerinnerungen erreicht" , it: "Hai raggiunto il limite di promemoria dei film"},
+      title: { tr: "Film hatırlatma limitin doldu", en: "You've reached your movie reminder limit", es: "Has alcanzado tu límite de recordatorios de películas", pt: "Você atingiu seu limite de lembretes de filmes", de: "Du hast dein Limit für Filmerinnerungen erreicht" , it: "Hai raggiunto il limite di promemoria dei film", fr: "Tu as atteint ta limite de rappels de films", ja: "映画リマインダーの上限に達しました"},
     },
-    unit: { tr: "film", en: "movies", es: "películas", pt: "filmes", de: "Filme" , it: "film"},
+    unit: { tr: "film", en: "movies", es: "películas", pt: "filmes", de: "Filme" , it: "film", fr: "films", ja: "映画"},
     note: {
       tr: "Çıkışı geçmiş filmler sayılmaz",
       en: "Movies that have already released don't count",
@@ -1047,7 +1159,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Filmes que já estrearam não contam",
       de: "Bereits erschienene Filme zählen nicht",
 
-  it: "I film già usciti non contano"},
+  it: "I film già usciti non contano",
+  fr: "Les films déjà sortis ne comptent pas",
+  ja: "すでに公開された映画はカウントされません"},
     phrase: {
       tr: (n) => `aynı anda en fazla ${n} filmin çıkışı için hatırlatma kurabilirsin`,
       en: (n) => `you can have reminders for up to ${n} upcoming movies at once`,
@@ -1055,7 +1169,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode ter lembretes de até ${n} próximas estreias de filmes ao mesmo tempo`,
       de: (n) => `du kannst Erinnerungen für bis zu ${n} kommende Filme gleichzeitig haben`,
 
-  it: n => `puoi avere promemoria per un massimo di ${n} film in uscita contemporaneamente`},
+  it: n => `puoi avere promemoria per un massimo di ${n} film in uscita contemporaneamente`,
+  fr: (n) => `tu peux avoir des rappels pour jusqu'à ${n} films à venir à la fois`,
+  ja: (n) => `公開予定の映画のリマインダーを同時に最大${n}件設定できます`},
   }),
   tv_reminders: feature({
     id: "tv_reminders",
@@ -1063,11 +1179,11 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "alerts",
     icon: "tv",
     limits: { free: 20, premium: 100, unlimited: UNLIMITED },
-    title: { tr: "Dizi hatırlatması", en: "Show reminders", es: "Recordatorios de series", pt: "Lembretes de séries", de: "Serienerinnerungen" , it: "Mostra promemoria"},
+    title: { tr: "Dizi hatırlatması", en: "Show reminders", es: "Recordatorios de series", pt: "Lembretes de séries", de: "Serienerinnerungen" , it: "Mostra promemoria", fr: "Rappels de séries", ja: "番組のリマインダー"},
     upsell: {
-      title: { tr: "Dizi hatırlatma limitin doldu", en: "You've reached your show reminder limit", es: "Has alcanzado tu límite de recordatorios de series", pt: "Você atingiu seu limite de lembretes de séries", de: "Du hast dein Limit für Serienerinnerungen erreicht" , it: "Hai raggiunto il limite di promemoria dello serie TV"},
+      title: { tr: "Dizi hatırlatma limitin doldu", en: "You've reached your show reminder limit", es: "Has alcanzado tu límite de recordatorios de series", pt: "Você atingiu seu limite de lembretes de séries", de: "Du hast dein Limit für Serienerinnerungen erreicht" , it: "Hai raggiunto il limite di promemoria dello serie TV", fr: "Tu as atteint ta limite de rappels de séries", ja: "番組リマインダーの上限に達しました"},
     },
-    unit: { tr: "dizi", en: "shows", es: "series", pt: "séries", de: "Serien" , it: "serie TV"},
+    unit: { tr: "dizi", en: "shows", es: "series", pt: "séries", de: "Serien" , it: "serie TV", fr: "séries", ja: "番組"},
     note: {
       tr: "Bir dizinin tüm bölümleri tek hak sayılır; yayınlanmış bölümler sayılmaz",
       en: "All episodes of one show use a single slot; aired episodes don't count",
@@ -1075,7 +1191,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Todos os episódios de uma série usam uma única vaga; os já exibidos não contam",
       de: "Alle Folgen einer Serie belegen einen einzigen Platz; bereits ausgestrahlte Folgen zählen nicht",
 
-  it: "Tutti gli episodi di uno serie TV utilizzano un unico slot; gli episodi trasmessi non contano"},
+  it: "Tutti gli episodi di uno serie TV utilizzano un unico slot; gli episodi trasmessi non contano",
+  fr: "Tous les épisodes d'une série utilisent un seul emplacement ; les épisodes diffusés ne comptent pas",
+  ja: "1つの番組の全エピソードで1枠を使います。放送済みのエピソードはカウントされません"},
     phrase: {
       tr: (n) => `aynı anda en fazla ${n} dizi için bölüm hatırlatması kurabilirsin`,
       en: (n) => `you can have episode reminders for up to ${n} shows at once`,
@@ -1083,7 +1201,9 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode ter lembretes de episódios de até ${n} séries ao mesmo tempo`,
       de: (n) => `du kannst Folgenerinnerungen für bis zu ${n} Serien gleichzeitig haben`,
 
-  it: n => `puoi avere promemoria degli episodi per un massimo di ${n} programmi contemporaneamente`},
+  it: n => `puoi avere promemoria degli episodi per un massimo di ${n} programmi contemporaneamente`,
+  fr: (n) => `tu peux avoir des rappels d'épisodes pour jusqu'à ${n} séries à la fois`,
+  ja: (n) => `最大${n}番組のエピソードリマインダーを同時に設定できます`},
   }),
   wrapped_archive: feature({
     id: "wrapped_archive",
@@ -1099,10 +1219,10 @@ export const PREMIUM_FEATURES = Object.freeze({
       premium: WRAPPED_YEARS_VISIBLE.premium,
       unlimited: UNLIMITED,
     },
-    title: { tr: "Wrapped arşivi", en: "Wrapped archive", es: "Archivo de Wrapped", pt: "Arquivo do Wrapped", de: "Wrapped-Archiv" , it: "Archivio completo"},
-    unit: { tr: "yıl", en: "years", es: "años", pt: "anos", de: "Jahre" , it: "anni"},
+    title: { tr: "Wrapped arşivi", en: "Wrapped archive", es: "Archivo de Wrapped", pt: "Arquivo do Wrapped", de: "Wrapped-Archiv" , it: "Archivio completo", fr: "Archive Wrapped", ja: "まとめのアーカイブ"},
+    unit: { tr: "yıl", en: "years", es: "años", pt: "anos", de: "Jahre" , it: "anni", fr: "ans", ja: "年"},
     upsell: {
-      title: { tr: "Geçmiş yıllar Premium'da", en: "Past years are a Premium perk", es: "Los años anteriores son una ventaja Premium", pt: "Os anos anteriores são um benefício Premium", de: "Frühere Jahre sind ein Premium-Vorteil" , it: "Gli anni passati sono un vantaggio Premium"},
+      title: { tr: "Geçmiş yıllar Premium'da", en: "Past years are a Premium perk", es: "Los años anteriores son una ventaja Premium", pt: "Os anos anteriores são um benefício Premium", de: "Frühere Jahre sind ein Premium-Vorteil" , it: "Gli anni passati sono un vantaggio Premium", fr: "Les années passées sont un avantage Premium", ja: "過去の年はPremium特典です"},
       // Premium'un penceresi dolunca (5 yıldan eski) hedef plan Max olur.
       titleByTarget: {
         [PREMIUM_PLAN.UNLIMITED]: {
@@ -1112,11 +1232,13 @@ export const PREMIUM_FEATURES = Object.freeze({
           pt: "Todos os anos são um benefício Premium Max",
           de: "Jedes Jahr ist ein Premium-Max-Vorteil",
 
-  it: "Ogni anno è un vantaggio Premium Max"},
+  it: "Ogni anno è un vantaggio Premium Max",
+  fr: "Toutes les années sont un avantage Premium Max",
+  ja: "すべての年はPremium Max特典です"},
       },
     },
     planValue: {
-      [PREMIUM_PLAN.FREE]: { tr: "Yalnız bu yıl", en: "This year only", es: "Solo este año", pt: "Somente este ano", de: "Nur dieses Jahr" , it: "Solo quest'anno"},
+      [PREMIUM_PLAN.FREE]: { tr: "Yalnız bu yıl", en: "This year only", es: "Solo este año", pt: "Somente este ano", de: "Nur dieses Jahr" , it: "Solo quest'anno", fr: "Cette année seulement", ja: "今年のみ"},
       [PREMIUM_PLAN.PREMIUM]: {
         tr: `Son ${WRAPPED_YEARS_VISIBLE.premium} yıl`,
         en: `Last ${WRAPPED_YEARS_VISIBLE.premium} years`,
@@ -1124,8 +1246,10 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: `Últimos ${WRAPPED_YEARS_VISIBLE.premium} anos`,
         de: `Letzte ${WRAPPED_YEARS_VISIBLE.premium} Jahre`,
 
-  it: `Ultimi ${WRAPPED_YEARS_VISIBLE.premium} anni`},
-      [PREMIUM_PLAN.UNLIMITED]: { tr: "Tüm yıllar", en: "Every year", es: "Todos los años", pt: "Todos os anos", de: "Jedes Jahr" , it: "Ogni anno"},
+  it: `Ultimi ${WRAPPED_YEARS_VISIBLE.premium} anni`,
+  fr: `${WRAPPED_YEARS_VISIBLE.premium} dernières années`,
+  ja: `過去${WRAPPED_YEARS_VISIBLE.premium}年`},
+      [PREMIUM_PLAN.UNLIMITED]: { tr: "Tüm yıllar", en: "Every year", es: "Todos los años", pt: "Todos os anos", de: "Jedes Jahr" , it: "Ogni anno", fr: "Toutes les années", ja: "すべての年"},
     },
     phrase: {
       tr: (n) =>
@@ -1159,7 +1283,19 @@ export const PREMIUM_FEATURES = Object.freeze({
             ? `du kannst die Wrapped-Rückblicke der letzten ${n} Jahre ansehen`
             : "du kannst die Wrapped-Rückblicke aller Jahre ansehen",
 
-  it: n => n === 1 ? "puoi visualizzare solo il riepilogo Wrapped di quest'anno" : Number.isFinite(n) ? `puoi visualizzare i riepiloghi Wrapped degli ultimi ${n} anni` : "puoi visualizzare i riepiloghi Wrapped di ogni anno"},
+  it: n => n === 1 ? "puoi visualizzare solo il riepilogo Wrapped di quest'anno" : Number.isFinite(n) ? `puoi visualizzare i riepiloghi Wrapped degli ultimi ${n} anni` : "puoi visualizzare i riepiloghi Wrapped di ogni anno",
+  fr: (n) =>
+        n === 1
+          ? "tu peux voir uniquement le Wrapped de cette année"
+          : Number.isFinite(n)
+            ? `tu peux voir tes Wrapped des ${n} dernières années`
+            : "tu peux voir tes Wrapped de toutes les années",
+  ja: (n) =>
+        n === 1
+          ? "今年のまとめのみ見られます"
+          : Number.isFinite(n)
+            ? `過去${n}年分のまとめを見られます`
+            : "すべての年のまとめを見られます"},
   }),
   // Uygulama içi geri bildirim kutusu (Ayarlar > Destek ve geri bildirim).
   // Hata bildirimi Free dahil açıktır; özellik isteği Premium Max kapısını korur.
@@ -1171,9 +1307,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "bug",
     enforcedBy: "server",
     minPlan: PREMIUM_PLAN.FREE,
-    title: { tr: "Hata bildirimi", en: "Bug reports", es: "Informes de errores", pt: "Relatos de erros", de: "Fehlerberichte" , it: "Segnalazioni di bug"},
+    title: { tr: "Hata bildirimi", en: "Bug reports", es: "Informes de errores", pt: "Relatos de erros", de: "Fehlerberichte" , it: "Segnalazioni di bug", fr: "Signalements de bugs", ja: "バグ報告"},
     upsell: {
-      title: { tr: "Hata bildir", en: "Report a bug", es: "Informar de un error", pt: "Relatar um erro", de: "Fehler melden" , it: "Segnala un bug"},
+      title: { tr: "Hata bildir", en: "Report a bug", es: "Informar de un error", pt: "Relatar um erro", de: "Fehler melden" , it: "Segnala un bug", fr: "Signaler un bug", ja: "バグを報告"},
       message: {
         tr: "Karşılaştığın sorunu uygulamadan doğrudan ilet; cihaz ve sürüm bilgisi kendiliğinden eklenir.",
         en: "Send the problem you ran into straight from the app; device and version details are attached for you.",
@@ -1181,7 +1317,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Envie o problema que você encontrou direto pelo app; os dados do dispositivo e da versão são anexados automaticamente.",
         de: "Sende das aufgetretene Problem direkt aus der App; Geräte- und Versionsangaben werden für dich angehängt.",
 
-  it: "Invia il problema che hai riscontrato direttamente dall'app; i dettagli del dispositivo e della versione sono allegati per te."},
+  it: "Invia il problema che hai riscontrato direttamente dall'app; i dettagli del dispositivo e della versione sono allegati per te.",
+  fr: "Envoie le problème rencontré directement depuis l'app ; les infos de l'appareil et de la version sont jointes pour toi.",
+  ja: "遭遇した問題をアプリから直接送れます。端末とバージョンの情報は自動で添付されます。"},
     },
     detail: {
       tr: "Uygulamadan, cihaz ve sürüm bilgisiyle birlikte",
@@ -1190,9 +1328,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Pelo app, com dados do dispositivo e da versão",
       de: "Direkt aus der App, mit Geräte- und Versionsangaben",
 
-  it: "Dall'interno dell'app, con i dettagli del dispositivo e della versione"},
-    freeValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" , it: "Segnala in-app"},
-    paidValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" , it: "Segnala in-app"},
+  it: "Dall'interno dell'app, con i dettagli del dispositivo e della versione",
+  fr: "Depuis l'app, avec les infos de l'appareil et de la version",
+  ja: "アプリ内から、端末とバージョンの情報付きで"},
+    freeValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" , it: "Segnala in-app", fr: "Signaler dans l'app", ja: "アプリ内で報告"},
+    paidValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" , it: "Segnala in-app", fr: "Signaler dans l'app", ja: "アプリ内で報告"},
   }),
   feature_request: feature({
     id: "feature_request",
@@ -1201,9 +1341,9 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "bulb",
     enforcedBy: "server",
     minPlan: PREMIUM_PLAN.UNLIMITED,
-    title: { tr: "Özellik isteği", en: "Feature requests", es: "Solicitudes de funciones", pt: "Pedidos de recursos", de: "Funktionswünsche" , it: "Richieste di funzionalità"},
+    title: { tr: "Özellik isteği", en: "Feature requests", es: "Solicitudes de funciones", pt: "Pedidos de recursos", de: "Funktionswünsche" , it: "Richieste di funzionalità", fr: "Suggestions de fonctionnalités", ja: "機能リクエスト"},
     upsell: {
-      title: { tr: "Özellik isteği Premium Max'te", en: "Feature requests are a Premium Max perk", es: "Las solicitudes de funciones son una ventaja Premium Max", pt: "Os pedidos de recursos são um benefício Premium Max", de: "Funktionswünsche sind ein Premium-Max-Vorteil" , it: "Le richieste di funzionalità sono un vantaggio di Premium Max"},
+      title: { tr: "Özellik isteği Premium Max'te", en: "Feature requests are a Premium Max perk", es: "Las solicitudes de funciones son una ventaja Premium Max", pt: "Os pedidos de recursos são um benefício Premium Max", de: "Funktionswünsche sind ein Premium-Max-Vorteil" , it: "Le richieste di funzionalità sono un vantaggio di Premium Max", fr: "Les suggestions de fonctionnalités sont un avantage Premium Max", ja: "機能リクエストはPremium Max特典です"},
       message: {
         tr: "Görmek istediğin özelliği doğrudan bize ilet; gönderdiklerinin durumunu uygulamadan takip et.",
         en: "Tell us the feature you want to see, and follow the status of what you sent right in the app.",
@@ -1211,7 +1351,9 @@ export const PREMIUM_FEATURES = Object.freeze({
         pt: "Conte qual recurso você quer ver e acompanhe no app o status do que você enviou.",
         de: "Sag uns, welche Funktion du dir wünschst, und verfolge den Status deiner Einsendung direkt in der App.",
 
-  it: "Dicci la funzionalità che desideri vedere e segui lo stato di ciò che hai inviato direttamente nell'app."},
+  it: "Dicci la funzionalità che desideri vedere e segui lo stato di ciò che hai inviato direttamente nell'app.",
+  fr: "Dis-nous quelle fonctionnalité tu veux voir, et suis l'état de ce que tu as envoyé directement dans l'app.",
+  ja: "欲しい機能を教えてください。送った内容の状況はアプリ内で確認できます。"},
     },
     detail: {
       tr: "Fikrini doğrudan bize ilet, durumunu takip et",
@@ -1220,9 +1362,11 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Envie sua ideia direto para nós e acompanhe o status",
       de: "Sende uns deine Idee direkt und verfolge ihren Status",
 
-  it: "Inviaci la tua idea direttamente e seguine lo stato"},
-    freeValue: { tr: "Yalnız e-posta", en: "Email only", es: "Solo correo", pt: "Somente e-mail", de: "Nur per E-Mail" , it: "Solo tramite e-mail"},
-    paidValue: { tr: "Uygulamadan öner", en: "Suggest in-app", es: "Sugerir en la app", pt: "Sugerir no app", de: "In der App vorschlagen" , it: "Suggerisci in-app"},
+  it: "Inviaci la tua idea direttamente e seguine lo stato",
+  fr: "Envoie-nous ton idée directement et suis son état",
+  ja: "アイデアを直接送り、状況を確認"},
+    freeValue: { tr: "Yalnız e-posta", en: "Email only", es: "Solo correo", pt: "Somente e-mail", de: "Nur per E-Mail" , it: "Solo tramite e-mail", fr: "E-mail seulement", ja: "メールのみ"},
+    paidValue: { tr: "Uygulamadan öner", en: "Suggest in-app", es: "Sugerir en la app", pt: "Sugerir no app", de: "In der App vorschlagen" , it: "Suggerisci in-app", fr: "Suggérer dans l'app", ja: "アプリ内で提案"},
   }),
 });
 
@@ -1242,7 +1386,7 @@ export const UPSELL_BUNDLES = Object.freeze({
   cineswipe: Object.freeze({
     id: "cineswipe",
     features: Object.freeze(["cineswipe_swipes", "cineswipe_rooms"]),
-    title: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium", pt: "O CineSwipe é um benefício Premium", de: "CineSwipe ist ein Premium-Vorteil" , it: "CineSwipe è un vantaggio Premium"},
+    title: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium", pt: "O CineSwipe é um benefício Premium", de: "CineSwipe ist ein Premium-Vorteil" , it: "CineSwipe è un vantaggio Premium", fr: "CineSwipe est un avantage Premium", ja: "CineSwipeはPremium特典です"},
     message: {
       tr: "Kartları tek başına kaydır ya da arkadaşınla ortak oda kur; eşleşin ve bu akşamki filmi birlikte seçin.",
       en: "Swipe cards on your own or host a shared room with a friend; match up and pick tonight's movie together.",
@@ -1250,7 +1394,9 @@ export const UPSELL_BUNDLES = Object.freeze({
       pt: "Deslize cards sozinho ou crie uma sala compartilhada com um amigo; deem match e escolham juntos o filme da noite.",
       de: "Wische allein durch Karten oder hoste einen gemeinsamen Raum mit einem Freund; matcht und wählt gemeinsam den Film für heute Abend.",
 
-  it: "Scorri le carte da solo o ospita una stanza condivisa con un amico; abbinatevi e scegliete insieme il film di stasera."},
+  it: "Scorri le carte da solo o ospita una stanza condivisa con un amico; abbinatevi e scegliete insieme il film di stasera.",
+  fr: "Fais défiler des cartes seul ou organise un salon partagé avec un ami ; trouvez des correspondances et choisissez ensemble le film de ce soir.",
+  ja: "ひとりでカードをスワイプするか、友だちと共有ルームを開いてマッチし、今夜の映画を一緒に決めよう。"},
   }),
 });
 
@@ -1266,7 +1412,7 @@ export function upsellBundleFor(featureId, plan) {
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı); `es` kolu olmayan girdi İngilizceye düşer.
 const pick = (copy, language) =>
-  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"])] ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])] ?? copy?.en ?? copy?.tr ?? "";
 
 /** Sayısal karşılaştırma için limit (AI kotasında günlük tavan). */
 const numericLimit = (definition, limit) =>
@@ -1393,7 +1539,7 @@ export function requiredPlanForWrappedYear(year, now = new Date()) {
 }
 
 const unlimitedWord = (language) =>
-  pickByLanguage(language, { tr: "Sınırsız", en: "Unlimited", es: "Ilimitado", pt: "Ilimitado", de: "Unbegrenzt" , it: "Illimitato"});
+  pickByLanguage(language, { tr: "Sınırsız", en: "Unlimited", es: "Ilimitado", pt: "Ilimitado", de: "Unbegrenzt" , it: "Illimitato", fr: "Illimité", ja: "無制限"});
 
 /** Cümle içinde plan adı: Free planı İspanyolcada "Gratis", Portekizcede "Grátis", Almancada "Kostenlos" (ekranlardaki plan adıyla aynı). */
 const planNameFor = (plan, language) => {
@@ -1434,7 +1580,9 @@ export function formatFeatureValue(featureId, plan, language = "en") {
       pt: `${limit.daily}/dia · ${limit.monthly}/mês`,
       de: `${limit.daily}/Tag · ${limit.monthly}/Mon.`,
 
-  it: `${limit.daily}/giorno · ${limit.monthly}/mese`});
+  it: `${limit.daily}/giorno · ${limit.monthly}/mese`,
+  fr: `${limit.daily}/jour · ${limit.monthly}/mois`,
+  ja: `${limit.daily}/日 · ${limit.monthly}/月`});
   }
   if (definition.kind === ACCESS) {
     if (!limit) return definition.freeValue ? pick(definition.freeValue, language) : "—";
@@ -1460,7 +1608,9 @@ export function formatFeatureValue(featureId, plan, language = "en") {
       pt: `${count} ${unit}/dia`,
       de: `${count} ${unit}/Tag`,
 
-  it: `${count} ${unit}/giorno`});
+  it: `${count} ${unit}/giorno`,
+  fr: `${count} ${unit}/jour`,
+  ja: `${count} ${unit}/日`});
   }
   return `${count} ${unit}`;
 }
@@ -1480,7 +1630,7 @@ function upgradeSentence(featureId, plan, language) {
       ? formatFeatureValue(featureId, candidate, language).toLocaleLowerCase(intlLocaleOf(lang))
       : Number.isFinite(limit)
         ? grouped(limit, lang)
-        : pickByLanguage(lang, { tr: "sınırsız", en: "unlimited", es: "ilimitado", pt: "ilimitado", de: "unbegrenzt" , it: "illimitato"});
+        : pickByLanguage(lang, { tr: "sınırsız", en: "unlimited", es: "ilimitado", pt: "ilimitado", de: "unbegrenzt" , it: "illimitato", fr: "illimité", ja: "無制限"});
     const name = getPremiumPlanDisplayName(candidate);
     parts.push(
       pickByLanguage(lang, {
@@ -1490,7 +1640,9 @@ function upgradeSentence(featureId, plan, language) {
         pt: `com ${name}: ${value}`,
         de: `mit ${name}: ${value}`,
 
-  it: `con ${name}: ${value}`}),
+  it: `con ${name}: ${value}`,
+  fr: `avec ${name} : ${value}`,
+  ja: `${name}なら:${value}`}),
     );
   }
   if (!parts.length) return "";
@@ -1521,7 +1673,9 @@ export function describeCurrentLimit(featureId, plan, language = "en") {
     pt: `No plano ${planName}, ${phrase(cap)}.`,
     de: `Im ${planName}-Plan gilt: ${phrase(cap)}.`,
 
-  it: `Il ${planName}, ${phrase(cap)}.`});
+  it: `Il ${planName}, ${phrase(cap)}.`,
+  fr: `Avec ${planName}, ${phrase(cap)}.`,
+  ja: `${planName}では${phrase(cap)}。`});
 }
 
 /**
@@ -1531,13 +1685,13 @@ export function describeCurrentLimit(featureId, plan, language = "en") {
 export function buildLimitCopy(featureId, plan, language = "en") {
   const definition = getFeature(featureId);
   const lang = normalizeAppLanguage(language);
-  const L = (tr, en, es, pt, de, it) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en });
+  const L = (tr, en, es, pt, de, it, fr, ja) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en, fr: fr ?? en, ja: ja ?? en });
   const normalized = normalizePlan(plan);
   const canUpgrade = Boolean(nextPlanFor(featureId, normalized));
 
   if (!definition) {
     return {
-      title: L("Premium özelliği", "Premium feature", "Función Premium", "Recurso Premium", "Premium-Funktion", "Funzione Premium"),
+      title: L("Premium özelliği", "Premium feature", "Función Premium", "Recurso Premium", "Premium-Funktion", "Funzione Premium", "Fonctionnalité Premium", "Premium機能"),
       message: "",
       canUpgrade: false,
     };
@@ -1550,21 +1704,21 @@ export function buildLimitCopy(featureId, plan, language = "en") {
     // Max'te açık" demez: Premium'da kilitlidir.
     if (definition.kind === ACCESS && definition.minPlan === PREMIUM_PLAN.UNLIMITED) {
       return {
-        title: L("Premium Max özelliği", "Premium Max feature", "Función Premium Max", "Recurso Premium Max", "Premium-Max-Funktion", "Funzione Premium Max"),
+        title: L("Premium Max özelliği", "Premium Max feature", "Función Premium Max", "Recurso Premium Max", "Premium-Max-Funktion", "Funzione Premium Max", "Fonctionnalité Premium Max", "Premium Max機能"),
         message: L(
           `${title} yalnızca Premium Max planında açık.`,
           `${title} is included in Premium Max only.`,
-          `${title} está incluido solo en Premium Max.`, `${title} está incluído apenas no Premium Max.`, `${title} ist nur in Premium Max enthalten.`, `${title} è incluso solo in Premium Max.`,
+          `${title} está incluido solo en Premium Max.`, `${title} está incluído apenas no Premium Max.`, `${title} ist nur in Premium Max enthalten.`, `${title} è incluso solo in Premium Max.`, `${title} est inclus uniquement dans Premium Max.`, `${title}はPremium Maxにのみ含まれます。`,
         ),
         canUpgrade,
       };
     }
     return {
-      title: L("Premium özelliği", "Premium feature", "Función Premium", "Recurso Premium", "Premium-Funktion", "Funzione Premium"),
+      title: L("Premium özelliği", "Premium feature", "Función Premium", "Recurso Premium", "Premium-Funktion", "Funzione Premium", "Fonctionnalité Premium", "Premium機能"),
       message: L(
         `${title} Premium ve Premium Max planlarında açık.`,
         `${title} is included in Premium and Premium Max.`,
-        `${title} está incluido en Premium y Premium Max.`, `${title} está incluído no Premium e no Premium Max.`, `${title} ist in Premium und Premium Max enthalten.`, `${title} è incluso in Premium e Premium Max.`,
+        `${title} está incluido en Premium y Premium Max.`, `${title} está incluído no Premium e no Premium Max.`, `${title} ist in Premium und Premium Max enthalten.`, `${title} è incluso in Premium e Premium Max.`, `${title} est inclus dans Premium et Premium Max.`, `${title}はPremiumとPremium Maxに含まれます。`,
       ),
       canUpgrade,
     };
@@ -1574,14 +1728,14 @@ export function buildLimitCopy(featureId, plan, language = "en") {
   const upgrade = canUpgrade ? upgradeSentence(featureId, normalized, language) : "";
   const renew =
     definition.kind === DAILY
-      ? L("Hakların yarın yenilenir.", "Your limit resets tomorrow.", "Tu límite se restablece mañana.", "Seu limite é redefinido amanhã.", "Dein Limit wird morgen zurückgesetzt.", "Il tuo limite si azzera domani.")
+      ? L("Hakların yarın yenilenir.", "Your limit resets tomorrow.", "Tu límite se restablece mañana.", "Seu limite é redefinido amanhã.", "Dein Limit wird morgen zurückgesetzt.", "Il tuo limite si azzera domani.", "Ta limite se réinitialise demain.", "上限は明日リセットされます。")
       : "";
 
   return {
     title:
       definition.kind === DAILY
-        ? L("Bugünkü hakkın doldu", "Today's limit reached", "Has alcanzado el límite de hoy", "Você atingiu o limite de hoje", "Tageslimit erreicht", "Limite di oggi raggiunto")
-        : L("Limite ulaştın", "Limit reached", "Has alcanzado el límite", "Você atingiu o limite", "Limit erreicht", "Limite raggiunto"),
+        ? L("Bugünkü hakkın doldu", "Today's limit reached", "Has alcanzado el límite de hoy", "Você atingiu o limite de hoje", "Tageslimit erreicht", "Limite di oggi raggiunto", "Limite du jour atteinte", "今日の上限に達しました")
+        : L("Limite ulaştın", "Limit reached", "Has alcanzado el límite", "Você atingiu o limite", "Limit erreicht", "Limite raggiunto", "Limite atteinte", "上限に達しました"),
     message: [base, upgrade, renew].filter(Boolean).join(" "),
     canUpgrade,
   };

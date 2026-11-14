@@ -22,12 +22,12 @@ export function prestijCoz(id) {
 }
 
 const AILE_ADI = {
-  film: { tr: "Film", en: "Film", es: "Película", pt: "Filme", de: "Film" , it: "Film"},
-  bolum: { tr: "Bölüm", en: "Episode", es: "Episodio", pt: "Episódio", de: "Folge" , it: "Episodio"},
-  final: { tr: "Final", en: "Finale", es: "Final", pt: "Final", de: "Finale" , it: "Finale"},
-  sure: { tr: "Süre", en: "Screen time", es: "Tiempo de pantalla", pt: "Tempo de tela", de: "Bildschirmzeit" , it: "Schermo"},
-  gun: { tr: "Gün", en: "Day", es: "Día", pt: "Dia", de: "Tag" , it: "Giorno"},
-  uzunMetraj: { tr: "Uzun metraj", en: "Feature", es: "Largometraje", pt: "Longa-metragem", de: "Spielfilm" , it: "Caratteristica"},
+  film: { tr: "Film", en: "Film", es: "Película", pt: "Filme", de: "Film" , it: "Film", fr: "Film", ja: "映画"},
+  bolum: { tr: "Bölüm", en: "Episode", es: "Episodio", pt: "Episódio", de: "Folge" , it: "Episodio", fr: "Épisode", ja: "エピソード"},
+  final: { tr: "Final", en: "Finale", es: "Final", pt: "Final", de: "Finale" , it: "Finale", fr: "Finale", ja: "最終回"},
+  sure: { tr: "Süre", en: "Screen time", es: "Tiempo de pantalla", pt: "Tempo de tela", de: "Bildschirmzeit" , it: "Schermo", fr: "Temps d'écran", ja: "視聴時間"},
+  gun: { tr: "Gün", en: "Day", es: "Día", pt: "Dia", de: "Tag" , it: "Giorno", fr: "Jour", ja: "日"},
+  uzunMetraj: { tr: "Uzun metraj", en: "Feature", es: "Largometraje", pt: "Longa-metragem", de: "Spielfilm" , it: "Caratteristica", fr: "Long métrage", ja: "長編"},
 };
 
 /**
@@ -35,7 +35,7 @@ const AILE_ADI = {
  * @returns {string|null} tanınmayan id'de null (çağıran kutlamayı atlar)
  */
 export function odulAdi(id, lang = "tr") {
-  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"]);
+  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
 
   const rozet = WATCH_BADGE_BY_ID[id];
   if (rozet) return badgeAd(rozet, code);
@@ -59,7 +59,9 @@ export function odulAdi(id, lang = "tr") {
       pt: `${aile} · prestígio ${prestij.n}`,
       de: `${aile} · Prestige ${prestij.n}`,
 
-  it: `${aile} · prestigio ${prestij.n}`});
+  it: `${aile} · prestigio ${prestij.n}`,
+  fr: `${aile} · prestige ${prestij.n}`,
+  ja: `${aile} · プレステージ${prestij.n}`});
   }
 
   return null;
@@ -67,11 +69,11 @@ export function odulAdi(id, lang = "tr") {
 
 /** Kutlama başlığı: ödül türüne göre değişir ("Rozet kazandın" her şeye uymaz). */
 export function odulBasligi(id, lang = "tr") {
-  const L = (tr, en, es, pt, de, it) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en });
-  if (BADGE_SET_BY_ID[id]) return L("Koleksiyon tamamlandı", "Collection complete", "Colección completada", "Coleção concluída", "Sammlung abgeschlossen", "Collezione completata");
-  if (muhurCoz(id)) return L("Dönem mührü kazandın", "Season seal earned", "Has conseguido un sello de temporada", "Você conquistou um selo de temporada", "Saison-Siegel erhalten", "Sigillo stagionale ottenuto");
-  if (prestijCoz(id)) return L("Prestij yükseldi", "Prestige up", "Subes de prestigio", "Você subiu de prestígio", "Prestige gestiegen", "Prestigio aumentato");
-  return L("Rozet kazandın", "Badge earned", "Has conseguido una insignia", "Você conquistou um emblema", "Abzeichen erhalten", "Badge ottenuto");
+  const L = (tr, en, es, pt, de, it, fr, ja) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en, fr: fr ?? en, ja: ja ?? en });
+  if (BADGE_SET_BY_ID[id]) return L("Koleksiyon tamamlandı", "Collection complete", "Colección completada", "Coleção concluída", "Sammlung abgeschlossen", "Collezione completata", "Collection terminée", "コレクション完成");
+  if (muhurCoz(id)) return L("Dönem mührü kazandın", "Season seal earned", "Has conseguido un sello de temporada", "Você conquistou um selo de temporada", "Saison-Siegel erhalten", "Sigillo stagionale ottenuto", "Sceau de saison obtenu", "シーズンシールを獲得");
+  if (prestijCoz(id)) return L("Prestij yükseldi", "Prestige up", "Subes de prestigio", "Você subiu de prestígio", "Prestige gestiegen", "Prestigio aumentato", "Prestige en hausse", "プレステージアップ");
+  return L("Rozet kazandın", "Badge earned", "Has conseguido una insignia", "Você conquistou um emblema", "Abzeichen erhalten", "Badge ottenuto", "Badge obtenu", "バッジを獲得");
 }
 
 // Ailenin kademe sayısı ve ZİRVE rozeti. Kutlama bildirimi rozetin şeklini

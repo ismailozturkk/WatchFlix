@@ -392,11 +392,11 @@ export default function AIChatScreen({
 
   const filterSummary = useMemo(() => {
     const parts = [];
-    if (prefs.mediaType === "movie") parts.push(pickByLanguage(language, { tr: "Film", en: "Movies", es: "Películas", pt: "Filmes", de: "Filme" , it: "Film"}));
-    if (prefs.mediaType === "tv") parts.push(pickByLanguage(language, { tr: "Dizi", en: "Series", es: "Series", pt: "Séries", de: "Serien" , it: "Serie"}));
+    if (prefs.mediaType === "movie") parts.push(pickByLanguage(language, { tr: "Film", en: "Movies", es: "Películas", pt: "Filmes", de: "Filme" , it: "Film", fr: "Films", ja: "映画"}));
+    if (prefs.mediaType === "tv") parts.push(pickByLanguage(language, { tr: "Dizi", en: "Series", es: "Series", pt: "Séries", de: "Serien" , it: "Serie", fr: "Séries", ja: "シリーズ"}));
     if (selectedProviders.length) parts.push(selectedProviders.map((provider) => provider.name).join(", "));
     if (selectedGenreLabels.length) parts.push(selectedGenreLabels.join(", "));
-    if (prefs.enabled) parts.push(pickByLanguage(language, { tr: "Listelerim açık", en: "My lists on", es: "Mis listas activadas", pt: "Minhas listas ativadas", de: "Meine Listen an" , it: "Le mie liste su"}));
+    if (prefs.enabled) parts.push(pickByLanguage(language, { tr: "Listelerim açık", en: "My lists on", es: "Mis listas activadas", pt: "Minhas listas ativadas", de: "Meine Listen an" , it: "Le mie liste su", fr: "Mes listes activées", ja: "マイリストをオン"}));
     return parts.join(" · ");
   }, [language, prefs.enabled, prefs.mediaType, selectedGenreLabels, selectedProviders]);
 
@@ -407,7 +407,7 @@ export default function AIChatScreen({
     const list = byTab.explore;
     if (discoveryPreferences) {
       list.unshift({
-        label: pickByLanguage(language, { tr: "🎯 Seçimlerime göre öner", en: "🎯 Recommend from my filters", es: "🎯 Recomienda según mis filtros", pt: "🎯 Recomende com base nos meus filtros", de: "🎯 Nach meinen Filtern empfehlen" , it: "🎯 Consiglia dai miei filtri"}),
+        label: pickByLanguage(language, { tr: "🎯 Seçimlerime göre öner", en: "🎯 Recommend from my filters", es: "🎯 Recomienda según mis filtros", pt: "🎯 Recomende com base nos meus filtros", de: "🎯 Nach meinen Filtern empfehlen" , it: "🎯 Consiglia dai miei filtri", fr: "🎯 Recommander selon mes filtres", ja: "🎯 絞り込みからおすすめ"}),
         // Bu metin kullanıcı balonunda da görünür (handleSend → display): her dilde yerelleştirilmiş olmalı.
         prompt: pickByLanguage(language, {
           tr: "Seçtiğim platform, içerik türü ve tür filtrelerine göre bana en uygun 5 yapımı öner",
@@ -416,7 +416,9 @@ export default function AIChatScreen({
           pt: "Recomende os 5 melhores títulos de acordo com meus filtros de plataforma, tipo de conteúdo e gênero",
           de: "Empfiehl mir die 5 besten Titel passend zu meinen gewählten Streaming-, Inhaltstyp- und Genre-Filtern",
 
-  it: "Consiglia i 5 migliori titoli che corrispondono ai filtri di streaming, tipo di contenuto e genere selezionati"}),
+  it: "Consiglia i 5 migliori titoli che corrispondono ai filtri di streaming, tipo di contenuto e genere selezionati",
+  fr: "Recommande les 5 meilleurs titres correspondant à mes filtres de streaming, de type de contenu et de genre",
+  ja: "選択した配信サービス、コンテンツの種類、ジャンルの絞り込みに合う作品を5つおすすめして"}),
       });
     }
     if (mostWatchedGenre) {
@@ -633,7 +635,7 @@ export default function AIChatScreen({
           upsell: limitCopy?.canUpgrade
             ? {
                 message: limitCopy.message,
-                cta: pickByLanguage(language, { tr: "Planları gör", en: "See plans", es: "Ver planes", pt: "Ver planos", de: "Pläne ansehen" , it: "Vedi i piani"}),
+                cta: pickByLanguage(language, { tr: "Planları gör", en: "See plans", es: "Ver planes", pt: "Ver planos", de: "Pläne ansehen" , it: "Vedi i piani", fr: "Voir les forfaits", ja: "プランを見る"}),
               }
             : null,
         };

@@ -131,9 +131,51 @@ const it = {
   chosenBackdropBadge: "Sfondo selezionato",
   premiumTag: "Premium"
 };
+const fr = {
+  useAsPoster: "Utiliser comme affiche",
+  currentPoster: "Ton affiche",
+  resetPoster: "Revenir par défaut",
+  chosenToast: "Affiche mise à jour",
+  chosenToastSub: "Cette affiche s'affichera dans ta bibliothèque, tes listes et ton profil.",
+  resetToast: "Retour à l'affiche par défaut",
+  fullToast: (max) => `Tu peux choisir jusqu'à ${max} affiches`,
+  fullToastSub: "Remets un autre titre par défaut pour en choisir une nouvelle.",
+  signInNeeded: "Connecte-toi pour choisir une affiche",
+  chosenBadge: "Affiche sélectionnée",
+  useAsBackdrop: "Utiliser comme fond",
+  currentBackdrop: "Ton fond",
+  backdropChosenToast: "Fond mis à jour",
+  backdropChosenToastSub: "Ce fond s'affichera sur la page du film ou de la série et dans la recherche.",
+  backdropResetToast: "Retour au fond par défaut",
+  backdropFullToast: (max) => `Tu peux choisir jusqu'à ${max} fonds`,
+  chosenBackdropBadge: "Fond sélectionné",
+  premiumTag: "Premium",
+};
+const ja = {
+  useAsPoster: "ポスターに使う",
+  currentPoster: "あなたのポスター",
+  resetPoster: "デフォルトに戻す",
+  chosenToast: "ポスターを更新しました",
+  chosenToastSub: "このポスターはライブラリ、リスト、プロフィールに表示されます。",
+  resetToast: "デフォルトのポスターに戻す",
+  fullToast: (max) => `選べるポスターは最大${max}枚です`,
+  fullToastSub: "新しく選ぶには、別の作品をデフォルトに戻してください。",
+  signInNeeded: "ポスターを選ぶにはサインイン",
+  chosenBadge: "選択したポスター",
+  useAsBackdrop: "背景画像に使う",
+  currentBackdrop: "あなたの背景画像",
+  backdropChosenToast: "背景画像を更新しました",
+  backdropChosenToastSub: "この背景画像は映画・番組のページと検索に表示されます。",
+  backdropResetToast: "デフォルトの背景画像に戻す",
+  backdropFullToast: (max) => `選べる背景画像は最大${max}枚です`,
+  chosenBackdropBadge: "選択した背景画像",
+  premiumTag: "Premium",
+};
 
 export const POSTER_CHOICES_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getPosterChoicesCopy = (language) =>

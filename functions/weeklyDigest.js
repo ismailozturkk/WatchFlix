@@ -26,6 +26,8 @@ const DIGEST_STRINGS = {
   pt: { title: (n) => `Estreias da semana (${n})`, more: (n) => `+${n}`, locale: "pt-BR" },
   de: { title: (n) => `Neu diese Woche (${n})`, more: (n) => `+${n}`, locale: "de-DE" },
   it: { title: (n) => `In arrivo questa settimana (${n})`, more: (n) => `+${n}`, locale: "it-IT" },
+  fr: { title: (n) => `À venir cette semaine (${n})`, more: (n) => `+${n}`, locale: "fr-FR" },
+  ja: { title: (n) => `今週の予定(${n})`, more: (n) => `+${n}`, locale: "ja-JP" },
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;

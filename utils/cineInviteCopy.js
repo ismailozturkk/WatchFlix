@@ -110,7 +110,41 @@ export const CINE_INVITE_COPY = {
   matches: n => n === 1 ? "1 corrispondenza in comune" : `${n} partite in comune`,
   noMatches: "Nessuna corrispondenza in comune",
   expired: "Questo invito è scaduto"
-}};
+},
+  fr: {
+    decline: "Refuser",
+    declineA11y: "Refuser l'invitation au salon",
+    rejoin: "Retour au salon",
+    statusWaiting: "En attente de réponse",
+    statusAccepted: "Acceptée",
+    statusYouAccepted: "Tu as accepté",
+    statusDeclined: "Refusée",
+    statusYouDeclined: "Tu as refusé",
+    statusDone: "Terminé",
+    statusExpired: "Expirée",
+    acceptedBy: (n) => (n === 1 ? "1 personne a accepté" : `${n} personnes ont accepté`),
+    declinedBy: (n) => (n === 1 ? "1 personne a refusé" : `${n} personnes ont refusé`),
+    matches: (n) => (n === 1 ? "1 match en commun" : `${n} matchs en commun`),
+    noMatches: "Aucun match en commun",
+    expired: "Cette invitation a expiré",
+  },
+  ja: {
+    decline: "拒否",
+    declineA11y: "ルームの招待を断る",
+    rejoin: "ルームに戻る",
+    statusWaiting: "返事待ち",
+    statusAccepted: "承諾済み",
+    statusYouAccepted: "承諾しました",
+    statusDeclined: "辞退",
+    statusYouDeclined: "辞退しました",
+    statusDone: "完結",
+    statusExpired: "期限切れ",
+    acceptedBy: (n) => (n === 1 ? "1人が承諾" : `${n}人が承諾`),
+    declinedBy: (n) => (n === 1 ? "1人が辞退" : `${n}人が辞退`),
+    matches: (n) => (n === 1 ? "共通のマッチ1件" : `共通のマッチ${n}件`),
+    noMatches: "共通のマッチはありません",
+    expired: "この招待は期限切れです",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getCineInviteCopy = (language) => CINE_INVITE_COPY[copyLanguage(language, Object.keys(CINE_INVITE_COPY))];

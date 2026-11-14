@@ -174,7 +174,7 @@ export const BadgeShowcaseEditorCard = memo(function BadgeShowcaseEditorCard({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const copy = getBadgeShowcaseCopy(lang);
 
   const slots = Array.from({ length: MAX_SHOWCASE_BADGES }, (_, i) => badges[i] || null);
@@ -276,7 +276,7 @@ export const FriendBadgeShowcase = memo(function FriendBadgeShowcase({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const copy = getBadgeShowcaseCopy(lang);
   const list = Array.isArray(badges) ? badges.slice(0, MAX_SHOWCASE_BADGES) : [];
   const [rowWidth, setRowWidth] = useState(0);

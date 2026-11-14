@@ -23,10 +23,10 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
   const movieItems = (reminders?.movieReminders || []).map((movie) => ({
     id: `movie-${movie.movieId}`,
     type: "movie",
-    title: movie.movieName || pickByLanguage(language, { tr: "Film", en: "Movie", es: "Película", pt: "Filme", de: "Film" , it: "Film"}),
+    title: movie.movieName || pickByLanguage(language, { tr: "Film", en: "Movie", es: "Película", pt: "Filme", de: "Film" , it: "Film", fr: "Film", ja: "映画"}),
     subtitle:
       Number(movie.movieMinutes) > 0
-        ? `${movie.movieMinutes} ${pickByLanguage(language, { tr: "dk", en: "min", es: "min", pt: "min", de: "Min." , it: "min"})}`
+        ? `${movie.movieMinutes} ${pickByLanguage(language, { tr: "dk", en: "min", es: "min", pt: "min", de: "Min." , it: "min", fr: "min", ja: "分"})}`
         : "",
     poster: posterUrl(movie.posterPath),
     dateEpoch: toEpoch(movie.releaseDate),
@@ -37,7 +37,7 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
       (season.episodes || []).map((episode) => ({
         id: `tv-${episode.episodeId || `${show.showId}-${season.seasonNumber}-${episode.episodeNumber}`}`,
         type: "tv",
-        title: show.showName || pickByLanguage(language, { tr: "Dizi", en: "TV Show", es: "Serie", pt: "Série", de: "Serie" , it: "Serie TV"}),
+        title: show.showName || pickByLanguage(language, { tr: "Dizi", en: "TV Show", es: "Serie", pt: "Série", de: "Serie" , it: "Serie TV", fr: "Série", ja: "TV番組"}),
         subtitle: pickByLanguage(language, {
           tr: `S${season.seasonNumber} · ${episode.episodeNumber}. Bölüm`,
           en: `S${season.seasonNumber} · Episode ${episode.episodeNumber}`,
@@ -45,7 +45,9 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
           pt: `T${season.seasonNumber} · Episódio ${episode.episodeNumber}`,
           de: `S${season.seasonNumber} · Folge ${episode.episodeNumber}`,
 
-  it: `S${season.seasonNumber} · Episodio ${episode.episodeNumber}`}),
+  it: `S${season.seasonNumber} · Episodio ${episode.episodeNumber}`,
+  fr: `S${season.seasonNumber} · Épisode ${episode.episodeNumber}`,
+  ja: `S${season.seasonNumber} · 第${episode.episodeNumber}話`}),
         // Sezon posteri varsa onu, yoksa dizi posterini kullan.
         poster: posterUrl(season.seasonPosterPath || show.showPosterPath),
         dateEpoch: toEpoch(episode.airDate),

@@ -26,7 +26,9 @@ export const IDENTITY_BADGES = Object.freeze({
     descTr: "Lansman öncesi katıldın",
     descEn: "Joined before launch", descEs: "Se unió antes del lanzamiento", descPt: "Entrou antes do lançamento", descDe: "Vor dem Start dabei",
 
-  it: "Fondatore"},
+  it: "Fondatore",
+  fr: "Fondateur",
+  ja: "創設者"},
   premium: {
     id: "premium",
     glyph: "diamond-outline",
@@ -38,7 +40,9 @@ export const IDENTITY_BADGES = Object.freeze({
     descTr: "Seelogd Premium abonesi",
     descEn: "Seelogd Premium subscriber", descEs: "Suscripción a Seelogd Premium", descPt: "Assinatura do Seelogd Premium", descDe: "Seelogd-Premium-Mitglied",
 
-  it: "Premium"},
+  it: "Premium",
+  fr: "Premium",
+  ja: "Premium"},
   unlimited: {
     id: "unlimited",
     glyph: "infinite-outline",
@@ -50,11 +54,13 @@ export const IDENTITY_BADGES = Object.freeze({
     descTr: "Günde 50, ayda 900 CineMatch AI mesajı",
     descEn: "50 CineMatch AI messages per day, 900 per month", descEs: "50 mensajes de IA de CineMatch al día, 900 al mes", descPt: "50 mensagens de IA do CineMatch por dia, 900 por mês", descDe: "50 CineMatch-KI-Nachrichten pro Tag, 900 pro Monat",
 
-  it: "Premium Max"},
+  it: "Premium Max",
+  fr: "Premium Max",
+  ja: "Premium Max"},
 });
 
 export const badgeLabel = (badge, lang) =>
-  badge?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"])] || badge?.en || "";
+  badge?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])] || badge?.en || "";
 /**
  * Profilde gösterilecek kimlik rozetleri, önem sırasına göre.
  * Premium ve Unlimited AYNI ANDA verilmez — Unlimited üst kademe olduğu için

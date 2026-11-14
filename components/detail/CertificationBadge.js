@@ -34,7 +34,9 @@ const LABELS = Object.freeze({
   it: {
   rating: "Classificazione per età",
   outside: "{region} rating"
-}});
+},
+  fr: { rating: "Classification", outside: "Classification {region}" },
+  ja: { rating: "年齢制限", outside: "{region}のレーティング" }});
 
 /**
  * @param {"movie"|"tv"} props.mediaType

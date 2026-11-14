@@ -61,7 +61,25 @@ export const SOCIAL_COPY = {
   openLabel: platform => `Apri profilo ${platform}`,
   openFailed: "Impossibile aprire il collegamento",
   strip: "Account social"
-}};
+},
+  fr: {
+    title: "Tes réseaux sociaux",
+    hint: "Les personnes qui voient ton profil peuvent les toucher pour les visiter. Tape un nom d'utilisateur ou colle le lien du profil ; ce qui reste vide est masqué.",
+    placeholder: "nom d'utilisateur",
+    invalid: (platform) => `Nom d'utilisateur ${platform} invalide`,
+    openLabel: (platform) => `Ouvrir le profil ${platform}`,
+    openFailed: "Impossible d'ouvrir le lien",
+    strip: "Réseaux sociaux",
+  },
+  ja: {
+    title: "あなたのソーシャルアカウント",
+    hint: "プロフィールを見た人がタップしてアクセスできます。ユーザー名を入力するかプロフィールのリンクを貼り付けてください。空欄のものは非表示になります。",
+    placeholder: "ユーザー名",
+    invalid: (platform) => `無効な${platform}ユーザー名`,
+    openLabel: (platform) => `${platform}のプロフィールを開く`,
+    openFailed: "リンクを開けませんでした",
+    strip: "ソーシャルアカウント",
+  }};
 
 /** Platform görünen adları (marka yazımı; dile göre değişmez). */
 export const SOCIAL_NAMES = Object.freeze({

@@ -236,6 +236,6 @@ describe("İspanyolca kopya gerçekten İspanyolca", () => {
   });
 
   it("bilinmeyen dil İngilizce kopyayı alır, Türkçeyi değil", () => {
-    expect(getWrappedStrings("fr")).toEqual(getWrappedStrings("en"));
+    expect(getWrappedStrings("ko")).toEqual(getWrappedStrings("en"));
   });
 });

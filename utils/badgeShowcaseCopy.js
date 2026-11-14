@@ -131,8 +131,50 @@ export const BADGE_SHOWCASE_COPY = {
   searchEmpty: "Nessun badge corrisponde alla tua ricerca.",
   resetFilters: "Reimposta ricerca e filtri",
   removeSlotA11y: name => `Rimuovi ${name} dalla vetrina`
-}};
+},
+  fr: {
+    profileTitle: "Badges à la une",
+    cardTitle: "Vitrine du profil",
+    cardSubtitle: "Choisis jusqu'à 6 badges à afficher sur ton profil d'ami",
+    selectingHint: "Touche les badges débloqués ci-dessous pour les ajouter ou les retirer de ta vitrine",
+    edit: "Modifier",
+    done: "Terminé",
+    emptySlot: "Choisir un badge",
+    addToShowcase: "Ajouter à la vitrine du profil",
+    inShowcaseRemove: "Dans la vitrine · Retirer",
+    showcaseBadgeTag: "ÉPINGLÉ",
+    showcaseFullTitle: "Vitrine pleine (6/6)",
+    showcaseFullBody: "Retire d'abord l'un de tes 6 badges en vitrine pour en ajouter un autre.",
+    lockedBadgeHint: "Seuls les badges que tu as débloqués peuvent être ajoutés à ta vitrine.",
+    searchPlaceholder: "Rechercher un nom, une description ou une section de badge…",
+    searchClear: "Effacer la recherche",
+    searchResultsCount: (n) => `${n} badges trouvés`,
+    searchEmpty: "Aucun badge ne correspond à ta recherche.",
+    resetFilters: "Réinitialiser la recherche et les filtres",
+    removeSlotA11y: (name) => `Retirer ${name} de la vitrine`,
+  },
+  ja: {
+    profileTitle: "注目のバッジ",
+    cardTitle: "プロフィールのショーケース",
+    cardSubtitle: "フレンドに見せるプロフィールに表示するバッジを最大6個選択",
+    selectingHint: "下の獲得済みバッジをタップしてショーケースに追加・削除",
+    edit: "編集",
+    done: "完了",
+    emptySlot: "バッジを選択",
+    addToShowcase: "プロフィールのショーケースに追加",
+    inShowcaseRemove: "ショーケースに表示中 · 削除",
+    showcaseBadgeTag: "ピン留め",
+    showcaseFullTitle: "ショーケースがいっぱいです(6/6)",
+    showcaseFullBody: "別のバッジを追加するには、先に表示中の6個のうち1つを外してください。",
+    lockedBadgeHint: "ショーケースに追加できるのは、獲得済みのバッジだけです。",
+    searchPlaceholder: "バッジ名、説明、セクションで検索…",
+    searchClear: "検索をクリア",
+    searchResultsCount: (n) => `${n}個のバッジが見つかりました`,
+    searchEmpty: "検索に一致するバッジはありません。",
+    resetFilters: "検索と絞り込みをリセット",
+    removeSlotA11y: (name) => `${name}をショーケースから外す`,
+  }};
 
 export function getBadgeShowcaseCopy(language) {
-  return BADGE_SHOWCASE_COPY[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"])];
+  return BADGE_SHOWCASE_COPY[copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])];
 }

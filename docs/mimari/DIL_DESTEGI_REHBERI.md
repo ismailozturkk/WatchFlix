@@ -352,12 +352,12 @@ Aynı iş paketinde üç şey yapıldı (2026-10-20): (a) dil denetimi bulgular�
 5. Testlerdeki "desteklenmeyen dil" örneği artık `"fr"` (önceden `"de"`; Almanca gerçek dil oldu). Yeni dil eklenince bu örnek bir daha kaymasın diye `COMING_SOON_LANGUAGES`'tan seçilir.
 
 ### 12.4 "Yakında" diller (seçilemez)
-- `utils/appLanguages.js` → **`COMING_SOON_LANGUAGES`** (`APP_LANGUAGES`'ten AYRI): fr Français, ja 日本語, ko 한국어, id Bahasa Indonesia, hi हिन्दी, ar العربية, zh 中文.
-  Bu dillerin kodu `SUPPORTED_LANGUAGE_CODES`'ta YOK → seçilemez, cihaz dili bunlardan biriyse İngilizce açılır. İtalyanca 2026-11-12'de desteklenen dillere taşındı.
+- `utils/appLanguages.js` → **`COMING_SOON_LANGUAGES`** (`APP_LANGUAGES`'ten AYRI): ja 日本語, ko 한국어, id Bahasa Indonesia, hi हिन्दी, ar العربية, zh 中文.
+  Bu dillerin kodu `SUPPORTED_LANGUAGE_CODES`'ta YOK → seçilemez, cihaz dili bunlardan biriyse İngilizce açılır. İtalyanca 2026-11-12'de, Fransızca 2026-11-13'te desteklenen dillere taşındı.
 - `screens/tabs/SettingsScreen.js`: dil sayfası = desteklenenler + `__soon__` başlığı (`autoI18n.language_coming_soon`, `language_more_soon_hint`) + düz `View` satırlar
   (`onPress` yok, `accessibilityState.disabled`, "Yakında" hapı, %62 saydamlık). Bekçi: `appLanguages.test.js` "Yakında" bloğu (desteklenenlerle karışmaz, SettingsScreen'de `onPress` yok).
 - **Bir "Yakında" dili gerçek dile çevirme:** `COMING_SOON_LANGUAGES`'tan satırı SİL, aynı alanlarla `APP_LANGUAGES`'e ekle, sonra bölüm 9 listesini uygula; onboarding zinciri ve
-  testlerdeki "desteklenmeyen dil" örneği (`fr`) başka bir Yakında koduna taşınır.
+  testlerdeki "desteklenmeyen dil" örneği başka bir Yakında koduna taşınır (fr eklenince örnek `ja` oldu).
 
 ### Durum (2026-10-20, Almanca çalışmasının sonu)
 
@@ -391,6 +391,24 @@ node scratchpad/scan4.js        # (oturum betiği; yoksa rg -n "tr: \"" ile elle
 ```
 
 Windows/Bash notu: `node -e` içinde `\n`/`\` bozuluyor → betik dosyası kullan (`windows-edit-tooling-gotchas`).
+
+## Durum (2026-11-14, Japonca)
+
+- `ja` desteklenen dillerde (`ja-JP`, TMDB bölgesi JP, görsel dili ja→en, yasal sayfa İngilizce, AI istem adı "Japanese (ja)"). Onboarding zinciri … → fr → ja → tr. Hitap: kibar **です/ます**. "Yakında" listesi artık ko, id, hi, ar, zh.
+- `translations/ja.json` en.json ile aynı anahtar/yer tutucu yapısında; satır içi kopyalar (146 dosya) Fransızca kolunun yanına aynı AST aracıyla eklendi.
+- Elle kapatılan düzensiz yerler: rozet kataloğu `descJa` + `ekJa`, Wrapped `jaDesc`, `PERDE_ADLARI_JA` + `adJa`, tarih biçimi `2026年10月15日` (rozet + tarih seçici), takvim `LocaleConfig.locales.ja` (pazar başlar; `datePickerCalendar` de), Premium şeridi/abone çubuğu, turnuva kısaltmaları (準々/準決/決勝).
+- **Tür katlaması değişti:** `foldGenreName` artık `NFKD` + kana/kanji (`぀-ヿ`, `゙゚`, `一-鿿`) KORUR — eskiden Japonca her ad boş string oluyordu. Takma ad tabloları (`ALIASES`, `COMPOSITE_PARTS`, `genreDisplay` `EXACT`) kurulurken katlanır; Latin adlar için sonuç değişmedi. TMDB'nin tuhaf ja çevirileri de eşlendi (History=履歴, Mystery=謎, Western=西洋). Sunucu aynası `syncTasteCore.js` ile yeniden üretildi. `aiCineInsights` ayrı tablo `JA_GENRE_ALIASES` + `・`/`＆` ayırıcı.
+- Native: `native/locales/ja.json`, `app.json`, `WidgetLanguage.kt` (+ sağlayıcılar), `values-ja/widget_strings.xml`, Swift `widgetPick` + `ja.lproj`. Sunucu: `STRINGS.ja`, `STREAM_STRINGS.ja`, `NOTIFICATION_LANGUAGES`, `DIGEST_STRINGS.ja`.
+- **Yazı tipi:** özel Latin yazı tiplerinde CJK glifi yok; sistem yedek fontuna düşer (iOS Hiragino, Android Noto CJK). Karışık metinde satır yüksekliği/kalınlık farkı cihazda kontrol edilmeli.
+- Bekçi: `__tests__/japaneseSupport.test.js`; testlerdeki "desteklenmeyen dil" örnekleri `ja` → `ko`. **Yapılmayanlar:** functions deploy, native build, cihazda taşma/font kontrolü, ana dili Japonca biriyle metin gözden geçirmesi (otomatik taslak).
+
+## Durum (2026-11-13, Fransızca)
+
+- `fr` desteklenen dillerde (`fr-FR`, TMDB bölgesi FR, görsel dili fr→en, yasal sayfa İngilizce). Onboarding zinciri tr → en → es → pt → de → it → fr → tr. Hitap: gayriresmî **tu**.
+- `translations/fr.json` en.json ile aynı anahtar/yer tutucu yapısında (3.607 yaprak). Satır içi kopyalar (~240 dosya) İtalyanca kolunun yanına AST ile eklendi; 6.441 benzersiz İngilizce metin tek sözlükten çevrildi (yer tutucu uyuşmazlığı 0).
+- Elle kapatılan düzensiz yerler: rozet kataloğu `descFr` (162) + `ekFr`, Wrapped kişilik `frDesc`, `PERDE_ADLARI_FR` + `adFr`, rozet/tarih seçici "1er" biçimi, takvim `LocaleConfig.locales.fr` (pazartesi başlar), Premium üst şeridi/abone çubuğu, turnuva "DF" kısaltması, tür takma adları (`genreCanon.js`, `aiCineInsights.js`, " et " ayırıcı).
+- Native: `native/locales/fr.json`, `app.json` (`locales.fr`, `CFBundleLocalizations`), `WidgetLanguage.kt` + 4 sağlayıcı, `values-fr/widget_strings.xml`, Swift `widgetPick` + `fr.lproj`. Sunucu: `STRINGS.fr`, `STREAM_STRINGS.fr`, `NOTIFICATION_LANGUAGES`, `DIGEST_STRINGS.fr`.
+- Bekçi: `__tests__/frenchSupport.test.js`. **Yapılmayanlar:** functions deploy, native build (widget/izin metinleri), cihazda taşma kontrolü, ana dili Fransızca biriyle metin gözden geçirmesi (otomatik taslak; bazı İtalyanca kolları zaten İngilizce kopyaydı, onların Fransızcası İngilizceden çevrildi).
 
 ## Durum (2026-11-12, İtalyanca)
 

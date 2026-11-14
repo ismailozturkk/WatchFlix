@@ -213,7 +213,7 @@ describe("metinler", () => {
       });
       expect(copy.bubble(2)).toContain("2");
     });
-    expect(floatingNoticeCopy("fr")).toBe(FLOATING_NOTICE_COPY.en);
+    expect(floatingNoticeCopy("ko")).toBe(FLOATING_NOTICE_COPY.en);
   });
 
   test("davet kartı: gönderen + eylem, grup adı + zaman; Kabul / Reddet", () => {

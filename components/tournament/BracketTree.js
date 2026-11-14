@@ -81,7 +81,9 @@ const COPY = {
   close: "Chiudi",
   zoomOut: "Riduci lo zoom",
   zoom: "Ingrandisci"
-}};
+},
+  fr: { title: "TABLEAU", live: "En direct", done: "Terminé", mine: "Ton vote", path: "Parcours du gagnant", champion: "CHAMPION", tbd: "CHAMPION ?", hint: "Touche un match", matches: "matchs", expand: "Plein écran", close: "Fermer", zoomOut: "Dézoomer", zoom: "Zoomer" },
+  ja: { title: "トーナメント表", live: "ライブ", done: "完了", mine: "あなたの投票", path: "勝者の道のり", champion: "チャンピオン", tbd: "チャンピオンは?", hint: "試合をタップ", matches: "試合", expand: "全画面", close: "閉じる", zoomOut: "縮小", zoom: "拡大" }};
 
 // Türkçe-güvenli BÜYÜK harf: JS'in toUpperCase'i 'i' → 'I' yapar ("FINAL"),
 // doğrusu 'İ'dir (eski sürüm textTransform ile "ÇEYREK FINAL" yazıyordu).

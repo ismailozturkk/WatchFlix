@@ -503,10 +503,22 @@ export const PERDE_ADLARI_IT = [
   "Archivista", "Collezionista", "Frequentatore di festival", "Socio della cineteca", "Curatore",
   "Maestro archivista", "Testimone di un'epoca", "Memoria del cinema", "Spettatore leggendario", "Leggenda del grande schermo",
 ];
+export const PERDE_ADLARI_FR = [
+  "Billet en main", "Habitué", "Fidèle des séances", "Équipe de nuit", "Marathonien",
+  "Fidèle des saisons", "Gardien du générique", "Critique de canapé", "Cinéphile", "Chasseur de cultes",
+  "Archiviste", "Collectionneur", "Festivalier", "Membre de la cinémathèque", "Curateur",
+  "Maître archiviste", "Témoin d'une époque", "Mémoire du cinéma", "Spectateur légendaire", "Légende du grand écran",
+];
+export const PERDE_ADLARI_JA = [
+  "チケット所有者", "常連", "上映フォロワー", "夜勤", "マラソンランナー",
+  "シーズンフォロワー", "エンドロールの番人", "ソファの批評家", "シネフィル", "カルトハンター",
+  "アーキビスト", "コレクター", "映画祭の旅人", "シネマテーク会員", "キュレーター",
+  "マスターアーキビスト", "時代の証人", "映画の記憶", "伝説の観客", "銀幕の伝説",
+];
 
 /** Perde adları: dile uygun liste, bilinmeyen dil İngilizce. */
 export const perdeAdlariOf = (lang) =>
-  lang === "tr" ? PERDE_ADLARI : lang === "es" ? PERDE_ADLARI_ES : lang === "pt" ? PERDE_ADLARI_PT : lang === "de" ? PERDE_ADLARI_DE : lang === "it" ? PERDE_ADLARI_IT : PERDE_ADLARI_EN;
+  lang === "tr" ? PERDE_ADLARI : lang === "es" ? PERDE_ADLARI_ES : lang === "pt" ? PERDE_ADLARI_PT : lang === "de" ? PERDE_ADLARI_DE : lang === "it" ? PERDE_ADLARI_IT : lang === "fr" ? PERDE_ADLARI_FR : lang === "ja" ? PERDE_ADLARI_JA : PERDE_ADLARI_EN;
 
 /**
  * @param {number} kare
@@ -557,6 +569,8 @@ export function computePerde(kare, tabanPerde = 1, tabanMakara = 0) {
     adPt: PERDE_ADLARI_PT[goruntulenen - 1],
     adDe: PERDE_ADLARI_DE[goruntulenen - 1],
     adIt: PERDE_ADLARI_IT[goruntulenen - 1],
+    adFr: PERDE_ADLARI_FR[goruntulenen - 1],
+    adJa: PERDE_ADLARI_JA[goruntulenen - 1],
     makara,
     zirve,
     tabanDevrede,

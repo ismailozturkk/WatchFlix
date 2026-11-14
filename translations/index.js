@@ -8,7 +8,9 @@ import {
 import de from "./de.json";
 import en from "./en.json";
 import es from "./es.json";
+import fr from "./fr.json";
 import it from "./it.json";
+import ja from "./ja.json";
 import pt from "./pt.json";
 import tr from "./tr.json";
 
@@ -45,7 +47,9 @@ const resources = {
   de: { translation: de },
   en: { translation: en },
   es: { translation: es },
+  fr: { translation: fr },
   it: { translation: it },
+  ja: { translation: ja },
   pt: { translation: pt },
   tr: { translation: tr },
 };
@@ -55,9 +59,9 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es/pt/de için). tr/en eskisi
+    // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es/pt/de/it/fr için). tr/en eskisi
     // gibi Türkçe'ye düşer — paketleri tam eşit olduğundan bu yalnız güvenlik ağı.
-    fallbackLng: { es: ["en", "tr"], pt: ["en", "tr"], de: ["en", "tr"], it: ["en", "tr"], default: ["tr"] },
+    fallbackLng: { es: ["en", "tr"], pt: ["en", "tr"], de: ["en", "tr"], it: ["en", "tr"], fr: ["en", "tr"], ja: ["en", "tr"], default: ["tr"] },
     compatibilityJSON: "v3", // React Native Android için gereklidir
     interpolation: {
       escapeValue: false, // React XSS'e karşı kendi korumasına sahip

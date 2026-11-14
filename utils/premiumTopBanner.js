@@ -132,6 +132,12 @@ export function premiumTopBannerCopy(language) {
   if (language === "it") {
     return { title: "Passa a Premium", subtitle: "Senza limiti", cta: "Scopri i piani" };
   }
+  if (language === "fr") {
+    return { title: "Passe à Premium", subtitle: "Sans limites", cta: "Voir les formules" };
+  }
+  if (language === "ja") {
+    return { title: "Premiumにする", subtitle: "上限をなくそう", cta: "アップグレード" };
+  }
   return { title: "Go Premium", subtitle: "Remove the limits", cta: "Upgrade" };
 }
 
@@ -149,6 +155,6 @@ export function premiumTopBannerAccessibilityLabel(language) {
             ? "Pläne ansehen"
             : language === "it"
               ? "vedi i piani"
-            : "see plans";
+            : language === "fr" ? "voir les formules" : language === "ja" ? "プランを見る" : "see plans";
   return `${copy.title}, ${copy.subtitle}, ${tail}`;
 }

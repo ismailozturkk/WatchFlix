@@ -26,7 +26,7 @@ export function percentText(value, language = i18n.language) {
  */
 export function upperText(text, language = i18n.language) {
   const code = String(language || "en").toLowerCase().split(/[-_]/)[0];
-  return String(text ?? "").toLocaleUpperCase(code === "tr" ? "tr-TR" : code === "de" ? "de-DE" : code === "it" ? "it-IT" : "en-US");
+  return String(text ?? "").toLocaleUpperCase(code === "tr" ? "tr-TR" : code === "de" ? "de-DE" : code === "it" ? "it-IT" : code === "fr" ? "fr-FR" : code === "ja" ? "ja-JP" : "en-US");
 }
 
 /**

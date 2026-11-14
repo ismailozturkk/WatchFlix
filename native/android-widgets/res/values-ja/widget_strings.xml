@@ -1,0 +1,28 @@
+<!-- ウィジェットの日本語テキスト。名前はシステムの言語に従います。 -->
+<resources>
+  <string name="reminder_widget_name">Seelogd 近日公開</string>
+  <string name="reminder_widget_description">近日公開の映画とエピソードを表示します</string>
+  <string name="reminder_widget_preview_title">近日公開</string>
+  <string name="reminder_widget_preview_count">リマインダー 0 件</string>
+  <string name="reminder_widget_empty">近日公開の映画やエピソードはありません</string>
+  <string name="reminder_widget_more">+0 件</string>
+  <string name="lists_widget_name">Seelogd マイリスト</string>
+  <string name="lists_widget_description">リストのポスターをグリッドで表示します</string>
+  <string name="lists_widget_preview_title">お気に入り</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">このリストはまだ空です</string>
+  <string name="lists_widget_prev">前のリスト</string>
+  <string name="lists_widget_next">次のリスト</string>
+  <string name="stats_widget_name">Seelogd 統計</string>
+  <string name="stats_widget_description">視聴統計をホーム画面に表示します</string>
+  <string name="stats_widget_preview_title">統計</string>
+  <string name="stats_widget_preview_total">合計時間</string>
+  <string name="stats_widget_preview_movies">映画</string>
+  <string name="stats_widget_preview_shows">ドラマ</string>
+  <string name="stats_widget_preview_episodes">エピソード</string>
+  <string name="stats_widget_preview_years">年</string>
+  <string name="stats_widget_preview_months">か月</string>
+  <string name="stats_widget_preview_days">日</string>
+  <string name="stats_widget_preview_hours">時間</string>
+  <string name="stats_widget_preview_minutes">分</string>
+</resources>

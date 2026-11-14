@@ -1109,7 +1109,7 @@ describe("SharedTasteMatchMessage", () => {
   test("profil kartının üst kısmı (türler dahil): yüzde, kademe, adlar, sayı şeridi ve tür çipleri — alıcının dilinde", () => {
     const root = mount(taste());
     const text = textOf(root);
-    ["ZEVK UYUMU", "Ali & Ada", "%72", "Epey benzer zevkleriniz var", "Ortak izlenen", "Ortak favori", "Puan uyumu", "%83", "Dram", "Komedi"].forEach((part) =>
+    ["İZLEME UYUMU", "Ali & Ada", "%72", "Epey uyumlusunuz", "Ortak izlenen", "Ortak favori", "Puan uyumu", "%83", "Dram", "Komedi"].forEach((part) =>
       expect(text).toContain(part),
     );
     // halka puanı oranla çizer

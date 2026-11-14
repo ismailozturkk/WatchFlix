@@ -64,7 +64,9 @@ export default function ReminderNotificationsScreen() {
       streamingBelowPremium ? ` · ${premiumStreamingLimit} mit Premium` : ""
     }`,
 
-  it: `I tuoi ${streamingGate.limit} ultimi titoli vengono monitorati${streamingBelowPremium ? ` · ${premiumStreamingLimit} con Premium` : ""}`});
+  it: `I tuoi ${streamingGate.limit} ultimi titoli vengono monitorati${streamingBelowPremium ? ` · ${premiumStreamingLimit} con Premium` : ""}`,
+  fr: `Tes ${streamingGate.limit} derniers titres sont suivis${streamingBelowPremium ? ` · ${premiumStreamingLimit} avec Premium` : ""}`,
+  ja: `最新の${streamingGate.limit}作品を追跡中${streamingBelowPremium ? ` · Premiumなら${premiumStreamingLimit}` : ""}`});
   const { notificationSettings, changeNotificationSettings } =
     useNotificationSettings();
   const { reminderPreviewLimit, changeReminderPreviewLimit } =

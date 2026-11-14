@@ -28,6 +28,17 @@ jest.mock("@context/LanguageContext", () => ({ useLanguage: () => ({ language: m
 jest.mock("@context/ThemeContext", () => ({ useTheme: () => ({ theme: {} }) }));
 let mockLists;
 jest.mock("@context/ListStatusContext", () => ({ useListStatusContext: () => mockLists }));
+jest.mock("@context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "u1" } }) }));
+let mockComments = { ok: true, comments: [] };
+// Eşzamanlı thenable: ekran ilk çizimde yorumları hazır görür (testler mikro görev beklemez).
+jest.mock("@services/libraryCommentsIO", () => ({
+  readMyTitleComments: () => ({
+    then: (onOk) => {
+      onOk(mockComments);
+      return { catch: () => {} };
+    },
+  }),
+}));
 
 // Ayar iskeleti: gerçek olanı BackButton / ScreenDecor / güvenli alan bağlar; burada yalnız yapı önemli.
 jest.mock("../screens/tabs/settings/settingsUi", () => {

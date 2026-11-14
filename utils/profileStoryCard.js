@@ -218,14 +218,14 @@ export function buildStoryStats({
  */
 export function formatStoryNumber(value, language = "tr", { compact = false } = {}) {
   const n = Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0;
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const short = (divisor, unit) => {
     const text = (n / divisor).toFixed(1).replace(/\.0$/, "");
     // Ondalık virgül: Türkçe ve İspanyolca; ayraç İngilizcede nokta.
     return `${lang === "en" ? text : text.replace(".", ",")}${unit}`;
   };
   if (compact && n >= 1_000_000) return short(1_000_000, "M");
-  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : lang === "pt" ? " mil" : lang === "de" ? "K" : lang === "it" ? " mila" : "B");
+  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : lang === "pt" ? " mil" : lang === "de" ? "K" : lang === "it" ? " mila" : lang === "fr" ? "B" : lang === "ja" ? "B" : "B");
   try {
     return n.toLocaleString(intlLocaleOf(language));
   } catch {
@@ -261,7 +261,7 @@ const GENRE_ORDER = Object.keys(STORY_GENRE_LABELS);
  * @returns {{ titles: number, top: Array<{id, label, count, pct}> }}
  */
 export function buildStoryGenres(items, language = "tr", limit = 3) {
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const counts = new Map();
   const seen = new Set();
   let titles = 0;
@@ -336,7 +336,7 @@ export function buildStoryPerde(info, language = "tr") {
   return {
     number,
     makara: Math.max(0, Math.floor(Number(info.makara)) || 0),
-    name: (language === "tr" ? info.ad : language === "es" ? info.adEs : language === "pt" ? info.adPt : language === "de" ? info.adDe : language === "it" ? info.adIt : info.adEn) || "",
+    name: (language === "tr" ? info.ad : language === "es" ? info.adEs : language === "pt" ? info.adPt : language === "de" ? info.adDe : language === "it" ? info.adIt : language === "fr" ? info.adFr : language === "ja" ? info.adJa : info.adEn) || "",
     progress: Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0,
     maxed: Boolean(info.zirve),
   };
@@ -357,7 +357,7 @@ export function formatMemberSince(raw, language = "tr") {
   const locale = intlLocaleOf(language);
   try {
     return date
-      .toLocaleDateString(locale, { month: copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]) === "en" ? "short" : "long", year: "numeric" })
+      .toLocaleDateString(locale, { month: copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]) === "en" ? "short" : "long", year: "numeric" })
       .toLocaleUpperCase(locale);
   } catch {
     return String(date.getFullYear());

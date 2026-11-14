@@ -124,7 +124,43 @@ export const LIST_SORT_FILTER_COPY = {
     3: "3 across",
     4: "4 across"
   }
-}};
+},
+  fr: {
+    title: "Trier et filtrer",
+    results: "{n} résultats",
+    showResults: "Afficher {n} résultats",
+    reset: "Réinitialiser",
+    close: "Fermer",
+    sort: "TRIER PAR",
+    asc: "Croissant",
+    desc: "Décroissant",
+    view: "Voir",
+    columns: "COLONNES",
+    corners: "COINS",
+    posterInfo: "AFFICHER SUR L'AFFICHE",
+    moreChips: "+{n} de plus",
+    lessChips: "Afficher moins",
+    radius: { 2: "Carré", 6: "Discrets", 10: "Normaux", 15: "Doux", 20: "Rond" },
+    columnsOption: { 3: "3 par ligne", 4: "4 par ligne" },
+  },
+  ja: {
+    title: "並べ替えと絞り込み",
+    results: "{n}件の結果",
+    showResults: "{n}件の結果を表示",
+    reset: "リセット",
+    close: "閉じる",
+    sort: "並べ替え",
+    asc: "昇順",
+    desc: "降順",
+    view: "表示",
+    columns: "列",
+    corners: "角",
+    posterInfo: "ポスターに表示",
+    moreChips: "ほか{n}件",
+    lessChips: "表示を減らす",
+    radius: { 2: "四角", 6: "控えめ", 10: "標準", 15: "ソフト", 20: "丸" },
+    columnsOption: { 3: "3列", 4: "4列" },
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getListSortFilterCopy = (language) =>

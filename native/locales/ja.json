@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "作成したストーリー画像を写真ライブラリに保存するために使用します。",
+    "NSPhotoLibraryAddUsageDescription": "作成したストーリー画像を写真ライブラリに保存するために使用します。",
+    "NSCalendarsUsageDescription": "映画・ドラマ・メモのリマインダーを追加・削除するためにカレンダーへのアクセスを使用します。",
+    "NSCalendarsFullAccessUsageDescription": "映画・ドラマ・メモのリマインダーを追加・削除するためにカレンダーへのアクセスを使用します。",
+    "NSFaceIDUsageDescription": "Seelogd は認証に Face ID を使用します。"
+  }
+}

@@ -92,7 +92,7 @@ function usernameHintFor(status, username, language) {
                     ? "Der Benutzername darf nicht nur aus Zahlen oder Unterstrichen bestehen (mindestens ein Buchstabe ist nötig)."
                     : lang === "it"
                       ? "Il nome utente non può contenere solo numeri o trattini bassi (serve almeno una lettera)."
-                      : "Username cannot be only numbers or underscores (must contain at least one letter).",
+                      : lang === "fr" ? "Le nom d'utilisateur ne peut pas être composé uniquement de chiffres ou de tirets bas (il doit contenir au moins une lettre)." : lang === "ja" ? "ユーザー名を数字やアンダースコアだけにはできません(英字を1文字以上含めてください)。" : "Username cannot be only numbers or underscores (must contain at least one letter).",
         };
       }
       return {
@@ -305,7 +305,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
                   ? "Der Benutzername darf nicht nur aus Zahlen bestehen (mindestens ein Buchstabe ist nötig)."
                   : lang === "it"
                     ? "Il nome utente non può contenere solo numeri (serve almeno una lettera)."
-                    : "Username cannot consist only of numbers (must contain at least one letter)."
+                    : lang === "fr" ? "Le nom d'utilisateur ne peut pas être composé uniquement de chiffres (il doit contenir au moins une lettre)." : lang === "ja" ? "ユーザー名を数字だけにはできません(英字を1文字以上含めてください)。" : "Username cannot consist only of numbers (must contain at least one letter)."
           : i18nText(
               "autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9",
               "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)",
@@ -328,7 +328,7 @@ export default function useOwnProfileEditor({ enabled = true } = {}) {
                     ? "Verfügbarkeit des Benutzernamens wird geprüft, bitte warten…"
                     : lang === "it"
                       ? "Verifica della disponibilità del nome utente, attendi…"
-                      : "Checking username availability, please wait…",
+                      : lang === "fr" ? "Vérification de la disponibilité du nom d'utilisateur, patiente…" : lang === "ja" ? "ユーザー名が使えるか確認しています。お待ちください…" : "Checking username availability, please wait…",
         });
         return false;
       }

@@ -27,6 +27,6 @@ describe("permissionSheetCopy", () => {
   });
 
   test("bilinmeyen dil İngilizceye düşer", () => {
-    expect(getPermissionSheetCopy("fr")).toBe(PERMISSION_SHEET_COPY.en);
+    expect(getPermissionSheetCopy("ja")).toBe(PERMISSION_SHEET_COPY.en);
   });
 });

@@ -58,7 +58,7 @@ describe("metin tablosu", () => {
 
   test("altı dil aynı şekilde; her adımın metni var", () => {
     const langs = Object.keys(MATCH_COPY);
-    expect(langs.sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
+    expect(langs.sort()).toEqual(["de", "en", "es", "fr", "it", "ja", "pt", "tr"]);
     const ref = shape(MATCH_COPY.tr);
     for (const lang of langs) {
       expect(shape(MATCH_COPY[lang])).toEqual(ref);

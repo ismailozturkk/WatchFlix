@@ -140,9 +140,53 @@ const it = {
     account: "Chiusura del tuo account"
   }
 };
+const fr = {
+  title: "Suppression de ton compte",
+  hint: "Cela peut prendre quelques minutes. Garde l'app ouverte.",
+  step: "Étape {n} sur {total}",
+  hold: "Maintiens pour supprimer",
+  holdActive: "Continue d'appuyer pour supprimer…",
+  holdHint: "Maintiens le bouton {seconds} secondes pour confirmer.",
+  stages: {
+    verify: "Vérification de ton identité",
+    local: "Suppression des données sur cet appareil",
+    social: "Suppression des amitiés, abonnements et notifications",
+    comments: "Suppression de tes commentaires",
+    content: "Suppression de tes publications, j'aime et notes",
+    chats: "Suppression des discussions, groupes et listes partagées",
+    games: "Suppression des scores de jeu, votes de tournoi et salons",
+    records: "Suppression des retours et invitations",
+    profile: "Suppression de ton profil et de tes données personnelles",
+    fallback: "Vérification et suppression des données restantes",
+    account: "Fermeture de ton compte",
+  },
+};
+const ja = {
+  title: "アカウントを削除しています",
+  hint: "数分かかる場合があります。アプリを開いたままにしてください。",
+  step: "ステップ{n}/{total}",
+  hold: "長押しで削除",
+  holdActive: "そのまま長押しで削除…",
+  holdHint: "確認するにはボタンを{seconds}秒間長押ししてください。",
+  stages: {
+    verify: "本人確認中",
+    local: "この端末のデータを消去中",
+    social: "フレンド、フォロー、通知を削除中",
+    comments: "コメントを削除中",
+    content: "投稿、いいね、評価を削除中",
+    chats: "チャット、グループ、共有リストを削除中",
+    games: "ゲームスコア、トーナメントの投票、ルームを削除中",
+    records: "フィードバックと招待の記録を削除中",
+    profile: "プロフィールと個人データを削除中",
+    fallback: "残ったデータを確認して削除中",
+    account: "アカウントを閉じています",
+  },
+};
 
 export const DELETE_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getDeleteAccountCopy = (language) =>

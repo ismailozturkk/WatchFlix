@@ -42,12 +42,12 @@ const timeParts = (time) => ({
  */
 export const buildStatsWidgetPayload = (stats = {}, language = "tr") => {
   const labels = stats.labels || {};
-  const hoursLabel = labels.hours || pickByLanguage(language, { tr: "Saat", en: "Hours", es: "Horas", pt: "Horas", de: "Stunden" , it: "Ore"});
+  const hoursLabel = labels.hours || pickByLanguage(language, { tr: "Saat", en: "Hours", es: "Horas", pt: "Horas", de: "Stunden" , it: "Ore", fr: "Heures", ja: "時間"});
   const movieMinutes = Number(stats.movieMinutes || 0);
   const tvMinutes = Number(stats.tvMinutes || 0);
 
   return {
-    title: labels.sectionTitle || pickByLanguage(language, { tr: "İstatistikler", en: "Statistics", es: "Estadísticas", pt: "Estatísticas", de: "Statistik" , it: "Statistiche"}),
+    title: labels.sectionTitle || pickByLanguage(language, { tr: "İstatistikler", en: "Statistics", es: "Estadísticas", pt: "Estatísticas", de: "Statistik" , it: "Statistiche", fr: "Statistiques", ja: "統計"}),
     movie: {
       count: num(stats.movieCount, language),
       countLabel: labels.movieWatched || "",

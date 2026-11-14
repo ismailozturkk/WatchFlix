@@ -20,16 +20,16 @@ import { isLightSurface } from "../../utils/colorUtils";
 const GOLD = "#F5C518";
 
 // Bilinmeyen dil İngilizceye düşer.
-const L = (lang, tr, en, es, pt, de, it) => (lang === "tr" ? tr : lang === "es" && es != null ? es : lang === "pt" && pt != null ? pt : lang === "de" && de != null ? de : lang === "it" && it != null ? it : en);
+const L = (lang, tr, en, es, pt, de, it, fr, ja) => (lang === "tr" ? tr : lang === "es" && es != null ? es : lang === "pt" && pt != null ? pt : lang === "de" && de != null ? de : lang === "it" && it != null ? it : lang === "fr" && fr != null ? fr : lang === "ja" && ja != null ? ja : en);
 /* ═══════════════════════ 1. YAPAY ZEKÂ — soru + öneri kartı ═════════════════ */
 
 // Seelogd AI'ın beş cevap stili (ilki örnekte açık, diğerleri çip olarak listelenir).
 const AI_STYLES = [
-  { icon: "sparkles", tr: "Öneri", en: "Picks", es: "Sugerencias", pt: "Sugestões", de: "Tipps" , it: "Scelte"},
-  { icon: "git-compare", tr: "Karşılaştırma", en: "Compare", es: "Comparación", pt: "Comparação", de: "Vergleichen" , it: "Confronta"},
-  { icon: "calendar", tr: "İzleme planı", en: "Watch plan", es: "Plan de visionado", pt: "Plano para assistir", de: "Schauplan" , it: "Piano di visione"},
-  { icon: "list", tr: "Liste", en: "List", es: "Lista", pt: "Lista", de: "Liste" , it: "Elenco"},
-  { icon: "information-circle", tr: "Künye", en: "Spotlight", es: "Ficha", pt: "Destaque", de: "Steckbrief" , it: "Sotto i riflettori"},
+  { icon: "sparkles", tr: "Öneri", en: "Picks", es: "Sugerencias", pt: "Sugestões", de: "Tipps" , it: "Scelte", fr: "Sélection", ja: "セレクト"},
+  { icon: "git-compare", tr: "Karşılaştırma", en: "Compare", es: "Comparación", pt: "Comparação", de: "Vergleichen" , it: "Confronta", fr: "Comparer", ja: "比較"},
+  { icon: "calendar", tr: "İzleme planı", en: "Watch plan", es: "Plan de visionado", pt: "Plano para assistir", de: "Schauplan" , it: "Piano di visione", fr: "Programme", ja: "視聴プラン"},
+  { icon: "list", tr: "Liste", en: "List", es: "Lista", pt: "Lista", de: "Liste" , it: "Elenco", fr: "Liste", ja: "リスト"},
+  { icon: "information-circle", tr: "Künye", en: "Spotlight", es: "Ficha", pt: "Destaque", de: "Steckbrief" , it: "Sotto i riflettori", fr: "Projecteur", ja: "スポットライト"},
 ];
 
 // Poster + puan rozeti + başlık/yıl. Veri henüz yoksa nötr iskelet çizer.
@@ -75,7 +75,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
       {/* Kullanıcının sorusu */}
       <View style={[aiMock.question, { backgroundColor: accent }]}>
         <Text style={[aiMock.questionText, { color: onAccent }]}>
-          {L(lang, "Bu akşam ne izlesem? 🍿", "What should I watch tonight? 🍿", "¿Qué veo esta noche? 🍿", "O que assistir hoje à noite? 🍿", "Was soll ich heute Abend schauen? 🍿", "Cosa dovrei guardare stasera? 🍿")}
+          {L(lang, "Bu akşam ne izlesem? 🍿", "What should I watch tonight? 🍿", "¿Qué veo esta noche? 🍿", "O que assistir hoje à noite? 🍿", "Was soll ich heute Abend schauen? 🍿", "Cosa dovrei guardare stasera? 🍿", "Qu'est-ce que je regarde ce soir ? 🍿", "今夜は何を観よう?🍿")}
         </Text>
       </View>
 
@@ -96,11 +96,11 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
             <Text style={[aiMock.aiName, { color: theme.text.primary }]}>Seelogd AI</Text>
             <View style={[aiMock.styleTag, { backgroundColor: alpha(accent, 0.14) }]}>
               <Ionicons name={AI_STYLES[0].icon} size={10} color={accent} />
-              <Text style={[aiMock.styleTagText, { color: accent }]}>{L(lang, AI_STYLES[0].tr, AI_STYLES[0].en, AI_STYLES[0].es, AI_STYLES[0].pt, AI_STYLES[0].de, AI_STYLES[0].it)}</Text>
+              <Text style={[aiMock.styleTagText, { color: accent }]}>{L(lang, AI_STYLES[0].tr, AI_STYLES[0].en, AI_STYLES[0].es, AI_STYLES[0].pt, AI_STYLES[0].de, AI_STYLES[0].it, AI_STYLES[0].fr, AI_STYLES[0].ja)}</Text>
             </View>
           </View>
           <Text style={[aiMock.answerText, { color: theme.text.secondary }]}>
-            {L(lang, "Ruh haline göre üç yapım seçtim:", "Three picks matched to your mood:", "Tres opciones según tu estado de ánimo:", "Três opções de acordo com o seu humor:", "Drei Tipps passend zu deiner Stimmung:", "Tre scelte adatte al tuo umore:")}
+            {L(lang, "Ruh haline göre üç yapım seçtim:", "Three picks matched to your mood:", "Tres opciones según tu estado de ánimo:", "Três opções de acordo com o seu humor:", "Drei Tipps passend zu deiner Stimmung:", "Tre scelte adatte al tuo umore:", "Trois choix adaptés à ton humeur :", "あなたの気分に合った3つのおすすめ:")}
           </Text>
 
           <View style={aiMock.picks}>
@@ -112,7 +112,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
           <View style={[aiMock.addRow, { borderTopColor: theme.border }]}>
             <Ionicons name="bookmark-outline" size={13} color={accent} />
             <Text style={[aiMock.addText, { color: theme.text.muted }]}>
-              {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap", "Añádelo a tu lista con un toque", "Adicione à sua lista com um toque", "Mit einem Tippen zu deiner Liste hinzufügen", "Aggiungi alla tua lista con un solo tocco")}
+              {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap", "Añádelo a tu lista con un toque", "Adicione à sua lista com um toque", "Mit einem Tippen zu deiner Liste hinzufügen", "Aggiungi alla tua lista con un solo tocco", "Ajoute à ta liste en un geste", "ワンタップでリストに追加")}
             </Text>
           </View>
         </View>
@@ -120,7 +120,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
 
       {/* Beş cevap stili */}
       <Text style={[aiMock.label, { color: theme.text.muted }]}>
-        {L(lang, "5 FARKLI CEVAP STİLİ", "5 ANSWER STYLES", "5 ESTILOS DE RESPUESTA", "5 ESTILOS DE RESPOSTA", "5 ANTWORTSTILE", "5 STILI DI RISPOSTA")}
+        {L(lang, "5 FARKLI CEVAP STİLİ", "5 ANSWER STYLES", "5 ESTILOS DE RESPUESTA", "5 ESTILOS DE RESPOSTA", "5 ANTWORTSTILE", "5 STILI DI RISPOSTA", "5 STYLES DE RÉPONSE", "5つの回答スタイル")}
       </Text>
       <View style={aiMock.chips}>
         {AI_STYLES.map((style, i) => (
@@ -135,7 +135,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
           >
             <Ionicons name={style.icon} size={12} color={i === 0 ? accent : theme.text.secondary} />
             <Text style={[aiMock.chipText, { color: i === 0 ? accent : theme.text.secondary }]}>
-              {L(lang, style.tr, style.en, style.es, style.pt, style.de, style.it)}
+              {L(lang, style.tr, style.en, style.es, style.pt, style.de, style.it, style.fr, style.ja)}
             </Text>
           </View>
         ))}
@@ -242,14 +242,14 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
         </View>
 
         <View style={pf.stats}>
-          <ProfileStat theme={theme} accent={accent} icon="film-outline" value="312" label={L(lang, "Film", "Movies", "Películas", "Filmes", "Filme", "Film")} />
-          <ProfileStat theme={theme} accent={accent} icon="tv-outline" value="48" label={L(lang, "Dizi", "Shows", "Series", "Séries", "Serien", "Serie TV")} />
+          <ProfileStat theme={theme} accent={accent} icon="film-outline" value="312" label={L(lang, "Film", "Movies", "Películas", "Filmes", "Filme", "Film", "Films", "映画")} />
+          <ProfileStat theme={theme} accent={accent} icon="tv-outline" value="48" label={L(lang, "Dizi", "Shows", "Series", "Séries", "Serien", "Serie TV", "Séries", "TV番組")} />
           <ProfileStat
             theme={theme}
             accent={accent}
             icon="time-outline"
-            value={L(lang, "18 gün", "18 days", "18 días", "18 dias", "18 Tage", "18 giorni")}
-            label={L(lang, "İzleme süresi", "Watch time", "Tiempo de visionado", "Tempo assistido", "Sehzeit", "Tempo di visione")}
+            value={L(lang, "18 gün", "18 days", "18 días", "18 dias", "18 Tage", "18 giorni", "18 jours", "18日")}
+            label={L(lang, "İzleme süresi", "Watch time", "Tiempo de visionado", "Tempo assistido", "Sehzeit", "Tempo di visione", "Temps de visionnage", "視聴時間")}
           />
         </View>
 
@@ -264,12 +264,12 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
           <MaterialCommunityIcons name="star-four-points" size={14} color="#fff" />
           <View style={{ flex: 1 }}>
             <Text style={pf.wrappedTitle}>Wrapped {year}</Text>
-            <Text style={pf.wrappedSub}>{L(lang, "Yılın izleme özetin hazır", "Your year in watching", "Tu año viendo cine y series", "Seu ano assistindo filmes e séries", "Dein Seh-Jahr", "Il tuo anno di visione")}</Text>
+            <Text style={pf.wrappedSub}>{L(lang, "Yılın izleme özetin hazır", "Your year in watching", "Tu año viendo cine y series", "Seu ano assistindo filmes e séries", "Dein Seh-Jahr", "Il tuo anno di visione", "Ton année de visionnage", "あなたの1年の視聴")}</Text>
           </View>
           <Ionicons name="arrow-forward" size={16} color="#fff" />
         </View>
 
-        <Text style={[pf.label, { color: theme.text.muted }]}>{L(lang, "FAVORİLERİN", "YOUR FAVORITES", "TUS FAVORITOS", "SEUS FAVORITOS", "DEINE FAVORITEN", "I TUOI PREFERITI")}</Text>
+        <Text style={[pf.label, { color: theme.text.muted }]}>{L(lang, "FAVORİLERİN", "YOUR FAVORITES", "TUS FAVORITOS", "SEUS FAVORITOS", "DEINE FAVORITEN", "I TUOI PREFERITI", "TES FAVORIS", "あなたのお気に入り")}</Text>
         <View style={pf.favs}>
           {[0, 1, 2, 3].map((k) => (
             <View key={k} style={[pf.fav, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
@@ -289,14 +289,14 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
       {/* Arkadaş hareketi */}
       <View style={[pf.activity, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         <Text style={[pf.label, { color: theme.text.muted, marginTop: 0 }]}>
-          {L(lang, "ARKADAŞLARIN NE İZLİYOR", "WHAT FRIENDS ARE WATCHING", "LO QUE VEN TUS AMIGOS", "O QUE SEUS AMIGOS ESTÃO ASSISTINDO", "WAS FREUNDE SCHAUEN", "COSA STANNO GUARDANDO GLI AMICI")}
+          {L(lang, "ARKADAŞLARIN NE İZLİYOR", "WHAT FRIENDS ARE WATCHING", "LO QUE VEN TUS AMIGOS", "O QUE SEUS AMIGOS ESTÃO ASSISTINDO", "WAS FREUNDE SCHAUEN", "COSA STANNO GUARDANDO GLI AMICI", "CE QUE REGARDENT TES AMIS", "友だちが観ているもの")}
         </Text>
         <FriendActivity
           first
           theme={theme}
           name="zeynep"
           color={green}
-          verb={L(lang, "izledi", "watched", "vio", "assistiu", "gesehen", "guardato")}
+          verb={L(lang, "izledi", "watched", "vio", "assistiu", "gesehen", "guardato", "vu", "視聴済み")}
           item={friendA}
           getTmdbUrl={getTmdbUrl}
         />
@@ -304,7 +304,7 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
           theme={theme}
           name="can"
           color={blue}
-          verb={L(lang, "puanladı", "rated", "puntuó", "avaliou", "bewertet", "valutato")}
+          verb={L(lang, "puanladı", "rated", "puntuó", "avaliou", "bewertet", "valutato", "noté", "評価済み")}
           item={friendB}
           rating={4.5}
           getTmdbUrl={getTmdbUrl}

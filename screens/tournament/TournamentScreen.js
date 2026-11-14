@@ -1120,7 +1120,7 @@ export default function TournamentScreen() {
       >
         <AppIcon family="Ionicons" name="eye" size={16} color={theme.accent} />
         <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
-          {lang === "tr" ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel." : lang === "es" ? "Estás viendo el torneo como espectador. Votar es una ventaja Premium." : lang === "pt" ? "Você está vendo o torneio como espectador. Votar é um benefício Premium." : lang === "de" ? "Du schaust als Zuschauer zu. Das Abstimmen ist ein Premium-Vorteil." : lang === "it" ? "Stai guardando come spettatore. Votare è un vantaggio Premium." : "You're watching as a spectator. Voting is a Premium perk."}
+          {lang === "tr" ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel." : lang === "es" ? "Estás viendo el torneo como espectador. Votar es una ventaja Premium." : lang === "pt" ? "Você está vendo o torneio como espectador. Votar é um benefício Premium." : lang === "de" ? "Du schaust als Zuschauer zu. Das Abstimmen ist ein Premium-Vorteil." : lang === "it" ? "Stai guardando come spettatore. Votare è un vantaggio Premium." : lang === "fr" ? "Tu regardes en spectateur. Le vote est un avantage Premium." : lang === "ja" ? "観戦モードです。投票はPremium特典です。" : "You're watching as a spectator. Voting is a Premium perk."}
         </Text>
         <AppIcon family="Ionicons" name="chevron-forward" size={14} color={theme.text.muted} />
       </GlassPressable>

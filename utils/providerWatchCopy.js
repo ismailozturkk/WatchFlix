@@ -90,7 +90,35 @@ export const PROVIDER_WATCH_COPY = {
   off: "Per prima cosa scegli le tue piattaforme in Impostazioni > I miei abbonamenti",
   noData: "Attiva \"Notifica quando disponibile\" in Impostazioni > Notifiche per utilizzare questo filtro. I primi risultati arrivano alle 18 della sera successiva",
   region: "I dati della piattaforma sono stati preparati per un'altra regione; si aggiorna al controllo successivo"
-}};
+},
+  fr: {
+    section: "PLATEFORME",
+    chip: "Sur mes plateformes",
+    chipCount: (count) => `Sur mes plateformes · ${count}`,
+    chipLabel: (count) => `Uniquement les titres disponibles sur mes plateformes, ${count} titres`,
+    ready: (yes, total) => `${yes} titres sur ${total} sont disponibles sur les plateformes choisies`,
+    none: "Rien ici n'est disponible sur les plateformes choisies",
+    unknown: (count) => `${count} titres n'ont pas encore été vérifiés ; ils n'apparaîtront pas avec ce filtre`,
+    age: (days) => `Dernière vérification il y a ${days} jours`,
+    off: "Choisis d'abord tes plateformes dans Réglages > Mes abonnements",
+    noData:
+      "Active « Prévenir quand c'est disponible » dans Réglages > Notifications pour utiliser ce filtre. Les premiers résultats arrivent le lendemain à 18 h",
+    region: "Les données de plateformes ont été préparées pour une autre région ; elles se mettront à jour à la prochaine vérification",
+  },
+  ja: {
+    section: "プラットフォーム",
+    chip: "利用中のプラットフォームで",
+    chipCount: (count) => `利用中のプラットフォームで · ${count}`,
+    chipLabel: (count) => `利用中のプラットフォームで観られる作品のみ、${count}作品`,
+    ready: (yes, total) => `${total}作品中${yes}作品が選んだプラットフォームで観られます`,
+    none: "選んだプラットフォームで観られるものはありません",
+    unknown: (count) => `${count}作品はまだ確認されていないため、この絞り込みでは表示されません`,
+    age: (days) => `最終確認は${days}日前`,
+    off: "まず設定 > 登録中のサービスでプラットフォームを選んでください",
+    noData:
+      "この絞り込みを使うには、設定 > 通知で「配信開始時に通知」をオンにしてください。最初の結果は翌日の午後6時に届きます",
+    region: "プラットフォームのデータは別の地域向けに準備されています。次回の確認で更新されます",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getProviderWatchCopy = (language) =>

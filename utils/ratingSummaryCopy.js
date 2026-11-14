@@ -49,7 +49,21 @@ export const RATING_SUMMARY_COPY = {
   rate: "Tocca per valutare",
   rated: mine => `La tua valutazione ${mine}. Tocca per cambiare`,
   locked: "Non ancora pubblicato"
-}};
+},
+  fr: {
+    score: (score, votes) => `Note ${score} sur 10${votes ? `, ${votes} votes` : ""}`,
+    noScore: "Pas encore de note",
+    rate: "Touche pour noter",
+    rated: (mine) => `Ta note ${mine}. Touche pour la changer`,
+    locked: "Pas encore sorti",
+  },
+  ja: {
+    score: (score, votes) => `評価 10点中${score}${votes ? `、${votes}票` : ""}`,
+    noScore: "まだ評価がありません",
+    rate: "タップして評価",
+    rated: (mine) => `あなたの評価 ${mine}。タップで変更`,
+    locked: "未公開",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getRatingSummaryCopy = (language) =>

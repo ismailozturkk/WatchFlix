@@ -17,70 +17,71 @@
 import { copyLanguage } from "./appLanguages";
 import { foldGenreName, kanonikTur } from "./genreCanon";
 
-const LANGS = ["tr", "en", "es", "pt", "de", "it"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it", "fr", "ja"];
 
 // Kanonik tür id'si → ad. profileStoryCard da bu tabloyu kullanır.
 export const GENRE_LABELS = Object.freeze({
-  action: { tr: "Aksiyon", en: "Action", es: "Acción", pt: "Ação", de: "Action" , it: "Azione"},
-  adventure: { tr: "Macera", en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer" , it: "Avventura"},
-  animation: { tr: "Animasyon", en: "Animation", es: "Animación", pt: "Animação", de: "Animation" , it: "Animazione"},
-  comedy: { tr: "Komedi", en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie" , it: "Commedia"},
-  crime: { tr: "Suç", en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi" , it: "Crimine"},
-  documentary: { tr: "Belgesel", en: "Documentary", es: "Documental", pt: "Documentário", de: "Dokumentarfilm" , it: "Documentario"},
-  drama: { tr: "Dram", en: "Drama", es: "Drama", pt: "Drama", de: "Drama" , it: "Dramma"},
-  family: { tr: "Aile", en: "Family", es: "Familia", pt: "Família", de: "Familie" , it: "Famiglia"},
-  fantasy: { tr: "Fantastik", en: "Fantasy", es: "Fantasía", pt: "Fantasia", de: "Fantasy" , it: "Fantasy"},
-  history: { tr: "Tarih", en: "History", es: "Historia", pt: "História", de: "Historie" , it: "Storia"},
-  horror: { tr: "Korku", en: "Horror", es: "Terror", pt: "Terror", de: "Horror" , it: "Orrore"},
-  music: { tr: "Müzik", en: "Music", es: "Música", pt: "Música", de: "Musik" , it: "Musica"},
-  mystery: { tr: "Gizem", en: "Mystery", es: "Misterio", pt: "Mistério", de: "Mystery" , it: "Mistero"},
-  romance: { tr: "Romantik", en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm" , it: "Romantico"},
-  scifi: { tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi" , it: "Fantascienza"},
-  thriller: { tr: "Gerilim", en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller" , it: "Thriller"},
-  war: { tr: "Savaş", en: "War", es: "Bélica", pt: "Guerra", de: "Kriegsfilm" , it: "Guerra"},
-  western: { tr: "Vahşi Batı", en: "Western", es: "Western", pt: "Faroeste", de: "Western" , it: "Western"},
-  reality: { tr: "Realite", en: "Reality", es: "Reality", pt: "Reality", de: "Reality" , it: "Reality"},
-  tvmovie: { tr: "TV Filmi", en: "TV Movie", es: "Película de TV", pt: "Filme para TV", de: "TV-Film" , it: "Film TV"},
+  action: { tr: "Aksiyon", en: "Action", es: "Acción", pt: "Ação", de: "Action" , it: "Azione", fr: "Action", ja: "アクション"},
+  adventure: { tr: "Macera", en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer" , it: "Avventura", fr: "Aventure", ja: "アドベンチャー"},
+  animation: { tr: "Animasyon", en: "Animation", es: "Animación", pt: "Animação", de: "Animation" , it: "Animazione", fr: "Animation", ja: "アニメーション"},
+  comedy: { tr: "Komedi", en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie" , it: "Commedia", fr: "Comédie", ja: "コメディ"},
+  crime: { tr: "Suç", en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi" , it: "Crimine", fr: "Crime", ja: "犯罪"},
+  documentary: { tr: "Belgesel", en: "Documentary", es: "Documental", pt: "Documentário", de: "Dokumentarfilm" , it: "Documentario", fr: "Documentaire", ja: "ドキュメンタリー"},
+  drama: { tr: "Dram", en: "Drama", es: "Drama", pt: "Drama", de: "Drama" , it: "Dramma", fr: "Drame", ja: "ドラマ"},
+  family: { tr: "Aile", en: "Family", es: "Familia", pt: "Família", de: "Familie" , it: "Famiglia", fr: "Familial", ja: "ファミリー"},
+  fantasy: { tr: "Fantastik", en: "Fantasy", es: "Fantasía", pt: "Fantasia", de: "Fantasy" , it: "Fantasy", fr: "Fantastique", ja: "ファンタジー"},
+  history: { tr: "Tarih", en: "History", es: "Historia", pt: "História", de: "Historie" , it: "Storia", fr: "Histoire", ja: "歴史"},
+  horror: { tr: "Korku", en: "Horror", es: "Terror", pt: "Terror", de: "Horror" , it: "Orrore", fr: "Horreur", ja: "ホラー"},
+  music: { tr: "Müzik", en: "Music", es: "Música", pt: "Música", de: "Musik" , it: "Musica", fr: "Musique", ja: "音楽"},
+  mystery: { tr: "Gizem", en: "Mystery", es: "Misterio", pt: "Mistério", de: "Mystery" , it: "Mistero", fr: "Mystère", ja: "ミステリー"},
+  romance: { tr: "Romantik", en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm" , it: "Romantico", fr: "Romance", ja: "ロマンス"},
+  scifi: { tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi" , it: "Fantascienza", fr: "Science-fiction", ja: "SF"},
+  thriller: { tr: "Gerilim", en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller" , it: "Thriller", fr: "Thriller", ja: "スリラー"},
+  war: { tr: "Savaş", en: "War", es: "Bélica", pt: "Guerra", de: "Kriegsfilm" , it: "Guerra", fr: "Guerre", ja: "戦争"},
+  western: { tr: "Vahşi Batı", en: "Western", es: "Western", pt: "Faroeste", de: "Western" , it: "Western", fr: "Western", ja: "西部劇"},
+  reality: { tr: "Realite", en: "Reality", es: "Reality", pt: "Reality", de: "Reality" , it: "Reality", fr: "Téléréalité", ja: "リアリティ"},
+  tvmovie: { tr: "TV Filmi", en: "TV Movie", es: "Película de TV", pt: "Filme para TV", de: "TV-Film" , it: "Film TV", fr: "Téléfilm", ja: "テレビ映画"},
 });
 
 // Yalnız dizilerde olan / genreCanon'un birleştirdiği türler. Anahtarlar
 // foldGenreName çıktısıdır ("Sci-Fi & Fantasy" → "sci fi fantasy").
 const EXACT = [
   {
-    aliases: ["action adventure", "aksiyon macera", "accion y aventura", "acao e aventura", "action abenteuer", "azione e avventura"],
-    labels: { tr: "Aksiyon & Macera", en: "Action & Adventure", es: "Acción y aventura", pt: "Ação e aventura", de: "Action & Abenteuer" , it: "Azione e avventura"},
+    aliases: ["action adventure", "aksiyon macera", "accion y aventura", "acao e aventura", "action abenteuer", "azione e avventura", "action et aventure", "アクション&アドベンチャー"],
+    labels: { tr: "Aksiyon & Macera", en: "Action & Adventure", es: "Acción y aventura", pt: "Ação e aventura", de: "Action & Abenteuer" , it: "Azione e avventura", fr: "Action & Aventure", ja: "アクション&アドベンチャー"},
   },
   {
     aliases: [
       "sci fi fantasy", "science fiction fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "bilim kurgu fantastik",
       "ciencia ficcion y fantasia", "ficcao cientifica e fantasia", "fantascienza e fantasy",
+      "SF&ファンタジー", "SF & ファンタジー",
     ],
-    labels: { tr: "Bilim Kurgu & Fantazi", en: "Sci-Fi & Fantasy", es: "Ciencia ficción y fantasía", pt: "Ficção científica e fantasia", de: "Sci-Fi & Fantasy" , it: "Fantascienza e fantasy"},
+    labels: { tr: "Bilim Kurgu & Fantazi", en: "Sci-Fi & Fantasy", es: "Ciencia ficción y fantasía", pt: "Ficção científica e fantasia", de: "Sci-Fi & Fantasy" , it: "Fantascienza e fantasy", fr: "Science-Fiction & Fantastique", ja: "SF&ファンタジー"},
   },
   {
-    aliases: ["war politics", "savas politika", "savas politik", "belica y politica", "guerra e politica", "krieg politik"],
-    labels: { tr: "Savaş & Politika", en: "War & Politics", es: "Bélica y política", pt: "Guerra e política", de: "Krieg & Politik" , it: "Guerra e politica"},
+    aliases: ["war politics", "savas politika", "savas politik", "belica y politica", "guerra e politica", "krieg politik", "戦争&政治", "戦争 & 政治"],
+    labels: { tr: "Savaş & Politika", en: "War & Politics", es: "Bélica y política", pt: "Guerra e política", de: "Krieg & Politik" , it: "Guerra e politica", fr: "Guerre & Politique", ja: "戦争&政治"},
   },
   {
-    aliases: ["kids", "cocuk", "cocuklar", "infantil", "kinder"],
-    labels: { tr: "Çocuk", en: "Kids", es: "Infantil", pt: "Infantil", de: "Kinder" , it: "Bambini"},
+    aliases: ["kids", "cocuk", "cocuklar", "infantil", "kinder", "キッズ"],
+    labels: { tr: "Çocuk", en: "Kids", es: "Infantil", pt: "Infantil", de: "Kinder" , it: "Bambini", fr: "Enfants", ja: "キッズ"},
   },
   {
-    aliases: ["soap", "pembe dizi", "telenovela", "novela", "seifenoper"],
-    labels: { tr: "Pembe Dizi", en: "Soap", es: "Telenovela", pt: "Novela", de: "Seifenoper" , it: "Soap"},
+    aliases: ["soap", "pembe dizi", "telenovela", "novela", "seifenoper", "ソープ"],
+    labels: { tr: "Pembe Dizi", en: "Soap", es: "Telenovela", pt: "Novela", de: "Seifenoper" , it: "Soap", fr: "Feuilleton", ja: "ソープ"},
   },
   {
-    aliases: ["talk", "talk show", "talkshow", "programa de entrevistas"],
-    labels: { tr: "Talk Show", en: "Talk", es: "Programa de entrevistas", pt: "Talk show", de: "Talkshow" , it: "Talk show"},
+    aliases: ["talk", "talk show", "talkshow", "programa de entrevistas", "トーク", "トークショー"],
+    labels: { tr: "Talk Show", en: "Talk", es: "Programa de entrevistas", pt: "Talk show", de: "Talkshow" , it: "Talk show", fr: "Talk-show", ja: "トーク"},
   },
   {
-    aliases: ["news", "haber", "noticias", "nachrichten"],
-    labels: { tr: "Haber", en: "News", es: "Noticias", pt: "Notícias", de: "Nachrichten" , it: "Notizie"},
+    aliases: ["news", "haber", "noticias", "nachrichten", "ニュース"],
+    labels: { tr: "Haber", en: "News", es: "Noticias", pt: "Notícias", de: "Nachrichten" , it: "Notizie", fr: "Actualités", ja: "ニュース"},
   },
 ];
 
 const EXACT_LOOKUP = new Map();
-for (const entry of EXACT) for (const alias of entry.aliases) EXACT_LOOKUP.set(alias, entry.labels);
+for (const entry of EXACT) for (const alias of entry.aliases) EXACT_LOOKUP.set(foldGenreName(alias), entry.labels);
 
 /**
  * Saklı tür adını `language` diline çevirir. Tanınmayan ad olduğu gibi döner.

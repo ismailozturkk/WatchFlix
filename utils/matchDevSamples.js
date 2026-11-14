@@ -31,7 +31,7 @@ export const MATCH_DEV_STATES = Object.freeze([
   { id: "empty", label: "Havuzda, aday yok", doc: doc(lane()) },
   {
     id: "cold",
-    label: "Soğuk başlangıç (yakın zevk)",
+    label: "Soğuk başlangıç (yüksek uyum)",
     doc: doc(lane({ pool: 42, active: 37, twinsEnabled: false, items: [person(1, { verdict: "near", score: 86 }), person(2, { verdict: "near", score: 81, implicitHeavy: true })] })),
   },
   {

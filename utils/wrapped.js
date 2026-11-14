@@ -205,34 +205,54 @@ export const longestStreakOf = (dayKeys = []) => {
 const PERSONALITIES = [
   { key: "comedy",      emoji: "😂", tr: "Kahkaha Avcısı",       en: "Laugh Hunter",      match: ["komedi", "comedy", "comedia", "commedia"],
     trDesc: "Kötü bir günün ilacı hep bir komedi.", enDesc: "A good comedy fixes any bad day.", es: "Cazarrisas", pt: "Caçador de risadas", de: "Lachjäger", esDesc: "Una buena comedia arregla cualquier mal día.", ptDesc: "Uma boa comédia conserta qualquer dia ruim.", deDesc: "Eine gute Komödie rettet jeden schlechten Tag." ,
-  it: "Cacciatore di risate", itDesc: "Una bella commedia risolleva anche la giornata peggiore."},
+  it: "Cacciatore di risate",
+  fr: "Chasseur de rires",
+  ja: "笑いハンター", itDesc: "Una bella commedia risolleva anche la giornata peggiore.", frDesc: "Une bonne comédie répare n'importe quelle mauvaise journée.", jaDesc: "いいコメディはどんな最悪の日も救ってくれる。"},
   { key: "horror",      emoji: "😱", tr: "Cesur Yürek",          en: "Brave Heart",       match: ["korku", "horror", "terror", "orrore"],
     trDesc: "Işıklar kapalı, ses sonuna kadar açık.", enDesc: "Lights off, volume all the way up.", es: "Corazón valiente", pt: "Coração valente", de: "Mutiges Herz", esDesc: "Luces apagadas y volumen al máximo.", ptDesc: "Luzes apagadas e volume no máximo.", deDesc: "Licht aus, Lautstärke voll auf." ,
-  it: "Cuore impavido", itDesc: "Luci spente e volume al massimo."},
+  it: "Cuore impavido",
+  fr: "Cœur vaillant",
+  ja: "勇敢な心", itDesc: "Luci spente e volume al massimo.", frDesc: "Lumières éteintes, volume à fond.", jaDesc: "照明を消して、音量は最大に。"},
   { key: "thriller",    emoji: "🔪", tr: "Gerilim Ustası",       en: "Thrill Seeker",     match: ["gerilim", "thriller", "suspense", "suspenso"],
     trDesc: "Bir sonraki sürprizi hep sen tahmin edersin.", enDesc: "You always call the next twist.", es: "Instinto de suspense", pt: "Instinto de suspense", de: "Nervenkitzel-Sucher", esDesc: "Siempre adivinas el siguiente giro.", ptDesc: "Você sempre adivinha a próxima reviravolta.", deDesc: "Du errätst immer die nächste Wendung." ,
-  it: "Amante del brivido", itDesc: "Indovini sempre il prossimo colpo di scena."},
+  it: "Amante del brivido",
+  fr: "Amateur de frissons",
+  ja: "スリルを求める人", itDesc: "Indovini sempre il prossimo colpo di scena.", frDesc: "Tu devines toujours le prochain rebondissement.", jaDesc: "次のどんでん返しはいつもお見通し。"},
   { key: "action",      emoji: "💥", tr: "Adrenalin Bağımlısı",  en: "Adrenaline Junkie", match: ["aksiyon", "action", "macera", "adventure", "acción", "aventura", "azione", "avventura"],
     trDesc: "Tempo düşmesin, patlama eksik olmasın.", enDesc: "Keep the pace up and the explosions coming.", es: "Adicción a la adrenalina", pt: "Viciado em adrenalina", de: "Adrenalinjunkie", esDesc: "Que no baje el ritmo y que no falten las explosiones.", ptDesc: "Que o ritmo não caia e que não faltem explosões.", deDesc: "Das Tempo darf nicht fallen, die Explosionen nicht fehlen." ,
-  it: "Amante dell'adrenalina", itDesc: "Ritmo serrato ed esplosioni senza sosta."},
+  it: "Amante dell'adrenalina",
+  fr: "Accro à l'adrénaline",
+  ja: "アドレナリン中毒", itDesc: "Ritmo serrato ed esplosioni senza sosta.", frDesc: "Du rythme et des explosions à la chaîne.", jaDesc: "テンポは落とさず、爆発は次々と。"},
   { key: "scifi",       emoji: "🚀", tr: "Zaman Yolcusu",        en: "Time Traveler",     match: ["bilim kurgu", "science fiction", "sci-fi", "fantastik", "fantasy", "ciencia ficción", "fantasía", "fantascienza"],
     trDesc: "Gerçeklik sana dar gelir, yeni evrenler ararsın.", enDesc: "Reality feels small — you want new worlds.", es: "Viajero en el tiempo", pt: "Viajante do tempo", de: "Zeitreisender", esDesc: "La realidad se te queda pequeña: buscas mundos nuevos.", ptDesc: "A realidade fica pequena para você: você busca mundos novos.", deDesc: "Die Realität wird dir zu eng – du suchst neue Welten." ,
-  it: "Viaggiatore del tempo", itDesc: "La realtà ti sta stretta: cerchi nuovi universi."},
+  it: "Viaggiatore del tempo",
+  fr: "Voyageur du temps",
+  ja: "タイムトラベラー", itDesc: "La realtà ti sta stretta: cerchi nuovi universi.", frDesc: "La réalité te semble étroite — tu veux de nouveaux mondes.", jaDesc: "現実は狭すぎる — 新しい世界を求めて。"},
   { key: "drama",       emoji: "🎭", tr: "Duygu Yolcusu",        en: "Soul Wanderer",     match: ["dram", "drama", "dramma"],
     trDesc: "Karakterlerle yaşar, finalde derin bir nefes alırsın.", enDesc: "You live with the characters, then exhale at the finale.", es: "Alma errante", pt: "Alma errante", de: "Seelenwanderer", esDesc: "Vives con los personajes y respiras hondo en el final.", ptDesc: "Você vive com os personagens e respira fundo no final.", deDesc: "Du lebst mit den Figuren und atmest beim Finale tief durch." ,
-  it: "Anima errante", itDesc: "Vivi insieme ai personaggi e tiri un lungo respiro al finale."},
+  it: "Anima errante",
+  fr: "Âme vagabonde",
+  ja: "魂の旅人", itDesc: "Vivi insieme ai personaggi e tiri un lungo respiro al finale.", frDesc: "Tu vis avec les personnages, puis tu souffles au final.", jaDesc: "登場人物と共に生き、最終回で深く息をつく。"},
   { key: "romance",     emoji: "💘", tr: "Romantik Ruh",         en: "Hopeless Romantic", match: ["romantik", "romance"],
     trDesc: "Bir aşk hikâyesine hep yer vardır.", enDesc: "There's always room for a love story.", es: "Alma romántica", pt: "Alma romântica", de: "Hoffnungsloser Romantiker", esDesc: "Siempre hay sitio para una historia de amor.", ptDesc: "Sempre há espaço para uma história de amor.", deDesc: "Für eine Liebesgeschichte ist immer Platz." ,
-  it: "Romantico senza speranza", itDesc: "C'è sempre spazio per una storia d'amore."},
+  it: "Romantico senza speranza",
+  fr: "Romantique incurable",
+  ja: "夢見るロマンチスト", itDesc: "C'è sempre spazio per una storia d'amore.", frDesc: "Il y a toujours de la place pour une histoire d'amour.", jaDesc: "ラブストーリーの入る余地はいつだってある。"},
   { key: "animation",   emoji: "🎨", tr: "Çizgi Düşler",         en: "Animated Dreamer",  match: ["animasyon", "animation", "animación", "animazione"],
     trDesc: "Çizilmiş dünyalar sana hiç çocukça gelmez.", enDesc: "Drawn worlds never feel childish to you.", es: "Sueños dibujados", pt: "Sonhos desenhados", de: "Animierter Träumer", esDesc: "Los mundos dibujados nunca te parecen infantiles.", ptDesc: "Mundos desenhados nunca parecem infantis para você.", deDesc: "Gezeichnete Welten wirken auf dich nie kindisch." ,
-  it: "Sognatore animato", itDesc: "I mondi disegnati non ti sembrano mai infantili."},
+  it: "Sognatore animato",
+  fr: "Rêveur animé",
+  ja: "アニメの夢想家", itDesc: "I mondi disegnati non ti sembrano mai infantili.", frDesc: "Les mondes dessinés ne te semblent jamais enfantins.", jaDesc: "描かれた世界を子どもっぽいと思ったことはない。"},
   { key: "documentary", emoji: "🔭", tr: "Bilge Gözlemci",       en: "Wise Observer",     match: ["belgesel", "documentary", "documental", "documentario"],
     trDesc: "Gerçek hikâyeler her kurgudan çok sarar.", enDesc: "Real stories beat fiction every time.", es: "Mirada sabia", pt: "Olhar sábio", de: "Weiser Beobachter", esDesc: "Las historias reales ganan a la ficción siempre.", ptDesc: "Histórias reais sempre ganham da ficção.", deDesc: "Wahre Geschichten schlagen jede Fiktion." ,
-  it: "Osservatore saggio", itDesc: "Le storie vere battono sempre la finzione."},
+  it: "Osservatore saggio",
+  fr: "Observateur sage",
+  ja: "賢い観察者", itDesc: "Le storie vere battono sempre la finzione.", frDesc: "Les histoires vraies battent toujours la fiction.", jaDesc: "実話はいつだってフィクションに勝る。"},
   { key: "crime",       emoji: "🕵️", tr: "Dosya Avcısı",         en: "Case Cracker",      match: ["suç", "crime", "gizem", "mystery", "crimen", "misterio", "crimine", "mistero"],
     trDesc: "Her ipucunu izler, dosyayı sen kapatırsın.", enDesc: "You follow every clue and close the case.", es: "Olfato de detective", pt: "Faro de detetive", de: "Fallknacker", esDesc: "Sigues cada pista y cierras el caso.", ptDesc: "Você segue cada pista e fecha o caso.", deDesc: "Du folgst jeder Spur und schließt den Fall." ,
-  it: "Segugio", itDesc: "Segui ogni indizio e risolvi il caso."},
+  it: "Segugio",
+  fr: "Résolveur d'énigmes",
+  ja: "事件解決人", itDesc: "Segui ogni indizio e risolvi il caso.", frDesc: "Tu suis chaque indice et tu boucles l'enquête.", jaDesc: "すべての手がかりを追い、事件を解決する。"},
 ];
 const DEFAULT_PERSONALITY = {
   key: "default", emoji: "🍿", tr: "Sinefil", en: "Cinephile", es: "Cinéfilo", pt: "Cinéfilo", de: "Cineast",
@@ -241,19 +261,21 @@ const DEFAULT_PERSONALITY = {
   ptDesc: "Você assiste a tudo: o cinema é um território amplo para você.",
   deDesc: "Du schaust alles – das Kino steht dir weit offen.",
 
-  it: "Cinefilo", itDesc: "Guardi di tutto: il cinema è un mondo senza confini."};
+  it: "Cinefilo",
+  fr: "Cinéphile",
+  ja: "シネフィル", itDesc: "Guardi di tutto: il cinema è un mondo senza confini.", frDesc: "Tu regardes de tout — le cinéma t'est grand ouvert.", jaDesc: "何でも観る — 映画の世界はあなたに開かれている。"};
 
 export const getPersonality = (genre, language = "tr") => {
   const g = (genre || "").toLowerCase();
   const found =
     (g && PERSONALITIES.find((p) => p.match.some((m) => g.includes(m)))) ||
     DEFAULT_PERSONALITY;
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   return {
     key: found.key,
     emoji: found.emoji,
-    title: lang === "tr" ? found.tr : lang === "es" ? found.es : lang === "pt" ? found.pt : lang === "de" ? found.de : lang === "it" ? found.it : found.en,
-    desc: lang === "tr" ? found.trDesc : lang === "es" ? found.esDesc : lang === "pt" ? found.ptDesc : lang === "de" ? found.deDesc : lang === "it" ? found.itDesc : found.enDesc,
+    title: lang === "tr" ? found.tr : lang === "es" ? found.es : lang === "pt" ? found.pt : lang === "de" ? found.de : lang === "it" ? found.it : lang === "fr" ? found.fr : lang === "ja" ? found.ja : found.en,
+    desc: lang === "tr" ? found.trDesc : lang === "es" ? found.esDesc : lang === "pt" ? found.ptDesc : lang === "de" ? found.deDesc : lang === "it" ? found.itDesc : lang === "fr" ? found.frDesc : lang === "ja" ? found.jaDesc : found.enDesc,
   };
 };
 

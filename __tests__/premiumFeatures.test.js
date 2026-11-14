@@ -330,8 +330,8 @@ describe("metinler", () => {
   });
 
   test("bilinmeyen dil İngilizce metin alır, Türkçe değil", () => {
-    expect(formatFeatureValue("games", PREMIUM, "fr")).toBe(formatFeatureValue("games", PREMIUM, "en"));
-    expect(buildLimitCopy("custom_lists", FREE, "fr").message).toBe(
+    expect(formatFeatureValue("games", PREMIUM, "ko")).toBe(formatFeatureValue("games", PREMIUM, "en"));
+    expect(buildLimitCopy("custom_lists", FREE, "ko").message).toBe(
       buildLimitCopy("custom_lists", FREE, "en").message,
     );
   });

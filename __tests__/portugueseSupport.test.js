@@ -20,7 +20,7 @@ describe("Portekizce: cihaz dili ve TMDB bağları", () => {
   it("Portekizce cihaz ilk açılışta Portekizce açılır (pt, pt-BR, pt-PT)", () => {
     expect(cihazDilindenSec([{ languageCode: "pt" }])).toBe("pt");
     expect(cihazDilindenSec([{ languageCode: "PT" }])).toBe("pt");
-    expect(cihazDilindenSec([{ languageCode: "fr" }])).toBe("en");
+    expect(cihazDilindenSec([{ languageCode: "ko" }])).toBe("en");
   });
 
   it("TMDB dili pt-BR; Intl pt-BR; yasal sayfa İngilizce (sayfa yazılana dek)", () => {
@@ -44,7 +44,7 @@ describe("Portekizce: tarih ve takvim", () => {
   it("takvim ekranı pt yerelini tanıyor ve Pazar başlangıcı kullanıyor", () => {
     const kaynak = oku("screens/calendar/CalendarScreen.js");
     expect(kaynak).toMatch(/LocaleConfig\.locales\.pt\s*=/);
-    expect(kaynak).toMatch(/firstDay=\{\["en", "pt"\]\.includes/);
+    expect(kaynak).toMatch(/firstDay=\{\["en", "pt", "ja"\]\.includes/);
   });
 });
 
@@ -86,7 +86,7 @@ describe("Portekizce kopya gerçekten Portekizce", () => {
 describe("Portekizce: dil listeleri olan kaynak dosyaları", () => {
   it("sunucu bildirim dili listesi pt'yi içeriyor ve metinleri var", () => {
     const sunucu = oku("functions/index.js");
-    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it"\]/);
+    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it", "fr", "ja"]/);
     expect(sunucu).toMatch(/\n  pt: \{\n    someone: "Alguém"/);
     expect(sunucu).toMatch(/\n  pt: \{\n    single: \(p\) =>/);
   });

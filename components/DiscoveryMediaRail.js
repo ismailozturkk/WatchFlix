@@ -217,7 +217,7 @@ export default function DiscoveryMediaRail({
   const [worldLanguage, setWorldLanguage] = useState(WORLD_TOUR_DEFAULT);
 
   // Metinler tr/en/es; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
-  const L = (tr, en, es, pt, de, it) => pickByLanguage(language, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en });
+  const L = (tr, en, es, pt, de, it, fr, ja) => pickByLanguage(language, { tr, en, es, pt: pt ?? en, de: de ?? en, it: it ?? en, fr: fr ?? en, ja: ja ?? en });
   const genreNamesKey = JSON.stringify(
     [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
   );
@@ -229,18 +229,18 @@ export default function DiscoveryMediaRail({
   // Tek istisna "Favori Türlerin": alt başlık kullanıcının üç türünün adı (yoksa tablodaki cümle).
   const section = useMemo(() => {
     if (preset === "subscriptions") {
-      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços", "Favoriten der Dienste", "I preferiti dei servizi") };
+      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços", "Favoriten der Dienste", "I preferiti dei servizi", "Favoris des plateformes", "サービスのお気に入り") };
     }
     if (preset === "worldTour") {
       return { title: worldTourTitle(language) };
     }
     if (preset === "topGenres") {
       return {
-        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos", "Lieblingsgenres", "Generi preferiti"),
+        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos", "Lieblingsgenres", "Generi preferiti", "Genres favoris", "好きなジャンル"),
         subtitle: localizeGenreList(normalizedGenreNames, language).join("  •  ") || undefined,
       };
     }
-    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes", "Aktuelle Favoriten", "Preferiti recenti") };
+    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes", "Aktuelle Favoriten", "Preferiti recenti", "Favoris récents", "最近のお気に入り") };
   }, [language, normalizedGenreNames, preset]);
 
   useEffect(() => {

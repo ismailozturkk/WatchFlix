@@ -83,7 +83,7 @@ describe("normalizeAppLanguage", () => {
   });
 
   it("bilinmeyen / bozuk değer İngilizceye düşer, Türkçeye DEĞİL", () => {
-    for (const girdi of ["fr", "zz", "", null, undefined, 42, {}]) {
+    for (const girdi of ["ko", "zz", "", null, undefined, 42, {}]) {
       expect(normalizeAppLanguage(girdi)).toBe("en");
     }
   });
@@ -99,20 +99,20 @@ describe("copyLanguage / pickByLanguage", () => {
   it("tabloda olmayan dil İngilizceye düşer (Türkçe'ye değil)", () => {
     expect(copyLanguage("es", ["tr", "en"])).toBe("en");
     expect(copyLanguage("pt", ["tr", "en", "es"])).toBe("en");
-    expect(copyLanguage("fr", ["tr", "en", "es"])).toBe("en");
+    expect(copyLanguage("ko", ["tr", "en", "es"])).toBe("en");
     expect(copyLanguage(undefined, ["tr", "en", "es"])).toBe("en");
   });
 
   it("İngilizce de yoksa tablonun ilk dili", () => {
     expect(copyLanguage("es", ["tr", "es"])).toBe("es");
-    expect(copyLanguage("fr", ["tr", "es"])).toBe("tr");
+    expect(copyLanguage("ko", ["tr", "es"])).toBe("tr");
   });
 
   it("pickByLanguage metni döndürür", () => {
     const tablo = { tr: "Merhaba", en: "Hello", es: "Hola" };
     expect(pickByLanguage("es", tablo)).toBe("Hola");
     expect(pickByLanguage("tr", tablo)).toBe("Merhaba");
-    expect(pickByLanguage("fr", tablo)).toBe("Hello");
+    expect(pickByLanguage("ko", tablo)).toBe("Hello");
     expect(pickByLanguage("es", { tr: "Merhaba", en: "Hello" })).toBe("Hello");
     expect(pickByLanguage("pt", { tr: "Merhaba", en: "Hello", es: "Hola", pt: "Olá" })).toBe("Olá");
     expect(pickByLanguage("pt", { tr: "Merhaba", en: "Hello", es: "Hola" })).toBe("Hello");
@@ -165,7 +165,7 @@ describe("dil bağlı sabitler", () => {
   });
 
   it("bilinmeyen dilde İngilizce bağları döner", () => {
-    expect(tmdbLanguageOf("fr")).toBe("en-US");
+    expect(tmdbLanguageOf("ko")).toBe("en-US");
     expect(intlLocaleOf("zz")).toBe("en-US");
   });
 });
@@ -197,12 +197,12 @@ describe("dil döngüsü ve eski bayrak göçü", () => {
     expect(isSupportedAppLanguage("pt")).toBe(true);
     expect(isSupportedAppLanguage("de")).toBe(true);
     expect(isSupportedAppLanguage("it")).toBe(true);
-    expect(isSupportedAppLanguage("fr")).toBe(false);
+    expect(isSupportedAppLanguage("ko")).toBe(false);
   });
 });
 
 describe("\"Yakında\" diller (henüz desteklenmeyen)", () => {
-  const BEKLENEN = ["fr", "ja", "ko", "id", "hi", "ar", "zh"];
+  const BEKLENEN = ["ko", "id", "hi", "ar", "zh"];
 
   it("desteklenmeyen yedi dil listede, İtalyanca seçilebilir", () => {
     expect(COMING_SOON_LANGUAGES.map((l) => l.code)).toEqual(BEKLENEN);

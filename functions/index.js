@@ -1548,7 +1548,7 @@ const STRINGS = {
     friend_request: "👤 sana arkadaşlık isteği gönderdi",
     friend_accepted: "🤝 arkadaşlık isteğini kabul etti",
     match_mutual: "✨ selamına karşılık verdi — artık arkadaşsınız",
-    match_circle: "⭕ Zevk Çemberin hazır — sohbete katıl",
+    match_circle: "⭕ Uyum Çemberin hazır — sohbete katıl",
     post_like: "❤️ gönderini beğendi",
     post_comment: "💬 gönderine yorum yaptı",
     post_comment_text: "💬 yorum yaptı: {text}",
@@ -1657,6 +1657,46 @@ const STRINGS = {
     mention: "💬 ti ha menzionato",
     mention_text: "💬 ti ha menzionato: {text}",
   },
+  fr: {
+    someone: "Quelqu'un",
+    notification: "Notification",
+    messageFallback: "t'a envoyé un message",
+    cineswipe_invite: "🎬 t'a invité dans un salon CineSwipe",
+    cineswipe_result: "🎬 Les résultats CineSwipe sont prêts",
+    cineswipe_result_detail: "🎬 Les résultats CineSwipe sont prêts · {n} matchs en commun",
+    game_challenge: "⚔️ t'a lancé un duel du jour",
+    friend_request: "👤 t'a envoyé une demande d'ami",
+    friend_accepted: "🤝 a accepté ta demande d'ami",
+    match_mutual: "✨ t'a salué en retour — vous êtes amis maintenant",
+    match_circle: "⭕ Ton Cercle de goûts est prêt — rejoins la discussion",
+    post_like: "❤️ a aimé ta publication",
+    post_comment: "💬 a commenté ta publication",
+    post_comment_text: "💬 a commenté : {text}",
+    comment_reply: "💬 a répondu à ton commentaire",
+    comment_reply_text: "💬 a répondu : {text}",
+    mention: "💬 t'a mentionné",
+    mention_text: "💬 t'a mentionné : {text}",
+  },
+  ja: {
+    someone: "誰か",
+    notification: "通知",
+    messageFallback: "メッセージを送信しました",
+    cineswipe_invite: "🎬 CineSwipeルームに招待されました",
+    cineswipe_result: "🎬 CineSwipeの結果が出ました",
+    cineswipe_result_detail: "🎬 CineSwipeの結果が出ました · 共通のマッチ{n}件",
+    game_challenge: "⚔️ デイリーデュエルを挑まれました",
+    friend_request: "👤 フレンド申請が届きました",
+    friend_accepted: "🤝 フレンド申請が承認されました",
+    match_mutual: "✨ あいさつを返してくれました — フレンドになりました",
+    match_circle: "⭕ テイストサークルの準備ができました — チャットに参加しよう",
+    post_like: "❤️ あなたの投稿にいいねしました",
+    post_comment: "💬 あなたの投稿にコメントしました",
+    post_comment_text: "💬 コメント:{text}",
+    comment_reply: "💬 あなたのコメントに返信しました",
+    comment_reply_text: "💬 返信:{text}",
+    mention: "💬 あなたをメンションしました",
+    mention_text: "💬 あなたをメンション:{text}",
+  },
 };
 
 // Push dili: istemci Users/{uid}.notificationLanguage'a uygulama dilini yazar
@@ -1664,7 +1704,7 @@ const STRINGS = {
 // (alan yokken varsayılan her zaman Türkçeydi). Alan var ama bu listede yoksa
 // (ileride eklenecek bir dil, bu deploy'dan önce) → İNGİLİZCE: yabancı kullanıcıya
 // Türkçe push gitmesin. YENİ DİL: STRINGS + STREAM_STRINGS'e giriş + bu liste.
-const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt", "de", "it"];
+const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt", "de", "it", "fr", "ja"];
 function pickNotificationLang(value) {
   if (!value) return "tr";
   return NOTIFICATION_LANGUAGES.includes(value) ? value : "en";
@@ -2388,6 +2428,16 @@ const STREAM_STRINGS = {
     single: (p) => `📺 Ora disponibile su ${p}`,
     multi: (ps) => `📺 Ora disponibile su: ${ps}`,
     fallbackTitle: "La tua lista Da vedere",
+  },
+  fr: {
+    single: (p) => `📺 Désormais en streaming sur ${p}`,
+    multi: (ps) => `📺 Désormais en streaming sur : ${ps}`,
+    fallbackTitle: "Ta liste à voir",
+  },
+  ja: {
+    single: (p) => `📺 ${p}で配信開始`,
+    multi: (ps) => `📺 配信開始:${ps}`,
+    fallbackTitle: "あなたのウォッチリスト",
   },
 };
 

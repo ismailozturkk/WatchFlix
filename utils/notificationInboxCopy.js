@@ -138,6 +138,40 @@ export const NOTIFICATION_INBOX_COPY = {
   markAllError: "Impossibile contrassegnare le notifiche come lette. Per favore riprova.",
   summary: n => n > 0 ? `${n} notifiche non lette` : "Visualizza le tue notifiche",
   relativeTime: (n, unit) => n === 0 ? "adesso" : `${n} ${unit}${n === 1 ? "" : "s"} fa`
-}};
+},
+  fr: {
+    importantTitle: "Invitations importantes",
+    noteReminder: "Rappel de note", listReminder: "Rappel de liste", untitledNote: "Note sans titre", untitledList: "Liste sans titre", reminderTitle: "Rappel", reminderCount: (n) => `${n} rappel${n === 1 ? "" : "s"}`, nextReminder: "Rappel suivant", reminderDone: "Terminé", reminderOpen: "Ouvrir la note", reminderSnooze: "Reporter d'1 heure", reminderSnoozed: "Rappel reporté d'1 heure", reminderSnoozeError: "Impossible de reporter le rappel. Réessaie.", cineInvite: "t'a invité dans un salon CineSwipe", duelInvite: "t'a défié en duel quotidien",
+    cineResult: "Les résultats CineSwipe sont prêts", cineResultDetail: (n) => n > 0 ? `${n} match${n === 1 ? "" : "s"} en commun` : "Aucun match en commun",
+    acceptInvite: "Accepter", declineInvite: "Refuser", acceptedInvite: "Acceptée", declinedInvite: "Refusée", inviteCount: (n) => `${n} invitation${n === 1 ? "" : "s"}`, nextInvite: "Invitation suivante", inviteError: "Impossible d'enregistrer ta réponse. Réessaie.",
+    expand: "Détails de la série", collapse: "Masquer les détails",
+    title: "Notifications", subtitle: "Toute l'activité, la plus récente d'abord", today: "Aujourd'hui", yesterday: "Hier",
+    unread: "Non lues", read: "Lues", all: "Tout", empty: "Aucune notification pour l'instant",
+    emptyBody: "Les demandes d'ami, les messages et l'activité des publications apparaîtront ici.",
+    emptyUnread: "Aucune notification non lue", emptyUnreadBody: "Toutes les notifications chargées ont été lues.",
+    error: "Impossible de charger les notifications. Réessaie.", readError: "Impossible de marquer cette notification comme lue. Réessaie.",
+    retry: "Réessayer", more: "Notifications plus anciennes", unknownDate: "Date indisponible", open: "Ouvrir le contenu associé",
+    markAllRead: "Tout marquer comme lu", markAllDone: "Toutes les notifications sont marquées comme lues",
+    markAllError: "Impossible de marquer les notifications comme lues. Réessaie.",
+    summary: (n) => n > 0 ? `${n} notifications non lues` : "Voir tes notifications",
+    relativeTime: (n, unit) => n === 0 ? "maintenant" : `il y a ${n} ${unit}${n === 1 ? "" : "s"}`,
+  },
+  ja: {
+    importantTitle: "重要な招待",
+    noteReminder: "メモのリマインダー", listReminder: "リストのリマインダー", untitledNote: "無題のメモ", untitledList: "無題のリスト", reminderTitle: "リマインダー", reminderCount: (n) => `リマインダー${n}件${n === 1 ? "" : ""}`, nextReminder: "次のリマインダー", reminderDone: "完了", reminderOpen: "メモを開く", reminderSnooze: "1時間後に再通知", reminderSnoozed: "リマインダーを1時間後に再通知します", reminderSnoozeError: "再通知を設定できませんでした。もう一度お試しください。", cineInvite: "CineSwipeルームに招待しました", duelInvite: "デイリーデュエルを挑みました",
+    cineResult: "CineSwipeの結果が出ました", cineResultDetail: (n) => n > 0 ? `共通のマッチ${n}件${n === 1 ? "" : ""}` : "共通のマッチはありません",
+    acceptInvite: "承認", declineInvite: "拒否", acceptedInvite: "承諾済み", declinedInvite: "辞退", inviteCount: (n) => `招待${n}件${n === 1 ? "" : ""}`, nextInvite: "次の招待", inviteError: "返答を保存できませんでした。もう一度お試しください。",
+    expand: "番組の詳細", collapse: "詳細を隠す",
+    title: "通知", subtitle: "すべてのアクティビティ(新しい順)", today: "今日", yesterday: "昨日",
+    unread: "未読", read: "既読", all: "すべて", empty: "通知はまだありません",
+    emptyBody: "フレンド申請、メッセージ、投稿のアクティビティがここに表示されます。",
+    emptyUnread: "未読の通知はありません", emptyUnreadBody: "読み込んだ通知はすべて既読です。",
+    error: "通知を読み込めませんでした。もう一度お試しください。", readError: "この通知を既読にできませんでした。もう一度お試しください。",
+    retry: "再試行", more: "以前の通知", unknownDate: "日付不明", open: "関連コンテンツを開く",
+    markAllRead: "すべて既読にする", markAllDone: "すべての通知を既読にしました",
+    markAllError: "通知を既読にできませんでした。もう一度お試しください。",
+    summary: (n) => n > 0 ? `未読の通知${n}件` : "通知を見る",
+    relativeTime: (n, unit) => n === 0 ? "今" : `${n}${unit}${n === 1 ? "" : ""}前`,
+  }};
 
 export const notificationInboxCopy = (language) => NOTIFICATION_INBOX_COPY[copyLanguage(language, Object.keys(NOTIFICATION_INBOX_COPY))];

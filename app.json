@@ -13,7 +13,9 @@
       "es": "./native/locales/es.json",
       "pt": "./native/locales/pt.json",
       "de": "./native/locales/de.json",
-      "it": "./native/locales/it.json"
+      "it": "./native/locales/it.json",
+      "fr": "./native/locales/fr.json",
+      "ja": "./native/locales/ja.json"
     },
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
@@ -29,7 +31,9 @@
           "es",
           "pt",
           "de",
-          "it"
+          "it",
+          "fr",
+          "ja"
         ]
       },
       "entitlements": {

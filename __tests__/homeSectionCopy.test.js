@@ -87,8 +87,8 @@ describe("HOME_SECTIONS tablosu", () => {
   });
 
   test("bilinmeyen dil İngilizce'ye düşer (Türkçe'ye değil)", () => {
-    expect(getSectionMeta("onTheAir", "fr", "tv").subtitle).toBe(getSectionMeta("onTheAir", "en", "tv").subtitle);
-    expect(getSectionMeta("onTheAir", "fr", "tv").subtitle).not.toBe(getSectionMeta("onTheAir", "tr", "tv").subtitle);
+    expect(getSectionMeta("onTheAir", "ko", "tv").subtitle).toBe(getSectionMeta("onTheAir", "en", "tv").subtitle);
+    expect(getSectionMeta("onTheAir", "ko", "tv").subtitle).not.toBe(getSectionMeta("onTheAir", "tr", "tv").subtitle);
   });
 
   test("bilinmeyen bölüm çökmez: varsayılan simge, metinler boş", () => {
@@ -105,7 +105,7 @@ describe("HOME_SECTIONS tablosu", () => {
     expect(getSeeAllLabel("tr")).toBe("Tümü");
     expect(getSeeAllLabel("en")).toBe("See all");
     expect(getSeeAllLabel("es")).toBe("Ver todo");
-    expect(getSeeAllLabel("fr")).toBe("See all");
+    expect(getSeeAllLabel("ko")).toBe("See all");
   });
 
   test("Türler başlığı büyük harfli çeviri anahtarına değil tabloya bağlı (cümle düzeni)", () => {

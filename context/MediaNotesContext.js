@@ -84,7 +84,9 @@ export const MediaNotesProvider = ({ children }) => {
                 pt: "Você atingiu seu limite de notas de séries",
                 de: "Du hast dein Limit für Serien-Notizen erreicht",
 
-  it: "Hai raggiunto il limite di note dello serie TV"}
+  it: "Hai raggiunto il limite di note dello serie TV",
+  fr: "Tu as atteint ta limite de notes de séries",
+  ja: "番組メモの上限に達しました"}
             : {
                 tr: "Film notu limitin doldu",
                 en: "You've reached your movie notes limit",
@@ -92,7 +94,9 @@ export const MediaNotesProvider = ({ children }) => {
                 pt: "Você atingiu seu limite de notas de filmes",
                 de: "Du hast dein Limit für Film-Notizen erreicht",
 
-  it: "Hai raggiunto il limite delle note sul film"},
+  it: "Hai raggiunto il limite delle note sul film",
+  fr: "Tu as atteint ta limite de notes de films",
+  ja: "映画メモの上限に達しました"},
         ),
       });
       return false;

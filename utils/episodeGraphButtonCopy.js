@@ -64,7 +64,27 @@ export const EPISODE_GRAPH_BUTTON_COPY = {
   low: "Bassa",
   high: "Alta",
   open: "Apri grafico"
-}};
+},
+  fr: {
+    title: "Graphique des notes d'épisodes",
+    subtitle: "Vois la note de chaque épisode dans une grille colorée, saison par saison",
+    summary: (seasons, episodes, fmt = String) =>
+      `${fmt(seasons)} ${seasons === 1 ? "season" : "seasons"} · ${fmt(episodes)} ${episodes === 1 ? "episode" : "episodes"}`,
+    seasonShort: "S",
+    low: "Basse",
+    high: "Haute",
+    open: "Ouvrir le graphique",
+  },
+  ja: {
+    title: "エピソード評価グラフ",
+    subtitle: "全エピソードの評価をシーズンごとにカラーグリッドで見る",
+    summary: (seasons, episodes, fmt = String) =>
+      `${fmt(seasons)} ${seasons === 1 ? "season" : "seasons"} · ${fmt(episodes)} ${episodes === 1 ? "episode" : "episodes"}`,
+    seasonShort: "S",
+    low: "低",
+    high: "高",
+    open: "グラフを開く",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getEpisodeGraphButtonCopy = (language) =>

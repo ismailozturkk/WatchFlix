@@ -116,7 +116,7 @@ function buildSocialContent(item, t, language) {
     case "match_mutual":
       return { title: name, body: t.notifBodyMatchMutual || "✨ selamına karşılık verdi — artık arkadaşsınız" };
     case "match_circle":
-      return { title: item.groupName || name, body: t.notifBodyMatchCircle || "⭕ Zevk Çemberin hazır — sohbete katıl" };
+      return { title: item.groupName || name, body: t.notifBodyMatchCircle || "⭕ Uyum Çemberin hazır — sohbete katıl" };
     case "post_like":
       return { title: name, body: t.notifBodyPostLike || "❤️ gönderini beğendi" };
     case "post_comment":

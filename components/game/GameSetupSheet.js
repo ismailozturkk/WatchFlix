@@ -136,7 +136,7 @@ export default function GameSetupSheet({ visible, gameId = SCENE_GAME_ID, initia
 
   const allowanceText = gamesGate.unlimited
     ? null
-    : language === "tr" ? `Bugün ${gamesGate.remaining}/${gamesGate.limit} oyun hakkın kaldı` : language === "es" ? `${gamesGate.remaining}/${gamesGate.limit} partidas restantes hoy` : language === "pt" ? `${gamesGate.remaining}/${gamesGate.limit} partidas restantes hoje` : language === "de" ? `${gamesGate.remaining}/${gamesGate.limit} Spiele heute übrig` : language === "it" ? `${gamesGate.remaining}/${gamesGate.limit} partite rimaste oggi` : `${gamesGate.remaining}/${gamesGate.limit} games left today`;
+    : language === "tr" ? `Bugün ${gamesGate.remaining}/${gamesGate.limit} oyun hakkın kaldı` : language === "es" ? `${gamesGate.remaining}/${gamesGate.limit} partidas restantes hoy` : language === "pt" ? `${gamesGate.remaining}/${gamesGate.limit} partidas restantes hoje` : language === "de" ? `${gamesGate.remaining}/${gamesGate.limit} Spiele heute übrig` : language === "it" ? `${gamesGate.remaining}/${gamesGate.limit} partite rimaste oggi` : language === "fr" ? `${gamesGate.remaining}/${gamesGate.limit} parties restantes aujourd'hui` : language === "ja" ? `今日の残りゲーム ${gamesGate.remaining}/${gamesGate.limit}` : `${gamesGate.remaining}/${gamesGate.limit} games left today`;
 
   return (
     <BottomSheetModal
@@ -254,7 +254,7 @@ export default function GameSetupSheet({ visible, gameId = SCENE_GAME_ID, initia
 
         {/* 3. İçerik kaynağı */}
         <Text style={[styles.label, styles.labelSpaced, { color: theme.text.muted }]} allowFontScaling={false}>
-          {pickByLanguage(language, { tr: "İçerik", en: "Content", es: "Contenido", pt: "Conteúdo", de: "Inhalte" , it: "Contenuti"})}
+          {pickByLanguage(language, { tr: "İçerik", en: "Content", es: "Contenido", pt: "Conteúdo", de: "Inhalte" , it: "Contenuti", fr: "Contenu", ja: "コンテンツ"})}
         </Text>
         <ScrollView
           horizontal

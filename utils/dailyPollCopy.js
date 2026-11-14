@@ -91,7 +91,35 @@ export const POLL_COPY = {
   nextQuestion: "Una nuova domanda domani",
   optionA11y: text => `${text}, vota`,
   resultA11y: (text, percent) => `${text}, ${percent} percentuale`
-}};
+},
+  fr: {
+    eyebrow: "QUESTION DU JOUR",
+    hint: "Touche une réponse et vois ce que tout le monde a dit",
+    votes: (n) => (n === 1 ? "1 vote" : `${n} votes`),
+    youPicked: "Ton choix",
+    fewVotes: "Les résultats apparaissent au fil des votes",
+    firstVoter: "Tu fais partie des premiers à voter",
+    waiting: "Enregistrement de ton vote…",
+    pendingSync: "Ton vote est enregistré sur cet appareil et comptera une fois en ligne",
+    streak: (n) => `Série de ${n} jours`,
+    nextQuestion: "Une nouvelle question demain",
+    optionA11y: (text) => `${text}, voter`,
+    resultA11y: (text, percent) => `${text}, ${percent} pour cent`,
+  },
+  ja: {
+    eyebrow: "今日の質問",
+    hint: "1つタップして、みんなの答えを見よう",
+    votes: (n) => (n === 1 ? "1票" : `${n}票`),
+    youPicked: "あなたの選択",
+    fewVotes: "投票が集まると結果が表示されます",
+    firstVoter: "最初に投票した一人です",
+    waiting: "投票を保存中…",
+    pendingSync: "投票はこの端末に保存され、オンラインになるとカウントされます",
+    streak: (n) => `${n}日連続`,
+    nextQuestion: "明日は新しい質問",
+    optionA11y: (text) => `${text}、投票`,
+    resultA11y: (text, percent) => `${text}、${percent}パーセント`,
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getPollCopy = (language) => POLL_COPY[copyLanguage(language, Object.keys(POLL_COPY))];

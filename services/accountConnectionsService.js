@@ -75,7 +75,9 @@ const ERROR_TEXT = {
     pt: "Não há nenhuma sessão ativa. Entre novamente.",
     de: "Keine aktive Sitzung. Bitte melde dich erneut an.",
 
-  it: "Nessuna sessione attiva. Accedi di nuovo."},
+  it: "Nessuna sessione attiva. Accedi di nuovo.",
+  fr: "Aucune session active. Reconnecte-toi.",
+  ja: "有効なセッションがありません。もう一度サインインしてください。"},
   [AccountConnectionCode.NO_EMAIL]: {
     tr: "Bu hesapta parola bağlanabilecek bir e-posta adresi yok.",
     en: "This account has no email address that can be linked to a password.",
@@ -83,7 +85,9 @@ const ERROR_TEXT = {
     pt: "Esta conta não tem nenhum e-mail ao qual uma senha possa ser vinculada.",
     de: "Dieses Konto hat keine E-Mail-Adresse, die mit einem Passwort verknüpft werden kann.",
 
-  it: "Questo account non ha un indirizzo email che possa essere collegato a una password."},
+  it: "Questo account non ha un indirizzo email che possa essere collegato a una password.",
+  fr: "Ce compte n'a pas d'adresse e-mail pouvant être associée à un mot de passe.",
+  ja: "このアカウントにはパスワードと連携できるメールアドレスがありません。"},
   [AccountConnectionCode.PASSWORD_MISMATCH]: {
     tr: "Girdiğin parolalar eşleşmiyor.",
     en: "The passwords do not match.",
@@ -91,7 +95,9 @@ const ERROR_TEXT = {
     pt: "As senhas não coincidem.",
     de: "Die Passwörter stimmen nicht überein.",
 
-  it: "Le password non corrispondono."},
+  it: "Le password non corrispondono.",
+  fr: "Les mots de passe ne correspondent pas.",
+  ja: "パスワードが一致しません。"},
   [AccountConnectionCode.WEAK_PASSWORD]: {
     tr: "Parolan en az 6 karakter olmalı.",
     en: "Your password must be at least 6 characters.",
@@ -99,7 +105,9 @@ const ERROR_TEXT = {
     pt: "Sua senha deve ter pelo menos 6 caracteres.",
     de: "Dein Passwort muss mindestens 6 Zeichen lang sein.",
 
-  it: "La tua password deve contenere almeno 6 caratteri."},
+  it: "La tua password deve contenere almeno 6 caratteri.",
+  fr: "Ton mot de passe doit contenir au moins 6 caractères.",
+  ja: "パスワードは6文字以上にしてください。"},
   [AccountConnectionCode.ALREADY_LINKED]: {
     tr: "E-posta ve parola girişi bu hesapta zaten etkin.",
     en: "Email and password sign-in is already active on this account.",
@@ -107,7 +115,9 @@ const ERROR_TEXT = {
     pt: "O login com e-mail e senha já está ativo nesta conta.",
     de: "Die Anmeldung mit E-Mail und Passwort ist für dieses Konto bereits aktiv.",
 
-  it: "L'accesso tramite email e password è già attivo su questo account."},
+  it: "L'accesso tramite email e password è già attivo su questo account.",
+  fr: "La connexion par e-mail et mot de passe est déjà active sur ce compte.",
+  ja: "このアカウントではすでにメールとパスワードでのサインインが有効です。"},
   [AccountConnectionCode.EMAIL_IN_USE]: {
     tr: "Bu e-posta başka bir giriş kaydı tarafından kullanılıyor.",
     en: "This email is already used by another sign-in record.",
@@ -115,7 +125,9 @@ const ERROR_TEXT = {
     pt: "Este e-mail já é usado por outro registro de login.",
     de: "Diese E-Mail-Adresse wird bereits von einem anderen Anmeldeeintrag verwendet.",
 
-  it: "Questo indirizzo email è già utilizzato da un altro record di accesso."},
+  it: "Questo indirizzo email è già utilizzato da un altro record di accesso.",
+  fr: "Cet e-mail est déjà utilisé par une autre méthode de connexion.",
+  ja: "このメールアドレスは別のサインイン記録で使われています。"},
   [AccountConnectionCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra yeniden dene.",
     en: "For security, sign out and sign in again before retrying.",
@@ -123,7 +135,9 @@ const ERROR_TEXT = {
     pt: "Por segurança, saia e entre de novo antes de tentar novamente.",
     de: "Melde dich aus Sicherheitsgründen ab und wieder an, bevor du es erneut versuchst.",
 
-  it: "Per sicurezza, esci e accedi di nuovo prima di riprovare."},
+  it: "Per sicurezza, esci e accedi di nuovo prima di riprovare.",
+  fr: "Par sécurité, déconnecte-toi puis reconnecte-toi avant de réessayer.",
+  ja: "セキュリティのため、一度サインアウトして再度サインインしてからお試しください。"},
   [AccountConnectionCode.LAST_PROVIDER]: {
     tr: "Hesabındaki tek giriş yöntemi kaldırılamaz.",
     en: "The only sign-in method on your account cannot be removed.",
@@ -131,7 +145,9 @@ const ERROR_TEXT = {
     pt: "O único método de login da sua conta não pode ser removido.",
     de: "Die einzige Anmeldemethode deines Kontos kann nicht entfernt werden.",
 
-  it: "L'unico metodo di accesso sul tuo account non può essere rimosso."},
+  it: "L'unico metodo di accesso sul tuo account non può essere rimosso.",
+  fr: "La seule méthode de connexion de ton compte ne peut pas être retirée.",
+  ja: "アカウントで唯一のサインイン方法は解除できません。"},
   [AccountConnectionCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
@@ -139,7 +155,9 @@ const ERROR_TEXT = {
     pt: "Não foi possível conectar à rede. Verifique sua conexão.",
     de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
 
-  it: "Impossibile raggiungere la rete. Controlla la tua connessione."},
+  it: "Impossibile raggiungere la rete. Controlla la tua connessione.",
+  fr: "Impossible d'accéder au réseau. Vérifie ta connexion.",
+  ja: "ネットワークに接続できませんでした。接続を確認してください。"},
   [AccountConnectionCode.TOO_MANY]: {
     tr: "Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.",
     en: "Too many attempts. Wait a bit and try again.",
@@ -147,7 +165,9 @@ const ERROR_TEXT = {
     pt: "Muitas tentativas. Aguarde um pouco e tente novamente.",
     de: "Zu viele Versuche. Warte einen Moment und versuche es erneut.",
 
-  it: "Troppi tentativi. Aspetta un po' e riprova."},
+  it: "Troppi tentativi. Aspetta un po' e riprova.",
+  fr: "Trop de tentatives. Patiente un peu et réessaie.",
+  ja: "試行回数が多すぎます。少し待ってからお試しください。"},
 };
 
 /**
@@ -165,7 +185,9 @@ export function describeAccountConnectionError(error, language = "tr") {
     pt: "Não foi possível concluir a ação. Tente novamente.",
     de: "Die Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
 
-  it: "Impossibile completare l'azione. Per favore riprova."});
+  it: "Impossibile completare l'azione. Per favore riprova.",
+  fr: "L'action n'a pas pu aboutir. Réessaie.",
+  ja: "操作を完了できませんでした。もう一度お試しください。"});
 }
 
 export async function addPasswordSignIn({ password, confirmation }) {

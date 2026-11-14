@@ -84,7 +84,9 @@ export function durationText(minutes, language) {
   it: {
   hour: "h",
   minute: "M"
-}});
+},
+  fr: { hour: "h", minute: "min" },
+  ja: { hour: "時間", minute: "分" }});
   const h = Math.floor(total / 60);
   const m = total % 60;
   if (h === 0) return `${m} ${minute}`;

@@ -286,9 +286,103 @@ const it = {
     countNotes: "{n} note · {r} promemoria"
   }
 };
+const fr = {
+  rowTitle: "Réinitialiser le compte",
+  rowDescription:
+    "Tes listes, ton historique de visionnage, tes badges, Mon activité (notes, commentaires, publications, j'aime, brouillons), tes notes, rappels et statistiques de jeu sont effacés. Ton compte, ton profil et tes amis restent.",
+  sheetTitle: "Réinitialiser le compte",
+  sheetDescription:
+    "Tout ce qui suit est effacé définitivement ; ton compte, ton profil et tes amis restent. C'est irréversible.",
+  needPassword: "Saisis ton mot de passe pour continuer.",
+  needGoogle: "Vérifie avec ton compte Google pour continuer.",
+  needApple: "Vérifie avec ton compte Apple pour continuer.",
+  hold: "Maintiens pour réinitialiser",
+  holdActive: "Continue d'appuyer pour réinitialiser…",
+  holdHint: "Maintiens le bouton {seconds} secondes pour confirmer.",
+  done: "Ton compte a été réinitialisé",
+  incomplete: "Certaines données n'ont pas pu être réinitialisées. Vérifie ta connexion et réessaie.",
+  title: "Réinitialisation de ton compte",
+  hint: "Cela peut prendre quelques minutes. Garde l'app ouverte.",
+  step: "Étape {n} sur {total}",
+  stages: {
+    verify: "Vérification de ton identité",
+    library: "Effacement de tes listes et de ton historique",
+    activity: "Effacement de tes commentaires, publications, notes et j'aime",
+    notes: "Effacement de tes notes, rappels et discussions IA",
+    games: "Effacement de tes scores et statistiques de jeu",
+    local: "Effacement des badges, brouillons et données de cet appareil",
+  },
+  scope: {
+    removeTitle: "Sera effacé",
+    keepTitle: "Restera",
+    movies: "Films que tu as vus",
+    shows: "Séries et épisodes que tu as vus",
+    time: "Temps de visionnage et statistiques",
+    lists: "Tes listes, favoris et liste à voir",
+    activity: "Tes notes, commentaires, publications, j'aime",
+    badges: "Tes badges, séries et objectif annuel",
+    notes: "Tes notes et rappels",
+    games: "Scores de jeu, tier lists, défis, personnes que tu suis",
+    ai: "Tes discussions IA et brouillons",
+    keep: "Ton compte, ton profil, tes amis et tes discussions",
+    countMovies: "{n} films",
+    countShows: "{n} séries · {e} épisodes",
+    countHours: "{n} h",
+    countItems: "{n} éléments",
+    countNotes: "{n} notes · {r} rappels",
+  },
+};
+const ja = {
+  rowTitle: "アカウントをリセット",
+  rowDescription:
+    "リスト、視聴履歴、バッジ、マイアクティビティ(評価、コメント、投稿、いいね、下書き)、メモ、リマインダー、ゲームの統計が消去されます。アカウント、プロフィール、フレンドは残ります。",
+  sheetTitle: "アカウントをリセット",
+  sheetDescription:
+    "以下のすべてが完全に消去されます。アカウント、プロフィール、フレンドは残ります。元に戻せません。",
+  needPassword: "続けるにはパスワードを入力してください。",
+  needGoogle: "続けるにはGoogleアカウントで確認してください。",
+  needApple: "続けるにはAppleアカウントで確認してください。",
+  hold: "長押しでリセット",
+  holdActive: "リセットするには押し続けてください…",
+  holdHint: "確認するにはボタンを{seconds}秒間長押ししてください。",
+  done: "アカウントをリセットしました",
+  incomplete: "一部のデータをリセットできませんでした。接続を確認して、もう一度お試しください。",
+  title: "アカウントをリセットしています",
+  hint: "数分かかる場合があります。アプリを開いたままにしてください。",
+  step: "ステップ{n}/{total}",
+  stages: {
+    verify: "本人確認中",
+    library: "リストと視聴履歴を消去中",
+    activity: "コメント、投稿、評価、いいねを消去中",
+    notes: "メモ、リマインダー、AIチャットを消去中",
+    games: "ゲームのスコアと統計を消去中",
+    local: "この端末のバッジ、下書き、データを消去中",
+  },
+  scope: {
+    removeTitle: "消去されるもの",
+    keepTitle: "残るもの",
+    movies: "観た映画",
+    shows: "観た番組とエピソード",
+    time: "視聴時間と統計",
+    lists: "リスト、お気に入り、ウォッチリスト",
+    activity: "評価、コメント、投稿、いいね",
+    badges: "バッジ、連続記録、年間目標",
+    notes: "メモとリマインダー",
+    games: "ゲームのスコア、ティアリスト、チャレンジ、フォロー中の人",
+    ai: "AIチャットと下書き",
+    keep: "アカウント、プロフィール、フレンド、チャット",
+    countMovies: "映画{n}本",
+    countShows: "番組{n}本 · {e}話",
+    countHours: "{n}時間",
+    countItems: "{n}件",
+    countNotes: "メモ{n}件 · リマインダー{r}件",
+  },
+};
 
 export const RESET_ACCOUNT_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getResetAccountCopy = (language) =>

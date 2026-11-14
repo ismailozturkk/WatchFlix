@@ -163,7 +163,59 @@ export const EXTERNAL_RATINGS_COPY = {
     }
   },
   source: "Le valutazioni provengono da OMDb. Non tutti i titoli li hanno tutti e tre; i programmi in particolare spesso mancano di Rotten Tomatoes e Metascore."
-}};
+},
+  fr: {
+    title: "Notes",
+    close: "Fermer",
+    open: (summary) => `Notes externes : ${summary}. Touche pour les détails`,
+    imdb: {
+      sub: (votes) => (votes ? `${votes} votes` : "Note des utilisateurs"),
+      scale: "sur 10",
+    },
+    rt: {
+      sub: "Taux d'approbation des critiques",
+      fresh: "Frais",
+      rotten: "Pourri",
+    },
+    meta: {
+      sub: "Moyenne des critiques",
+      scale: "sur 100",
+      verdicts: {
+        universalAcclaim: "Acclamation universelle",
+        favorable: "Globalement favorable",
+        mixed: "Mitigé ou moyen",
+        unfavorable: "Globalement défavorable",
+        overwhelmingDislike: "Rejet massif",
+      },
+    },
+    source: "Les notes proviennent d'OMDb. Tous les titres n'ont pas les trois ; les séries en particulier n'ont souvent ni Rotten Tomatoes ni Metascore.",
+  },
+  ja: {
+    title: "評価",
+    close: "閉じる",
+    open: (summary) => `外部評価:${summary}。タップで詳細`,
+    imdb: {
+      sub: (votes) => (votes ? `${votes}票` : "ユーザー評価"),
+      scale: "10点満点",
+    },
+    rt: {
+      sub: "批評家の支持率",
+      fresh: "フレッシュ",
+      rotten: "ロットン",
+    },
+    meta: {
+      sub: "批評家の平均",
+      scale: "100点満点",
+      verdicts: {
+        universalAcclaim: "絶賛",
+        favorable: "おおむね好評",
+        mixed: "賛否両論",
+        unfavorable: "おおむね不評",
+        overwhelmingDislike: "圧倒的に不評",
+      },
+    },
+    source: "評価はOMDbから取得しています。すべての作品に3つ揃っているわけではなく、特に番組にはRotten TomatoesやMetascoreがないことがよくあります。",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getExternalRatingsCopy = (language) =>

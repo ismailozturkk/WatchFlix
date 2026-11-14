@@ -353,7 +353,121 @@ export const FAVORITES_COPY = {
     subtitle: names => `Perché hai scelto ${names}`,
     more: count => `+${count}`
   }
-}};
+},
+  fr: {
+    kinds: {
+      movies: {
+        label: "Films",
+        add: "Ajouter un film",
+        pickTitle: "Choisis tes films préférés",
+        search: "Rechercher des films…",
+        icon: "film-outline",
+      },
+      shows: {
+        label: "Séries",
+        add: "Ajouter une série",
+        pickTitle: "Choisis tes séries préférées",
+        search: "Rechercher des séries…",
+        icon: "tv-outline",
+      },
+      people: {
+        label: "Acteurs",
+        add: "Ajouter un acteur",
+        pickTitle: "Choisis tes acteurs préférés",
+        search: "Rechercher des acteurs…",
+        icon: "person-outline",
+      },
+    },
+    counter: (count, max) => `${count}/${max}`,
+    section: {
+      title: "Tes quatre favoris",
+      hint: "Toute personne qui peut voir ton profil les voit. Choisis jusqu'à 4 par catégorie — ou laisse vide.",
+    },
+    picker: {
+      done: "Terminé",
+      full: "Complet · retires-en un pour échanger",
+      suggestions: "Suggestions",
+      popular: "Populaire",
+      basedOnPicks: "Selon tes choix",
+      castOfPicks: "Tirés de la distribution de tes choix",
+      results: "Résultats",
+      noResults: "Aucun résultat",
+      searchError: "Recherche impossible. Vérifie ta connexion.",
+      loadError: "Impossible de charger la liste.",
+      retry: "Réessayer",
+      typeMore: "Tape au moins 2 lettres pour rechercher",
+      remove: "Retirer",
+      selected: "Sélectionné",
+      add: (title) => `Ajouter ${title}`,
+      removeLabel: (title) => `Retirer ${title} des favoris`,
+    },
+    profile: {
+      title: "Choix favoris",
+      open: "Ouvrir",
+    },
+    rail: {
+      title: "Grâce à tes favoris",
+      subtitle: (names) => `Parce que tu as choisi ${names}`,
+      more: (count) => `+${count}`,
+    },
+  },
+  ja: {
+    kinds: {
+      movies: {
+        label: "映画",
+        add: "映画を追加",
+        pickTitle: "好きな映画を選ぼう",
+        search: "映画を検索…",
+        icon: "film-outline",
+      },
+      shows: {
+        label: "TV番組",
+        add: "番組を追加",
+        pickTitle: "好きな番組を選ぼう",
+        search: "番組を検索…",
+        icon: "tv-outline",
+      },
+      people: {
+        label: "俳優",
+        add: "俳優を追加",
+        pickTitle: "好きな俳優を選ぼう",
+        search: "俳優を検索…",
+        icon: "person-outline",
+      },
+    },
+    counter: (count, max) => `${count}/${max}`,
+    section: {
+      title: "あなたの4つのお気に入り",
+      hint: "プロフィールを見られる人全員に表示されます。各カテゴリ最大4つまで — 空欄でも構いません。",
+    },
+    picker: {
+      done: "完了",
+      full: "いっぱい · 入れ替えるには1つ外してください",
+      suggestions: "おすすめ",
+      popular: "人気",
+      basedOnPicks: "あなたの選択に基づく",
+      castOfPicks: "選んだ作品のキャストから",
+      results: "結果",
+      noResults: "結果が見つかりません",
+      searchError: "検索できませんでした。接続を確認してください。",
+      loadError: "リストを読み込めませんでした。",
+      retry: "再試行",
+      typeMore: "検索するには2文字以上入力してください",
+      remove: "削除",
+      selected: "選択済み",
+      add: (title) => `${title}を追加`,
+      removeLabel: (title) => `${title}をお気に入りから外す`,
+    },
+    profile: {
+      title: "お気に入りのセレクト",
+      open: "開く",
+    },
+    rail: {
+      title: "お気に入りから",
+      subtitle: (names) => `${names}を選んだあなたへ`,
+      more: (count) => `+${count}`,
+    },
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getFavoritesCopy = (language) =>

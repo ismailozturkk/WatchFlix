@@ -90,9 +90,37 @@ const it = {
   sendWait: "Invia ({n})",
   spamHint: "Se non arriva, controlla anche la cartella spam."
 };
+const fr = {
+  invalidEmail: "Saisis une adresse e-mail valide.",
+  offline: "Pas de connexion internet. Réessaie une fois en ligne.",
+  tooMany: "Trop de tentatives. Patiente un peu et réessaie.",
+  noSession: "Aucune session trouvée. Reconnecte-toi.",
+  generic: "L'e-mail n'a pas pu être envoyé. Réessaie dans un instant.",
+  resendVerification: "Renvoyer l'e-mail de vérification",
+  resendWait: "Patiente {n} s pour renvoyer",
+  verificationSent: "E-mail de vérification envoyé à {email}",
+  nowVerified: "Ton e-mail est vérifié",
+  sendWait: "Envoyer ({n})",
+  spamHint: "S'il n'arrive pas, vérifie aussi tes spams.",
+};
+const ja = {
+  invalidEmail: "有効なメールアドレスを入力してください。",
+  offline: "インターネットに接続されていません。オンラインになってからお試しください。",
+  tooMany: "試行回数が多すぎます。少し待ってからお試しください。",
+  noSession: "セッションが見つかりません。もう一度サインインしてください。",
+  generic: "メールを送信できませんでした。少ししてからお試しください。",
+  resendVerification: "確認メールを再送信",
+  resendWait: "{n}秒後に再送信できます",
+  verificationSent: "{email}に確認メールを送信しました",
+  nowVerified: "メールアドレスは確認済みです",
+  sendWait: "送信({n})",
+  spamHint: "届かない場合は迷惑メールフォルダも確認してください。",
+};
 
 export const AUTH_EMAIL_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 export const getAuthEmailCopy = (language) =>
   AUTH_EMAIL_COPY[copyLanguage(language, Object.keys(AUTH_EMAIL_COPY))];

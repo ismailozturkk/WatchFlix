@@ -56,6 +56,8 @@ export default function OpenSourceLicensesScreen() {
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
   const it = normalizeAppLanguage(language) === "it";
+  const fr = normalizeAppLanguage(language) === "fr";
+  const ja = normalizeAppLanguage(language) === "ja";
 
   // 850 KB'lık lisans verisi uygulama açılışında ayrıştırılmasın diye geçiş
   // animasyonu bittikten sonra tembel yüklenir.
@@ -117,14 +119,14 @@ export default function OpenSourceLicensesScreen() {
             <AppIcon family="Ionicons" name="heart-outline" size={16} color={C.accent} />
           </View>
           <Text allowFontScaling={false} style={[s.introTitle, { color: C.text }]}>
-            {isTr ? "Bu uygulama açık kaynakla çalışıyor" : es ? "Construido sobre código abierto" : pt ? "Feito sobre código aberto" : de ? "Auf Open Source gebaut" : language === "it" ? "Costruito su open source" : "Built on open source"}
+            {isTr ? "Bu uygulama açık kaynakla çalışıyor" : es ? "Construido sobre código abierto" : pt ? "Feito sobre código aberto" : de ? "Auf Open Source gebaut" : language === "it" ? "Costruito su open source" : language === "fr" ? "Construit sur l'open source" : language === "ja" ? "オープンソースで作られています" : "Built on open source"}
           </Text>
         </View>
         <Text allowFontScaling={false} style={[s.introBody, { color: C.muted }]}>
-          {isTr ? "Seelogd, aşağıdaki açık kaynak kütüphaneleri kullanır. Her birinin lisans metni ve telif bildirimi lisans koşulları gereği burada yer alır. Bir paketin tam metnini görmek için üzerine dokunun." : es ? "Seelogd utiliza las bibliotecas de código abierto que figuran abajo. El texto de cada licencia y su aviso de copyright se reproducen aquí tal como exigen sus términos. Toca un paquete para leer su licencia completa." : pt ? "O Seelogd usa as bibliotecas de código aberto listadas abaixo. O texto de cada licença e seu aviso de direitos autorais são reproduzidos aqui conforme exigem seus termos. Toque em um pacote para ler a licença completa." : de ? "Seelogd verwendet die unten aufgeführten Open-Source-Bibliotheken. Jeder Lizenztext und jeder Urheberrechtshinweis wird hier gemäß ihren Bedingungen wiedergegeben. Tippe auf ein Paket, um die vollständige Lizenz zu lesen." : language === "it" ? "Seelogd utilizza le librerie open source elencate di seguito. Ogni testo di licenza e avviso di copyright viene riprodotto qui come richiesto dai relativi termini. Tocca un pacchetto per leggerne la licenza completa." : "Seelogd uses the open source libraries listed below. Each license text and copyright notice is reproduced here as required by their terms. Tap a package to read its full license."}
+          {isTr ? "Seelogd, aşağıdaki açık kaynak kütüphaneleri kullanır. Her birinin lisans metni ve telif bildirimi lisans koşulları gereği burada yer alır. Bir paketin tam metnini görmek için üzerine dokunun." : es ? "Seelogd utiliza las bibliotecas de código abierto que figuran abajo. El texto de cada licencia y su aviso de copyright se reproducen aquí tal como exigen sus términos. Toca un paquete para leer su licencia completa." : pt ? "O Seelogd usa as bibliotecas de código aberto listadas abaixo. O texto de cada licença e seu aviso de direitos autorais são reproduzidos aqui conforme exigem seus termos. Toque em um pacote para ler a licença completa." : de ? "Seelogd verwendet die unten aufgeführten Open-Source-Bibliotheken. Jeder Lizenztext und jeder Urheberrechtshinweis wird hier gemäß ihren Bedingungen wiedergegeben. Tippe auf ein Paket, um die vollständige Lizenz zu lesen." : language === "it" ? "Seelogd utilizza le librerie open source elencate di seguito. Ogni testo di licenza e avviso di copyright viene riprodotto qui come richiesto dai relativi termini. Tocca un pacchetto per leggerne la licenza completa." : language === "fr" ? "Seelogd utilise les bibliothèques open source listées ci-dessous. Chaque texte de licence et mention de copyright est reproduit ici comme l'exigent leurs conditions. Touche un paquet pour lire sa licence complète." : language === "ja" ? "Seelogdは以下のオープンソースライブラリを使用しています。各ライセンスの条件に従い、ライセンス文と著作権表示をここに掲載しています。パッケージをタップすると全文を読めます。" : "Seelogd uses the open source libraries listed below. Each license text and copyright notice is reproduced here as required by their terms. Tap a package to read its full license."}
         </Text>
         <Text allowFontScaling={false} style={[s.introMeta, { color: C.muted }]}>
-          {isTr ? `${db.packageCount} paket · ${db.generatedAt} tarihinde oluşturuldu` : es ? `${db.packageCount} paquetes · generado el ${db.generatedAt}` : pt ? `${db.packageCount} pacotes · gerado em ${db.generatedAt}` : de ? `${db.packageCount} Pakete · erstellt ${db.generatedAt}` : language === "it" ? `${db.packageCount} pacchetti · generati ${db.generatedAt}` : `${db.packageCount} packages · generated ${db.generatedAt}`}
+          {isTr ? `${db.packageCount} paket · ${db.generatedAt} tarihinde oluşturuldu` : es ? `${db.packageCount} paquetes · generado el ${db.generatedAt}` : pt ? `${db.packageCount} pacotes · gerado em ${db.generatedAt}` : de ? `${db.packageCount} Pakete · erstellt ${db.generatedAt}` : language === "it" ? `${db.packageCount} pacchetti · generati ${db.generatedAt}` : language === "fr" ? `${db.packageCount} paquets · généré le ${db.generatedAt}` : language === "ja" ? `${db.packageCount}パッケージ · ${db.generatedAt}生成` : `${db.packageCount} packages · generated ${db.generatedAt}`}
         </Text>
       </View>
 
@@ -137,7 +139,7 @@ export default function OpenSourceLicensesScreen() {
             setQuery(v);
             scrollTop();
           }}
-          placeholder={isTr ? "Paket ara" : es ? "Buscar paquetes" : pt ? "Buscar pacotes" : de ? "Pakete suchen" : language === "it" ? "Cerca pacchetti" : "Search packages"}
+          placeholder={isTr ? "Paket ara" : es ? "Buscar paquetes" : pt ? "Buscar pacotes" : de ? "Pakete suchen" : language === "it" ? "Cerca pacchetti" : language === "fr" ? "Rechercher des paquets" : language === "ja" ? "パッケージを検索" : "Search packages"}
           placeholderTextColor={C.muted}
           allowFontScaling={false}
           autoCapitalize="none"
@@ -166,7 +168,7 @@ export default function OpenSourceLicensesScreen() {
       >
         <Chip
           C={C}
-          label={isTr ? "Tümü" : es ? "Todos" : pt ? "Todos" : de ? "Alle" : language === "it" ? "Tutti" : "All"}
+          label={isTr ? "Tümü" : es ? "Todos" : pt ? "Todos" : de ? "Alle" : language === "it" ? "Tutti" : language === "fr" ? "Tout" : language === "ja" ? "すべて" : "All"}
           count={db.packageCount}
           active={!licenseFilter}
           onPress={() => {
@@ -200,7 +202,7 @@ export default function OpenSourceLicensesScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           <Text allowFontScaling={false} style={[s.empty, { color: C.muted }]}>
-            {isTr ? "Eşleşen paket yok." : es ? "No hay paquetes que coincidan." : pt ? "Nenhum pacote correspondente." : de ? "Keine passenden Pakete." : language === "it" ? "Nessun pacchetto corrispondente." : "No matching packages."}
+            {isTr ? "Eşleşen paket yok." : es ? "No hay paquetes que coincidan." : pt ? "Nenhum pacote correspondente." : de ? "Keine passenden Pakete." : language === "it" ? "Nessun pacchetto corrispondente." : language === "fr" ? "Aucun paquet correspondant." : language === "ja" ? "一致するパッケージはありません。" : "No matching packages."}
           </Text>
         }
         style={s.listRoom}
@@ -219,7 +221,7 @@ export default function OpenSourceLicensesScreen() {
         C={C}
         isTr={isTr}
         es={es}
-        pt={pt} de={de} it={it}
+        pt={pt} de={de} it={it} fr={fr} ja={ja}
         db={db}
         item={selected}
         onClose={() => setSelected(null)}
@@ -285,7 +287,7 @@ const PackageRow = React.memo(function PackageRow({ C, item, onPress }) {
   );
 });
 
-function LicenseDetailModal({ C, isTr, es, pt, de, it, db, item, onClose }) {
+function LicenseDetailModal({ C, isTr, es, pt, de, it, fr, ja, db, item, onClose }) {
   const insets = useSafeAreaInsets();
   if (!item) return null;
 
@@ -360,7 +362,7 @@ function LicenseDetailModal({ C, isTr, es, pt, de, it, db, item, onClose }) {
                   {noticeText}
                 </Text>
                 <Text allowFontScaling={false} style={[s.blockLabel, { color: C.muted }]}>
-                  {isTr ? "LİSANS" : es ? "LICENCIA" : pt ? "LICENÇA" : de ? "LIZENZ" : it ? "LICENZA" : "LICENSE"}
+                  {isTr ? "LİSANS" : es ? "LICENCIA" : pt ? "LICENÇA" : de ? "LIZENZ" : it ? "LICENZA" : fr ? "LICENCE" : ja ? "ライセンス" : "LICENSE"}
                 </Text>
               </>
             ) : null}
@@ -370,7 +372,7 @@ function LicenseDetailModal({ C, isTr, es, pt, de, it, db, item, onClose }) {
               </Text>
             ) : (
               <Text allowFontScaling={false} style={[s.licenseText, { color: C.muted }]}>
-                {isTr ? `Bu paket lisans metnini kendi dağıtımına eklememiş. Beyan edilen lisans: ${item.license}. Tam metin için paketin kaynak deposuna bakın.` : es ? `Este paquete no incluye archivo de licencia. Licencia declarada: ${item.license}. Consulta el repositorio del paquete para ver el texto completo.` : pt ? `Este pacote não inclui arquivo de licença. Licença declarada: ${item.license}. Consulte o repositório do pacote para ver o texto completo.` : de ? `Dieses Paket enthält keine Lizenzdatei. Angegebene Lizenz: ${item.license}. Den vollständigen Text findest du im Repository des Pakets.` : it ? `Questo pacchetto non include un file di licenza. Licenza dichiarata: ${item.license}. Consulta il repository del pacchetto per il testo completo.` : `This package ships no license file. Declared license: ${item.license}. See the package repository for the full text.`}
+                {isTr ? `Bu paket lisans metnini kendi dağıtımına eklememiş. Beyan edilen lisans: ${item.license}. Tam metin için paketin kaynak deposuna bakın.` : es ? `Este paquete no incluye archivo de licencia. Licencia declarada: ${item.license}. Consulta el repositorio del paquete para ver el texto completo.` : pt ? `Este pacote não inclui arquivo de licença. Licença declarada: ${item.license}. Consulte o repositório do pacote para ver o texto completo.` : de ? `Dieses Paket enthält keine Lizenzdatei. Angegebene Lizenz: ${item.license}. Den vollständigen Text findest du im Repository des Pakets.` : it ? `Questo pacchetto non include un file di licenza. Licenza dichiarata: ${item.license}. Consulta il repository del pacchetto per il testo completo.` : fr ? `Ce paquet ne fournit pas de fichier de licence. Licence déclarée : ${item.license}. Consulte le dépôt du paquet pour le texte complet.` : ja ? `このパッケージにはライセンスファイルが含まれていません。宣言されたライセンス:${item.license}。全文はパッケージのリポジトリをご覧ください。` : `This package ships no license file. Declared license: ${item.license}. See the package repository for the full text.`}
               </Text>
             )}
           </ScrollView>

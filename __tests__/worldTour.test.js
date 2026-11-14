@@ -71,8 +71,8 @@ describe("dil çözümü", () => {
   });
 
   test("bilinmeyen uygulama dili İngilizceye düşer", () => {
-    expect(worldTourName("ko", "fr")).toBe("Korean");
-    expect(worldTourTitle("fr")).toBe("World Tour");
+    expect(worldTourName("ko", "fr")).toBe("Coréen");
+    expect(worldTourTitle("fr")).toBe("Tour du monde");
   });
 
   test("başlık ve boş durum metni her dilde dolu; Tümü başlığı dil adını taşır", () => {

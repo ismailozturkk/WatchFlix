@@ -62,7 +62,9 @@ export const BADGE_SETS = [
     descTr: "Her ailenin ilk kademesini aç", descEn: "Unlock the first tier of every family", descEs: "Desbloquea el primer nivel de cada familia", descPt: "Desbloqueie o primeiro nível de cada família", descDe: "Schalte die erste Stufe jeder Familie frei",
     uyeler: () => kademeIdleri(1),
 
-  it: "First Rungs"},
+  it: "First Rungs",
+  fr: "Premiers échelons",
+  ja: "最初の一段"},
   {
     id: "set_mevsim",
     icon: "snow-outline", iconSolid: "snow", rarity: RARITY.rare,
@@ -70,7 +72,9 @@ export const BADGE_SETS = [
     descTr: "Tüm mevsimsel rozetleri topla", descEn: "Collect every seasonal badge", descEs: "Reúne todas las insignias de temporada", descPt: "Reúna todos os emblemas de temporada", descDe: "Sammle jedes saisonale Abzeichen",
     uyeler: () => idler((b) => b.section === BOLUM.MEVSIM),
 
-  it: "Collana stagionale"},
+  it: "Collana stagionale",
+  fr: "Collier des saisons",
+  ja: "シーズンのネックレス"},
   {
     id: "set_uzman",
     icon: "ribbon-outline", iconSolid: "ribbon", rarity: RARITY.rare,
@@ -80,7 +84,9 @@ export const BADGE_SETS = [
     // belgesel/komedi): çeşitlilik değil DERİNLİK ölçen set budur.
     uyeler: () => idler((b) => KLASIK_TUR_UZMANLIKLARI.includes(b.id)),
 
-  it: "Specialista di genere"},
+  it: "Specialista di genere",
+  fr: "Spécialiste du genre",
+  ja: "ジャンルスペシャリスト"},
   {
     id: "set_tur_hakimi",
     icon: "color-palette-outline", iconSolid: "color-palette", rarity: RARITY.epic,
@@ -90,7 +96,9 @@ export const BADGE_SETS = [
     // çalışma anında çözülür: yeni bir tür uzmanlığı eklendiğinde set kendiliğinden büyür.
     uyeler: () => idler((b) => b.section === BOLUM.TUR && !b.family),
 
-  it: "Maestro del genere"},
+  it: "Maestro del genere",
+  fr: "Maître du genre",
+  ja: "ジャンルマスター"},
   {
     id: "set_baslangic",
     icon: "thumbs-up-outline", iconSolid: "thumbs-up", rarity: RARITY.uncommon,
@@ -100,7 +108,9 @@ export const BADGE_SETS = [
     // rozet, hepsi birkaç işaretlemeye sığar.
     uyeler: () => idler((b) => b.section === BOLUM.BASLANGIC),
 
-  it: "Buon inizio"},
+  it: "Buon inizio",
+  fr: "Bon départ",
+  ja: "好スタート"},
   {
     id: "set_baglilik",
     icon: "ribbon-outline", iconSolid: "ribbon", rarity: RARITY.rare,
@@ -108,7 +118,9 @@ export const BADGE_SETS = [
     descTr: "Bağlılık bölümündeki tüm rozetleri kazan", descEn: "Earn every Devotion badge", descEs: "Consigue todas las insignias de Fidelidad", descPt: "Conquiste todos os emblemas de Dedicação", descDe: "Erwirb jedes Abzeichen aus „Treue“",
     uyeler: () => idler((b) => b.section === BOLUM.BAGLILIK),
 
-  it: "Spettatore fedele"},
+  it: "Spettatore fedele",
+  fr: "Spectateur fidèle",
+  ja: "忠実な視聴者"},
   {
     id: "set_kesif",
     icon: "compass-outline", iconSolid: "compass", rarity: RARITY.uncommon,
@@ -120,7 +132,9 @@ export const BADGE_SETS = [
     // ve koleksiyonlar legendary'ye dokunmaz.
     uyeler: () => idler((b) => b.section === BOLUM.KESIF),
 
-  it: "Esploratore"},
+  it: "Esploratore",
+  fr: "Explorateur",
+  ja: "探検家"},
   {
     id: "set_yari_yol",
     icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.rare,
@@ -128,7 +142,9 @@ export const BADGE_SETS = [
     descTr: "Her ailenin 3. kademesine ulaş", descEn: "Reach the 3rd tier of every family", descEs: "Llega al tercer nivel de cada familia", descPt: "Chegue ao terceiro nível de cada família", descDe: "Erreiche die 3. Stufe jeder Familie",
     uyeler: () => kademeIdleri(3),
 
-  it: "A metà strada"},
+  it: "A metà strada",
+  fr: "À mi-chemin",
+  ja: "折り返し地点"},
   {
     id: "set_sir",
     icon: "eye-outline", iconSolid: "eye", rarity: RARITY.epic,
@@ -136,7 +152,9 @@ export const BADGE_SETS = [
     descTr: "Tüm gizli rozetleri ortaya çıkar", descEn: "Uncover every hidden badge", descEs: "Descubre todas las insignias ocultas", descPt: "Descubra todos os emblemas ocultos", descDe: "Enthülle jedes verborgene Abzeichen",
     uyeler: () => idler((b) => b.hidden),
 
-  it: "Custode dei segreti"},
+  it: "Custode dei segreti",
+  fr: "Gardien des secrets",
+  ja: "秘密の番人"},
   {
     id: "set_panteon",
     icon: "trophy-outline", iconSolid: "trophy", rarity: RARITY.epic,
@@ -144,7 +162,9 @@ export const BADGE_SETS = [
     descTr: "Her ailenin zirvesine ulaş", descEn: "Reach the peak of every family", descEs: "Llega a la cima de cada familia", descPt: "Chegue ao topo de cada família", descDe: "Erreiche den Gipfel jeder Familie",
     uyeler: zirveIdleri,
 
-  it: "Pantheon"},
+  it: "Pantheon",
+  fr: "Panthéon",
+  ja: "殿堂"},
   // ── ROZET SAYISI MERDİVENİ ─────────────────────────────────────────────────
   // "Toplam N rozet aç." Diğer koleksiyonlar BELİRLİ rozetleri ister; bunlar
   // herhangi N tanesini. İki işi var:
@@ -164,7 +184,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 10 rozet kazan", descEn: "Earn 10 badges in total", descEs: "Consigue 10 insignias en total", descPt: "Conquiste 10 emblemas no total", descDe: "Erwirb insgesamt 10 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Primi dieci"},
+  it: "Primi dieci",
+  fr: "Les dix premiers",
+  ja: "最初の10個"},
   {
     id: "set_sayi_25", esik: 25,
     icon: "podium-outline", iconSolid: "podium", rarity: RARITY.uncommon,
@@ -172,7 +194,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 25 rozet kazan", descEn: "Earn 25 badges in total", descEs: "Consigue 25 insignias en total", descPt: "Conquiste 25 emblemas no total", descDe: "Erwirb insgesamt 25 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Appassionato di distintivi"},
+  it: "Appassionato di distintivi",
+  fr: "Amateur de badges",
+  ja: "バッジ好き"},
   {
     id: "set_sayi_50", esik: 50,
     icon: "podium-outline", iconSolid: "podium", rarity: RARITY.rare,
@@ -180,7 +204,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 50 rozet kazan", descEn: "Earn 50 badges in total", descEs: "Consigue 50 insignias en total", descPt: "Conquiste 50 emblemas no total", descDe: "Erwirb insgesamt 50 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Collezionista di distintivi"},
+  it: "Collezionista di distintivi",
+  fr: "Collectionneur de badges",
+  ja: "バッジコレクター"},
   {
     id: "set_sayi_75", esik: 75,
     icon: "podium-outline", iconSolid: "podium", rarity: RARITY.rare,
@@ -188,7 +214,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 75 rozet kazan", descEn: "Earn 75 badges in total", descEs: "Consigue 75 insignias en total", descPt: "Conquiste 75 emblemas no total", descDe: "Erwirb insgesamt 75 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Maestro di distintivi"},
+  it: "Maestro di distintivi",
+  fr: "Maître des badges",
+  ja: "バッジマスター"},
   {
     id: "set_sayi_100", esik: 100,
     icon: "podium-outline", iconSolid: "podium", rarity: RARITY.epic,
@@ -196,7 +224,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 100 rozet kazan", descEn: "Earn 100 badges in total", descEs: "Consigue 100 insignias en total", descPt: "Conquiste 100 emblemas no total", descDe: "Erwirb insgesamt 100 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Vetrina secolare"},
+  it: "Vetrina secolare",
+  fr: "Vitrine du siècle",
+  ja: "100個のショーケース"},
   {
     id: "set_sayi_125", esik: 125,
     icon: "podium-outline", iconSolid: "podium", rarity: RARITY.epic,
@@ -204,7 +234,9 @@ export const BADGE_SETS = [
     descTr: "Toplam 125 rozet kazan", descEn: "Earn 125 badges in total", descEs: "Consigue 125 insignias en total", descPt: "Conquiste 125 emblemas no total", descDe: "Erwirb insgesamt 125 Abzeichen",
     uyeler: () => idler(() => true),
 
-  it: "Quasi tutto"},
+  it: "Quasi tutto",
+  fr: "Presque tout",
+  ja: "ほぼすべて"},
 ];
 
 export const BADGE_SET_IDS = Object.freeze(BADGE_SETS.map((s) => s.id));

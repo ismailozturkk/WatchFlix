@@ -163,7 +163,7 @@ export function canStepYear(year, delta, { minIso, maxIso, years }) {
  * Haftanın ilk günü: 0 = Pazar, 1 = Pazartesi. Takvim ekranıyla aynı kural
  * (screens/calendar/CalendarScreen.js): yalnız İngilizce ve Portekizce Pazar.
  */
-export const firstDayOfWeekFor = (lang) => (lang === "en" || lang === "pt" ? 0 : 1);
+export const firstDayOfWeekFor = (lang) => (lang === "en" || lang === "pt" || lang === "ja" ? 0 : 1);
 
 /** Başlık satırının gün sırası (Date#getDay indeksleri). */
 export const weekdayOrder = (firstDay) =>

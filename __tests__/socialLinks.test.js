@@ -122,7 +122,7 @@ describe("metinler ve kural eşleşmesi", () => {
     for (const lang of ["en", "es", "pt", "de"]) {
       expect(shape(SOCIAL_COPY[lang])).toEqual(shape(SOCIAL_COPY.tr));
     }
-    expect(getSocialCopy("fr")).toBe(SOCIAL_COPY.en);
+    expect(getSocialCopy("ko")).toBe(SOCIAL_COPY.en);
     expect(SOCIAL_COPY.tr.invalid("X")).toContain("X");
   });
 

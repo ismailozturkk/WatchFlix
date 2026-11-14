@@ -13,26 +13,34 @@ export const PHASE_META = {
     color: "#3B82F6",
     gradient: ["#2563EB", "#7C3AED"],
 
-  it: "Selezione"},
+  it: "Selezione",
+  fr: "Sélection",
+  ja: "選出"},
   voting: {
     tr: "Oylama", en: "Voting", es: "Votación", pt: "Votação", de: "Abstimmung", icon: "flame",
     color: "#F59E0B",
     gradient: ["#EA580C", "#DC2626"],
 
-  it: "Votazione"},
+  it: "Votazione",
+  fr: "Vote",
+  ja: "投票"},
   results: {
     tr: "Sonuçlar", en: "Results", es: "Resultados", pt: "Resultados", de: "Ergebnisse", icon: "trophy",
     color: "#F5C518",
     gradient: ["#D97706", "#F5C518"],
 
-  it: "Risultati"},
+  it: "Risultati",
+  fr: "Résultats",
+  ja: "結果"},
   upcoming: {
     tr: "Yakında", en: "Upcoming", es: "Próximamente", pt: "Em breve", de: "Demnächst", icon: "time",
     color: "#6B7280",
     gradient: ["#4B5563", "#1F2937"],
 
-  it: "Prossimi"},
+  it: "Prossimi",
+  fr: "À venir",
+  ja: "今後"},
 };
 
 /** Faz adı: dile uygun, yoksa İngilizce (utils/appLanguages kuralı). */
-export const phaseLabel = (meta, lang) => meta?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"])] || meta?.en || "";
+export const phaseLabel = (meta, lang) => meta?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])] || meta?.en || "";

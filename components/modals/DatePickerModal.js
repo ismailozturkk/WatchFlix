@@ -156,6 +156,14 @@ export const MONTHS_IT = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
 ];
+export const MONTHS_FR = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
+export const MONTHS_JA = [
+  "1月", "2月", "3月", "4月", "5月", "6月",
+  "7月", "8月", "9月", "10月", "11月", "12月",
+];
 
 const WEEKDAYS_TR = [
   "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
@@ -180,6 +188,12 @@ const WEEKDAYS_DE = [
 const WEEKDAYS_IT = [
   "Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato",
 ];
+const WEEKDAYS_FR = [
+  "Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi",
+];
+const WEEKDAYS_JA = [
+  "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日",
+];
 
 // Izgara başlığı (Pazar = 0, Date#getDay sırası).
 const WEEKDAYS_SHORT_TR = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
@@ -188,9 +202,11 @@ const WEEKDAYS_SHORT_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const WEEKDAYS_SHORT_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const WEEKDAYS_SHORT_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const WEEKDAYS_SHORT_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+const WEEKDAYS_SHORT_FR = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+const WEEKDAYS_SHORT_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
-const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE, it: MONTHS_IT };
-const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT, de: WEEKDAYS_DE, it: WEEKDAYS_IT };
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE, it: MONTHS_IT, fr: MONTHS_FR, ja: MONTHS_JA };
+const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT, de: WEEKDAYS_DE, it: WEEKDAYS_IT, fr: WEEKDAYS_FR, ja: WEEKDAYS_JA };
 const WEEKDAY_SHORT_NAMES = {
   tr: WEEKDAYS_SHORT_TR,
   en: WEEKDAYS_SHORT_EN,
@@ -198,6 +214,8 @@ const WEEKDAY_SHORT_NAMES = {
   pt: WEEKDAYS_SHORT_PT,
   de: WEEKDAYS_SHORT_DE,
   it: WEEKDAYS_SHORT_IT,
+  fr: WEEKDAYS_SHORT_FR,
+  ja: WEEKDAYS_SHORT_JA,
 };
 
 /** Dile uygun ay adları (0-11); bilinmeyen dil İngilizce. YENİ DİL: tablolara ekle. */
@@ -212,6 +230,9 @@ export function formatLongDateParts(language, { day, monthIndex, year }) {
   if (lang === "es" || lang === "pt") return `${day} de ${month.toLowerCase()} de ${year}`;
   if (lang === "de") return `${day}. ${month} ${year}`;
   if (lang === "it") return `${day} ${month.toLowerCase()} ${year}`;
+  if (lang === "fr") return `${Number(day) === 1 ? "1er" : day} ${month.toLowerCase()} ${year}`;
+  // Japonca: "1998年3月5日" — ay adı zaten "3月".
+  if (lang === "ja") return `${year}年${month}${Number(day)}日`;
   return `${day} ${month} ${year}`;
 }
 

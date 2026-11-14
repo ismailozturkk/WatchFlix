@@ -66,9 +66,29 @@ const it = {
   hour: "h",
   minute: "min"
 };
+const fr = {
+  full: "{day} est complet : 24 heures maximum peuvent être enregistrées par jour. Il reste {remaining}, tu as essayé d'ajouter {requested}. Choisis un autre jour.",
+  fullNone: "Les 24 heures du {day} sont utilisées. Choisis un autre jour.",
+  span: "Ce titre ({requested}) ne tient pas même sur {days} jours avant la date choisie. Choisis une date plus tardive ou marque les épisodes un par un.",
+  spreadTitle: "Réparti sur plusieurs jours",
+  spreadBody: "Une journée contient au maximum 24 heures, les épisodes ont donc été répartis sur {days} jours, du {start} au {end}.",
+  hour: "h",
+  minute: "min",
+};
+const ja = {
+  full: "{day}はいっぱいです:1日に記録できるのは最大24時間です。残り{remaining}に対し、{requested}を追加しようとしました。別の日を選んでください。",
+  fullNone: "{day}の24時間を使い切りました。別の日を選んでください。",
+  span: "この作品({requested})は、選んだ日付から{days}日さかのぼっても収まりません。もっと後の日付を選ぶか、エピソードを1話ずつ記録してください。",
+  spreadTitle: "複数の日に分散",
+  spreadBody: "1日は最大24時間のため、エピソードを{start}〜{end}の{days}日間に分散しました。",
+  hour: "時間",
+  minute: "分",
+};
 
 export const DAILY_LIMIT_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 export const getDailyLimitCopy = (language) =>
   DAILY_LIMIT_COPY[copyLanguage(language, Object.keys(DAILY_LIMIT_COPY))];

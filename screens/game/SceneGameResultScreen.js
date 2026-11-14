@@ -61,11 +61,11 @@ function useCountUp(target, duration = 900) {
 }
 
 // Doğruluğa göre kısa değerlendirme (başlık + ikon).
-function verdictFor(accuracy, tr, es, pt, de, it) {
-  if (accuracy >= 100) return { icon: "ribbon", text: tr ? "Kusursuz!" : es ? "¡Impecable!" : pt ? "Impecável!" : de ? "Makellos!" : it ? "Impeccabile!" : "Flawless!" };
-  if (accuracy >= 80) return { icon: "star", text: tr ? "Harika iş!" : es ? "¡Buen trabajo!" : pt ? "Bom trabalho!" : de ? "Super gemacht!" : it ? "Ottimo lavoro!" : "Great job!" };
-  if (accuracy >= 60) return { icon: "thumbs-up", text: tr ? "Fena değil" : es ? "Nada mal" : pt ? "Nada mal" : de ? "Nicht schlecht" : it ? "Niente male" : "Not bad" };
-  return { icon: "flash", text: tr ? "Bir dahaki sefere!" : es ? "¡A la próxima!" : pt ? "Na próxima!" : de ? "Beim nächsten Mal!" : it ? "Alla prossima!" : "Next time!" };
+function verdictFor(accuracy, tr, es, pt, de, it, fr, ja) {
+  if (accuracy >= 100) return { icon: "ribbon", text: tr ? "Kusursuz!" : es ? "¡Impecable!" : pt ? "Impecável!" : de ? "Makellos!" : it ? "Impeccabile!" : fr ? "Sans faute !" : ja ? "パーフェクト!" : "Flawless!" };
+  if (accuracy >= 80) return { icon: "star", text: tr ? "Harika iş!" : es ? "¡Buen trabajo!" : pt ? "Bom trabalho!" : de ? "Super gemacht!" : it ? "Ottimo lavoro!" : fr ? "Bravo !" : ja ? "お見事!" : "Great job!" };
+  if (accuracy >= 60) return { icon: "thumbs-up", text: tr ? "Fena değil" : es ? "Nada mal" : pt ? "Nada mal" : de ? "Nicht schlecht" : it ? "Niente male" : fr ? "Pas mal" : ja ? "悪くない" : "Not bad" };
+  return { icon: "flash", text: tr ? "Bir dahaki sefere!" : es ? "¡A la próxima!" : pt ? "Na próxima!" : de ? "Beim nächsten Mal!" : it ? "Alla prossima!" : fr ? "La prochaine fois !" : ja ? "次こそ!" : "Next time!" };
 }
 
 export default function SceneGameResultScreen({ navigation, route }) {
@@ -87,6 +87,8 @@ export default function SceneGameResultScreen({ navigation, route }) {
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
   const it = normalizeAppLanguage(language) === "it";
+  const fr = normalizeAppLanguage(language) === "fr";
+  const ja = normalizeAppLanguage(language) === "ja";
 
   useEffect(() => {
     setResult(getGameSessionResult(sessionId));
@@ -188,7 +190,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
       await new Promise((r) => setTimeout(r, 90));
       const uri = await captureRef(shareCardRef, { format: "png", quality: 1, result: "tmpfile" });
       if (!(await Sharing.isAvailableAsync())) {
-        toast.error(tr ? "Paylaşım kullanılamıyor" : es ? "Compartir no está disponible" : pt ? "O compartilhamento não está disponível" : de ? "Teilen ist nicht verfügbar" : language === "it" ? "Condivisione non disponibile" : "Sharing is unavailable");
+        toast.error(tr ? "Paylaşım kullanılamıyor" : es ? "Compartir no está disponible" : pt ? "O compartilhamento não está disponível" : de ? "Teilen ist nicht verfügbar" : language === "it" ? "Condivisione non disponibile" : language === "fr" ? "Le partage n'est pas disponible" : language === "ja" ? "シェアは利用できません" : "Sharing is unavailable");
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -196,7 +198,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         dialogTitle: gameTitle,
       });
     } catch (e) {
-      toast.error(tr ? "Paylaşılamadı" : es ? "No se pudo compartir" : pt ? "Não foi possível compartilhar" : de ? "Konnte nicht geteilt werden" : language === "it" ? "Impossibile condividere" : "Could not share", e?.message);
+      toast.error(tr ? "Paylaşılamadı" : es ? "No se pudo compartir" : pt ? "Não foi possível compartilhar" : de ? "Konnte nicht geteilt werden" : language === "it" ? "Impossibile condividere" : language === "fr" ? "Partage impossible" : language === "ja" ? "シェアできませんでした" : "Could not share", e?.message);
     } finally {
       setSharing(false);
     }
@@ -204,10 +206,10 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
   if (!result) {
     return (
-      <GameScreenShell navigation={navigation} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : language === "it" ? "Risultato del gioco" : "Game Result"} scroll={false}>
+      <GameScreenShell navigation={navigation} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : language === "it" ? "Risultato del gioco" : language === "fr" ? "Résultat de la partie" : language === "ja" ? "ゲーム結果" : "Game Result"} scroll={false}>
         <View style={styles.missing}>
           <AppIcon family="Ionicons" name="alert-circle-outline" size={42} color={theme.text.muted} />
-          <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : es ? "El resultado de esta sesión ya no está disponible." : pt ? "O resultado desta sessão não está mais disponível." : de ? "Das Ergebnis dieser Sitzung ist nicht mehr verfügbar." : language === "it" ? "Il risultato di questa sessione non è più disponibile." : "This session result is no longer available."}</Text>
+          <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : es ? "El resultado de esta sesión ya no está disponible." : pt ? "O resultado desta sessão não está mais disponível." : de ? "Das Ergebnis dieser Sitzung ist nicht mehr verfügbar." : language === "it" ? "Il risultato di questa sessione non è più disponibile." : language === "fr" ? "Le résultat de cette session n'est plus disponible." : language === "ja" ? "このセッションの結果はもう利用できません。" : "This session result is no longer available."}</Text>
           <GlassTouchable style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={closeResult}>
             <Text style={gameSharedStyles.primaryButtonText}>{i18nText("autoI18n.kapat", "Kapat")}</Text>
           </GlassTouchable>
@@ -218,18 +220,18 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
   const outcomeLabel =
     result.outcome === "failed"
-      ? (tr ? "Oyun bitti" : es ? "Fin de la partida" : pt ? "Fim da partida" : de ? "Spiel vorbei" : language === "it" ? "Partita terminata" : "Game over")
+      ? (tr ? "Oyun bitti" : es ? "Fin de la partida" : pt ? "Fim da partida" : de ? "Spiel vorbei" : language === "it" ? "Partita terminata" : language === "fr" ? "Partie terminée" : language === "ja" ? "ゲームオーバー" : "Game over")
       : result.outcome === "quit"
-        ? (tr ? "Yarıda bitirildi" : es ? "Terminada antes de tiempo" : pt ? "Encerrada antes da hora" : de ? "Vorzeitig beendet" : language === "it" ? "Finito in anticipo" : "Ended early")
-        : (tr ? "Tamamlandı" : es ? "Completada" : pt ? "Concluída" : de ? "Abgeschlossen" : language === "it" ? "Completato" : "Completed");
+        ? (tr ? "Yarıda bitirildi" : es ? "Terminada antes de tiempo" : pt ? "Encerrada antes da hora" : de ? "Vorzeitig beendet" : language === "it" ? "Finito in anticipo" : language === "fr" ? "Terminée plus tôt" : language === "ja" ? "途中で終了" : "Ended early")
+        : (tr ? "Tamamlandı" : es ? "Completada" : pt ? "Concluída" : de ? "Abgeschlossen" : language === "it" ? "Completato" : language === "fr" ? "Terminé" : language === "ja" ? "完了" : "Completed");
 
-  const verdict = verdictFor(accuracy, tr, es, pt, de, it);
+  const verdict = verdictFor(accuracy, tr, es, pt, de, it, fr, ja);
   const progress = result.progressSummary;
   const leveledUp = progress && progress.level > progress.levelBefore;
   const myRank = dailyBoard ? dailyBoard.findIndex((row) => row.uid === user?.uid) + 1 : 0;
 
   return (
-    <GameScreenShell navigation={navigation} onBack={closeResult} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : language === "it" ? "Risultato del gioco" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
+    <GameScreenShell navigation={navigation} onBack={closeResult} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : language === "it" ? "Risultato del gioco" : language === "fr" ? "Résultat de la partie" : language === "ja" ? "ゲーム結果" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
       {/* Hero skor */}
       <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreHero}>
         <View pointerEvents="none" style={styles.heroGlowOne} />
@@ -238,13 +240,13 @@ export default function SceneGameResultScreen({ navigation, route }) {
           <AppIcon family="Ionicons" name={verdict.icon} size={13} color="#FFD76A" />
           <Text style={styles.verdictText} allowFontScaling={false}>{verdict.text}</Text>
         </View>
-        <Text style={styles.scoreLabel} allowFontScaling={false}>{tr ? "TOPLAM SKOR" : es ? "PUNTUACIÓN TOTAL" : pt ? "PONTUAÇÃO TOTAL" : de ? "GESAMTPUNKTZAHL" : language === "it" ? "PUNTEGGIO TOTALE" : "TOTAL SCORE"}</Text>
+        <Text style={styles.scoreLabel} allowFontScaling={false}>{tr ? "TOPLAM SKOR" : es ? "PUNTUACIÓN TOTAL" : pt ? "PONTUAÇÃO TOTAL" : de ? "GESAMTPUNKTZAHL" : language === "it" ? "PUNTEGGIO TOTALE" : language === "fr" ? "SCORE TOTAL" : language === "ja" ? "合計スコア" : "TOTAL SCORE"}</Text>
         <Text style={styles.score} allowFontScaling={false}>{shownScore}</Text>
         <View style={styles.heroBadges}>
           {result.isNewRecord ? (
             <View style={styles.heroBadge}>
               <AppIcon family="Ionicons" name="ribbon" size={13} color="#FFD76A" />
-              <Text style={styles.heroBadgeText}>{tr ? "Yeni Rekor!" : es ? "¡Nuevo récord!" : pt ? "Novo recorde!" : de ? "Neuer Rekord!" : language === "it" ? "Nuovo record!" : "New Record!"}</Text>
+              <Text style={styles.heroBadgeText}>{tr ? "Yeni Rekor!" : es ? "¡Nuevo récord!" : pt ? "Novo recorde!" : de ? "Neuer Rekord!" : language === "it" ? "Nuovo record!" : language === "fr" ? "Nouveau record !" : language === "ja" ? "新記録!" : "New Record!"}</Text>
             </View>
           ) : null}
           {result.xpEarned ? (
@@ -256,7 +258,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
           {isDaily && progress?.dailyStreak > 0 ? (
             <View style={styles.heroBadge}>
               <AppIcon family="Ionicons" name="flame" size={13} color="#FF9F5A" />
-              <Text style={styles.heroBadgeText}>{tr ? `${progress.dailyStreak} günlük seri` : es ? `racha de ${progress.dailyStreak} días` : pt ? `sequência de ${progress.dailyStreak} dias` : de ? `${progress.dailyStreak}-Tage-Serie` : language === "it" ? `${progress.dailyStreak} giorni consecutivi` : `${progress.dailyStreak}-day streak`}</Text>
+              <Text style={styles.heroBadgeText}>{tr ? `${progress.dailyStreak} günlük seri` : es ? `racha de ${progress.dailyStreak} días` : pt ? `sequência de ${progress.dailyStreak} dias` : de ? `${progress.dailyStreak}-Tage-Serie` : language === "it" ? `${progress.dailyStreak} giorni consecutivi` : language === "fr" ? `Série de ${progress.dailyStreak} jours` : language === "ja" ? `${progress.dailyStreak}日連続` : `${progress.dailyStreak}-day streak`}</Text>
             </View>
           ) : null}
         </View>
@@ -269,9 +271,9 @@ export default function SceneGameResultScreen({ navigation, route }) {
             <AppIcon family="Ionicons" name="trending-up" size={20} color="#FFFFFF" />
           </View>
           <View style={styles.levelUpCopy}>
-            <Text style={[styles.levelUpTitle, { color: theme.text.primary }]}>{tr ? "Seviye atladın!" : es ? "¡Subes de nivel!" : pt ? "Você subiu de nível!" : de ? "Level aufgestiegen!" : language === "it" ? "Sali di livello!" : "Level up!"}</Text>
+            <Text style={[styles.levelUpTitle, { color: theme.text.primary }]}>{tr ? "Seviye atladın!" : es ? "¡Subes de nivel!" : pt ? "Você subiu de nível!" : de ? "Level aufgestiegen!" : language === "it" ? "Sali di livello!" : language === "fr" ? "Niveau supérieur !" : language === "ja" ? "レベルアップ!" : "Level up!"}</Text>
             <Text style={[styles.levelUpText, { color: theme.text.muted }]}>
-              {tr ? `Seviye ${progress.levelBefore} → ${progress.level}` : es ? `Nivel ${progress.levelBefore} → ${progress.level}` : pt ? `Nível ${progress.levelBefore} → ${progress.level}` : de ? `Level ${progress.levelBefore} → ${progress.level}` : language === "it" ? `Livello ${progress.levelBefore} → ${progress.level}` : `Level ${progress.levelBefore} → ${progress.level}`}
+              {tr ? `Seviye ${progress.levelBefore} → ${progress.level}` : es ? `Nivel ${progress.levelBefore} → ${progress.level}` : pt ? `Nível ${progress.levelBefore} → ${progress.level}` : de ? `Level ${progress.levelBefore} → ${progress.level}` : language === "it" ? `Livello ${progress.levelBefore} → ${progress.level}` : language === "fr" ? `Niveau ${progress.levelBefore} → ${progress.level}` : language === "ja" ? `レベル ${progress.levelBefore} → ${progress.level}` : `Level ${progress.levelBefore} → ${progress.level}`}
             </Text>
           </View>
         </View>
@@ -291,18 +293,18 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
       {/* Ana metrikler */}
       <View style={gameSharedStyles.metricRow}>
-        <Metric value={`${result.totalCorrect || 0}/${totalQuestions}`} label={tr ? "Doğru" : es ? "Aciertos" : pt ? "Acertos" : de ? "Richtig" : language === "it" ? "Corretto" : "Correct"} color="#2ECC71" theme={theme} />
-        <Metric value={`${accuracy}%`} label={tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : de ? "Genauigkeit" : language === "it" ? "Precisione" : "Accuracy"} color={theme.accent} theme={theme} />
-        <Metric value={result.bestStreak || 0} label={tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : de ? "Beste Serie" : language === "it" ? "Miglior serie" : "Best streak"} color="#FF6B6B" theme={theme} />
+        <Metric value={`${result.totalCorrect || 0}/${totalQuestions}`} label={tr ? "Doğru" : es ? "Aciertos" : pt ? "Acertos" : de ? "Richtig" : language === "it" ? "Corretto" : language === "fr" ? "Correct" : language === "ja" ? "正解" : "Correct"} color="#2ECC71" theme={theme} />
+        <Metric value={`${accuracy}%`} label={tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : de ? "Genauigkeit" : language === "it" ? "Precisione" : language === "fr" ? "Précision" : language === "ja" ? "正答率" : "Accuracy"} color={theme.accent} theme={theme} />
+        <Metric value={result.bestStreak || 0} label={tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : de ? "Beste Serie" : language === "it" ? "Miglior serie" : language === "fr" ? "Meilleure série" : language === "ja" ? "最高連続正解" : "Best streak"} color="#FF6B6B" theme={theme} />
       </View>
 
       {/* Ayrinti seridi: zorluk · kaynak · ortalama sure */}
       <View style={[styles.detailStrip, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <DetailItem icon="speedometer-outline" label={tr ? "Zorluk" : es ? "Dificultad" : pt ? "Dificuldade" : de ? "Schwierigkeit" : language === "it" ? "Difficoltà" : "Difficulty"} value={difficultyLabel} theme={theme} />
+        <DetailItem icon="speedometer-outline" label={tr ? "Zorluk" : es ? "Dificultad" : pt ? "Dificuldade" : de ? "Schwierigkeit" : language === "it" ? "Difficoltà" : language === "fr" ? "Difficulté" : language === "ja" ? "難易度" : "Difficulty"} value={difficultyLabel} theme={theme} />
         <View style={[styles.detailDivider, { backgroundColor: theme.border }]} />
-        <DetailItem icon="albums-outline" label={tr ? "Kaynak" : es ? "Fuente" : pt ? "Fonte" : de ? "Quelle" : language === "it" ? "Fonte" : "Source"} value={sourceLabel} theme={theme} />
+        <DetailItem icon="albums-outline" label={tr ? "Kaynak" : es ? "Fuente" : pt ? "Fonte" : de ? "Quelle" : language === "it" ? "Fonte" : language === "fr" ? "Source" : language === "ja" ? "ソース" : "Source"} value={sourceLabel} theme={theme} />
         <View style={[styles.detailDivider, { backgroundColor: theme.border }]} />
-        <DetailItem icon="time-outline" label={tr ? "Ort. süre" : es ? "Tiempo medio" : pt ? "Tempo médio" : de ? "Ø Zeit" : language === "it" ? "Tempo medio" : "Avg time"} value={averageMs != null ? `${(averageMs / 1000).toFixed(1)}s` : "–"} theme={theme} />
+        <DetailItem icon="time-outline" label={tr ? "Ort. süre" : es ? "Tiempo medio" : pt ? "Tempo médio" : de ? "Ø Zeit" : language === "it" ? "Tempo medio" : language === "fr" ? "Temps moyen" : language === "ja" ? "平均時間" : "Avg time"} value={averageMs != null ? `${(averageMs / 1000).toFixed(1)}s` : "–"} theme={theme} />
       </View>
 
       {/* Günlük: arkadaş sıralaması */}
@@ -310,7 +312,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={[styles.boardCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={styles.boardHeader}>
             <AppIcon family="Ionicons" name="podium-outline" size={18} color={theme.accent} />
-            <Text style={[styles.boardTitle, { color: theme.text.primary }]}>{tr ? "Arkadaşların arasında" : es ? "Entre tus amigos" : pt ? "Entre seus amigos" : de ? "Unter deinen Freunden" : language === "it" ? "Tra i tuoi amici" : "Among your friends"}</Text>
+            <Text style={[styles.boardTitle, { color: theme.text.primary }]}>{tr ? "Arkadaşların arasında" : es ? "Entre tus amigos" : pt ? "Entre seus amigos" : de ? "Unter deinen Freunden" : language === "it" ? "Tra i tuoi amici" : language === "fr" ? "Parmi tes amis" : language === "ja" ? "友だちの中で" : "Among your friends"}</Text>
             {myRank > 0 ? (
               <View style={[styles.rankPill, { backgroundColor: alpha(theme.accent, 0.16) }]}>
                 <Text style={[styles.rankPillText, { color: theme.accent }]}>#{myRank}</Text>
@@ -324,7 +326,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
                 <Text style={[styles.boardRank, { color: theme.text.muted }]}>{index + 1}</Text>
                 <UserAvatar avatarIndex={row.avatarIndex} photoURL={row.photoURL} isCustomPhoto size={30} />
                 <Text style={[styles.boardName, { color: theme.text.primary }]} numberOfLines={1}>
-                  {isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : de ? "Du" : language === "it" ? "Tu" : "You") : row.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : de ? "Anonym" : language === "it" ? "Anonimo" : "Anonymous")}
+                  {isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : de ? "Du" : language === "it" ? "Tu" : language === "fr" ? "Toi" : language === "ja" ? "あなた" : "You") : row.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : de ? "Anonym" : language === "it" ? "Anonimo" : language === "fr" ? "Anonyme" : language === "ja" ? "匿名" : "Anonymous")}
                 </Text>
                 <Text style={[styles.boardScore, { color: theme.accent }]}>{row.bestScore}</Text>
               </View>
@@ -338,13 +340,13 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={[styles.reviewCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={tr ? "Cevapları incele" : es ? "Revisar respuestas" : pt ? "Revisar respostas" : de ? "Antworten ansehen" : language === "it" ? "Risposte di revisione" : "Review answers"}
+            accessibilityLabel={tr ? "Cevapları incele" : es ? "Revisar respuestas" : pt ? "Revisar respostas" : de ? "Antworten ansehen" : language === "it" ? "Risposte di revisione" : language === "fr" ? "Revoir les réponses" : language === "ja" ? "回答を見直す" : "Review answers"}
             activeOpacity={0.75}
             onPress={() => setReviewExpanded((v) => !v)}
             style={styles.reviewHeader}
           >
             <AppIcon family="Ionicons" name="list-outline" size={18} color={theme.text.secondary} />
-            <Text style={[styles.reviewTitle, { color: theme.text.primary }]}>{tr ? "Cevapları İncele" : es ? "Revisar respuestas" : pt ? "Revisar respostas" : de ? "Antworten ansehen" : language === "it" ? "Risposte di revisione" : "Review Answers"}</Text>
+            <Text style={[styles.reviewTitle, { color: theme.text.primary }]}>{tr ? "Cevapları İncele" : es ? "Revisar respuestas" : pt ? "Revisar respostas" : de ? "Antworten ansehen" : language === "it" ? "Risposte di revisione" : language === "fr" ? "Revoir les réponses" : language === "ja" ? "回答を見直す" : "Review Answers"}</Text>
             <View style={[styles.reviewCount, { backgroundColor: theme.primary }]}><Text style={[styles.reviewCountText, { color: theme.text.muted }]}>{result.sessionHistory.length}</Text></View>
             <AppIcon family="Ionicons" name={reviewExpanded ? "chevron-up" : "chevron-down"} size={18} color={theme.text.muted} />
           </TouchableOpacity>
@@ -369,7 +371,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
                     <View style={styles.reviewCopy}>
                       <Text style={[styles.reviewName, { color: theme.text.primary }]} numberOfLines={1}>{answer.item?.title || "?"}</Text>
                       {wrongAnswer ? (
-                        <Text style={[styles.reviewWrong, { color: theme.text.muted }]} numberOfLines={1}>{(tr ? "Cevabın: " : es ? "Tú: " : pt ? "Você: " : de ? "Du: " : language === "it" ? "Tu: " : "You: ") + answer.userAnswer.title}</Text>
+                        <Text style={[styles.reviewWrong, { color: theme.text.muted }]} numberOfLines={1}>{(tr ? "Cevabın: " : es ? "Tú: " : pt ? "Você: " : de ? "Du: " : language === "it" ? "Tu: " : language === "fr" ? "Toi : " : language === "ja" ? "あなた: " : "You: ") + answer.userAnswer.title}</Text>
                       ) : (
                         <Text style={[styles.reviewMeta, { color: theme.text.muted }]} numberOfLines={1}>{Number.isFinite(answer.responseMs) ? `${(answer.responseMs / 1000).toFixed(1)}s` : ""}</Text>
                       )}
@@ -389,11 +391,11 @@ export default function SceneGameResultScreen({ navigation, route }) {
       {result.saveStatus === "error" ? (
         <TouchableOpacity style={styles.retry} onPress={async () => { setResult((c) => ({ ...c, saveStatus: "saving" })); const saved = await result.retrySave?.(); setResult((c) => ({ ...c, saveStatus: saved ? "saved" : "error" })); }}>
           <AppIcon family="Ionicons" name="cloud-upload-outline" size={18} color="#FF6B6B" />
-          <Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydedilemedi. Tekrar dene" : es ? "El resultado no se guardó. Inténtalo de nuevo" : pt ? "O resultado não foi salvo. Tente novamente" : de ? "Ergebnis wurde nicht gespeichert. Versuche es erneut" : language === "it" ? "Il risultato non è stato salvato. Riprova" : "Result was not saved. Try again"}</Text>
+          <Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydedilemedi. Tekrar dene" : es ? "El resultado no se guardó. Inténtalo de nuevo" : pt ? "O resultado não foi salvo. Tente novamente" : de ? "Ergebnis wurde nicht gespeichert. Versuche es erneut" : language === "it" ? "Il risultato non è stato salvato. Riprova" : language === "fr" ? "Le résultat n'a pas été enregistré. Réessaie" : language === "ja" ? "結果を保存できませんでした。もう一度お試しください" : "Result was not saved. Try again"}</Text>
         </TouchableOpacity>
       ) : null}
       {result.saveStatus === "saving" ? (
-        <View style={styles.retry}><LensLoader size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : es ? "Guardando el resultado..." : pt ? "Salvando o resultado..." : de ? "Ergebnis wird gespeichert..." : language === "it" ? "Salvataggio risultato..." : "Saving result..."}</Text></View>
+        <View style={styles.retry}><LensLoader size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : es ? "Guardando el resultado..." : pt ? "Salvando o resultado..." : de ? "Ergebnis wird gespeichert..." : language === "it" ? "Salvataggio risultato..." : language === "fr" ? "Enregistrement du résultat..." : language === "ja" ? "結果を保存中..." : "Saving result..."}</Text></View>
       ) : null}
 
       {/* Aksiyonlar (Part 13.3). Günlük tek deneme: "Tekrar Oyna" yerine sıralama. */}
@@ -405,7 +407,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         >
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
             <AppIcon family="Ionicons" name="podium-outline" size={19} color="#fff" />
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Günlük Sıralamayı Gör" : es ? "Ver la clasificación diaria" : pt ? "Ver o ranking diário" : de ? "Tagesrangliste ansehen" : language === "it" ? "Visualizza classifica giornaliera" : "View Daily Ranking"}</Text>
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Günlük Sıralamayı Gör" : es ? "Ver la clasificación diaria" : pt ? "Ver o ranking diário" : de ? "Tagesrangliste ansehen" : language === "it" ? "Visualizza classifica giornaliera" : language === "fr" ? "Voir le classement du jour" : language === "ja" ? "デイリーランキングを見る" : "View Daily Ranking"}</Text>
           </LinearGradient>
         </PressableScale>
       ) : (
@@ -416,17 +418,17 @@ export default function SceneGameResultScreen({ navigation, route }) {
         >
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
             <AppIcon family="Ionicons" name="refresh" size={19} color="#fff" />
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : es ? "Jugar otra vez" : pt ? "Jogar de novo" : de ? "Nochmal spielen" : language === "it" ? "Gioca di nuovo" : "Play Again"}</Text>
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : es ? "Jugar otra vez" : pt ? "Jogar de novo" : de ? "Nochmal spielen" : language === "it" ? "Gioca di nuovo" : language === "fr" ? "Rejouer" : language === "ja" ? "もう一度プレイ" : "Play Again"}</Text>
           </LinearGradient>
         </PressableScale>
       )}
 
       <View style={styles.actionRow}>
         {!isDaily ? (
-          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : es ? "Elegir modo" : pt ? "Escolher modo" : de ? "Moduseinrichtung" : language === "it" ? "Impostazione modalità" : "Mode Setup"} theme={theme} onPress={() => setSetupVisible(true)} />
+          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : es ? "Elegir modo" : pt ? "Escolher modo" : de ? "Moduseinrichtung" : language === "it" ? "Impostazione modalità" : language === "fr" ? "Configuration du mode" : language === "ja" ? "モード設定" : "Mode Setup"} theme={theme} onPress={() => setSetupVisible(true)} />
         ) : null}
-        <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : language === "it" ? "Classifica" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
-        <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : de ? "Teilen" : language === "it" ? "Condividi" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
+        <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : language === "it" ? "Classifica" : language === "fr" ? "Classement" : language === "ja" ? "ランキング" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
+        <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : de ? "Teilen" : language === "it" ? "Condividi" : language === "fr" ? "Partager" : language === "ja" ? "シェア" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
 
       {/* Kabul edilen düello: skorlar davetin geldiği sohbete yazıldı mı. */}
@@ -464,7 +466,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
             accent={theme.accent}
             bold={theme.bold}
             score={result.score || 0}
-            scoreLabel={tr ? "Skor" : es ? "Puntuación" : pt ? "Pontuação" : de ? "Punktzahl" : language === "it" ? "Punteggio" : "Score"}
+            scoreLabel={tr ? "Skor" : es ? "Puntuación" : pt ? "Pontuação" : de ? "Punktzahl" : language === "it" ? "Punteggio" : language === "fr" ? "Score" : language === "ja" ? "スコア" : "Score"}
             modeLabel={modeLabel}
             difficultyLabel={difficultyLabel}
             accuracy={accuracy}
@@ -473,11 +475,11 @@ export default function SceneGameResultScreen({ navigation, route }) {
             total={totalQuestions}
             brand={gameTitle}
             isNewRecord={Boolean(result.isNewRecord)}
-            recordLabel={tr ? "Yeni Rekor" : es ? "Nuevo récord" : pt ? "Novo recorde" : de ? "Neuer Rekord" : language === "it" ? "Nuovo record" : "New Record"}
+            recordLabel={tr ? "Yeni Rekor" : es ? "Nuevo récord" : pt ? "Novo recorde" : de ? "Neuer Rekord" : language === "it" ? "Nuovo record" : language === "fr" ? "Nouveau record" : language === "ja" ? "新記録" : "New Record"}
             labels={{
-              accuracy: tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : de ? "Genauigkeit" : language === "it" ? "Precisione" : "Accuracy",
-              correct: tr ? "Doğru" : es ? "Aciertos" : pt ? "Acertos" : de ? "Richtig" : language === "it" ? "Corretto" : "Correct",
-              streak: tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : de ? "Beste Serie" : language === "it" ? "Miglior serie" : "Best streak",
+              accuracy: tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : de ? "Genauigkeit" : language === "it" ? "Precisione" : language === "fr" ? "Précision" : language === "ja" ? "正答率" : "Accuracy",
+              correct: tr ? "Doğru" : es ? "Aciertos" : pt ? "Acertos" : de ? "Richtig" : language === "it" ? "Corretto" : language === "fr" ? "Correct" : language === "ja" ? "正解" : "Correct",
+              streak: tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : de ? "Beste Serie" : language === "it" ? "Miglior serie" : language === "fr" ? "Meilleure série" : language === "ja" ? "最高連続正解" : "Best streak",
             }}
           />
         </View>

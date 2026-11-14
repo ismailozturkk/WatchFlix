@@ -1132,7 +1132,7 @@ export function sharePreview(share) {
     case SHARE_TYPE.CINE_ROOM:
       return i18nText("autoI18n.paylas_cine_daveti", "CineSwipe daveti");
     case SHARE_TYPE.TASTE_MATCH:
-      return i18nText("autoI18n.paylas_zevk_onizleme", "Zevk uyumu %{{n}}", { n: share.score });
+      return i18nText("autoI18n.paylas_zevk_onizleme", "İzleme uyumu %{{n}}", { n: share.score });
     case SHARE_TYPE.CHALLENGE:
       return i18nText("autoI18n.paylas_meydan_onizleme", "Günlük meydan okuma · {{n}} puan", { n: share.score });
     case SHARE_TYPE.DUEL_RESULT:

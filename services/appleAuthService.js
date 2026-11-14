@@ -116,7 +116,9 @@ const ERROR_TEXT = {
     pt: "Entrar com a Apple não está disponível neste dispositivo.",
     de: "Die Anmeldung mit Apple ist auf diesem Gerät nicht verfügbar.",
 
-  it: "L'accesso con Apple non è disponibile su questo dispositivo."},
+  it: "L'accesso con Apple non è disponibile su questo dispositivo.",
+  fr: "La connexion avec Apple n'est pas disponible sur cet appareil.",
+  ja: "この端末ではAppleでサインインを利用できません。"},
   [AppleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce mevcut yönteminle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Apple'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with the existing method, then connect Apple from Settings > Account connections.",
@@ -124,7 +126,9 @@ const ERROR_TEXT = {
     pt: "Já existe uma conta do Seelogd com este e-mail. Entre com seu método atual e depois vincule a Apple em Configurações > Contas vinculadas.",
     de: "Ein Seelogd-Konto verwendet diese E-Mail-Adresse bereits. Melde dich mit der bisherigen Methode an und verknüpfe Apple dann unter Einstellungen > Kontoverknüpfungen.",
 
-  it: "Un account Seelogd utilizza già questa email. Accedi con il metodo esistente, quindi connetti Apple da Impostazioni > Connessioni account."},
+  it: "Un account Seelogd utilizza già questa email. Accedi con il metodo esistente, quindi connetti Apple da Impostazioni > Connessioni account.",
+  fr: "Un compte Seelogd utilise déjà cet e-mail. Connecte-toi avec la méthode existante, puis connecte Apple depuis Réglages > Comptes connectés.",
+  ja: "このメールアドレスはすでにSeelogdアカウントで使われています。既存の方法でサインインしてから、設定 > アカウント連携 でAppleを連携してください。"},
   [AppleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
     tr: "Bu Apple hesabı başka bir Seelogd hesabına bağlı.",
     en: "This Apple account is linked to another Seelogd account.",
@@ -132,7 +136,9 @@ const ERROR_TEXT = {
     pt: "Esta conta da Apple está vinculada a outra conta do Seelogd.",
     de: "Dieses Apple-Konto ist mit einem anderen Seelogd-Konto verknüpft.",
 
-  it: "Questo account Apple è collegato a un altro account Seelogd."},
+  it: "Questo account Apple è collegato a un altro account Seelogd.",
+  fr: "Ce compte Apple est associé à un autre compte Seelogd.",
+  ja: "このAppleアカウントは別のSeelogdアカウントに連携されています。"},
   [AppleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Apple hesabın zaten bağlı.",
     en: "Your Apple account is already connected.",
@@ -140,7 +146,9 @@ const ERROR_TEXT = {
     pt: "Sua conta da Apple já está vinculada.",
     de: "Dein Apple-Konto ist bereits verknüpft.",
 
-  it: "Il tuo account Apple è già connesso."},
+  it: "Il tuo account Apple è già connesso.",
+  fr: "Ton compte Apple est déjà connecté.",
+  ja: "Appleアカウントはすでに連携されています。"},
   [AppleAuthCode.WRONG_ACCOUNT]: {
     tr: "Oturumu açtığın Apple hesabını seç.",
     en: "Choose the Apple account used for this session.",
@@ -148,7 +156,9 @@ const ERROR_TEXT = {
     pt: "Escolha a conta da Apple que você usou nesta sessão.",
     de: "Wähle das Apple-Konto, das für diese Sitzung verwendet wurde.",
 
-  it: "Scegli l'account Apple utilizzato per questa sessione."},
+  it: "Scegli l'account Apple utilizzato per questa sessione.",
+  fr: "Choisis le compte Apple utilisé pour cette session.",
+  ja: "このセッションで使っているAppleアカウントを選んでください。"},
   [AppleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
@@ -156,7 +166,9 @@ const ERROR_TEXT = {
     pt: "Por segurança, saia, entre de novo e tente novamente.",
     de: "Melde dich aus Sicherheitsgründen ab und wieder an und versuche es dann erneut.",
 
-  it: "Per motivi di sicurezza, esci e accedi di nuovo, quindi riprova."},
+  it: "Per motivi di sicurezza, esci e accedi di nuovo, quindi riprova.",
+  fr: "Par sécurité, déconnecte-toi puis reconnecte-toi, puis réessaie.",
+  ja: "セキュリティのため、一度サインアウトして再度サインインしてからお試しください。"},
   [AppleAuthCode.LAST_PROVIDER]: {
     tr: "Apple şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Apple is your only sign-in method and cannot be removed.",
@@ -164,7 +176,9 @@ const ERROR_TEXT = {
     pt: "A Apple agora é seu único método de login e não pode ser removida.",
     de: "Apple ist deine einzige Anmeldemethode und kann nicht entfernt werden.",
 
-  it: "Apple è il tuo unico metodo di accesso e non può essere rimosso."},
+  it: "Apple è il tuo unico metodo di accesso e non può essere rimosso.",
+  fr: "Apple est ta seule méthode de connexion et ne peut pas être retiré.",
+  ja: "Appleは唯一のサインイン方法のため解除できません。"},
   [AppleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
@@ -172,7 +186,9 @@ const ERROR_TEXT = {
     pt: "Não foi possível conectar à rede. Verifique sua conexão.",
     de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
 
-  it: "Impossibile raggiungere la rete. Controlla la tua connessione."},
+  it: "Impossibile raggiungere la rete. Controlla la tua connessione.",
+  fr: "Impossible d'accéder au réseau. Vérifie ta connexion.",
+  ja: "ネットワークに接続できませんでした。接続を確認してください。"},
   [AppleAuthCode.NO_ID_TOKEN]: {
     tr: "Apple kimliğini doğrulayamadı. Lütfen tekrar dene.",
     en: "Apple could not verify your identity. Please try again.",
@@ -180,7 +196,9 @@ const ERROR_TEXT = {
     pt: "A Apple não conseguiu verificar sua identidade. Tente novamente.",
     de: "Apple konnte deine Identität nicht bestätigen. Bitte versuche es erneut.",
 
-  it: "Apple non è riuscita a verificare la tua identità. Per favore riprova."},
+  it: "Apple non è riuscita a verificare la tua identità. Per favore riprova.",
+  fr: "Apple n'a pas pu vérifier ton identité. Réessaie.",
+  ja: "Appleで本人確認ができませんでした。もう一度お試しください。"},
   [AppleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
@@ -188,7 +206,9 @@ const ERROR_TEXT = {
     pt: "Não há nenhuma sessão ativa. Entre novamente.",
     de: "Keine aktive Sitzung. Bitte melde dich erneut an.",
 
-  it: "Nessuna sessione attiva. Accedi di nuovo."},
+  it: "Nessuna sessione attiva. Accedi di nuovo.",
+  fr: "Aucune session active. Reconnecte-toi.",
+  ja: "有効なセッションがありません。もう一度サインインしてください。"},
   [AppleAuthCode.IN_PROGRESS]: {
     tr: "Apple ile giriş zaten sürüyor.",
     en: "Sign in with Apple is already in progress.",
@@ -196,7 +216,9 @@ const ERROR_TEXT = {
     pt: "Já há um login com a Apple em andamento.",
     de: "Die Anmeldung mit Apple läuft bereits.",
 
-  it: "L'accesso con Apple è già in corso."},
+  it: "L'accesso con Apple è già in corso.",
+  fr: "La connexion avec Apple est déjà en cours.",
+  ja: "Appleでのサインインはすでに進行中です。"},
   [AppleAuthCode.REVOCATION_FAILED]: {
     tr: "Apple yetkilendirmesi kaldırılamadı. Lütfen tekrar dene.",
     en: "Apple authorization could not be revoked. Please try again.",
@@ -204,7 +226,9 @@ const ERROR_TEXT = {
     pt: "Não foi possível revogar a autorização da Apple. Tente novamente.",
     de: "Die Apple-Autorisierung konnte nicht widerrufen werden. Bitte versuche es erneut.",
 
-  it: "L'autorizzazione di Apple non può essere revocata. Per favore riprova."},
+  it: "L'autorizzazione di Apple non può essere revocata. Per favore riprova.",
+  fr: "L'autorisation Apple n'a pas pu être révoquée. Réessaie.",
+  ja: "Appleの認証を取り消せませんでした。もう一度お試しください。"},
 };
 
 /**
@@ -222,7 +246,9 @@ export function describeAppleAuthError(error, language = "tr") {
     pt: "Não foi possível concluir a ação. Tente novamente.",
     de: "Die Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
 
-  it: "Impossibile completare l'azione. Per favore riprova."});
+  it: "Impossibile completare l'azione. Per favore riprova.",
+  fr: "L'action n'a pas pu aboutir. Réessaie.",
+  ja: "操作を完了できませんでした。もう一度お試しください。"});
 }
 
 let busy = false;

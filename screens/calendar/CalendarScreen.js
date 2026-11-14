@@ -123,6 +123,27 @@ LocaleConfig.locales.it = {
   today: "Oggi",
 };
 
+LocaleConfig.locales.fr = {
+  monthNames: [
+    "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+  ],
+  monthNamesShort: [
+    "Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin",
+    "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc.",
+  ],
+  dayNames: ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"],
+  dayNamesShort: ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+  today: "Aujourd'hui",
+};
+LocaleConfig.locales.ja = {
+  monthNames: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+  monthNamesShort: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
+  dayNames: ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"],
+  dayNamesShort: ["日", "月", "火", "水", "木", "金", "土"],
+  today: "今日",
+};
+
 // "" = kütüphanenin varsayılanı (İngilizce). YENİ DİL: yukarıya LocaleConfig.locales.<kod> ekle.
 const applyCalendarLocale = (language) => {
   const code = normalizeAppLanguage(language);
@@ -711,7 +732,7 @@ export default function CalendarScreen({ navigation }) {
           markedDates={combinedMarked}
           theme={calendarTheme}
           // Pazar başlangıcı: İngilizce ve Brezilya Portekizcesi; diğerleri Pazartesi.
-          firstDay={["en", "pt"].includes(normalizeAppLanguage(language)) ? 0 : 1}
+          firstDay={["en", "pt", "ja"].includes(normalizeAppLanguage(language)) ? 0 : 1}
           enableSwipeMonths
           hideExtraDays
           renderArrow={(direction) => (
@@ -832,7 +853,7 @@ export default function CalendarScreen({ navigation }) {
           fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" , it: "Aggiorna calendario"})}
+          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" , it: "Aggiorna calendario", fr: "Actualiser le calendrier", ja: "カレンダーを更新"})}
         >
           {isLoadingEvents ? <LensLoader size="small" color={theme.accent} /> : null}
         </GlassIconButton>

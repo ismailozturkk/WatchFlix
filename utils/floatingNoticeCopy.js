@@ -102,7 +102,31 @@ export const FLOATING_NOTICE_COPY = {
       cta: "Guarda i risultati"
     }
   }
-}};
+},
+  fr: {
+    inviteEyebrow: "Invitation", eventEyebrow: "Tournoi",
+    minimize: "Réduire", next: "Notification suivante",
+    bubble: (n) => `${n} notification${n === 1 ? "" : "s"} en attente`, bubbleHint: "Touche pour ouvrir, fais glisser pour la déplacer vers un bord",
+    eventDone: "OK",
+    tournament: {
+      selection: { title: "Un nouveau tournoi a commencé", detail: (theme) => `Thème du mois : ${theme}. Les nominés sont en cours de sélection.`, cta: "Aller au tournoi" },
+      r32: { title: "Le vote du tournoi est ouvert", detail: (theme) => `Les seizièmes de finale du tournoi ${theme} sont en cours.`, cta: "Voir les matchs" },
+      final: { title: "C'est l'heure de la finale", detail: (theme) => `Les derniers votes couronneront le champion ${theme}.`, cta: "Voir la finale" },
+      results: { title: "Le tournoi est terminé", detail: (theme) => `Le champion ${theme} est désigné.`, cta: "Voir les résultats" },
+    },
+  },
+  ja: {
+    inviteEyebrow: "招待", eventEyebrow: "トーナメント",
+    minimize: "最小化", next: "次の通知",
+    bubble: (n) => `保留中の通知${n}件${n === 1 ? "" : ""}`, bubbleHint: "タップで開く、ドラッグで端に移動",
+    eventDone: "OK",
+    tournament: {
+      selection: { title: "新しいトーナメントが始まりました", detail: (theme) => `今月のテーマ:${theme}。候補を選出中です。`, cta: "トーナメントへ" },
+      r32: { title: "トーナメントの投票が始まりました", detail: (theme) => `${theme}トーナメントのベスト32の試合が始まっています。`, cta: "試合を見る" },
+      final: { title: "いよいよ決勝です", detail: (theme) => `最後の投票で${theme}のチャンピオンが決まります。`, cta: "決勝を見る" },
+      results: { title: "トーナメントが終了しました", detail: (theme) => `${theme}のチャンピオンが決まりました。`, cta: "結果を見る" },
+    },
+  }};
 
 export const floatingNoticeCopy = (language) =>
   FLOATING_NOTICE_COPY[copyLanguage(language, Object.keys(FLOATING_NOTICE_COPY))];

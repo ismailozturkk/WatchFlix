@@ -117,9 +117,43 @@ const it = {
   gridView: "Passa alla visualizzazione griglia",
   listView: "Passa alla visualizzazione elenco"
 };
+const fr = {
+  tabs: { movie: "Films", tv: "Séries", actor: "Acteurs" },
+  placeholder: { movie: "Rechercher des films…", tv: "Rechercher des séries…", actor: "Rechercher des acteurs…" },
+  typeLabel: "Type de recherche",
+  categoryLabel: "Découvrir",
+  categories: {
+    popular: "Populaire",
+    upcoming: "À venir",
+    onAir: "En diffusion",
+    topRated: "Les mieux notés",
+    trending: "Tendances",
+  },
+  clear: "Effacer la recherche",
+  gridView: "Passer en vue grille",
+  listView: "Passer en vue liste",
+};
+const ja = {
+  tabs: { movie: "映画", tv: "TV番組", actor: "俳優" },
+  placeholder: { movie: "映画を検索…", tv: "TV番組を検索…", actor: "俳優を検索…" },
+  typeLabel: "検索の種類",
+  categoryLabel: "発見",
+  categories: {
+    popular: "人気",
+    upcoming: "今後",
+    onAir: "放送中",
+    topRated: "高評価",
+    trending: "トレンド",
+  },
+  clear: "検索をクリア",
+  gridView: "グリッド表示に切り替え",
+  listView: "リスト表示に切り替え",
+};
 
 export const SEARCH_HEADER_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSearchHeaderCopy = (language) =>

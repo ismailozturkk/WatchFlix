@@ -241,7 +241,81 @@ export const WATCH_PICKER_COPY = {
     oneSeason: "Una stagione, in poco tempo",
     longRun: "Una serie di lunga durata: {n} stagioni"
   }
-}};
+},
+  fr: {
+    entry: {
+      title: "Que regarder ?",
+      movie: "Film",
+      tv: "Série",
+      empty: "Ajoute d'abord quelque chose à ta liste",
+      filteredNote: "Choix parmi ta liste filtrée",
+      a11yRandom: "Quoi regarder ? Tire un titre au hasard dans ta liste à voir",
+      a11yMovie: "Tire un film au hasard dans ta liste à voir",
+      a11yTv: "Tire une série au hasard dans ta liste à voir",
+    },
+    sheet: {
+      title: "Qu'est-ce que je regarde ?",
+      pool: "Parmi {n} titres",
+      poolFiltered: "Depuis ta liste filtrée · {n} titres",
+      shuffling: "Mélange…",
+      reroll: "Un autre",
+      open: "Voir les détails",
+      history: "Tout juste tiré",
+      cycled: "Tu les as tous vus, on a donc remélangé",
+      emptyType: "Aucun titre de ce type dans ta liste",
+      unreleased: "Pas encore sorti. Tu veux en choisir un autre ?",
+      close: "Fermer",
+      types: { mixed: "Mixte", movie: "Films", tv: "Séries" },
+      kind: { movie: "Film", tv: "Série" },
+      units: { hour: "h", minute: "min", season: "saisons", episode: "épisodes" },
+    },
+    reasons: {
+      waitingMonths: "Attend dans ta liste depuis {n} mois",
+      waitingDays: "Attend dans ta liste depuis {n} jours",
+      fresh: "Tout juste ajouté",
+      shortFilm: "Court : fini en {n} minutes",
+      longFilm: "Un film pour une longue soirée",
+      oneSeason: "Une saison, vite terminée",
+      longRun: "Une série au long cours : {n} saisons",
+    },
+  },
+  ja: {
+    entry: {
+      title: "何を観よう?",
+      movie: "映画",
+      tv: "番組",
+      empty: "まずリストに何か追加してください",
+      filteredNote: "絞り込んだリストから選択",
+      a11yRandom: "何を観よう?ウォッチリストからランダムに1作品選ぶ",
+      a11yMovie: "ウォッチリストからランダムに映画を選ぶ",
+      a11yTv: "ウォッチリストからランダムに番組を選ぶ",
+    },
+    sheet: {
+      title: "何を観よう?",
+      pool: "{n}作品の中から",
+      poolFiltered: "絞り込んだリストから · {n}作品",
+      shuffling: "シャッフル中…",
+      reroll: "別のを",
+      open: "詳細へ",
+      history: "今引いたもの",
+      cycled: "すべて出たので、もう一度シャッフルしました",
+      emptyType: "リストにこの種類の作品はありません",
+      unreleased: "まだ公開されていません。別のを選びますか?",
+      close: "閉じる",
+      types: { mixed: "ミックス", movie: "映画", tv: "TV番組" },
+      kind: { movie: "映画", tv: "番組" },
+      units: { hour: "時間", minute: "分", season: "シーズン", episode: "話" },
+    },
+    reasons: {
+      waitingMonths: "リストで{n}か月待っています",
+      waitingDays: "リストで{n}日待っています",
+      fresh: "追加したばかり",
+      shortFilm: "短め:{n}分で観終わります",
+      longFilm: "長い夜向けの映画",
+      oneSeason: "1シーズンですぐ観終わる",
+      longRun: "長寿シリーズ:{n}シーズン",
+    },
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getWatchPickerCopy = (language) =>

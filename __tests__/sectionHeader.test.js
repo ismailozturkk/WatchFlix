@@ -72,7 +72,7 @@ describe("SectionHeader — kimlik", () => {
     expect(texts(render(<SectionHeader section="nowPlaying" mediaType="movie" title="X" />))[1]).toBe(
       "En cines ahora mismo",
     );
-    mockLanguage = "fr";
+    mockLanguage = "ko";
     expect(texts(render(<SectionHeader section="nowPlaying" mediaType="movie" title="X" />))[1]).toBe(
       "In cinemas right now",
     );

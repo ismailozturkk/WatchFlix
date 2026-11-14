@@ -44,7 +44,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const {
     loading,
     kare,
@@ -156,7 +156,9 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
               pt: `Ato ${perde.perde}, ${perdeAdi}. Emblemas`,
               de: `Akt ${perde.perde}, ${perdeAdi}. Abzeichen`,
 
-  it: `Agisci ${perde.perde}, ${perdeAdi}. Distintivi`}),
+  it: `Agisci ${perde.perde}, ${perdeAdi}. Distintivi`,
+  fr: `Acte ${perde.perde}, ${perdeAdi}. Badges`,
+  ja: `第${perde.perde}幕、${perdeAdi}。バッジ`}),
             activeOpacity: 0.85,
             onPress,
           }

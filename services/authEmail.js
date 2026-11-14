@@ -21,7 +21,7 @@ import { normalizeAppLanguage } from "../utils/appLanguages";
 import { fillAuthEmailText, getAuthEmailCopy } from "../utils/authEmailCopy";
 
 /** Uygulama dili → Firebase şablon dili. Brezilya Portekizcesi `pt-BR`. */
-const FIREBASE_LANGUAGE = Object.freeze({ tr: "tr", en: "en", es: "es", pt: "pt-BR", de: "de" , it: "en"});
+const FIREBASE_LANGUAGE = Object.freeze({ tr: "tr", en: "en", es: "es", pt: "pt-BR", de: "de" , it: "en", fr: "fr", ja: "ja"});
 
 export const authLanguageCode = (language) => FIREBASE_LANGUAGE[normalizeAppLanguage(language)] || "en";
 

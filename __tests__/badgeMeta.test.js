@@ -457,8 +457,8 @@ describe("v2 bolumleri", () => {
   test("Baslangic ekranin en ustunde, Baglilik ritimden hemen sonra", () => {
     expect(BOLUM_SIRA[0]).toBe(BOLUM.BASLANGIC);
     expect(BOLUM_SIRA.indexOf(BOLUM.BAGLILIK)).toBe(BOLUM_SIRA.indexOf(BOLUM.RITIM) + 1);
-    expect(BOLUM_BASLIK.baslangic).toEqual({ tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos", pt: "Primeiros passos", de: "Erste Schritte", it: "Per iniziare" });
-    expect(BOLUM_BASLIK.baglilik).toEqual({ tr: "Bağlılık", en: "Devotion", es: "Fidelidad", pt: "Dedicação", de: "Treue", it: "Dedizione" });
+    expect(BOLUM_BASLIK.baslangic).toEqual({ tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos", pt: "Primeiros passos", de: "Erste Schritte", it: "Per iniziare", fr: "Premiers pas", ja: "はじめの一歩" });
+    expect(BOLUM_BASLIK.baglilik).toEqual({ tr: "Bağlılık", en: "Devotion", es: "Fidelidad", pt: "Dedicação", de: "Treue", it: "Dedizione", fr: "Dévouement", ja: "献身" });
   });
 
   test("bolum basliklari ekranin i18n anahtarlariyla ayni (tr/en/es JSON'da var)", () => {

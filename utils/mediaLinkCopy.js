@@ -48,7 +48,21 @@ export const MEDIA_LINK_COPY = {
   emptyClipboard: "Non è presente alcun collegamento IMDb o TMDB negli appunti",
   notFound: "Impossibile trovare il titolo per questo collegamento",
   clipboardFailed: "Impossibile leggere gli appunti"
-}};
+},
+  fr: {
+    pasteLabel: "Ouvrir le lien de film ou de série du presse-papiers",
+    opening: "Ouverture du lien…",
+    emptyClipboard: "Aucun lien IMDb ou TMDB dans le presse-papiers",
+    notFound: "Impossible de trouver le titre de ce lien",
+    clipboardFailed: "Impossible de lire le presse-papiers",
+  },
+  ja: {
+    pasteLabel: "クリップボードの映画・番組のリンクを開く",
+    opening: "リンクを開いています…",
+    emptyClipboard: "クリップボードにIMDbやTMDBのリンクがありません",
+    notFound: "このリンクの作品が見つかりませんでした",
+    clipboardFailed: "クリップボードを読み取れませんでした",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getMediaLinkCopy = (language) =>

@@ -61,7 +61,25 @@ export const EXTERNAL_ENTRY_COPY = {
   shareOpening: "Collegamento di apertura...",
   shareUnrecognized: "Non sono riuscito a trovare un film o un programma in questo collegamento. Condividi un collegamento IMDb o TMDB.",
   shareNotFound: "Impossibile trovare il titolo per questo collegamento"
-}};
+},
+  fr: {
+    search: "Rechercher",
+    upnext: "À suivre",
+    reminders: "Rappels",
+    lists: "Mes listes",
+    shareOpening: "Ouverture du lien…",
+    shareUnrecognized: "Je n'ai trouvé ni film ni série dans ce lien. Partage un lien IMDb ou TMDB.",
+    shareNotFound: "Impossible de trouver le titre de ce lien",
+  },
+  ja: {
+    search: "検索",
+    upnext: "次はこちら",
+    reminders: "リマインダー",
+    lists: "マイリスト",
+    shareOpening: "リンクを開いています…",
+    shareUnrecognized: "このリンクに映画や番組が見つかりませんでした。IMDbかTMDBのリンクをシェアしてください。",
+    shareNotFound: "このリンクの作品が見つかりませんでした",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getExternalEntryCopy = (language) =>

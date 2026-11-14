@@ -27,9 +27,10 @@ const foldGenreName = (value) =>
   String(value || "")
     .replace(/[İIı]/g, "i")
     .toLowerCase()
-    .normalize("NFD")
+    .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    // Japonca: kana + ayrışmış (han)dakuten işaretleri + kanji korunur; yoksa "ドラマ" boş string olur.
+    .replace(/[^a-z0-9\u3040-\u30ff\u3099\u309a\u4e00-\u9fff]+/g, " ")
     .trim();
 
 // Kanonik küme: 20 id. TMDB'nin 19 film + 16 dizi türü buraya düşer.
@@ -45,39 +46,40 @@ const GENRE_IDS = Object.freeze([
   "thriller", "war", "western", "reality", "tvmovie",
 ]);
 
-// id → katlanmış ad varyantları (TR + EN + ES + PT + DE). Aynı id'ye birden çok ad düşebilir.
+// id → ad varyantları (TR + EN + ES + PT + DE + IT + FR + JA); tablo kurulurken foldGenreName ile katlanır. Aynı id'ye birden çok ad düşebilir.
 // YENİ DİL: o dilin TMDB tür adlarını (film + dizi, bölgesel varyantlar dahil) buraya
 // ekle — yoksa tür "other" kovasına düşer ve tür puanı/rozetleri sessizce bozulur.
 const ALIASES = {
-  action: ["action", "aksiyon", "action adventure", "aksiyon macera", "accion", "accion y aventura", "acao", "acao e aventura", "azione", "azione e avventura"],
-  adventure: ["adventure", "macera", "aventura", "abenteuer"],
-  animation: ["animation", "animasyon", "animacion", "animacao"],
-  comedy: ["comedy", "komedi", "comedia", "komodie", "commedia"],
-  crime: ["crime", "suc", "crimen", "krimi", "crimine"],
-  documentary: ["documentary", "belgesel", "news", "haber", "documental", "noticias", "documentario", "dokumentarfilm", "nachrichten"],
-  drama: ["drama", "dram", "soap", "pembe dizi", "telenovela", "novela", "seifenoper", "dramma"],
-  family: ["family", "aile", "kids", "cocuk", "familia", "infantil", "familie", "kinder", "famiglia", "bambini"],
-  fantasy: ["fantasy", "fantastik", "fantezi", "fantasia"],
-  history: ["history", "tarih", "historia", "historie", "geschichte", "storia"],
-  horror: ["horror", "korku", "terror", "orrore"],
-  music: ["music", "muzik", "musica", "musik"],
-  mystery: ["mystery", "gizem", "misterio", "mistero"],
-  romance: ["romance", "romantik", "romantizm", "liebesfilm", "romanze"],
+  action: ["action", "aksiyon", "action adventure", "aksiyon macera", "accion", "accion y aventura", "acao", "acao e aventura", "azione", "azione e avventura", "action et aventure", "アクション", "アクション&アドベンチャー"],
+  adventure: ["adventure", "macera", "aventura", "abenteuer", "aventure", "アドベンチャー", "冒険"],
+  animation: ["animation", "animasyon", "animacion", "animacao", "アニメーション", "アニメ"],
+  comedy: ["comedy", "komedi", "comedia", "komodie", "commedia", "comedie", "コメディ", "コメディー"],
+  crime: ["crime", "suc", "crimen", "krimi", "crimine", "犯罪"],
+  documentary: ["documentary", "belgesel", "news", "haber", "documental", "noticias", "documentario", "dokumentarfilm", "nachrichten", "documentaire", "ドキュメンタリー", "ニュース"],
+  drama: ["drama", "dram", "soap", "pembe dizi", "telenovela", "novela", "seifenoper", "dramma", "drame", "ドラマ", "ソープ", "メロドラマ"],
+  family: ["family", "aile", "kids", "cocuk", "familia", "infantil", "familie", "kinder", "famiglia", "bambini", "familial", "ファミリー", "家族", "キッズ", "子供向け"],
+  fantasy: ["fantasy", "fantastik", "fantezi", "fantasia", "fantastique", "ファンタジー"],
+  history: ["history", "tarih", "historia", "historie", "geschichte", "storia", "histoire", "歴史", "履歴"],
+  horror: ["horror", "korku", "terror", "orrore", "horreur", "ホラー"],
+  music: ["music", "muzik", "musica", "musik", "musique", "音楽", "ミュージック"],
+  mystery: ["mystery", "gizem", "misterio", "mistero", "mystere", "ミステリー", "ミステリ", "謎"],
+  romance: ["romance", "romantik", "romantizm", "liebesfilm", "romanze", "ロマンス", "恋愛"],
   scifi: [
     "science fiction", "bilim kurgu", "sci fi fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "scifi", "sci fi",
     "ciencia ficcion", "ciencia ficcion y fantasia", "ficcao cientifica", "ficcao cientifica e fantasia",
-    "fantascienza", "fantascienza e fantasy",
+    "fantascienza", "fantascienza e fantasy", "science fiction fantastique",
+      "SF", "サイエンスフィクション", "サイエンス・フィクション", "空想科学", "SF&ファンタジー",
   ],
-  thriller: ["thriller", "gerilim", "suspense", "suspenso"],
-  war: ["war", "savas", "war politics", "savas politika", "belica", "belica y politica", "guerra", "guerra e politica", "kriegsfilm", "krieg"],
-  western: ["western", "vahsi bati", "kovboy", "faroeste"],
-  reality: ["reality", "realite", "talk", "program", "talk show", "programa de entrevistas"],
-  tvmovie: ["tv movie", "tv film", "tv filmi", "pelicula de tv", "cine tv", "cinema tv", "filme para tv", "telefilme", "film tv"],
+  thriller: ["thriller", "gerilim", "suspense", "suspenso", "スリラー", "サスペンス"],
+  war: ["war", "savas", "war politics", "savas politika", "belica", "belica y politica", "guerra", "guerra e politica", "kriegsfilm", "krieg", "guerre", "guerre politique", "guerre et politique", "戦争", "戦争&政治"],
+  western: ["western", "vahsi bati", "kovboy", "faroeste", "西部劇", "西洋", "ウエスタン"],
+  reality: ["reality", "realite", "talk", "program", "talk show", "programa de entrevistas", "リアリティ", "リアリティー", "トーク", "トークショー"],
+  tvmovie: ["tv movie", "tv film", "tv filmi", "pelicula de tv", "cine tv", "cinema tv", "filme para tv", "telefilme", "film tv", "telefilm", "テレビ映画", "TV映画", "テレビムービー"],
 };
 
 const LOOKUP = new Map();
 for (const id of Object.keys(ALIASES)) {
-  for (const alias of ALIASES[id]) LOOKUP.set(alias, id);
+  for (const alias of ALIASES[id]) LOOKUP.set(foldGenreName(alias), id);
 }
 
 /**
@@ -99,16 +101,17 @@ function kanonikTur(name) {
 // dizideki "Aksiyon & Macera" filmdeki "Macera" ile de eşleşsin.
 const COMPOSITE_PARTS = new Map();
 for (const [aliases, parts] of [
-  [["action adventure", "aksiyon macera", "accion y aventura", "acao e aventura", "action abenteuer", "azione e avventura"], ["action", "adventure"]],
+  [["action adventure", "aksiyon macera", "accion y aventura", "acao e aventura", "action abenteuer", "azione e avventura", "action et aventure", "アクション&アドベンチャー"], ["action", "adventure"]],
   [
     [
       "sci fi fantasy", "science fiction fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "bilim kurgu fantastik",
-      "ciencia ficcion y fantasia", "ficcao cientifica e fantasia", "fantascienza e fantasy",
+      "ciencia ficcion y fantasia", "ficcao cientifica e fantasia", "fantascienza e fantasy", "science fiction fantastique",
+      "SF&ファンタジー", "SF & ファンタジー", "サイエンスフィクション&ファンタジー",
     ],
     ["scifi", "fantasy"],
   ],
 ]) {
-  for (const alias of aliases) COMPOSITE_PARTS.set(alias, parts);
+  for (const alias of aliases) COMPOSITE_PARTS.set(foldGenreName(alias), parts);
 }
 
 /**

@@ -67,7 +67,27 @@ export const RATING_DISTRIBUTION_COPY = {
   emptyOwn: "La tua diffusione di valutazioni prende forma qui mentre valuti",
   a11y: (count, average) => `Diffusione di valutazioni: ${count} valutazioni, media ${average} stelle`,
   a11yStep: (stars, n) => `${stars} stelle: ${n} valutazioni`
-}};
+},
+  fr: {
+    title: "Répartition des notes",
+    count: (n, shown = n) => `${shown} ${n === 1 ? "rating" : "ratings"}`,
+    average: "moyenne",
+    mostCommon: "le plus",
+    share: (pct) => `${pct}%`,
+    emptyOwn: "La répartition de tes notes prend forme ici à mesure que tu notes",
+    a11y: (count, average) => `Répartition des notes : ${count} notes, moyenne ${average} étoiles`,
+    a11yStep: (stars, n) => `${stars} étoiles : ${n} notes`,
+  },
+  ja: {
+    title: "評価の分布",
+    count: (n, shown = n) => `${shown} ${n === 1 ? "rating" : "ratings"}`,
+    average: "平均",
+    mostCommon: "最多",
+    share: (pct) => `${pct}%`,
+    emptyOwn: "評価するほど、ここに評価の分布ができていきます",
+    a11y: (count, average) => `評価の分布:${count}件の評価、平均${average}つ星`,
+    a11yStep: (stars, n) => `${stars}つ星:${n}件`,
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getRatingDistributionCopy = (language) =>

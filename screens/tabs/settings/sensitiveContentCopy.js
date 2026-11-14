@@ -99,9 +99,41 @@ const it = {
   },
   note: "La corrispondenza utilizza parole chiave, generi e descrizioni TMDB, quindi alcuni titoli potrebbero sfuggire. I tuoi elenchi e le pagine che apri direttamente non sono interessati."
 };
+const fr = {
+  title: "Contenu sensible",
+  rowAllHidden: "Tout masqué",
+  rowSomeShown: "{n} catégories affichées",
+  intro:
+    "Les catégories activées apparaissent dans la découverte, la recherche, les recommandations et les rangées. Les catégories désactivées sont masquées. Toutes sont désactivées par défaut.",
+  categories: {
+    adult: ["Contenu pour adultes (18+)", "Contenu sexuel et titres classés 18+"],
+    drugs: ["Drogues et consommation de substances", "Titres sur la drogue, l'addiction et les cartels"],
+    gore: ["Gore et brutalité", "Titres avec du sang, de la torture et de la brutalité explicites"],
+    war: ["Guerre", "Films et séries du genre guerre"],
+  },
+  note:
+    "La détection utilise les mots-clés, genres et descriptions TMDB, donc certains titres peuvent passer à travers. Tes propres listes et les pages ouvertes directement ne sont pas affectées.",
+};
+const ja = {
+  title: "センシティブなコンテンツ",
+  rowAllHidden: "すべて非表示",
+  rowSomeShown: "{n}カテゴリを表示中",
+  intro:
+    "オンにしたカテゴリは、発見、検索、おすすめ、レールに表示されます。オフのものは非表示になります。デフォルトはすべてオフです。",
+  categories: {
+    adult: ["成人向けコンテンツ(18+)", "性的なコンテンツと18+指定の作品"],
+    drugs: ["薬物と物質使用", "薬物、依存症、カルテルを扱う作品"],
+    gore: ["流血と残虐描写", "生々しい流血、拷問、残虐描写のある作品"],
+    war: ["戦争", "戦争ジャンルの映画と番組"],
+  },
+  note:
+    "判定にはTMDBのキーワード、ジャンル、説明を使うため、一部の作品はすり抜ける場合があります。自分のリストや直接開いたページには影響しません。",
+};
 
 export const SENSITIVE_CONTENT_COPY = Object.freeze({ tr, en, es, pt, de ,
-  it: it});
+  it: it,
+  fr,
+  ja});
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSensitiveContentCopy = (language) =>

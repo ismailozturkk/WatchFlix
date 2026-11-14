@@ -298,13 +298,13 @@ export function prestijBilgisi(kart) {
 // Prestij adımının BİRİM adı. Süre ailesi (`sure`) burada yok: onun birimi çeviriciden
 // (dk/sa/gün) geliyor ve formatBadgeDeger zaten ekliyor.
 const PRESTIJ_EK = Object.freeze({
-  film: { tr: "film", en: "films", es: "películas", pt: "filmes", de: "Filme" , it: "film"},
-  bolum: { tr: "bölüm", en: "episodes", es: "episodios", pt: "episódios", de: "Folgen" , it: "episodi"},
-  final: { tr: "dizi", en: "series", es: "series", pt: "séries", de: "Serien" , it: "serie"},
-  gun: { tr: "gün", en: "days", es: "días", pt: "dias", de: "Tage" , it: "giorni"},
-  uzunMetraj: { tr: "uzun film", en: "long films", es: "películas largas", pt: "filmes longos", de: "lange Filme" , it: "film lunghi"},
+  film: { tr: "film", en: "films", es: "películas", pt: "filmes", de: "Filme" , it: "film", fr: "films", ja: "本の映画"},
+  bolum: { tr: "bölüm", en: "episodes", es: "episodios", pt: "episódios", de: "Folgen" , it: "episodi", fr: "épisodes", ja: "話"},
+  final: { tr: "dizi", en: "series", es: "series", pt: "séries", de: "Serien" , it: "serie", fr: "séries", ja: "本のドラマ"},
+  gun: { tr: "gün", en: "days", es: "días", pt: "dias", de: "Tage" , it: "giorni", fr: "jours", ja: "日"},
+  uzunMetraj: { tr: "uzun film", en: "long films", es: "películas largas", pt: "filmes longos", de: "lange Filme" , it: "film lunghi", fr: "longs films", ja: "本の長編映画"},
 });
-export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"])] || "";
+export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"])] || "";
 
 /**
  * Rozeti bir kart listesinde bulur: kartın kendi id'si ya da kademeli ailenin
@@ -362,7 +362,7 @@ export function rozetAramaEslesirMi(kart, sorgu, lang = "tr") {
   if (!kart) return false;
   if (gizliKilitli(kart)) return false;
 
-  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it"]);
+  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const adayMetinler = [
     badgeAd(kart, code),
     badgeAciklama(kart, code),

@@ -24,6 +24,7 @@ export const BETA_FEATURE_IDS = Object.freeze([
   "profile_banner", // Profil kapağı
   "app_icon", // Uygulama simgesi seçici
   "streak_flame", // Haftalık seri alevi (ayrıntı sayfası)
+  "match", // Uyum Çemberleri (Hub kartı, Ayarlar satırı, katılım ekranı)
 ]);
 
 const BETA_SET = new Set(BETA_FEATURE_IDS);

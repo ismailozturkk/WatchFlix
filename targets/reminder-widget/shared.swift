@@ -23,7 +23,7 @@ func loadLanguage() -> String {
 /// AYNI): bilinmeyen dil → İNGİLİZCE; kayıt yoksa eski davranış korunur ("tr").
 /// YENİ DİL: `widgetSupportedLanguages`'e kodu ekle ve her widgetPick(...) çağrısına
 /// metni ver.
-let widgetSupportedLanguages: Set<String> = ["tr", "es", "pt", "de", "it"]
+let widgetSupportedLanguages: Set<String> = ["tr", "es", "pt", "de", "it", "fr", "ja"]
 
 func widgetLanguage() -> String {
   let raw = loadLanguage().trimmingCharacters(in: .whitespaces).lowercased()
@@ -31,13 +31,15 @@ func widgetLanguage() -> String {
   return widgetSupportedLanguages.contains(base) ? base : "en"
 }
 
-func widgetPick(_ lang: String, tr: String, en: String, es: String, pt: String, de: String, it: String) -> String {
+func widgetPick(_ lang: String, tr: String, en: String, es: String, pt: String, de: String, it: String, fr: String, ja: String) -> String {
   switch lang {
   case "tr": return tr
   case "es": return es
   case "pt": return pt
   case "de": return de
   case "it": return it
+  case "fr": return fr
+  case "ja": return ja
   default: return en
   }
 }

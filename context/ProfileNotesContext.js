@@ -60,7 +60,9 @@ export const ProfileNotesProvider = ({ children }) => {
           pt: "Criar lembretes é um benefício Premium",
           de: "Erinnerungen zu setzen ist ein Premium-Vorteil",
 
-  it: "L'impostazione dei promemoria è un vantaggio Premium"}),
+  it: "L'impostazione dei promemoria è un vantaggio Premium",
+  fr: "Les rappels sont un avantage Premium",
+  ja: "リマインダーの設定はPremium特典です"}),
       });
       return false;
     }
@@ -294,7 +296,9 @@ export const ProfileNotesProvider = ({ children }) => {
                 pt: "Você atingiu seu limite de tarefas",
                 de: "Du hast dein Aufgaben-Limit erreicht",
 
-  it: "Hai raggiunto il limite di cose da fare"}
+  it: "Hai raggiunto il limite di cose da fare",
+  fr: "Tu as atteint ta limite de tâches",
+  ja: "ToDoの上限に達しました"}
             : {
                 tr: "Not limitin doldu",
                 en: "You've reached your notes limit",
@@ -302,7 +306,9 @@ export const ProfileNotesProvider = ({ children }) => {
                 pt: "Você atingiu seu limite de notas",
                 de: "Du hast dein Notizen-Limit erreicht",
 
-  it: "Hai raggiunto il limite di note"},
+  it: "Hai raggiunto il limite di note",
+  fr: "Tu as atteint ta limite de notes",
+  ja: "メモの上限に達しました"},
         ),
       });
       return false;

@@ -105,7 +105,41 @@ export const GAME_BOARDS_COPY = {
   overallNote: "I punteggi dei giochi utilizzano scale diverse, quindi non vengono sommati; conta solo il tuo posto in ogni partita. La parte superiore" + RANK_POINTS_MAX + "i giocatori di ogni gioco guadagnano punti.",
   quickNote: "Il tuo record in questo gioco viene pubblicato al termine della partita (dopo la partita successiva se hai giocato offline). In Poster sfocato il punteggio corrisponde al totale dei tuoi punti.",
   posterNote: "Il tabellone Poster Puzzle utilizza i risultati Classico + Normale; i giochi della lista personale non hanno effetto."
-}};
+},
+  fr: {
+    overall: "Général",
+    overallSubtitle: "Classement sur tous les jeux",
+    gameSubtitle: (title) => `Classement ${title}`,
+    overallMeta: (games, firsts) => `${games} ${games === 1 ? "game" : "games"}${firsts ? ` · ${firsts} ${firsts === 1 ? "first place" : "first places"}` : ""}`,
+    correctMeta: (n) => `${n} correctes`,
+    partial: "Certains classements n'ont pas pu être chargés ; le classement général peut être incomplet.",
+    overallRules: [
+      "Ta place dans le classement de chaque jeu rapporte des points : la 1re place rapporte " + RANK_POINTS_MAX + ", la 2e " + (RANK_POINTS_MAX - 1) + "… " + RANK_POINTS_MAX + "e place rapporte 1.",
+      "Ton score général est la somme des points de tous les jeux.",
+      "Les joueurs à égalité partagent la même place et les mêmes points.",
+      "En cas d'égalité au score général, le plus de premières places l'emporte, puis le classement dans le plus de jeux.",
+    ],
+    overallNote: "Les scores des jeux utilisent des échelles différentes, ils ne s'additionnent donc pas ; seule ta place dans chaque jeu compte. Les " + RANK_POINTS_MAX + " premiers joueurs de chaque jeu gagnent des points.",
+    quickNote: "Ton record dans ce jeu est publié à la fin d'une partie (après ta prochaine partie si tu as joué hors ligne). Dans Affiche floue, le score est ton total de points.",
+    posterNote: "Le classement du Puzzle d'affiche utilise les résultats Classique + Normal ; les parties sur des listes personnelles ne comptent pas.",
+  },
+  ja: {
+    overall: "総合",
+    overallSubtitle: "全ゲームのランキング",
+    gameSubtitle: (title) => `${title}のランキング`,
+    overallMeta: (games, firsts) => `${games} ${games === 1 ? "game" : "games"}${firsts ? ` · ${firsts} ${firsts === 1 ? "first place" : "first places"}` : ""}`,
+    correctMeta: (n) => `${n}問正解`,
+    partial: "一部のランキングを読み込めなかったため、総合ランキングが不完全な可能性があります。",
+    overallRules: [
+      "各ゲームのランキングでの順位に応じてポイントを獲得:1位は" + RANK_POINTS_MAX + "、2位は" + (RANK_POINTS_MAX - 1) + "… " + RANK_POINTS_MAX + "位は1。",
+      "総合スコアは全ゲームのポイントの合計です。",
+      "同点のプレイヤーは同じ順位とポイントになります。",
+      "総合スコアが同点の場合は、1位の数が多い方、次にランクインしたゲーム数が多い方が上位です。",
+    ],
+    overallNote: "ゲームごとにスコアの尺度が違うため合算はせず、各ゲームでの順位だけを数えます。各ゲームの上位" + RANK_POINTS_MAX + "人のプレイヤーがポイントを獲得します。",
+    quickNote: "このゲームでの記録はゲーム終了時に投稿されます(オフラインでプレイした場合は次のゲーム後)。ぼやけたポスターでは合計ポイントがスコアになります。",
+    posterNote: "ポスターパズルのランキングはクラシック+ノーマルの結果を使います。個人リストのゲームは影響しません。",
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getGameBoardsCopy = (language) => GAME_BOARDS_COPY[copyLanguage(language, Object.keys(GAME_BOARDS_COPY))];

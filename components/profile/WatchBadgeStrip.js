@@ -43,7 +43,7 @@ const KOMPAKT_ROZET_BOYUT = 30;
 function WatchBadgeStrip({ progress, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const copy = getBadgeShowcaseCopy(lang);
   const { loading, kartlar, acikSayisi, toplamRozet } = progress || {};
   const { showcaseIds, toggleBadge, isShowcased } = useBadgeShowcase();
@@ -101,7 +101,9 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
             pt: "Todos os emblemas",
             de: "Alle Abzeichen",
 
-  it: "Tutti i distintivi"})}
+  it: "Tutti i distintivi",
+  fr: "Tous les badges",
+  ja: "すべてのバッジ"})}
           onPress={onPress}
           style={[
             styles.hepsi,

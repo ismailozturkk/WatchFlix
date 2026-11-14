@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Autorise l'app à enregistrer dans ta photothèque l'image de la story que tu as créée.",
+    "NSPhotoLibraryAddUsageDescription": "Autorise l'app à enregistrer dans ta photothèque l'image de la story que tu as créée.",
+    "NSCalendarsUsageDescription": "Autorise l'accès au calendrier pour ajouter et supprimer des rappels de films, de séries et de notes.",
+    "NSCalendarsFullAccessUsageDescription": "Autorise l'accès au calendrier pour ajouter et supprimer des rappels de films, de séries et de notes.",
+    "NSFaceIDUsageDescription": "Autorise Seelogd à utiliser Face ID pour l'authentification."
+  }
+}

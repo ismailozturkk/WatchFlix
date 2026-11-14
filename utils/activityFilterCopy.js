@@ -170,9 +170,53 @@ const it = {
     bookmark: "Salvato"
   }
 };
+const fr = {
+  search: "Rechercher dans cet onglet…",
+  filter: "Filtrer",
+  all: "Tout",
+  noMatch: "Rien ne correspond à ta recherche ou à tes filtres",
+  clear: "Effacer les filtres",
+  sections: { kind: "TYPE", score: "NOTE", date: "DATE", postType: "TYPE DE PUBLICATION", action: "INTERACTION" },
+  sorts: { date: "Date", score: "Score", name: "Prénom", likes: "J'aime", comments: "Commentaires" },
+  kinds: { movie: "Film", tv: "Séries", post: "Publication", list: "Liste", story: "Histoire" },
+  scores: { 10: "10", 9: "9", 8: "8", 7: "7", 6: "6", "5-": "5 et moins" },
+  dates: { week: "7 derniers jours", month: "30 derniers jours", year: "L'année dernière", older: "Plus anciens" },
+  postTypes: {
+    review: "Critique",
+    list: "Liste",
+    text: "Talk-show",
+    poll: "Sondage",
+    tierlist: "Tier list",
+    tvgraph: "Graphique des épisodes",
+  },
+  actions: { like: "J'aime", bookmark: "Enregistré" },
+};
+const ja = {
+  search: "このタブを検索…",
+  filter: "絞り込み",
+  all: "すべて",
+  noMatch: "検索や絞り込みに一致するものはありません",
+  clear: "絞り込みを解除",
+  sections: { kind: "TYPE", score: "スコア", date: "日付", postType: "投稿の種類", action: "交流" },
+  sorts: { date: "日付", score: "スコア", name: "名", likes: "いいね", comments: "コメント" },
+  kinds: { movie: "映画", tv: "シリーズ", post: "投稿", list: "リスト", story: "ストーリー" },
+  scores: { 10: "10", 9: "9", 8: "8", 7: "7", 6: "6", "5-": "5以下" },
+  dates: { week: "過去7日", month: "過去30日", year: "昨年", older: "それ以前" },
+  postTypes: {
+    review: "レビュー",
+    list: "リスト",
+    text: "トーク",
+    poll: "投票",
+    tierlist: "ティアリスト",
+    tvgraph: "エピソードグラフ",
+  },
+  actions: { like: "いいね", bookmark: "保存済み" },
+};
 
 export const ACTIVITY_FILTER_COPY = { tr, en, es, pt, de ,
-  it: it};
+  it: it,
+  fr,
+  ja};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getActivityFilterCopy = (language) =>

@@ -192,7 +192,7 @@ describe("planImport — değerler", () => {
     ["theme", "custom:"],
     ["theme", "custom:../../x"],
     ["theme", 5],
-    ["language", "fr"],
+    ["language", "ko"],
     ["listsGridColumns", 7],
     ["listsGridColumns", "3"],
     ["listsPosterRadius", 11],

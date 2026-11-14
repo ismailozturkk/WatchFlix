@@ -26,13 +26,13 @@ describe("cihazDilindenSec", () => {
     expect(cihazDilindenSec([locale("es_MX")])).toBe("es");
     expect(cihazDilindenSec([locale("es"), locale("tr")])).toBe("es");
     // Birinci dil desteklenmiyorsa listede ilerideki "es" onu kurtarmaz.
-    expect(cihazDilindenSec([locale("fr"), locale("es")])).toBe("en");
+    expect(cihazDilindenSec([locale("ko"), locale("es")])).toBe("en");
   });
 
   it("desteklenmeyen dil yedek dile düşer (Türkçe'ye DEĞİL)", () => {
-    expect(cihazDilindenSec([locale("fr")])).toBe("en");
+    expect(cihazDilindenSec([locale("ko")])).toBe("en");
     expect(cihazDilindenSec([locale("ar")])).toBe("en");
-    expect(cihazDilindenSec([locale("ja")])).toBe("en");
+    expect(cihazDilindenSec([locale("ko")])).toBe("en");
   });
 
   it("yalnız ilk tercih dikkate alınır", () => {
@@ -40,7 +40,7 @@ describe("cihazDilindenSec", () => {
     expect(cihazDilindenSec([locale("en"), locale("tr")])).toBe("en");
     expect(cihazDilindenSec([locale("tr"), locale("en")])).toBe("tr");
     // Birinci dil desteklenmiyorsa listede ilerideki "tr" onu kurtarmaz.
-    expect(cihazDilindenSec([locale("fr"), locale("tr")])).toBe("en");
+    expect(cihazDilindenSec([locale("ko"), locale("tr")])).toBe("en");
   });
 
   it("bölgeli etiketler kısaltılır", () => {

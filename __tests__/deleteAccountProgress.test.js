@@ -51,7 +51,7 @@ describe("ilerleme metinleri", () => {
   const languages = Object.keys(DELETE_ACCOUNT_COPY);
 
   it("altı dil de var", () => {
-    expect(languages.sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
+    expect(languages.sort()).toEqual(["de", "en", "es", "fr", "it", "ja", "pt", "tr"]);
   });
 
   it.each(languages)("%s: her aşamanın (yedek dahil) etiketi dolu", (language) => {
@@ -80,6 +80,6 @@ describe("ilerleme metinleri", () => {
   });
 
   it("bilinmeyen dil İngilizce'ye düşer", () => {
-    expect(getDeleteAccountCopy("fr")).toBe(DELETE_ACCOUNT_COPY.en);
+    expect(getDeleteAccountCopy("ko")).toBe(DELETE_ACCOUNT_COPY.en);
   });
 });

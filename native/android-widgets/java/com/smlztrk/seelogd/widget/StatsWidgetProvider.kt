@@ -98,7 +98,7 @@ class StatsWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(
         R.id.stats_widget_title,
         stats?.optString("title")?.takeIf { it.isNotBlank() }
-          ?: WidgetLanguage.pick(lang, "İstatistikler", "Statistics", "Estadísticas", "Estatísticas", "Statistik", "Statistiche"),
+          ?: WidgetLanguage.pick(lang, "İstatistikler", "Statistics", "Estadísticas", "Estatísticas", "Statistik", "Statistiche", "Statistiques", "統計"),
       )
       views.setTextColor(R.id.stats_widget_title, appearance.text)
 

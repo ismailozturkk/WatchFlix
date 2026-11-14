@@ -30,7 +30,7 @@ import {
 const buildStages = (lang) => [
   {
     key: "selection", icon: "checkbox", roundIndex: null,
-    label: lang === "tr" ? "Seçim" : lang === "es" ? "Elección" : lang === "pt" ? "Escolha" : lang === "de" ? "Tipps" : lang === "it" ? "Scelte" : "Picks",
+    label: lang === "tr" ? "Seçim" : lang === "es" ? "Elección" : lang === "pt" ? "Escolha" : lang === "de" ? "Tipps" : lang === "it" ? "Scelte" : lang === "fr" ? "Sélection" : lang === "ja" ? "セレクト" : "Picks",
     startDay: 0, endDay: SELECTION_DAYS,
   },
   ...ROUNDS.map((r, i) => ({
@@ -40,15 +40,15 @@ const buildStages = (lang) => [
     label:
       r.key === "r32" ? "32"
       : r.key === "r16" ? "16"
-      : r.key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : lang === "pt" ? "QF" : lang === "de" ? "VF" : "QF")
-      : r.key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : lang === "pt" ? "SF" : lang === "de" ? "HF" : "SF")
-      : (lang === "tr" ? "Final" : lang === "es" ? "Final" : lang === "pt" ? "Final" : lang === "de" ? "Finale" : lang === "it" ? "Finale" : "Final"),
+      : r.key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : lang === "pt" ? "QF" : lang === "de" ? "VF" : lang === "ja" ? "準々" : "QF")
+      : r.key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : lang === "pt" ? "SF" : lang === "de" ? "HF" : lang === "fr" ? "DF" : lang === "ja" ? "準決" : "SF")
+      : (lang === "tr" ? "Final" : lang === "es" ? "Final" : lang === "pt" ? "Final" : lang === "de" ? "Finale" : lang === "it" ? "Finale" : lang === "fr" ? "Finale" : lang === "ja" ? "決勝" : "Final"),
     startDay: r.startDay,
     endDay: r.endDay,
   })),
   {
     key: "results", icon: "trophy", roundIndex: ROUNDS.length - 1,
-    label: lang === "tr" ? "Kupa" : lang === "es" ? "Copa" : lang === "pt" ? "Taça" : lang === "de" ? "Pokal" : lang === "it" ? "Coppa" : "Cup",
+    label: lang === "tr" ? "Kupa" : lang === "es" ? "Copa" : lang === "pt" ? "Taça" : lang === "de" ? "Pokal" : lang === "it" ? "Coppa" : lang === "fr" ? "Coupe" : lang === "ja" ? "カップ" : "Cup",
     startDay: RESULTS_START_DAY, endDay: 31,
   },
 ];

@@ -69,7 +69,7 @@ export default function WatchBadgeDetailModal({
   const { theme } = useTheme();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const showcaseCopy = getBadgeShowcaseCopy(lang);
 
   // Koleksiyon üyelerini çözmek ve üyeye dokununca onun kartını bulmak için
@@ -389,7 +389,7 @@ export default function WatchBadgeDetailModal({
                         {/* Büyük harfe JS'te çevriliyor: style textTransform Android'de
                             cihaz yereline göre çalışıyor ve Türkçe yerelli telefonda
                             İngilizce arayüzde "min" → "MİN" oluyordu. */}
-                        {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : lang === "pt" ? b.ekPt : lang === "de" ? b.ekDe : lang === "it" ? b.ekIt : b.ekEn).toUpperCase()}
+                        {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : lang === "pt" ? b.ekPt : lang === "de" ? b.ekDe : lang === "it" ? b.ekIt : lang === "fr" ? b.ekFr : lang === "ja" ? b.ekJa : b.ekEn).toUpperCase()}
                       </Text>
                     </GlassTouchable>
                   );

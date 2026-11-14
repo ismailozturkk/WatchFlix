@@ -241,9 +241,9 @@ function PremiumShowcase() {
 
   const premiumName = getPremiumPlanDisplayName(PREMIUM_PLAN.PREMIUM);
   const freeName = getPremiumPlanDisplayName(PREMIUM_PLAN.FREE);
-  const title = tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : pt ? "Desbloqueie o cinema sem limites" : de ? "Schalte grenzenloses Kino frei" : lang === "it" ? "Sblocca Boundless Cinema" : "Unlock Boundless Cinema";
+  const title = tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : pt ? "Desbloqueie o cinema sem limites" : de ? "Schalte grenzenloses Kino frei" : lang === "it" ? "Sblocca Boundless Cinema" : lang === "fr" ? "Débloque un cinéma sans limites" : lang === "ja" ? "無限のシネマを解放" : "Unlock Boundless Cinema";
   // Kısa tutulur: fiyat zaten ikinci satırda, yanındaki indirim rozeti de yer ister.
-  const ctaTitle = tr ? "Planları Gör" : es ? "Ver planes" : pt ? "Ver planos" : de ? "Pläne ansehen" : lang === "it" ? "Visualizza i piani" : "View Plans";
+  const ctaTitle = tr ? "Planları Gör" : es ? "Ver planes" : pt ? "Ver planos" : de ? "Pläne ansehen" : lang === "it" ? "Visualizza i piani" : lang === "fr" ? "Voir les forfaits" : lang === "ja" ? "プランを見る" : "View Plans";
   const ctaSubtitle = showcaseCtaSubtitle(pricing, lang, {
     inlineOffer: Boolean(pricing?.offer) && !showBadge,
   });

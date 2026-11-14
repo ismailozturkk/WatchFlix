@@ -254,7 +254,73 @@ export const QUICK_COPY = {
     war: "Guerra",
     western: "Western"
   }
-}};
+},
+  fr: {
+    gridTitle: "Jeux rapides",
+    games: {
+      popular: { title: "Lequel est le plus populaire ?", hint: "Deux affiches : laquelle a reçu le plus de votes ?", prompt: "Lequel a reçu le plus de votes ?" },
+      decade: { title: "Quelle décennie ?", hint: "Regarde l'affiche et trouve sa décennie", prompt: "De quelle décennie date-t-il ?" },
+      kind: { title: "Film ou série ?", hint: "Regarde l'affiche : film ou série ?", prompt: "Est-ce un film ou une série ?" },
+      genre: { title: "Quel genre ?", hint: "Devine le genre à partir de l'affiche", prompt: "Lequel de ces genres est l'un des siens ?" },
+      blur: { title: "Affiche floue", hint: "Trouve-le avant qu'il devienne net et rafle les points", prompt: "Quel est ce titre ?" },
+      rating: { title: "Lequel est le mieux noté ?", hint: "Choisis l'affiche la mieux notée · Une erreur et c'est fini", prompt: "Quel titre a la meilleure note TMDB ?" },
+    },
+    blur: {
+      scoreLabel: "Points",
+      points: (n) => `+${n} pts`,
+      endScore: (n) => (n === 1 ? "1 point" : `${n} points`),
+      timeUp: "Temps écoulé",
+      secondsLeft: (n) => `Années ${n}`,
+      posterA11y: "Affiche floue",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1)}`,
+      ratingA11y: (title, r) => `${title}, note TMDB ${r.toFixed(1)}`,
+    },
+    kind: { movie: "Film", tv: "Séries" },
+    decadeLabel: (d) => `Années ${d}`,
+    votes: (n) =>
+      n >= 1e6 ? `${compact(n / 1e6, ".")} M votes` : n >= 1e3 ? `${compact(n / 1e3, ".")} k votes` : n === 1 ? "1 vote" : `${n} votes`,
+    genres: {
+      action: "Action", adventure: "Aventure", animation: "Animation", comedy: "Comédie", crime: "Crime",
+      documentary: "Documentaire", drama: "Drame", family: "Family", fantasy: "Fantastique", history: "Histoire",
+      horror: "Horreur", music: "Musique", mystery: "Mystère", romance: "Romance", scifi: "SF",
+      thriller: "Thriller", war: "Guerre", western: "Western",
+    },
+  },
+  ja: {
+    gridTitle: "クイックゲーム",
+    games: {
+      popular: { title: "人気なのはどっち?", hint: "2枚のポスター:票が多いのはどっち?", prompt: "票が多いのはどっち?" },
+      decade: { title: "どの年代?", hint: "ポスターを見て年代を当てよう", prompt: "これはどの年代に公開された?" },
+      kind: { title: "映画?ドラマ?", hint: "ポスターを見て:映画?ドラマ?", prompt: "これは映画?ドラマ?" },
+      genre: { title: "どのジャンル?", hint: "ポスターからジャンルを当てよう", prompt: "この作品のジャンルはどれ?" },
+      blur: { title: "ぼやけたポスター", hint: "はっきりする前に当てて、ポイントをゲット", prompt: "この作品は何?" },
+      rating: { title: "評価が高いのはどっち?", hint: "評価が高いポスターを選ぼう · 1回のミスで終了", prompt: "TMDB評価が高いのはどっち?" },
+    },
+    blur: {
+      scoreLabel: "ポイント",
+      points: (n) => `+${n}点`,
+      endScore: (n) => (n === 1 ? "1ポイント" : `${n}ポイント`),
+      timeUp: "時間切れ",
+      secondsLeft: (n) => `${n}年代`,
+      posterA11y: "ぼかしたポスター",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1)}`,
+      ratingA11y: (title, r) => `${title}、TMDB評価 ${r.toFixed(1)}`,
+    },
+    kind: { movie: "映画", tv: "シリーズ" },
+    decadeLabel: (d) => `${d}年代`,
+    votes: (n) =>
+      n >= 1e6 ? `${compact(n / 1e6, ".")}M票` : n >= 1e3 ? `${compact(n / 1e3, ".")}K票` : n === 1 ? "1票" : `${n}票`,
+    genres: {
+      action: "アクション", adventure: "アドベンチャー", animation: "アニメーション", comedy: "コメディ", crime: "犯罪",
+      documentary: "ドキュメンタリー", drama: "ドラマ", family: "Family", fantasy: "ファンタジー", history: "歴史",
+      horror: "ホラー", music: "音楽", mystery: "ミステリー", romance: "ロマンス", scifi: "SF",
+      thriller: "スリラー", war: "戦争", western: "西部劇",
+    },
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getQuickCopy = (language) => QUICK_COPY[copyLanguage(language, Object.keys(QUICK_COPY))];

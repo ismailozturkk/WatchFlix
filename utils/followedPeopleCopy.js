@@ -267,7 +267,93 @@ export const FOLLOWED_PEOPLE_COPY = {
     },
     close: "Chiudi"
   }
-}};
+},
+  fr: {
+    button: {
+      follow: "Suivre",
+      following: "Abonnements",
+      followHint: "Tu verras ses prochains projets dans l'onglet Films et séries",
+      unfollowHint: "Touche pour ne plus suivre",
+      followLabel: (name) => `Suivre ${name}`,
+      unfollowLabel: (name) => `Ne plus suivre ${name}`,
+    },
+    toast: {
+      followed: (name) => `Tu suis ${name}`,
+      followedHint: "Ses prochains projets s'afficheront dans l'onglet Films et séries",
+      unfollowed: (name) => `Tu ne suis plus ${name}`,
+      limit: (max) => `Tu peux suivre jusqu'à ${max} personnes`,
+      limitHint: "Arrête de suivre quelqu'un pour faire de la place",
+    },
+    rail: {
+      title: "À venir des personnes que tu suis",
+      more: (count) => `+${count}`,
+      manage: "Personnes que je suis",
+      addToCalendar: (title) => `Ajouter la date de sortie de ${title} au calendrier du téléphone`,
+      removeFromCalendar: (title) => `Retirer la date de sortie de ${title} du calendrier du téléphone`,
+      addAll: "Ajouter toutes les sorties à venir au calendrier du téléphone",
+      quietTitle: "Rien à venir des personnes que tu suis",
+      quietBody: (count) => (count === 1 ? "Tu suis 1 personne" : `Tu suis ${count} personnes`),
+    },
+    sheet: {
+      title: "Personnes que je suis",
+      count: (count, max) => `${count}/${max}`,
+      empty: "Tu ne suis encore personne",
+      emptyHint: "Touche « Suivre » sur la page d'un acteur ou d'un réalisateur et ses nouveaux projets s'accumuleront ici.",
+      unfollowLabel: (name) => `Ne plus suivre ${name}`,
+      open: (name) => `Ouvrir la page de ${name}`,
+      departments: {
+        Acting: "Acteur",
+        Directing: "Réalisateur",
+        Writing: "Scénariste",
+        Production: "Producteur",
+        other: "Personne",
+      },
+      close: "Fermer",
+    },
+  },
+  ja: {
+    button: {
+      follow: "フォロー",
+      following: "フォロー中",
+      followHint: "映画&番組タブで今後の作品が表示されます",
+      unfollowHint: "タップでフォロー解除",
+      followLabel: (name) => `${name}をフォロー`,
+      unfollowLabel: (name) => `${name}のフォローを解除`,
+    },
+    toast: {
+      followed: (name) => `${name}をフォロー中`,
+      followedHint: "今後の作品が映画&番組タブに表示されます",
+      unfollowed: (name) => `${name}のフォローを解除しました`,
+      limit: (max) => `フォローできるのは最大${max}人です`,
+      limitHint: "誰かのフォローを解除して枠を空けてください",
+    },
+    rail: {
+      title: "フォロー中の人の新作予定",
+      more: (count) => `+${count}`,
+      manage: "フォロー中の人",
+      addToCalendar: (title) => `${title}の公開日をスマホのカレンダーに追加`,
+      removeFromCalendar: (title) => `${title}の公開日をスマホのカレンダーから削除`,
+      addAll: "今後の予定をすべてスマホのカレンダーに追加",
+      quietTitle: "フォロー中の人の新作予定はありません",
+      quietBody: (count) => (count === 1 ? "1人をフォロー中" : `${count}人をフォロー中`),
+    },
+    sheet: {
+      title: "フォロー中の人",
+      count: (count, max) => `${count}/${max}`,
+      empty: "まだ誰もフォローしていません",
+      emptyHint: "俳優や監督のページで「フォロー」をタップすると、新しい作品がここに集まります。",
+      unfollowLabel: (name) => `${name}のフォローを解除`,
+      open: (name) => `${name}のページを開く`,
+      departments: {
+        Acting: "俳優",
+        Directing: "監督",
+        Writing: "脚本",
+        Production: "製作",
+        other: "人物",
+      },
+      close: "閉じる",
+    },
+  }};
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getFollowedPeopleCopy = (language) =>

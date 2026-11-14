@@ -22,7 +22,7 @@ import { helloState, laneStatus, parseTitleKey } from "../../utils/matchSuggesti
 export const VERDICT_COLORS = { twin: "#A855F7", near: "#3B82F6", guide: "#F59E0B" };
 
 const genreText = (ids, language) => {
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   return (ids || []).map((id) => GENRE_LABELS[id]?.[lang]).filter(Boolean).join(", ");
 };
 

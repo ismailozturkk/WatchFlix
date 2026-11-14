@@ -228,7 +228,7 @@ export default function EditProfileScreen({ navigation }) {
         type: "error",
         text1:
           verificationProvider === "apple"
-            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : de ? "Bestätige zuerst mit Apple" : language === "it" ? "Verificare prima con Apple" : "Verify with Apple first")
+            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : de ? "Bestätige zuerst mit Apple" : language === "it" ? "Verificare prima con Apple" : language === "fr" ? "Vérifie d'abord avec Apple" : language === "ja" ? "先にAppleで確認してください" : "Verify with Apple first")
             : i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
       });
       return false;
@@ -388,7 +388,7 @@ export default function EditProfileScreen({ navigation }) {
   // Hesap silme sayfasının metinleri (dil dallanması burada kalır).
   const deleteDescription = verificationProvider
     ? verificationProvider === "apple"
-      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : pt ? "Isso não pode ser desfeito. Verifique com a Apple para que a autorização dela também possa ser revogada." : de ? "Das kann nicht rückgängig gemacht werden. Bestätige mit Apple, damit auch dessen Autorisierung widerrufen werden kann." : language === "it" ? "Questa operazione non può essere annullata. Verificare con Apple affinché anche la sua autorizzazione possa essere revocata." : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
+      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : pt ? "Isso não pode ser desfeito. Verifique com a Apple para que a autorização dela também possa ser revogada." : de ? "Das kann nicht rückgängig gemacht werden. Bestätige mit Apple, damit auch dessen Autorisierung widerrufen werden kann." : language === "it" ? "Questa operazione non può essere annullata. Verificare con Apple affinché anche la sua autorizzazione possa essere revocata." : language === "fr" ? "C'est irréversible. Vérifie avec Apple pour que son autorisation puisse aussi être révoquée." : language === "ja" ? "元に戻せません。Appleの認証も取り消せるよう、Appleで確認してください。" : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
       : i18nText(
           "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
           "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
@@ -405,7 +405,7 @@ export default function EditProfileScreen({ navigation }) {
   const holdMs = isReset ? RESET_HOLD_MS : DELETE_HOLD_MS;
   const verifyLabel =
     verificationProvider === "apple"
-      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : de ? "Mit Apple bestätigen" : language === "it" ? "Verifica con Apple" : "Verify with Apple")
+      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : de ? "Mit Apple bestätigen" : language === "it" ? "Verifica con Apple" : language === "fr" ? "Vérifier avec Apple" : language === "ja" ? "Appleで確認" : "Verify with Apple")
       : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula");
 
   return (

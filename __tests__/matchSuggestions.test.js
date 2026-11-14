@@ -154,7 +154,7 @@ describe("ekran metinleri", () => {
     );
 
   test("6 dil, aynı anahtarlar ve aynı türler", () => {
-    expect(Object.keys(MATCH_SCREEN_COPY).sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
+    expect(Object.keys(MATCH_SCREEN_COPY).sort()).toEqual(["de", "en", "es", "fr", "it", "ja", "pt", "tr"]);
     const ref = shape(MATCH_SCREEN_COPY.tr);
     for (const [lang, copy] of Object.entries(MATCH_SCREEN_COPY)) expect([lang, shape(copy)]).toEqual([lang, ref]);
   });

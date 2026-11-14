@@ -163,7 +163,9 @@ const ERROR_TEXT = {
     pt: "Esta conta do Google está vinculada a outra conta do Seelogd. Desvincule-a primeiro lá.",
     de: "Dieses Google-Konto ist mit einem anderen Seelogd-Konto verknüpft. Trenne es dort zuerst.",
 
-  it: "Questo account Google è collegato a un altro account Seelogd. Prima disconnettilo da lì."},
+  it: "Questo account Google è collegato a un altro account Seelogd. Prima disconnettilo da lì.",
+  fr: "Ce compte Google est associé à un autre compte Seelogd. Déconnecte-le d'abord de celui-ci.",
+  ja: "このGoogleアカウントは別のSeelogdアカウントに連携されています。先にそちらで連携を解除してください。"},
   [GoogleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Google hesabın zaten bağlı.",
     en: "Your Google account is already connected.",
@@ -171,7 +173,9 @@ const ERROR_TEXT = {
     pt: "Sua conta do Google já está vinculada.",
     de: "Dein Google-Konto ist bereits verknüpft.",
 
-  it: "Il tuo account Google è già collegato."},
+  it: "Il tuo account Google è già collegato.",
+  fr: "Ton compte Google est déjà connecté.",
+  ja: "Googleアカウントはすでに連携されています。"},
   [GoogleAuthCode.WRONG_ACCOUNT]: {
     tr: "Farklı bir Google hesabı seçtin. Oturumu açtığın hesabı seç.",
     en: "You picked a different Google account. Choose the one you signed in with.",
@@ -179,7 +183,9 @@ const ERROR_TEXT = {
     pt: "Você escolheu uma conta do Google diferente. Escolha aquela com a qual você entrou.",
     de: "Du hast ein anderes Google-Konto gewählt. Wähle das, mit dem du dich angemeldet hast.",
 
-  it: "Hai scelto un account Google diverso. Scegli quello con cui hai effettuato l'accesso."},
+  it: "Hai scelto un account Google diverso. Scegli quello con cui hai effettuato l'accesso.",
+  fr: "Tu as choisi un autre compte Google. Choisis celui avec lequel tu t'es connecté.",
+  ja: "別のGoogleアカウントが選ばれました。サインインに使ったアカウントを選んでください。"},
   [GoogleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
@@ -187,7 +193,9 @@ const ERROR_TEXT = {
     pt: "Por segurança, saia, entre de novo e tente novamente.",
     de: "Melde dich aus Sicherheitsgründen ab und wieder an und versuche es dann erneut.",
 
-  it: "Per motivi di sicurezza, esci e accedi di nuovo, quindi riprova."},
+  it: "Per motivi di sicurezza, esci e accedi di nuovo, quindi riprova.",
+  fr: "Par sécurité, déconnecte-toi puis reconnecte-toi, puis réessaie.",
+  ja: "セキュリティのため、一度サインアウトして再度サインインしてからお試しください。"},
   [GoogleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
@@ -195,7 +203,9 @@ const ERROR_TEXT = {
     pt: "Não foi possível conectar à rede. Verifique sua conexão.",
     de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
 
-  it: "Impossibile raggiungere la rete. Controlla la tua connessione."},
+  it: "Impossibile raggiungere la rete. Controlla la tua connessione.",
+  fr: "Impossible d'accéder au réseau. Vérifie ta connexion.",
+  ja: "ネットワークに接続できませんでした。接続を確認してください。"},
   [GoogleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
@@ -203,7 +213,9 @@ const ERROR_TEXT = {
     pt: "Já existe uma conta do Seelogd com este e-mail. Entre primeiro com seu e-mail e senha e depois vincule o Google em Configurações > Contas vinculadas.",
     de: "Ein Seelogd-Konto verwendet diese E-Mail-Adresse bereits. Melde dich zuerst mit E-Mail und Passwort an und verknüpfe Google dann unter Einstellungen > Kontoverknüpfungen.",
 
-  it: "Un account Seelogd utilizza già questa email. Accedi prima con email e password, quindi connetti Google da Impostazioni > Connessioni account."},
+  it: "Un account Seelogd utilizza già questa email. Accedi prima con email e password, quindi connetti Google da Impostazioni > Connessioni account.",
+  fr: "Un compte Seelogd utilise déjà cet e-mail. Connecte-toi d'abord avec ton e-mail et ton mot de passe, puis connecte Google depuis Réglages > Comptes connectés.",
+  ja: "このメールアドレスはすでにSeelogdアカウントで使われています。先にメールとパスワードでサインインしてから、設定 > アカウント連携 でGoogleを連携してください。"},
   [GoogleAuthCode.PLAY_SERVICES]: {
     tr: "Google Play Hizmetleri bu cihazda kullanılamıyor.",
     en: "Google Play Services is unavailable on this device.",
@@ -211,7 +223,9 @@ const ERROR_TEXT = {
     pt: "O Google Play Services não está disponível neste dispositivo.",
     de: "Die Google Play-Dienste sind auf diesem Gerät nicht verfügbar.",
 
-  it: "Google Play Services non è disponibile su questo dispositivo."},
+  it: "Google Play Services non è disponibile su questo dispositivo.",
+  fr: "Les services Google Play ne sont pas disponibles sur cet appareil.",
+  ja: "この端末ではGoogle Play開発者サービスを利用できません。"},
   [GoogleAuthCode.MISCONFIGURED]: {
     tr: "Google girişi bu uygulama sürümünde kullanılamıyor.",
     en: "Google sign-in is unavailable in this build.",
@@ -219,7 +233,9 @@ const ERROR_TEXT = {
     pt: "O login com o Google não está disponível nesta versão do app.",
     de: "Die Anmeldung mit Google ist in diesem Build nicht verfügbar.",
 
-  it: "L'accesso a Google non è disponibile in questa build."},
+  it: "L'accesso a Google non è disponibile in questa build.",
+  fr: "La connexion Google n'est pas disponible dans cette version.",
+  ja: "このビルドではGoogleサインインを利用できません。"},
   [GoogleAuthCode.LAST_PROVIDER]: {
     tr: "Google şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Google is your only sign-in method and cannot be removed.",
@@ -227,7 +243,9 @@ const ERROR_TEXT = {
     pt: "O Google agora é seu único método de login e não pode ser removido.",
     de: "Google ist deine einzige Anmeldemethode und kann nicht entfernt werden.",
 
-  it: "Google è il tuo unico metodo di accesso e non può essere rimosso."},
+  it: "Google è il tuo unico metodo di accesso e non può essere rimosso.",
+  fr: "Google est ta seule méthode de connexion et ne peut pas être retiré.",
+  ja: "Googleは唯一のサインイン方法のため解除できません。"},
   [GoogleAuthCode.IN_PROGRESS]: {
     tr: "Google girişi zaten sürüyor.",
     en: "Google sign-in is already in progress.",
@@ -235,7 +253,9 @@ const ERROR_TEXT = {
     pt: "Já há um login com o Google em andamento.",
     de: "Die Anmeldung mit Google läuft bereits.",
 
-  it: "L'accesso a Google è già in corso."},
+  it: "L'accesso a Google è già in corso.",
+  fr: "La connexion Google est déjà en cours.",
+  ja: "Googleサインインはすでに進行中です。"},
   [GoogleAuthCode.NO_ID_TOKEN]: {
     tr: "Google kimlik doğrulaması tamamlanamadı. Tekrar dene.",
     en: "Google could not verify your identity. Please try again.",
@@ -243,7 +263,9 @@ const ERROR_TEXT = {
     pt: "O Google não conseguiu verificar sua identidade. Tente novamente.",
     de: "Google konnte deine Identität nicht bestätigen. Bitte versuche es erneut.",
 
-  it: "Google non è riuscito a verificare la tua identità. Per favore riprova."},
+  it: "Google non è riuscito a verificare la tua identità. Per favore riprova.",
+  fr: "Google n'a pas pu vérifier ton identité. Réessaie.",
+  ja: "Googleで本人確認ができませんでした。もう一度お試しください。"},
   [GoogleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
@@ -251,7 +273,9 @@ const ERROR_TEXT = {
     pt: "Não há nenhuma sessão ativa. Entre novamente.",
     de: "Keine aktive Sitzung. Bitte melde dich erneut an.",
 
-  it: "Nessuna sessione attiva. Accedi di nuovo."},
+  it: "Nessuna sessione attiva. Accedi di nuovo.",
+  fr: "Aucune session active. Reconnecte-toi.",
+  ja: "有効なセッションがありません。もう一度サインインしてください。"},
 };
 
 /**
@@ -273,7 +297,9 @@ export function describeGoogleAuthError(error, language = "tr") {
     pt: "Ocorreu um erro. Tente novamente.",
     de: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
 
-  it: "Qualcosa è andato storto. Per favore riprova."});
+  it: "Qualcosa è andato storto. Per favore riprova.",
+  fr: "Un problème est survenu. Réessaie.",
+  ja: "問題が発生しました。もう一度お試しください。"});
 }
 
 // ── Yapılandırma ────────────────────────────────────────────────────────────

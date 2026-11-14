@@ -509,7 +509,179 @@ ${links}`,
   },
   loadFailed: "Impossibile caricare i dettagli dell'invito",
   retry: "Riprova"
-}};
+},
+  fr: {
+    rowTitle: "Inviter un ami",
+    rowSubtitle: "Partage ton code et gagne 1 mois offert pour chaque ami qui s'abonne",
+    screenTitle: "Inviter un ami",
+    hero: {
+      title: "Invite un ami, gagne 1 mois de Premium",
+      body: (percent) =>
+        `Quand un ami saisit ton code et s'abonne, tu gagnes 1 mois de Premium offert, et il obtient -${percent} % sur son premier abonnement.`,
+    },
+    yourCode: "Ton code d'invitation",
+    copy: "Copier",
+    copied: "Code copié",
+    share: "Envoyer l'invitation",
+    shareMessage: (code, percent, links) =>
+      `Essaie Seelogd ! Après ton inscription, saisis mon code ${code} dans « Tu as un code ? » sur la page Premium pour obtenir -${percent} % sur ton premier abonnement.
+
+${links}`,
+    steps: {
+      title: "Comment ça marche",
+      one: "Envoie ton code à un ami",
+      two: (days) => `Ton ami le saisit dans les ${days} jours`,
+      three: "Quand il s'abonne, tu gagnes 1 mois de Premium offert",
+    },
+    reward: {
+      title: "Tes mois offerts",
+      none: "Tu n'as pas encore gagné de mois offert",
+      available: (n) => (n === 1 ? "1 mois offert t'attend" : `${n} mois offerts t'attendent`),
+      start: "Démarrer le mois offert",
+      starting: "Démarrage…",
+      active: (date) => `Premium offert actif jusqu'au ${date}`,
+      started: (date) => `Premium offert actif jusqu'au ${date}`,
+      storeActive: "Les mois offerts attendent tant que ton abonnement via le store est actif ; démarres-en un quand il prend fin",
+      earned: (n, max) => `${n} mois gagnés sur ${max}`,
+      capped: (max) => `Tu peux gagner jusqu'à ${max} mois`,
+    },
+    list: {
+      title: "Amis que tu as invités",
+      empty: "Personne n'a encore saisi ton code. Tes amis apparaîtront ici une fois que tu l'auras partagé.",
+      counts: (registered, subscribed) =>
+        `${registered} ont saisi ton code · ${subscribed} abonnés`,
+      status: {
+        registered: "Inscrit",
+        subscribed: "Abonné",
+        rewarded: "Abonné · tu as gagné un mois offert",
+      },
+      statusHint: "Si un ami a seulement saisi ton code, il apparaît comme « Inscrit »",
+    },
+    invitedBy: {
+      title: (name) => (name ? `${name} t'a invité` : "Tu as rejoint via une invitation"),
+      discount: (percent) =>
+        `-${percent} % sur ton premier abonnement t'attend. La réduction s'applique au paiement.`,
+      used: "Tu as utilisé ta réduction d'invitation",
+    },
+    redeem: {
+      entryTitle: "Tu as un code ?",
+      entryHint: "Saisis un code d'invitation ou promo",
+      sheetTitle: "Saisis un code",
+      sheetBody: "Saisis le code d'invitation d'un ami (réduction sur ton premier abonnement) ou un code promo (1 mois de Premium offert).",
+      placeholder: "ABCD-EFGH",
+      apply: "Utiliser le code",
+      applying: "Vérification…",
+      promoSuccess: (days, date) => `${days} jours de Premium offert débloqués · jusqu'au ${date}`,
+      referralSuccess: (percent, name) =>
+        name
+          ? `Tu as accepté l'invitation de ${name}. -${percent} % s'appliquera à ton premier abonnement.`
+          : `Invitation acceptée. -${percent} % s'appliquera à ton premier abonnement.`,
+      discountPending: (percent) =>
+        `La réduction d'invitation (${percent} %) apparaîtra au paiement dès que l'offre du store sera active.`,
+    },
+    errors: {
+      "code-not-found": "Ce code n'est pas valide. Vérifie l'orthographe.",
+      "code-exhausted": "Ce code a été épuisé.",
+      "code-expired": "Ce code a expiré.",
+      "code-inactive": "Ce code ne peut plus être utilisé.",
+      "already-redeemed": "Tu as déjà utilisé un code ; chaque compte peut en utiliser un seul.",
+      "own-code": "Tu ne peux pas utiliser ton propre code d'invitation.",
+      "window-closed": (days) => `Un code d'invitation peut être saisi dans les ${days} premiers jours après l'inscription.`,
+      "already-purchased": "La réduction d'invitation est réservée à un premier abonnement ; tu t'es déjà abonné.",
+      "store-subscription-active": "Ce code ne peut pas être utilisé pendant un abonnement actif.",
+      "rate-limited": "Trop de tentatives erronées. Réessaie demain.",
+      "no-credit": "Tu n'as aucun mois offert à démarrer.",
+      generic: "Ça n'a pas marché. Vérifie ta connexion et réessaie.",
+    },
+    loadFailed: "Impossible de charger les détails de l'invitation",
+    retry: "Réessayer",
+  },
+  ja: {
+    rowTitle: "友だちを招待",
+    rowSubtitle: "コードをシェアして、友だちが登録するたびに1か月無料",
+    screenTitle: "友だちを招待",
+    hero: {
+      title: "友だちを誘ってPremiumを1か月",
+      body: (percent) =>
+        `友だちがあなたのコードを入力して登録すると、あなたはPremiumが1か月無料になり、友だちは最初のサブスクリプションが${percent}%オフになります。`,
+    },
+    yourCode: "あなたの招待コード",
+    copy: "コピー",
+    copied: "コードをコピーしました",
+    share: "招待を送る",
+    shareMessage: (code, percent, links) =>
+      `Seelogdを試してみて!登録後、Premiumページの「コードをお持ちですか?」に私のコード${code}を入力すると、最初のサブスクリプションが${percent}%オフになります。
+
+${links}`,
+    steps: {
+      title: "仕組み",
+      one: "友だちにコードを送る",
+      two: (days) => `友だちが${days}日以内に入力`,
+      three: "友だちが登録すると、Premiumが1か月無料に",
+    },
+    reward: {
+      title: "無料の月",
+      none: "まだ無料の月を獲得していません",
+      available: (n) => (n === 1 ? "無料の1か月があなたを待っています" : `無料の${n}か月があなたを待っています`),
+      start: "無料の月を始める",
+      starting: "開始中…",
+      active: (date) => `無料のPremiumは${date}まで有効です`,
+      started: (date) => `無料のPremiumは${date}まで有効です`,
+      storeActive: "ストアのサブスクリプションが有効な間、無料の月は待機します。終了したら開始してください",
+      earned: (n, max) => `${max}か月中${n}か月獲得`,
+      capped: (max) => `最大${max}か月獲得できます`,
+    },
+    list: {
+      title: "招待した友だち",
+      empty: "まだ誰もあなたのコードを入力していません。シェアすると友だちがここに表示されます。",
+      counts: (registered, subscribed) =>
+        `${registered}人がコードを入力 · ${subscribed}人が登録`,
+      status: {
+        registered: "登録済み",
+        subscribed: "サブスクリプション登録済み",
+        rewarded: "サブスクリプション登録済み · 無料の月を獲得しました",
+      },
+      statusHint: "コードを入力しただけの友だちは「登録済み」と表示されます",
+    },
+    invitedBy: {
+      title: (name) => (name ? `${name}さんから招待されました` : "招待で参加しました"),
+      discount: (percent) =>
+        `最初のサブスクリプションが${percent}%オフになります。割引はお支払い時に適用されます。`,
+      used: "招待割引を使用しました",
+    },
+    redeem: {
+      entryTitle: "コードをお持ちですか?",
+      entryHint: "招待コードかプロモコードを入力",
+      sheetTitle: "コードを入力",
+      sheetBody: "友だちの招待コード(最初のサブスクリプションが割引)か、プロモコード(Premiumが1か月無料)を入力してください。",
+      placeholder: "ABCD-EFGH",
+      apply: "コードを使う",
+      applying: "確認中…",
+      promoSuccess: (days, date) => `Premium${days}日間無料を解放しました · ${date}まで`,
+      referralSuccess: (percent, name) =>
+        name
+          ? `${name}さんの招待を受け取りました。最初のサブスクリプションが${percent}%オフになります。`
+          : `招待を受け取りました。最初のサブスクリプションが${percent}%オフになります。`,
+      discountPending: (percent) =>
+        `招待割引(${percent}%)は、ストアのオファーが有効になるとお支払い時に表示されます。`,
+    },
+    errors: {
+      "code-not-found": "このコードは無効です。つづりを確認してください。",
+      "code-exhausted": "このコードは使用上限に達しています。",
+      "code-expired": "このコードは期限切れです。",
+      "code-inactive": "このコードはもう使えません。",
+      "already-redeemed": "すでにコードを使用しています。1アカウントにつき1回まで使えます。",
+      "own-code": "自分の招待コードは使えません。",
+      "window-closed": (days) => `招待コードは登録後${days}日以内に入力できます。`,
+      "already-purchased": "招待割引は最初のサブスクリプションのみ対象です。以前に登録したことがあります。",
+      "store-subscription-active": "サブスクリプション中はこのコードを使えません。",
+      "rate-limited": "間違いが多すぎます。明日もう一度お試しください。",
+      "no-credit": "開始できる無料の月がありません。",
+      generic: "うまくいきませんでした。接続を確認して、もう一度お試しください。",
+    },
+    loadFailed: "招待の詳細を読み込めませんでした",
+    retry: "再試行",
+  }};
 
 /** Uygulama diline göre metin tablosu (tabloda olmayan dil → İngilizce). */
 export const getReferralCopy = (language) =>

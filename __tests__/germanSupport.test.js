@@ -28,7 +28,7 @@ describe("Almanca: cihaz dili ve TMDB bağları", () => {
   it("Almanca cihaz ilk açılışta Almanca açılır (de, de-AT, de-CH)", () => {
     expect(cihazDilindenSec([{ languageCode: "de" }])).toBe("de");
     expect(cihazDilindenSec([{ languageCode: "DE" }])).toBe("de");
-    expect(cihazDilindenSec([{ languageCode: "fr" }])).toBe("en");
+    expect(cihazDilindenSec([{ languageCode: "ko" }])).toBe("en");
   });
 
   it("TMDB dili de-DE; Intl de-DE; yasal sayfa İngilizce (sayfa yazılana dek)", () => {
@@ -58,8 +58,8 @@ describe("Almanca: tarih ve takvim", () => {
   it("takvim ekranı de yerelini tanıyor ve haftayı PAZARTESİ başlatıyor", () => {
     const kaynak = oku("screens/calendar/CalendarScreen.js");
     expect(kaynak).toMatch(/LocaleConfig\.locales\.de\s*=/);
-    // firstDay: yalnız en + pt Pazar (0) başlatır; Almanca bu listede OLMAMALI.
-    expect(kaynak).toMatch(/firstDay=\{\["en", "pt"\]\.includes/);
+    // firstDay: yalnız en + pt + ja Pazar (0) başlatır; Almanca bu listede OLMAMALI.
+    expect(kaynak).toMatch(/firstDay=\{\["en", "pt", "ja"\]\.includes/);
   });
 });
 
@@ -186,7 +186,7 @@ describe("Almanca: rozet kataloğu", () => {
 describe("Almanca: dil listeleri olan kaynak dosyaları", () => {
   it("sunucu bildirim dili listesi de'yi içeriyor ve metinleri var", () => {
     const sunucu = oku("functions/index.js");
-    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it"\]/);
+    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de", "it", "fr", "ja"]/);
     expect(sunucu).toMatch(/\n {2}de: \{\n {4}someone: "Jemand"/);
     expect(sunucu).toMatch(/\n {2}de: \{\n {4}single: \(p\) =>/);
   });
@@ -223,11 +223,11 @@ describe("Almanca: içe aktarma akışı ve düzeltilen denetim bulguları", () 
   it("içe aktarma metinleri 5 dilde ve hata kodları çözülüyor", () => {
     const { getImportCopy, importErrorText, IMPORT_COPY } = require("../components/import/importCopy");
     const { ImportError } = require("../services/import/importErrors");
-    expect(Object.keys(IMPORT_COPY).sort()).toEqual(["de", "en", "es", "it", "pt", "tr"]);
+    expect(Object.keys(IMPORT_COPY).sort()).toEqual(["de", "en", "es", "fr", "it", "ja", "pt", "tr"]);
     const de = getImportCopy("de");
     expect(importErrorText(new ImportError("noBundle"), de)).toBe(de.errors.noBundle);
     expect(importErrorText(new Error("ham"), de)).toBe(de.unexpected);
-    expect(getImportCopy("fr")).toBe(IMPORT_COPY.en);
+    expect(getImportCopy("ko")).toBe(IMPORT_COPY.en);
   });
 
   it("takvim etkinlik sayısı gerçek sayıyla çözümleniyor (autoI18n.n_etkinlik → {{n}})", () => {

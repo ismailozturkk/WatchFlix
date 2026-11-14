@@ -148,7 +148,7 @@ const GENRE_ICONS = {
   documentary: { name: "videocam-outline" },
 };
 
-const LANGS = ["tr", "en", "es", "pt", "de", "it"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it", "fr", "ja"];
 const BEZEL = 7;
 // Kapalıyken atmosferin önizlemedeki sönüklüğü.
 const DIM_OPACITY = 0.28;
