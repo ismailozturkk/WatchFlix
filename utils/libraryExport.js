@@ -66,6 +66,16 @@ function listEntry(item, ratings) {
     poster: posterOf(item?.imagePath || item?.poster_path || item?.posterPath),
     addedAt: normalizeWatchDate(item?.dateAdded),
     rating: ratingFor(ratings, type, tmdbId),
+    // Liste öğesinin süre/boyut bilgisi (listItemsService.normalizeItem). Dosyada yoksa geri yüklemede
+    // izleme listesindeki dizi "1 sezon · 1 bölüm", film süresiz yazılıyordu (14 Kas).
+    ...(type === "movie"
+      ? { minutes: minutesOf(item) }
+      : {
+          episodeMinutes: positiveInt(item?.episodeMinutes),
+          seasonCount: positiveInt(item?.seasonCount),
+          episodeCount: positiveInt(item?.episodeCount),
+          totalMinutes: positiveInt(item?.totalMinutes),
+        }),
   };
 }
 
@@ -99,14 +109,37 @@ function showEntry(show, ratings) {
     }
   }
   episodes.sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0));
+  // "Tüm dizi izlendi" olayları (bölüm anahtarı yok; Letterboxd/IMDb aktarımı ya da eski kayıt): bunlar
+  // bölüm listesinde görünmez. Tarihleri ve bölüm süresi ayrıca yazılmazsa geri yüklemede izleme ve
+  // SÜRE kaybolur (dizi toplam süresi 0'a düşüyordu, 14 Kas).
+  const showEvents = asArray(show?.watchEvents).filter(
+    (event) => event && !(Array.isArray(event.episodeKeys) && event.episodeKeys.length > 0) && normalizeWatchDate(event.watchedAt),
+  );
+  const showWatchedDates = uniqueSorted(showEvents.map((event) => normalizeWatchDate(event.watchedAt)));
   return {
     ...base,
     type: "tv",
     seasonCount: positiveInt(show?.showSeasonCount),
     episodeCount: positiveInt(show?.showEpisodeCount),
+    episodeMinutes: showEpisodeMinutes(show, showEvents),
     episodesWatched: episodes.length,
     episodes,
+    showWatchedDates,
   };
+}
+
+/** Dizinin bölüm başı süresi: alan varsa o; yoksa "tüm dizi" olayının süresi ÷ bölüm sayısı; yoksa toplam ÷ bölüm. */
+function showEpisodeMinutes(show, showEvents) {
+  const direct = positiveInt(show?.episodeMinutes);
+  if (direct) return direct;
+  for (const event of showEvents) {
+    const minutes = Number(event?.minutes);
+    const count = Number(event?.episodeCount) || Number(show?.showEpisodeCount);
+    if (minutes > 0 && count > 0) return positiveInt(Math.round(minutes / count));
+  }
+  const total = Number(show?.totalMinutes);
+  const count = Number(show?.watchedEpisodeCount) || Number(show?.showEpisodeCount);
+  return total > 0 && count > 0 && asArray(show?.seasons).length === 0 ? positiveInt(Math.round(total / count)) : null;
 }
 
 /** Yorum metni sınırı (dosya ve içe aktarma aynı sınırı kullanır). */

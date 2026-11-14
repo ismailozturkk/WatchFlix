@@ -83,6 +83,14 @@ function cleanEntry(raw, now, forcedType = null) {
     poster: posterOf(raw.poster),
     addedAt: cleanDate(raw.addedAt, now),
     rating: cleanRating(raw.rating),
+    ...(type === "movie"
+      ? { minutes: intIn(raw.minutes, 1, 2000) }
+      : {
+          episodeMinutes: intIn(raw.episodeMinutes, 1, 600),
+          seasonCount: intIn(raw.seasonCount, 1, 500),
+          episodeCount: intIn(raw.episodeCount, 1, 50000),
+          totalMinutes: intIn(raw.totalMinutes, 1, 600000),
+        }),
   };
 }
 
@@ -117,8 +125,11 @@ function cleanShow(raw, now) {
     ...base,
     seasonCount: intIn(raw.seasonCount, 1, 500),
     episodeCount: intIn(raw.episodeCount, 1, 50000),
+    episodeMinutes: intIn(raw.episodeMinutes, 1, 600),
     episodesWatched: episodes.length,
     episodes,
+    // "Tüm dizi izlendi" tarihleri (bölüm anahtarsız olaylar; utils/libraryExport.showEntry).
+    showWatchedDates: cleanDates(raw.showWatchedDates, now),
   };
 }
 
@@ -298,6 +309,10 @@ function sourceItem(entry, extra) {
     poster_path: entry.poster,
     rawGenres: entry.genres,
     rawMinutes: entry.minutes ?? null,
+    episodeMinutes: entry.episodeMinutes ?? null,
+    seasonCount: entry.seasonCount ?? null,
+    episodeCount: entry.episodeCount ?? null,
+    totalMinutes: entry.totalMinutes ?? null,
     dateAdded: entry.addedAt || null,
     rating: null,
     importSource: IMPORT_SOURCE,
@@ -339,14 +354,18 @@ export function buildImportPlan(backup, sectionIds = IMPORT_SECTIONS) {
   }
   if (keep.has("shows")) {
     for (const show of asArray(b.watchedShows)) {
-      const dates = [...new Set(show.episodes.flatMap((e) => e.watchedDates))].sort();
+      const showDates = asArray(show.showWatchedDates);
+      const dates = [...new Set([...show.episodes.flatMap((e) => e.watchedDates), ...showDates])].sort();
       items.push(
         sourceItem(show, {
           targetList: "watchedTv",
           rating: takeRating(show),
           seasonCount: show.seasonCount,
           episodeCount: show.episodeCount,
+          episodeMinutes: show.episodeMinutes ?? null,
           episodes: show.episodes,
+          // Bölüm anahtarsız izlemeler: importMerge.mergeBackupTv bunları "tüm dizi" olayı olarak geri kurar.
+          watchDates: showDates.length ? showDates : null,
           watchedDate: dates[dates.length - 1] || show.addedAt || null,
         }),
       );

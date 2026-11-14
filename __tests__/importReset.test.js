@@ -159,14 +159,15 @@ describe("dayanıklı yazım", () => {
     const progress = jest.fn();
     const original = firestore.runTransaction.getMockImplementation();
     let call = 0;
-    // 1. transaction şema hazırlığı, 2. ilk öğe.
+    // 1. transaction şema hazırlığı, 2. ilk öğe. Öğe başına (chunkSize 1) yol: parçalı yol
+    // letterboxdImportPipeline.test.js'te (parça düşerse öğeler tek tek yeniden denenir).
     firestore.runTransaction.mockImplementation(async (db, cb) => {
       call += 1;
       if (call === 2) throw Object.assign(new Error("denied"), { code: "permission-denied" });
       return original(db, cb);
     });
     try {
-      const stats = await writeImportedItems(uid, [film(1), film(2)], { rebuildStats: false, onProgress: progress });
+      const stats = await writeImportedItems(uid, [film(1), film(2)], { rebuildStats: false, chunkSize: 1, onProgress: progress });
       expect(stats.failedCount).toBe(1);
       expect(stats.failedItems[0]).toMatchObject({ id: 1, code: "permission-denied" });
       expect(stats.count).toBe(1);
@@ -186,7 +187,7 @@ describe("dayanıklı yazım", () => {
     });
     jest.useFakeTimers();
     try {
-      const promise = writeImportedItems(uid, [film(1), film(2), film(3)], { rebuildStats: false });
+      const promise = writeImportedItems(uid, [film(1), film(2), film(3)], { rebuildStats: false, chunkSize: 1 });
       const caught = promise.catch((error) => error);
       await jest.advanceTimersByTimeAsync(60000);
       const error = await caught;
@@ -201,7 +202,7 @@ describe("dayanıklı yazım", () => {
   test("durdurma sinyali sıradaki öğeden önce keser", async () => {
     const signal = createImportSignal();
     await expect(
-      writeImportedItems(uid, [film(1), film(2)], { rebuildStats: false, signal, onProgress: () => signal.cancel() }),
+      writeImportedItems(uid, [film(1), film(2)], { rebuildStats: false, chunkSize: 1, signal, onProgress: () => signal.cancel() }),
     ).rejects.toMatchObject({ code: "cancelled", processed: 1 });
   });
 });

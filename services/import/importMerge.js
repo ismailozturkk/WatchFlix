@@ -127,6 +127,17 @@ export function mergeImportedTv(existing = {}, item = {}, options = {}) {
       minutes: totalMinutes,
     },
   });
+  // ONARIM: önceki bir aktarım bu diziyi süresiz (0 dk) yazdıysa ve süre artık biliniyorsa, bölüm anahtarsız
+  // "tüm dizi" olaylarının süresi doldurulur (aynı dosyayı yeniden aktarmak 0 dk'yı düzeltir, 14 Kas).
+  let repairedMinutes = 0;
+  if (totalMinutes > 0) {
+    merged.events = merged.events.map((event) => {
+      const showLevel = !(Array.isArray(event?.episodeKeys) && event.episodeKeys.length > 0);
+      if (!showLevel || Number(event?.minutes) > 0 || !event?.watchedAt) return event;
+      repairedMinutes += totalMinutes;
+      return { ...event, minutes: totalMinutes, episodeCount: Number(event.episodeCount) || episodeCount };
+    });
+  }
   const cleanDate = dates[dates.length - 1] || options.fallbackDate;
   const metadata = fillMissingFields(existing, {
     id: item.id,
@@ -144,13 +155,19 @@ export function mergeImportedTv(existing = {}, item = {}, options = {}) {
     seasons: [],
   });
 
+  const document = { ...existing, ...metadata, watchEvents: merged.events, watchCount: merged.events.length };
+  if (repairedMinutes > 0 && !(Number(existing.totalMinutes) > 0) && !(Array.isArray(existing.seasons) && existing.seasons.length > 0)) {
+    document.totalMinutes = totalMinutes;
+  }
   return {
-    document: { ...existing, ...metadata, watchEvents: merged.events, watchCount: merged.events.length },
+    document,
     addedEvents: merged.addedCount,
     wasWatched: currentEvents.length > 0,
     addedEpisodes: merged.addedCount * episodeCount,
     addedSeasons: merged.addedCount * seasonCount,
-    addedMinutes: merged.addedCount * totalMinutes,
+    // Yeni olaylar + onarılan (eskiden 0 dk) olaylar: yazıcı kök süre sayacını bu kadar artırır.
+    addedMinutes: merged.addedCount * totalMinutes + repairedMinutes,
+    repairedMinutes,
   };
 }
 
@@ -326,6 +343,45 @@ export function mergeRestoredTv(existing = {}, item = {}, options = {}) {
   };
 }
 
+/**
+ * Dizi kaydı birleştirme (her kaynak): bölüm geçmişi varsa bölüm bölüm geri kurulur (mergeRestoredTv),
+ * "tüm dizi izlendi" tarihleri (item.watchDates) varsa onlar da dizi düzeyi olay olur (mergeImportedTv).
+ * Seelogd yedeğinde ikisi BİRLİKTE gelebilir: Letterboxd'dan gelmiş bir diziye sonradan bölüm işaretlenmişse.
+ * Bölüm geçmişi olmayan (Letterboxd/IMDb ya da eski yedek) kayıt eskisi gibi tek "tüm dizi" olayıdır.
+ * `addedShowEvents`: stats.tv.shows.total artışı (bölüm olayları tam dizi izleme sayılmaz).
+ */
+export function mergeBackupTv(existing = {}, item = {}, options = {}) {
+  const hasEpisodes = Array.isArray(item.episodes) && item.episodes.length > 0;
+  if (!hasEpisodes) {
+    const imported = mergeImportedTv(existing, item, options);
+    return { ...imported, addedShowEvents: imported.addedEvents };
+  }
+  const restored = mergeRestoredTv(existing, item, options);
+  const hasShowDates = Array.isArray(item.watchDates) && item.watchDates.length > 0;
+  if (!hasShowDates) return { ...restored, addedShowEvents: 0 };
+  const show = mergeImportedTv(restored.document, item, options);
+  // mergeRestoredTv olayları türetilmiş hâliyle döndürür (bölüm anahtarsız olayın süresi orada 0 görünür);
+  // gerçek onarım yalnız SAKLI belgede 0 dk olan olaydır, yoksa her yeniden aktarım "onarım" sayardı.
+  const storedMinutes = new Map(
+    (Array.isArray(existing.watchEvents) ? existing.watchEvents : []).map((event) => [event?.id, Number(event?.minutes) || 0]),
+  );
+  const repairedMinutes = show.repairedMinutes
+    ? show.document.watchEvents
+        .filter((event) => storedMinutes.has(event.id) && storedMinutes.get(event.id) === 0 && Number(event.minutes) > 0)
+        .reduce((sum, event) => sum + Number(event.minutes), 0)
+    : 0;
+  return {
+    document: show.document,
+    wasWatched: restored.wasWatched,
+    addedEvents: restored.addedEvents + show.addedEvents,
+    addedShowEvents: show.addedEvents,
+    addedEpisodes: restored.addedEpisodes + show.addedEpisodes,
+    addedSeasons: restored.addedSeasons + show.addedSeasons,
+    addedMinutes: restored.addedMinutes + (show.addedMinutes - (show.repairedMinutes || 0)) + repairedMinutes,
+    repairedMinutes,
+  };
+}
+
 export function mergeImportedWatchlist(existing = {}, item = {}, fallbackDate) {
   const type = item.mediaType || "movie";
   return {
@@ -347,9 +403,18 @@ export function mergeImportedWatchlist(existing = {}, item = {}, fallbackDate) {
       seasonCount: type === "tv" && Number(item.seasonCount) > 0
         ? Number(item.seasonCount)
         : null,
+      // ListsScreen süre rozeti/sıralaması dizide totalMinutes okur (listItemsService.normalizeItem).
+      totalMinutes: type === "tv" ? listTvTotalMinutes(item) : null,
     }),
   };
 }
+
+const listTvTotalMinutes = (item) => {
+  if (Number(item.totalMinutes) > 0) return Number(item.totalMinutes);
+  const perEpisode = Number(item.episodeMinutes);
+  const count = Number(item.episodeCount);
+  return perEpisode > 0 && count > 0 ? perEpisode * count : null;
+};
 
 export function importedReviewId(uid, mediaType, mediaId) {
   const owner = String(uid || "user").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);

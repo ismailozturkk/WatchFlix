@@ -35,6 +35,8 @@ jest.mock("@context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "u1", 
 jest.mock("@context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
 jest.mock("@context/ThemeContext", () => ({ useTheme: () => ({ theme: {} }) }));
 jest.mock("@context/UserProfileContext", () => ({ useUserProfile: () => ({ username: "ad" }) }));
+const mockRefreshList = jest.fn(() => Promise.resolve());
+jest.mock("@context/ListStatusContext", () => ({ useListStatusContext: () => ({ refreshList: mockRefreshList }) }));
 jest.mock("../components/common/GlassBox", () => ({ __esModule: true, default: "GlassBox" }));
 jest.mock("../components/common/GlassTouchable", () => ({ __esModule: true, default: "Touch" }));
 jest.mock("../hooks/useReduceMotion", () => ({ __esModule: true, default: () => true }));
@@ -101,6 +103,7 @@ let errorSpy;
 beforeEach(() => {
   mockPick.mockReset();
   mockRun.mockReset();
+  mockRefreshList.mockClear();
   mockCreate.mockReset().mockImplementation((input) => ({ input, plan: { items: [1], comments: [1], totals: { lists: 0 } } }));
   mockNavigation.goBack.mockReset();
   Object.values(mockToast).forEach((fn) => fn.mockClear());
@@ -204,6 +207,9 @@ it("bağlantı kesilirse sürdür düğmesi aynı işi devam ettirir", async () 
   await press(button(copy.resume));
   expect(mockRun).toHaveBeenCalledTimes(2);
   expect(mockRun.mock.calls[1][0]).toBe(job);
+  // Yarıda kalan ve biten geri yüklemenin ikisinde de liste önbelleği yenilenir.
+  expect(mockRefreshList).toHaveBeenCalledTimes(2);
+  expect(mockRefreshList).toHaveBeenCalledWith("all");
   expect(mockCreate).toHaveBeenCalledTimes(1);
   expect(texts()).toContain(copy.doneTitle);
 });

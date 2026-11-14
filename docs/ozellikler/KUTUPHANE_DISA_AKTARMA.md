@@ -77,6 +77,22 @@ v1 dosyaları da okunur. v2'de eklenenler: her kayıtta `poster` (TMDB yolu, `/^
 bölümde `minutes`/`name`, üst düzeyde `comments[]` = `{id, type, tmdbId, title, poster, text, isSpoiler, createdAt, parentId, scope}`
 ve `counts.comments`. ZIP'e `comments.csv` girer (yorum varsa).
 
+### 14 Kas 2026 düzeltmesi: süre ve dizi bilgisi kaybı (sürüm hâlâ 2, alanlar ek)
+
+Dışa → içe dönüşünde dizi toplam süresi 0'a düşüyordu. Nedenler ve çözüm:
+- **Bölümsüz "tüm dizi izlendi" olayları** (Letterboxd/IMDb aktarımı, eski kayıt) bölüm listesinde yoktu; dosyaya ne tarihi ne
+  süresi yazılıyordu. Artık dizide `showWatchedDates` ve `episodeMinutes` var; `importMerge.mergeBackupTv` bölüm geçmişini
+  (`mergeRestoredTv`) ve bu tarihleri (`mergeImportedTv`) birlikte kurar. Yazıcı (`importWriter`) bu tek yardımcıyı kullanır.
+- **Liste öğeleri** (izleme listesi, favori, özel liste) süre/boyut taşımıyordu; geri yüklemede dizi "1 sezon · 1 bölüm" yazılıyordu.
+  Artık filmde `minutes`, dizide `episodeMinutes`/`seasonCount`/`episodeCount`/`totalMinutes`; bilinmeyen sayı uydurulmaz (`null`).
+- **Geri yükleme ekranı** bitince (ya da yarıda kalınca) `refreshList("all")` çağırır; eskiden cihaz önbelleği eski kalıyordu.
+- **Eski dosya ve onarım:** dosyada süre yoksa bölümsüz izlenmiş dizinin bölüm süresi TMDB'den alınır (ad/afiş dosyadan; ağ
+  hatası kaydı düşürmez). Önceki aktarımın 0 dk yazdığı "tüm dizi" olayları aynı dosya yeniden aktarılınca onarılır
+  (`mergeImportedTv` → `repairedMinutes`; izleme sayısı çoğalmaz).
+- Tam dönüş testi: `__tests__/libraryRoundTrip.test.js` (dışa → dosya → içe → profil istatistiği birebir).
+- Bilinen, AYRI tutarsızlık (düzeltilmedi): bölüm iskeleti olan dizide "tüm dizi" olaylarının süresi profilde sayılmıyor
+  (Letterboxd'dan gelmiş diziye sonradan bölüm işaretlenince o süre profilden düşer). Dönüş bunu korur, değiştirmez.
+
 ## Akış ve dosyalar
 
 | Dosya | Görev |
@@ -110,3 +126,11 @@ ve `counts.comments`. ZIP'e `comments.csv` girer (yorum varsa).
 - Cihazda görülmedi: dosya seçici + `File.text()` büyük dosyada, animasyonların gerçek görünümü, binlerce kayıtta süre.
 - `website/privacy.html` yorumların dışa aktarıldığını ve geri yüklemeyi henüz anmıyor (karar kullanıcıda; deploy edilmedi).
 - Gönderi yorumları (kind `post`) kapsam dışı.
+
+## Letterboxd / ortak kayıt hattı (14 Kas 2026)
+
+- **Yanlış dizi eşleşmesi:** Letterboxd yalnız film tutar ama başlık araması film bulamayınca diziye düşüyor, benzer adlı dizinin TAMAMINI "izlendi" yazıyordu (dizi süresi yüzlerce saat şişebiliyordu). Artık tür ipucu yokken diziye düşüş yalnız ad + yıl birebir tutarsa (puan 7, `STRONG_MATCH_SCORE`), yılsız dizi araması yapılmaz (`tmdbResolver.resolveByTitleYear`). Eski aktarımın yanlış yazdığı diziler `importedFrom: "letterboxd"` taşır; Ayarlar → İçe aktar → Letterboxd verisini sıfırla ile temizlenip yeniden aktarılabilir.
+- **Parçalı kayıt:** `writeImportedItems` öğe başına transaction yerine `ITEM_CHUNK_SIZE` (12) öğelik parçalar yazar; kök belge parça başına bir kez, sayaçlar parçada toplanıp tek `increment`. Aynı medya bir parçada iki kez bulunmaz. Parça kalıcı hatayla düşerse öğeler tek tek yeniden denenir. Durdurma parça sınırında etkili olur. Letterboxd ve yedek geri yükleme aynı hattı kullanır.
+- **Eşleştirme eşzamanlılığı** 5 → 8 (429'da Retry-After ile geri çekilme zaten var).
+- **İnceleme HTML'i** (`<i>`, `<br />`, `<p>` …) düz metne iner, satır sonları korunur (`cleanLetterboxdReview`); tekil CSV ayrıştırıcı da aynı puan/inceleme yardımcılarını kullanır.
+- Test: `__tests__/letterboxdImportPipeline.test.js` (paket → TMDB → parçalı yazım → profil özeti; yeniden aktarım çoğaltmaz; parçada tek hatalı öğe).

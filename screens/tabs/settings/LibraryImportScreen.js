@@ -16,6 +16,7 @@ import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import { useAuth } from "@context/AuthContext";
+import { useListStatusContext } from "@context/ListStatusContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { useUserProfile } from "@context/UserProfileContext";
@@ -90,6 +91,15 @@ export default function LibraryImportScreen() {
   const reduceMotion = useReduceMotion();
   const uid = useAuth()?.user?.uid || null;
   const authUser = useAuth()?.user || null;
+  // Geri yüklemeden sonra listeler sunucudan yeniden çekilir (Letterboxd/IMDb aktarımı da böyle yapar,
+  // components/import/ImportDataModal). Yapılmazsa cihazdaki liste önbelleği eski kalıyor; yeni diziler,
+  // bölümler ve süreler uygulama yeniden açılana dek görünmüyordu.
+  const refreshList = useListStatusContext()?.refreshList;
+  const refreshRef = useRef(refreshList);
+  refreshRef.current = refreshList;
+  const refreshLists = useCallback(() => {
+    Promise.resolve(refreshRef.current?.("all")).catch(() => {});
+  }, []);
   const profile = useUserProfile() || {};
 
   const [phase, setPhase] = useState("intro"); // intro | reading | preview | running | done | stopped
@@ -153,11 +163,14 @@ export default function LibraryImportScreen() {
         signal,
         onEvent: (event) => aliveRef.current && setStages((state) => reduceStages(state, event)),
       });
+      refreshLists();
       if (!aliveRef.current) return;
       setSummary(result);
       setPhase("done");
       celebrate();
     } catch (error) {
+      // Durdurulan / yarıda kalan geri yüklemede de yazılmış kayıtlar vardır.
+      refreshLists();
       if (!aliveRef.current) return;
       const code = error?.code || "generic";
       setRunError(code);
@@ -166,7 +179,7 @@ export default function LibraryImportScreen() {
     } finally {
       if (signalRef.current === signal) signalRef.current = null;
     }
-  }, []);
+  }, [refreshLists]);
 
   const start = () => {
     if (!picked || !uid) return;

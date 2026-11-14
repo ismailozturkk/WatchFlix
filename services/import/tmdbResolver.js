@@ -121,7 +121,7 @@ export function scoreCandidate(candidate, { title, originalTitle, year }) {
  * En iyi aday. `strict`: yıl filtresi düşürülmüş aramada ad da yıl da tutmuyorsa yanlış
  * filmi kaydetmektense eşleşmedi denir.
  */
-export function pickBestCandidate(results, query, { strict = false } = {}) {
+export function pickBestCandidate(results, query, { strict = false, minScore = null } = {}) {
   const list = (Array.isArray(results) ? results : []).filter((item) => item?.id != null).slice(0, 10);
   if (!list.length) return null;
   const ranked = list
@@ -130,8 +130,12 @@ export function pickBestCandidate(results, query, { strict = false } = {}) {
     .sort((a, b) => b.score - a.score);
   const best = ranked[0];
   if (strict && best.score < 1) return null;
+  if (minScore != null && best.score < minScore) return null;
   return best.candidate;
 }
+
+/** Ad birebir (+4) ve yıl birebir (+3): tür tahmin edilirken kabul edilen en düşük puan. */
+const STRONG_MATCH_SCORE = 7;
 
 // ---- Ayrıntı -----------------------------------------------------------------
 
@@ -255,7 +259,23 @@ export function resolveByTitleYear(title, year = null, language = DEFAULT_LANGUA
 
   return cached(`title:${order[0]}:${cleanTitle.toLowerCase()}:${year || "any"}:${language}`, async () => {
     for (const mediaType of order) {
-      let candidate = pickBestCandidate(await searchTitles(mediaType, cleanTitle, year, signal), query);
+      // Tür belirsizken (Letterboxd yalnız film tutar) diziye düşüş YALNIZ kesin eşleşmede: ad birebir + yıl
+      // birebir (puan 7). Eskiden film bulunamayınca benzer adlı bir dizinin TAMAMI "izlendi" yazılıyor, dizi
+      // süresi yüzlerce saat şişiyordu. Yılsız dizi araması da yapılmaz.
+      const fallbackTv = mediaType === "tv" && hint !== "tv";
+      if (fallbackTv && !year) continue;
+      let candidate = pickBestCandidate(
+        await searchTitles(mediaType, cleanTitle, year, signal),
+        query,
+        fallbackTv ? { minScore: STRONG_MATCH_SCORE } : undefined,
+      );
+      if (fallbackTv) {
+        if (candidate) {
+          const details = await fetchMediaDetails(candidate.id, mediaType, language, { signal });
+          return normalizeMedia(candidate, details, mediaType);
+        }
+        continue;
+      }
       // Yılla bulunamadıysa YILSIZ ara (Letterboxd festival / vizyon yılı farkları)
       if (!candidate && year) {
         candidate = pickBestCandidate(await searchTitles(mediaType, cleanTitle, null, signal), query, { strict: true });
@@ -287,15 +307,46 @@ function localMedia(item) {
     vote_average: 0,
     overview: "",
     minutes: !tv && Number(item.rawMinutes) > 0 ? Number(item.rawMinutes) : null,
-    episodeMinutes: null,
-    seasonCount: tv ? Number(item.seasonCount) || 1 : null,
-    episodeCount: tv ? Number(item.episodeCount) || 1 : null,
+    // Seelogd yedeği dizinin bölüm süresini taşır; olmadan "tüm dizi izlendi" kaydı 0 dakika yazılırdı.
+    episodeMinutes: tv && Number(item.episodeMinutes) > 0 ? Number(item.episodeMinutes) : null,
+    // Bilinmeyen sayı uydurulmaz (eskiden 1 yazılıyordu: izleme listesinde "1 sezon · 1 bölüm").
+    seasonCount: tv ? Number(item.seasonCount) || null : null,
+    episodeCount: tv ? Number(item.episodeCount) || null : null,
+    totalMinutes: tv && Number(item.totalMinutes) > 0 ? Number(item.totalMinutes) : null,
     genres: Array.isArray(item.rawGenres) ? item.rawGenres : [],
   };
 }
 
+/**
+ * Eski (14 Kas öncesi) yedekte bölümsüz izlenmiş dizinin bölüm süresi yoktur; dosyadan kurulursa süre 0 yazılır.
+ * Yalnız o durumda TMDB'den bölüm süresi alınır; ad/afiş dosyadaki gibi kalır. Ağ hatası kaydı düşürmez.
+ */
+const needsShowRuntime = (item) =>
+  item.mediaType === "tv" &&
+  item.targetList === "watchedTv" &&
+  !(Array.isArray(item.episodes) && item.episodes.length > 0) &&
+  !(Number(item.episodeMinutes) > 0);
+
 async function resolveByTmdbId(item, language, signal) {
-  if (item.title && item.poster_path) return localMedia(item);
+  if (item.title && item.poster_path) {
+    const local = localMedia(item);
+    if (!needsShowRuntime(item)) return local;
+    try {
+      const details = await fetchMediaDetails(item.tmdbId, "tv", language, { signal });
+      if (details) {
+        const media = normalizeMedia({ id: Number(item.tmdbId) }, details, "tv");
+        return {
+          ...local,
+          episodeMinutes: media.episodeMinutes || null,
+          seasonCount: local.seasonCount || media.seasonCount || null,
+          episodeCount: local.episodeCount || media.episodeCount || null,
+        };
+      }
+    } catch (error) {
+      if (error?.code === "cancelled") throw error;
+    }
+    return local;
+  }
   const mediaType = item.mediaType === "tv" ? "tv" : "movie";
   const details = await fetchMediaDetails(item.tmdbId, mediaType, language, { signal });
   if (!details) return item.title ? localMedia(item) : null;
@@ -328,9 +379,12 @@ export function attachSourceData(media, item) {
     ? media.genres
     : (Array.isArray(item.rawGenres) ? item.rawGenres : []);
 
+  const episodeMinutes = media.episodeMinutes || (Number(item.episodeMinutes) > 0 ? Number(item.episodeMinutes) : null);
+
   return {
     ...media,
     minutes,
+    episodeMinutes,
     genres,
     userRating: item.rating ?? null,
     watchedDate: item.watchedDate ?? null,
@@ -364,7 +418,8 @@ export function attachSourceData(media, item) {
 export async function resolveImportItems(items, options = {}) {
   const {
     language = DEFAULT_LANGUAGE,
-    concurrency = 5,
+    // TMDB ~40 istek/sn kaldırır; 429 gelirse Retry-After ile geri çekilinir.
+    concurrency = 8,
     signal,
     onProgress,
     maxConsecutiveFailures = 6,

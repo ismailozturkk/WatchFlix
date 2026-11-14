@@ -58,6 +58,22 @@ const cleanDate = (raw) => {
   return value || null;
 };
 
+/**
+ * Letterboxd inceleme metni biçimlemeyi HTML olarak taşır (<i>, <b>, <br />, <p>, <a>, <blockquote>).
+ * Uygulama düz metin gösterir: satır sonları korunur, etiketler atılır (eskiden yorumda "<i>…</i>" görünüyordu).
+ */
+export function cleanLetterboxdReview(raw) {
+  const text = String(raw || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>\s*<p[^>]*>/gi, "\n\n")
+    .replace(/<\/?(?:p|i|b|em|strong|u|s|strike|del|blockquote|span|a)(?:\s[^>]*)?>/gi, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text || null;
+}
+
 const rowUri = (row) => row["letterboxd uri"] || row["letterboxd_uri"] || row["uri"] || row["url"] || null;
 
 const titleKey = (title, year) => `${(title || "").trim().toLowerCase()}__${year || "any"}`;
@@ -247,7 +263,7 @@ export function parseLetterboxdBundle(filesMap, { allowEmpty = false } = {}) {
     const title = rowTitle(row);
     if (!title) continue;
     const entry = entryFor(title, parseYear(row["year"]), rowUri(row));
-    const reviewText = (row["review"] || "").trim();
+    const reviewText = cleanLetterboxdReview(row["review"]);
     const watchedDate = cleanDate(row["watched date"]);
     if (reviewText) entry.review = reviewText;
     if (watchedDate) addUnique(entry.diaryDates, watchedDate);

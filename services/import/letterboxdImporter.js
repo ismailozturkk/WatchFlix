@@ -5,6 +5,7 @@
 
 import { parseCsv } from "./csvParser";
 import { ImportError } from "./importErrors";
+import { cleanLetterboxdReview, normalizeLetterboxdRating } from "./letterboxdBundleImporter";
 
 /**
  * Verilen CSV'nin Letterboxd formatında olup olmadığını belirler.
@@ -79,17 +80,11 @@ export function parseLetterboxdCsv(csvText, fileNameHint = null) {
       const year = Number.isNaN(rawYear) ? null : rawYear;
 
       // Rating (0.5 ile 5.0 arası yıldız -> 1 ile 10 skalasına çevir)
-      let rating = null;
-      if (row["rating"] !== undefined && row["rating"] !== "") {
-        const rawRating = parseFloat(row["rating"]);
-        if (!Number.isNaN(rawRating) && rawRating > 0) {
-          rating = Math.round(Math.min(10, Math.max(1, rawRating * 2)));
-        }
-      }
+      const rating = normalizeLetterboxdRating(row["rating"]);
 
       const watchedDate = row["watched date"] || row["date"] || null;
       const isRewatch = (row["rewatch"] || "").trim().toLowerCase() === "yes";
-      const review = (row["review"] || "").trim() || null;
+      const review = cleanLetterboxdReview(row["review"]);
       const letterboxdUri = row["letterboxd uri"] || row["letterboxd_uri"] || row["uri"] || null;
 
       if (!title) return null;
