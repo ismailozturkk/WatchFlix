@@ -97,3 +97,21 @@ assets/unused-lottie/
 
 # Yük testi betikleri (uygulama kodu değil)
 load-test/
+
+# Kökte bırakılan geçici ekran görüntüleri / denemeler (tmp-*.png, tmp-*/)
+/tmp-*
+
+# Yerel Expo modüllerinin Gradle derleme çıktısı ve önbelleği (kaynak değil)
+modules/*/android/build/
+modules/*/android/.gradle/
+
+# Birleştirme artıkları, örnek ortam dosyası, yerel kimlik dosyası
+*.orig.*
+.env.example
+credentials.json
+
+# Expo Doctor / tema denetimi gibi yerel dışa aktarımlar
+.theme-audit-export.log
+
+# AI değerlendirme çıktıları (scripts/* zaten hariç; açıkça dursun)
+scripts/ai-eval/out/

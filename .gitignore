@@ -96,3 +96,11 @@ modules/*/android/.gradle/
 
 # Yük testi kimlik jetonları (staging test kullanıcılarının ID jetonları — asla commit etme)
 load-test/tokens*.json
+
+# Pazarlama video kaynak kareleri ve üretilmiş videolar (~1,1 GB; uret.py ile
+# yeniden üretilir). Metinler, strateji ve marka dosyaları izlenir.
+marketing/sosyal-medya/kaynak/
+marketing/sosyal-medya/cikti/
+
+# Kökte bırakılan geçici ekran görüntüleri / denemeler
+/tmp-*
