@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex, nofollow" />
 <meta name="color-scheme" content="dark" />
-<meta name="theme-color" content="#06080c" />
+<meta name="theme-color" content="#070a10" />
 <title>seelogd · Yönetim</title>
 <link rel="icon" href="favicon.ico" sizes="any" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -13,28 +13,18 @@
 <link rel="stylesheet" href="fonts/fonts.css" /><!-- kendi sunucumuzdan; Google Fonts yok (gizlilik) -->
 <link rel="stylesheet" href="admin.css" />
 </head>
-<!-- Site yönetim paneli (yalnız siteAdmins/{uid} belgesi olan hesap). Veri: betaTesters, waitlist, siteStats.
-     Yetki tamamen firestore.rules'ta; bu sayfa yalnız okur. Ayrıntı: README.md → "Yönetim paneli". -->
+<!-- Site yönetim paneli (yalnız siteAdmins/{uid} belgesi olan hesap). Veri: siteStats (günlük toplam), betaTesters,
+     waitlist, betaFeatureVotes. Yetki tamamen firestore.rules'ta; bu sayfa yalnız okur. Ayrıntı: README.md → "Yönetim paneli". -->
 <body>
 <a class="skip" href="#main">İçeriğe geç</a>
-<header class="bar">
-  <div class="wrap bar-in">
-    <a class="brand" href="/" aria-label="seelogd ana sayfa"><img src="lens-mark.svg" width="30" height="30" alt="" />seelogd <span>Yönetim merkezi</span></a>
-    <div class="who" id="who" hidden>
-      <span class="secure-pill">● Güvenli oturum</span>
-      <span id="whoEmail"></span>
-      <button class="btn ghost sm" type="button" id="signOut">Çıkış</button>
-    </div>
-  </div>
-</header>
 
-<main class="wrap" id="main">
-  <!-- Yükleniyor -->
-  <section class="state" id="stLoading"><p class="muted">Yükleniyor…</p></section>
+<!-- Yükleniyor / giriş / yetki yok: tam ekran ortada -->
+<div class="gate" id="stLoading"><div class="spinner" aria-hidden="true"></div><p class="muted">Yükleniyor…</p></div>
 
-  <!-- Giriş -->
-  <section class="state card login" id="stLogin" hidden>
-    <h1>Yönetim paneli</h1>
+<div class="gate" id="stLogin" hidden>
+  <section class="card login">
+    <div class="login-brand"><img src="lens-mark.svg" width="40" height="40" alt="" /><div><b>seelogd</b><span>Yönetim merkezi</span></div></div>
+    <h1>Panele giriş</h1>
     <p class="muted">Uygulamadaki hesabınla giriş yap. Yalnız yönetici olarak eklenen hesap verileri görebilir.</p>
     <button class="btn primary wide" type="button" id="googleBtn">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6a5.1 5.1 0 0 1-2.2 3.3v2.8h3.6c2.1-1.9 3.2-4.8 3.2-8.2z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.6-2.8c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.4-.4-2.1s.1-1.4.4-2.1V6.9H2A11 11 0 0 0 1 12c0 1.8.4 3.4 1.1 4.9l3.6-2.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2 6.9l3.7 2.9C6.6 7.3 9.1 5.4 12 5.4z"/></svg>
@@ -52,148 +42,228 @@
     </details>
     <p class="err" id="loginErr" role="alert"></p>
   </section>
+</div>
 
-  <!-- Yetki yok -->
-  <section class="state card login" id="stDenied" hidden>
+<div class="gate" id="stDenied" hidden>
+  <section class="card login">
     <h1>Bu hesap yönetici değil</h1>
     <p class="muted">Panel yalnız <code>siteAdmins</code> koleksiyonunda belgesi olan hesaplara açık. Kendini eklemek için
       Firebase Console → Firestore'da <code>siteAdmins</code> koleksiyonuna, kimliği aşağıdaki UID olan boş bir belge ekle
       (istersen <code>note</code> alanı yaz), sonra bu sayfayı yenile.</p>
     <div class="uid"><code id="uid"></code><button class="btn sm" type="button" id="copyUid">Kopyala</button></div>
     <a class="btn ghost wide" id="consoleLink" target="_blank" rel="noopener" href="https://console.firebase.google.com/project/movieandtv-2832a/firestore/databases/-default-/data">Firebase Console'u aç</a>
+    <button class="btn ghost wide" type="button" data-signout>Başka hesapla giriş yap</button>
   </section>
+</div>
 
-  <!-- Panel -->
-  <section class="state" id="stPanel" hidden>
-    <div class="panel-hero">
-      <div>
-        <p class="eyebrow">SEELOGD / SİTE YÖNETİMİ</p>
-        <h1>Her şey tek bakışta.</h1>
-        <p>Site trafiğini ve katılım kayıtlarını buradan takip et. Veriler yalnız bu hesap için okunur.</p>
-      </div>
-      <div class="hero-side">
-        <span class="hero-live"><i></i> Yönetici erişimi açık</span>
-        <span id="updatedAt">Veriler yükleniyor…</span>
-        <button class="btn hero-refresh" type="button" id="refresh">↻ &nbsp; Verileri yenile</button>
-      </div>
-    </div>
-    <nav class="tabs" role="tablist" aria-label="Bölümler">
-      <button role="tab" id="tab-overview" aria-controls="pane-overview" type="button" class="tab" data-tab="overview" aria-selected="true">Genel bakış</button>
-      <button role="tab" id="tab-stats" aria-controls="pane-stats" type="button" class="tab" data-tab="stats" aria-selected="false">Ziyaret analizi</button>
-      <button role="tab" id="tab-beta" aria-controls="pane-beta" type="button" class="tab" data-tab="beta" aria-selected="false">Beta testçileri <b id="betaBadge"></b></button>
-      <button role="tab" id="tab-votes" aria-controls="pane-votes" type="button" class="tab" data-tab="votes" aria-selected="false">Özellik oyları</button>
-      <button role="tab" id="tab-wait" aria-controls="pane-wait" type="button" class="tab" data-tab="wait" aria-selected="false">Bekleme listesi <b id="waitBadge"></b></button>
+<!-- Panel -->
+<div class="shell" id="stPanel" hidden>
+  <aside class="side" id="side">
+    <a class="brand" href="/" aria-label="seelogd ana sayfa"><img src="lens-mark.svg" width="30" height="30" alt="" /><span><b>seelogd</b><small>Yönetim merkezi</small></span></a>
+    <nav class="side-nav" role="tablist" aria-label="Bölümler" aria-orientation="vertical">
+      <p class="side-group">Analiz</p>
+      <button role="tab" type="button" class="tab" data-tab="overview" aria-selected="true"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm10 8h8V11h-8zM3 21h8v-6H3zm10-18v6h8V3z"/></svg></span>Genel bakış</button>
+      <button role="tab" type="button" class="tab" data-tab="traffic" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg></span>Trafik ve kaynaklar</button>
+      <button role="tab" type="button" class="tab" data-tab="audience" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>Kitle</button>
+      <button role="tab" type="button" class="tab" data-tab="behavior" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 11V6a3 3 0 0 1 6 0v5M5 11h14l-1.5 10h-11z"/></svg></span>Davranış</button>
+      <button role="tab" type="button" class="tab" data-tab="signups" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M19 8v6M22 11h-6"/></svg></span>Kayıtlar ve dönüşüm</button>
+      <p class="side-group">Listeler</p>
+      <button role="tab" type="button" class="tab" data-tab="beta" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2l-6-10V3"/></svg></span>Beta testçileri <b class="count" id="betaBadge"></b></button>
+      <button role="tab" type="button" class="tab" data-tab="wait" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>Bekleme listesi <b class="count" id="waitBadge"></b></button>
+      <button role="tab" type="button" class="tab" data-tab="votes" aria-selected="false"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 10v11M15 5.9 14 10h5.8a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 18.4 21H7V10l4-8a3 3 0 0 1 3 3.9z"/></svg></span>Özellik oyları</button>
     </nav>
-
-    <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
-      <div class="section-heading"><div><p class="eyebrow">DURUM ÖZETİ</p><h2>Bugün neler oluyor?</h2><p>Son 7 günlük site etkinliği ve toplam katılım kayıtları.</p></div></div>
-      <div class="overview-kpis" id="overviewKpis" aria-live="polite"></div>
-      <div class="overview-grid">
-        <article class="card insight-card"><div class="card-head"><div><p class="eyebrow">TRAFİK</p><h2>7 günlük görünüm</h2></div><button class="text-link" type="button" data-go="stats">Ayrıntıları aç →</button></div><div id="overviewTraffic" class="insight-body"></div></article>
-        <article class="card insight-card"><div class="card-head"><div><p class="eyebrow">KATILIM</p><h2>Kayıt hareketi</h2></div><button class="text-link" type="button" data-go="beta">Beta listesini aç →</button></div><div id="overviewJoin" class="insight-body"></div></article>
-      </div>
-      <div class="section-heading compact"><div><p class="eyebrow">HIZLI ERİŞİM</p><h2>Çalışma alanları</h2></div></div>
-      <div class="quick-grid">
-        <button class="quick-card" type="button" data-go="stats"><span class="quick-icon">↗</span><b>Ziyaret analizi</b><span>Kaynak, cihaz, ülke ve saat dağılımını incele.</span><i>Analize git →</i></button>
-        <button class="quick-card" type="button" data-go="beta"><span class="quick-icon">◈</span><b>Beta testçileri</b><span>Platforma göre filtrele, listeyi kopyala veya indir.</span><i>Listeye git →</i></button>
-        <button class="quick-card" type="button" data-go="wait"><span class="quick-icon">≋</span><b>Bekleme listesi</b><span>Sıra numaralarını gör ve kayıtları dışa aktar.</span><i>Listeye git →</i></button>
-      </div>
-      <details class="info-panel"><summary>Bu paneldeki sayılar nasıl hesaplanır?</summary><p>Ziyaret verileri günlük toplam olarak saklanır. “Ziyaretçi” her gün ayrı sayılır; birden fazla günün toplamı gerçek tekil kişi sayısı değildir. Beta ve bekleme listesi sayıları ise tüm kayıtların güncel toplamıdır. İstatistikler çerez veya saklanan IP kullanmaz.</p></details>
+    <div class="side-foot">
+      <span class="secure-pill"><i></i> Güvenli oturum</span>
+      <span class="who-email" id="whoEmail"></span>
+      <button class="btn ghost sm wide" type="button" id="signOut">Çıkış yap</button>
     </div>
+  </aside>
 
-    <!-- Ziyaretler -->
-    <div class="pane" id="pane-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
-      <div class="section-heading"><div><p class="eyebrow">ZİYARET ANALİZİ</p><h2>Site performansı</h2><p>Günlük ziyaret eğilimini ve kitlenin dağılımını incele.</p></div></div>
-      <div class="toolbar">
+  <div class="content">
+    <header class="topbar">
+      <button class="btn ghost sm menu-btn" type="button" id="menuBtn" aria-controls="side" aria-expanded="false">☰ <span>Menü</span></button>
+      <div class="topbar-title"><p class="eyebrow" id="pageEyebrow">ANALİZ</p><h1 id="pageTitle">Genel bakış</h1></div>
+      <div class="topbar-tools" id="rangeTools">
         <div class="seg" role="group" aria-label="Zaman aralığı" id="range">
           <button type="button" data-days="1">Bugün</button>
           <button type="button" data-days="7">7 gün</button>
           <button type="button" data-days="30" class="on">30 gün</button>
           <button type="button" data-days="90">90 gün</button>
         </div>
+        <button class="btn sm icon-btn" type="button" id="refresh" title="Verileri yenile" aria-label="Verileri yenile">↻</button>
       </div>
-      <p class="note">Gün ve saatler İstanbul saatiyle. Ülke, ziyaretçinin saat diliminden tahmin edilir; çerez ve IP kullanılmaz.
-        Do Not Track açık tarayıcılar ve botlar sayılmaz.</p>
+    </header>
+    <p class="updated" id="updatedAt" role="status">Veriler yükleniyor…</p>
 
-      <div class="kpis" id="kpis"></div>
-
-      <article class="card chart-card">
-        <header class="card-head">
-          <h2>Günlük ziyaret</h2>
-          <ul class="legend" id="trendLegend"></ul>
-        </header>
-        <div class="trend" id="trend"></div>
-      </article>
-
-      <div class="grid2">
-        <article class="card"><header class="card-head"><h2>Ülkeler</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="countries"></ol></article>
-        <article class="card"><header class="card-head"><h2>Nereden geldi</h2><small>oturum</small></header><ol class="bars" id="refs"></ol></article>
-        <article class="card"><header class="card-head"><h2>Cihaz</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="devices"></ol></article>
-        <article class="card"><header class="card-head"><h2>İşletim sistemi</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="os"></ol></article>
-        <article class="card"><header class="card-head"><h2>Tarayıcı dili</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="langs"></ol></article>
-        <article class="card"><header class="card-head"><h2>Sayfalar</h2><small>görüntüleme</small></header><ol class="bars" id="pages"></ol></article>
-      </div>
-
-      <article class="card">
-        <header class="card-head"><h2>Saatlere göre</h2><small>görüntüleme · İstanbul saati</small></header>
-        <div class="hours" id="hours"></div>
-      </article>
-    </div>
-
-    <!-- Beta testçileri -->
-    <div class="pane" id="pane-beta" role="tabpanel" aria-labelledby="tab-beta" hidden>
-      <div class="section-heading"><div><p class="eyebrow">KAPALI TEST</p><h2>Beta testçileri</h2><p>Başvuruları platforma ve tarihe göre incele; görünen sonuçları dışa aktar.</p></div></div>
-      <div class="kpis small" id="betaKpis"></div>
-      <div class="toolbar list-toolbar">
-        <div class="seg" role="group" aria-label="Platform" id="betaFilter">
-          <button type="button" data-p="" class="on">Tümü</button>
-          <button type="button" data-p="android">Android</button>
-          <button type="button" data-p="ios">iOS</button>
+    <main id="main">
+      <!-- GENEL BAKIŞ -->
+      <section class="pane" id="pane-overview" role="tabpanel" data-title="Genel bakış" data-eyebrow="ANALİZ">
+        <div class="kpis" id="ovKpis" aria-live="polite"></div>
+        <div class="grid g-2-1">
+          <article class="card">
+            <header class="card-head"><div><h2>Ziyaret ve kayıt eğilimi</h2><small id="ovTrendSub">günlük · İstanbul saati</small></div><ul class="legend" id="ovLegend"></ul></header>
+            <div class="chart" id="ovTrend"></div>
+          </article>
+          <article class="card">
+            <header class="card-head"><div><h2>Dönüşüm hunisi</h2><small>ziyaretçiden kayda</small></div></header>
+            <div class="funnel" id="ovFunnel"></div>
+          </article>
         </div>
-        <input class="search" type="search" id="betaSearch" placeholder="E-postada ara" aria-label="Beta e-postalarında ara" />
-        <select id="betaPeriod" aria-label="Beta kayıt tarihi"><option value="all">Tüm tarihler</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
-        <select id="betaSort" aria-label="Beta sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="email">E-posta A–Z</option></select>
-        <div class="actions">
-          <button class="btn sm" type="button" id="betaCopy">E-postaları kopyala</button>
-          <button class="btn ghost sm" type="button" id="betaCsv">CSV indir</button>
+        <div class="grid g-3">
+          <article class="card"><header class="card-head"><div><h2>En çok getiren kaynaklar</h2><small>oturum · kayıt</small></div><button class="text-link" type="button" data-go="traffic">Tümü →</button></header><div id="ovSources"></div></article>
+          <article class="card"><header class="card-head"><div><h2>Ülkeler</h2><small>tekil ziyaretçi</small></div><button class="text-link" type="button" data-go="audience">Tümü →</button></header><ol class="bars" id="ovCountries"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Öne çıkanlar</h2><small>otomatik çıkarım</small></div></header><ul class="insights" id="ovInsights"></ul></article>
         </div>
-      </div>
-      <p class="note">Android davetinde e-postalar Play Console → Kapalı test → Test kullanıcıları listesine, iOS'ta App Store Connect →
-        TestFlight → Harici test kullanıcılarına yapıştırılır. "Kopyala" görünen (süzülmüş) listeyi virgülle ayırır.</p>
-      <p class="result-count" id="betaCount" role="status"></p>
-      <div class="table-wrap"><table class="table" id="betaTable"><thead><tr><th>E-posta</th><th>Platform</th><th>Dil</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
-      <div class="pager"><button class="btn ghost sm" type="button" id="betaPrev">← Önceki</button><span id="betaPage"></span><button class="btn ghost sm" type="button" id="betaNext">Sonraki →</button></div>
-      <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console'daki kapalı test kullanıcı listesine, iOS e-postalarını App Store Connect'teki TestFlight harici test kullanıcılarına ekle. Platform filtresi ve arama, kopyalama ile CSV çıktısına da uygulanır. Davetler bu panelden gönderilmez.</p></details>
-    </div>
-
-    <!-- Beta özellik oyları: toplamlar Firestore kurallarıyla yalnız siteAdmins hesabına açık. -->
-    <div class="pane" id="pane-votes" role="tabpanel" aria-labelledby="tab-votes" hidden>
-      <div class="section-heading"><div><p class="eyebrow">ÜRÜN GERİ BİLDİRİMİ</p><h2>Beta özellik oyları</h2><p>Her hesap, her özelliğe yalnız bir oy verir; seçimini değiştirirse toplamlar güncellenir.</p></div></div>
-      <div class="kpis small" id="voteKpis"></div>
-      <div class="table-wrap"><table class="table" id="votesTable"><thead><tr><th>Özellik</th><th>Beğeni</th><th>Beğenmeme</th><th>Toplam</th><th>Beğeni oranı</th></tr></thead><tbody></tbody></table></div>
-      <p class="note">Bu sayılar yalnız yönetici hesabına görünür. Oy verenlerin kimliği bu tabloda gösterilmez.</p>
-    </div>
-
-    <!-- Bekleme listesi -->
-    <div class="pane" id="pane-wait" role="tabpanel" aria-labelledby="tab-wait" hidden>
-      <div class="section-heading"><div><p class="eyebrow">YAYIN HABERİ</p><h2>Bekleme listesi</h2><p>Yayın duyurusu için kayıtları ve sıra numaralarını görüntüle.</p></div></div>
-      <div class="kpis small" id="waitKpis"></div>
-      <div class="toolbar list-toolbar">
-        <input class="search" type="search" id="waitSearch" placeholder="E-postada ara" aria-label="E-postada ara" />
-        <select id="waitPeriod" aria-label="Bekleme listesi kayıt tarihi"><option value="all">Tüm tarihler</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
-        <select id="waitSort" aria-label="Bekleme listesi sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="queue">Sıra numarası</option><option value="email">E-posta A–Z</option></select>
-        <div class="actions">
-          <button class="btn sm" type="button" id="waitCopy">E-postaları kopyala</button>
-          <button class="btn ghost sm" type="button" id="waitCsv">CSV indir</button>
+        <div class="grid g-2">
+          <article class="card"><header class="card-head"><div><h2>Katılım listeleri</h2><small>tüm zamanlar · seçili aralıktaki yeni kayıt</small></div><button class="text-link" type="button" data-go="signups">Ayrıntı →</button></header><div class="stat-pairs" id="ovLists"></div></article>
+          <article class="card"><header class="card-head"><div><h2>Cihaz karışımı</h2><small>tekil ziyaretçi</small></div></header><div class="donut-row" id="ovDevices"></div></article>
         </div>
-      </div>
-      <p class="result-count" id="waitCount" role="status"></p>
-      <div class="table-wrap"><table class="table" id="waitTable"><thead><tr><th>E-posta</th><th>Sıra</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
-      <div class="pager"><button class="btn ghost sm" type="button" id="waitPrev">← Önceki</button><span id="waitPage"></span><button class="btn ghost sm" type="button" id="waitNext">Sonraki →</button></div>
-      <details class="info-panel"><summary>Bekleme listesi hakkında</summary><p>Beta başvurusu yapan adresler yayın haberi için bu listede de bulunabilir. Sıra numarası kayıt sırasında atanır. Kopyalama ve CSV, etkin filtreye uyan tüm sonuçları içerir; yalnız ekrandaki sayfayla sınırlı değildir.</p></details>
-    </div>
-  </section>
-</main>
+      </section>
+
+      <!-- TRAFİK -->
+      <section class="pane" id="pane-traffic" role="tabpanel" data-title="Trafik ve kaynaklar" data-eyebrow="ANALİZ" hidden>
+        <div class="kpis" id="trKpis"></div>
+        <article class="card">
+          <header class="card-head"><div><h2>Günlük trafik</h2><small>ziyaretçi · oturum · görüntüleme</small></div><ul class="legend" id="trLegend"></ul></header>
+          <div class="chart" id="trTrend"></div>
+        </article>
+        <article class="card">
+          <header class="card-head"><div><h2>Kaynaklar</h2><small>oturumun giriş kaynağı; utm_source etiketi önce gelir</small></div><button class="btn ghost sm" type="button" id="srcCsv">CSV indir</button></header>
+          <div class="table-wrap"><table class="table sortable" id="srcTable"><thead><tr>
+            <th data-k="key">Kaynak</th><th data-k="sessions" class="num">Oturum</th><th data-k="share" class="num">Pay</th>
+            <th data-k="engaged" class="num">İlgili oturum</th><th data-k="engagedRate" class="num">İlgi oranı</th>
+            <th data-k="signups" class="num">Kayıt</th><th data-k="convRate" class="num">Dönüşüm</th>
+          </tr></thead><tbody></tbody></table></div>
+          <p class="note">"İlgili oturum": sekme önde en az 15 sn kalan oturum. "Kayıt": o oturumda tamamlanan bekleme listesi ya da beta kaydı.</p>
+        </article>
+        <div class="grid g-2">
+          <article class="card"><header class="card-head"><div><h2>Kampanyalar</h2><small>utm_source ~ utm_campaign · oturum</small></div></header><ol class="bars" id="trCampaigns"></ol>
+            <p class="note">Bağlantı biçimi: <code>https://seelogd.com/?utm_source=tiktok&amp;utm_campaign=lansman</code>. Kısaltıcılar etiketi düşürebilir.</p></article>
+          <article class="card"><header class="card-head"><div><h2>Yeni ve geri dönen</h2><small>tekil ziyaretçi</small></div></header><div id="trReturning"></div></article>
+          <article class="card"><header class="card-head"><div><h2>Sayfalar</h2><small>görüntüleme</small></div></header><ol class="bars" id="trPages"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Kaynak payı</h2><small>oturum</small></div></header><div class="donut-row" id="trSourceDonut"></div></article>
+        </div>
+      </section>
+
+      <!-- KİTLE -->
+      <section class="pane" id="pane-audience" role="tabpanel" data-title="Kitle" data-eyebrow="ANALİZ" hidden>
+        <div class="kpis" id="auKpis"></div>
+        <article class="card">
+          <header class="card-head"><div><h2>Ülkeler</h2><small>ziyaretçi (saat diliminden tahmin) ve aynı ülkeden tamamlanan kayıt</small></div></header>
+          <div class="table-wrap"><table class="table" id="countryTable"><thead><tr><th>Ülke</th><th class="num">Ziyaretçi</th><th>Pay</th><th class="num">Kayıt</th><th class="num">Dönüşüm</th></tr></thead><tbody></tbody></table></div>
+        </article>
+        <div class="grid g-3">
+          <article class="card"><header class="card-head"><div><h2>Cihaz</h2><small>tekil ziyaretçi</small></div></header><ol class="bars" id="auDevices"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>İşletim sistemi</h2><small>tekil ziyaretçi</small></div></header><ol class="bars" id="auOs"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Tarayıcı</h2><small>tekil ziyaretçi · "Uygulama içi" = Instagram/TikTok vb.</small></div></header><ol class="bars" id="auBrowsers"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Tarayıcı dili</h2><small>tekil ziyaretçi</small></div></header><ol class="bars" id="auLangs"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Sitede seçilen dil</h2><small>tekil ziyaretçi</small></div></header><ol class="bars" id="auSiteLangs"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Ekran boyutu</h2><small>tekil ziyaretçi</small></div></header><ol class="bars" id="auScreens"></ol></article>
+        </div>
+      </section>
+
+      <!-- DAVRANIŞ -->
+      <section class="pane" id="pane-behavior" role="tabpanel" data-title="Davranış" data-eyebrow="ANALİZ" hidden>
+        <div class="kpis" id="bhKpis"></div>
+        <article class="card">
+          <header class="card-head"><div><h2>Ne zaman geliyorlar?</h2><small>gün × saat · görüntüleme · İstanbul saati</small></div><div class="heat-scale"><span>az</span><i></i><span>çok</span></div></header>
+          <div class="heat" id="bhHeat"></div>
+        </article>
+        <div class="grid g-2">
+          <article class="card"><header class="card-head"><div><h2>Sayfada ne kadar ilerliyorlar?</h2><small>kaydırma derinliği · tüm görüntülemelere oran</small></div></header><div class="steps" id="bhScroll"></div></article>
+          <article class="card"><header class="card-head"><div><h2>Hangi bölümleri gördüler?</h2><small>ana sayfa bölümü ekrana girdi · ana sayfa görüntülemesine oran</small></div></header><div class="steps" id="bhSections"></div></article>
+        </div>
+        <article class="card">
+          <header class="card-head"><div><h2>Ne yaptılar?</h2><small>düğme, form ve bağlantı etkileşimleri</small></div></header>
+          <div class="table-wrap"><table class="table" id="actionTable"><thead><tr><th>Etkileşim</th><th>Tür</th><th class="num">Adet</th><th>Görüntülemeye oran</th></tr></thead><tbody></tbody></table></div>
+        </article>
+        <article class="card">
+          <header class="card-head"><div><h2>Saatlere göre</h2><small>görüntüleme · İstanbul saati</small></div></header>
+          <div class="hours" id="bhHours"></div>
+        </article>
+      </section>
+
+      <!-- KAYITLAR -->
+      <section class="pane" id="pane-signups" role="tabpanel" data-title="Kayıtlar ve dönüşüm" data-eyebrow="ANALİZ" hidden>
+        <div class="kpis" id="sgKpis"></div>
+        <article class="card">
+          <header class="card-head"><div><h2>Günlük kayıt</h2><small>listelerdeki gerçek kayıtlar (createdAt) · İstanbul günü</small></div><ul class="legend" id="sgLegend"></ul></header>
+          <div class="chart" id="sgChart"></div>
+        </article>
+        <div class="grid g-3">
+          <article class="card"><header class="card-head"><div><h2>Kayıtlar nereden geldi?</h2><small>oturumun giriş kaynağı</small></div></header><ol class="bars" id="sgRefs"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Kayıt olanların ülkesi</h2><small>saat diliminden tahmin</small></div></header><ol class="bars" id="sgCountries"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Kayıt olanların cihazı</h2><small>sayaç</small></div></header><ol class="bars" id="sgDevices"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Beta platformu</h2><small>seçili aralıktaki beta kaydı</small></div></header><div class="donut-row" id="sgPlatforms"></div></article>
+          <article class="card"><header class="card-head"><div><h2>Beta kaydının dili</h2><small>formdaki site dili</small></div></header><ol class="bars" id="sgLangs"></ol></article>
+          <article class="card"><header class="card-head"><div><h2>Form sonuçları</h2><small>deneme · başarı · zaten listede · hata</small></div></header><div id="sgForms"></div></article>
+        </div>
+        <details class="info-panel"><summary>Kayıt sayıları neden iki kaynaktan geliyor?</summary>
+          <p><b>Günlük kayıt</b> grafiği ve beta platform/dil dağılımı, listelerdeki gerçek kayıtlardan sayılır (tam ve kesin).
+          <b>Kaynak, ülke ve cihaz</b> kırılımı ise sayaçtan gelir: kayıt anında yalnız "bir kayıt oldu" ve oturumun kaynağı/ülkesi toplam olarak
+          artırılır, e-postayla bağlanmaz. Do Not Track açık tarayıcılar sayaçta yer almadığı için bu kırılımların toplamı gerçek kayıttan biraz az olabilir.
+          Sayaç alanları 14 Kasım 2026'da eklendi; önceki günlerde boş görünür.</p></details>
+      </section>
+
+      <!-- BETA -->
+      <section class="pane" id="pane-beta" role="tabpanel" data-title="Beta testçileri" data-eyebrow="LİSTELER" hidden>
+        <div class="kpis" id="betaKpis"></div>
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="Platform" id="betaFilter">
+            <button type="button" data-p="" class="on">Tümü</button>
+            <button type="button" data-p="android">Android</button>
+            <button type="button" data-p="ios">iOS</button>
+          </div>
+          <input class="search" type="search" id="betaSearch" placeholder="E-postada ara" aria-label="Beta e-postalarında ara" />
+          <select id="betaPeriod" aria-label="Beta kayıt tarihi"><option value="all">Tüm tarihler</option><option value="1">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
+          <select id="betaSort" aria-label="Beta sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="email">E-posta A–Z</option></select>
+          <div class="actions">
+            <button class="btn sm" type="button" id="betaCopy">E-postaları kopyala</button>
+            <button class="btn ghost sm" type="button" id="betaCsv">CSV indir</button>
+          </div>
+        </div>
+        <p class="result-count" id="betaCount" role="status"></p>
+        <div class="table-wrap"><table class="table" id="betaTable"><thead><tr><th>E-posta</th><th>Platform</th><th>Dil</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
+        <div class="pager"><button class="btn ghost sm" type="button" id="betaPrev">← Önceki</button><span id="betaPage"></span><button class="btn ghost sm" type="button" id="betaNext">Sonraki →</button></div>
+        <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console → Kapalı test → Test kullanıcıları listesine, iOS e-postalarını App Store Connect → TestFlight → Harici test kullanıcılarına ekle. "Kopyala" görünen (süzülmüş) listenin tamamını virgülle ayırır; CSV de aynı süzgeci kullanır. Davetler bu panelden gönderilmez.</p></details>
+      </section>
+
+      <!-- BEKLEME -->
+      <section class="pane" id="pane-wait" role="tabpanel" data-title="Bekleme listesi" data-eyebrow="LİSTELER" hidden>
+        <div class="kpis" id="waitKpis"></div>
+        <div class="toolbar">
+          <input class="search" type="search" id="waitSearch" placeholder="E-postada ara" aria-label="E-postada ara" />
+          <select id="waitPeriod" aria-label="Bekleme listesi kayıt tarihi"><option value="all">Tüm tarihler</option><option value="1">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
+          <select id="waitSort" aria-label="Bekleme listesi sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="queue">Sıra numarası</option><option value="email">E-posta A–Z</option></select>
+          <div class="actions">
+            <button class="btn sm" type="button" id="waitCopy">E-postaları kopyala</button>
+            <button class="btn ghost sm" type="button" id="waitCsv">CSV indir</button>
+          </div>
+        </div>
+        <p class="result-count" id="waitCount" role="status"></p>
+        <div class="table-wrap"><table class="table" id="waitTable"><thead><tr><th>E-posta</th><th>Sıra</th><th>Beta</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
+        <div class="pager"><button class="btn ghost sm" type="button" id="waitPrev">← Önceki</button><span id="waitPage"></span><button class="btn ghost sm" type="button" id="waitNext">Sonraki →</button></div>
+        <details class="info-panel"><summary>Bekleme listesi hakkında</summary><p>Beta başvurusu yapan adresler yayın haberi için bu listeye de yazılır ("Beta" sütunu). Sıra numarası kayıt sırasında atanır. Kopyalama ve CSV, etkin süzgece uyan tüm sonuçları içerir.</p></details>
+      </section>
+
+      <!-- OYLAR -->
+      <section class="pane" id="pane-votes" role="tabpanel" data-title="Özellik oyları" data-eyebrow="ÜRÜN" hidden>
+        <div class="kpis" id="voteKpis"></div>
+        <article class="card">
+          <header class="card-head"><div><h2>Beta özellik oyları</h2><small>her hesap her özelliğe bir oy; seçim değişirse toplam güncellenir</small></div></header>
+          <div class="votes" id="votesList"></div>
+          <p class="note">Bu sayılar yalnız yönetici hesabına görünür. Oy verenlerin kimliği gösterilmez.</p>
+        </article>
+      </section>
+
+      <details class="info-panel method"><summary>Bu paneldeki sayılar nasıl hesaplanır?</summary>
+        <p>Ziyaret verileri yalnız <b>günlük toplam</b> olarak saklanır; tek tek ziyaret, çerez, kimlik ya da IP tutulmaz. "Ziyaretçi" her gün ayrı sayılır,
+        bu yüzden birden çok günün toplamı gerçek tekil kişi sayısından büyüktür. Ülke tarayıcının saat diliminden tahmin edilir. Do Not Track / GPC açık
+        tarayıcılar ve botlar sayılmaz. Karşılaştırma oku, seçili aralığı hemen önceki aynı uzunluktaki aralıkla kıyaslar.</p></details>
+    </main>
+  </div>
+  <div class="scrim" id="scrim" hidden></div>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 

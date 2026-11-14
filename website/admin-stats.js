@@ -10,8 +10,13 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var NUMBERS = ["views", "sessions", "visitors", "newcomers", "engagedSec"];
-  var MAPS = ["pages", "hours", "refs", "countries", "langs", "devices", "os"];
+  var NUMBERS = ["views", "sessions", "visitors", "newcomers", "engagedSec", "engagedSessions", "signups"];
+  var MAPS = [
+    "pages", "hours", "refs", "countries", "langs", "devices", "os",
+    // 14 Kas: ayrıntılı analiz (functions/siteStats.js başlığı)
+    "browsers", "siteLangs", "screens", "returnGap", "campaigns", "engagedRefs", "scroll", "actions",
+    "convRefs", "convCountries", "convDevices", "convLangs",
+  ];
 
   var DAY_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" });
 
@@ -134,7 +139,110 @@
     });
   }
 
+  /** Önceki döneme göre değişim: { diff, ratio (null = önceki 0), dir: "up"|"down"|"flat" }. */
+  function delta(current, previous) {
+    var c = Number(current) || 0;
+    var p = Number(previous) || 0;
+    var diff = c - p;
+    return { diff: diff, ratio: p ? diff / p : null, dir: diff > 0 ? "up" : diff < 0 ? "down" : "flat" };
+  }
+
+  /** a / b güvenli oran (b = 0 → 0). */
+  function rate(a, b) {
+    var d = Number(b) || 0;
+    return d ? (Number(a) || 0) / d : 0;
+  }
+
+  /** "YYYY-MM-DD" → haftanın günü, Pazartesi = 0 … Pazar = 6 (gün anahtarı takvim günüdür, saat dilimi yok). */
+  function weekdayOf(day) {
+    var d = new Date(day + "T00:00:00Z");
+    return (d.getUTCDay() + 6) % 7;
+  }
+
+  /** Gün × saat ısı haritası: 7 satır (Pzt→Paz) × 24 sütun görüntüleme toplamı ve en büyük hücre. */
+  function weekHourMatrix(byDay, days) {
+    var grid = [];
+    for (var r = 0; r < 7; r += 1) { grid.push([]); for (var h = 0; h < 24; h += 1) grid[r].push(0); }
+    var max = 0;
+    (days || Object.keys(byDay || {})).forEach(function (day) {
+      var hours = byDay && byDay[day] && byDay[day].hours;
+      if (!hours) return;
+      var row = weekdayOf(day);
+      Object.keys(hours).forEach(function (k) {
+        var h = Number(k);
+        var n = Number(hours[k]) || 0;
+        if (h >= 0 && h < 24 && n > 0) { grid[row][h] += n; if (grid[row][h] > max) max = grid[row][h]; }
+      });
+    });
+    return { grid: grid, max: max };
+  }
+
+  /** Kayıt listesini (r.at: Date) gün gün sayar; days dışındakiler atlanır. */
+  function countByDay(rows, days) {
+    var out = {};
+    (days || []).forEach(function (d) { out[d] = 0; });
+    (rows || []).forEach(function (r) {
+      if (!r || !r.at) return;
+      var d = istanbulDay(r.at);
+      if (Object.prototype.hasOwnProperty.call(out, d)) out[d] += 1;
+    });
+    return out;
+  }
+
+  /** Bir alanın değerlerini sayar (ör. platform, lang) → { değer: adet }; boş değer "xx". */
+  function countBy(rows, field) {
+    var out = {};
+    (rows || []).forEach(function (r) {
+      var k = r && r[field] ? String(r[field]) : "xx";
+      out[k] = (out[k] || 0) + 1;
+    });
+    return out;
+  }
+
+  /**
+   * Kaynak tablosu: oturum, ilgili oturum (15 sn+), kayıt ve oranlar; oturuma göre büyükten küçüğe.
+   * Kaydı olup oturumu sayılmamış kaynak (ör. eski oturum bayrağı) yine satır olur.
+   */
+  function sourceTable(total) {
+    var refs = (total && total.refs) || {};
+    var engaged = (total && total.engagedRefs) || {};
+    var conv = (total && total.convRefs) || {};
+    var keys = {};
+    [refs, engaged, conv].forEach(function (m) { Object.keys(m).forEach(function (k) { keys[k] = 1; }); });
+    return Object.keys(keys).map(function (k) {
+      var sessions = Number(refs[k]) || 0;
+      var eng = Number(engaged[k]) || 0;
+      var sign = Number(conv[k]) || 0;
+      return { key: k, sessions: sessions, engaged: eng, signups: sign, engagedRate: rate(eng, sessions), convRate: rate(sign, sessions) };
+    }).filter(function (r) { return r.sessions || r.signups; })
+      .sort(function (a, b) { return b.sessions - a.sessions || b.signups - a.signups || (a.key < b.key ? -1 : 1); });
+  }
+
+  /** Ziyaretçi → ilgili oturum → kayıt denemesi → kayıt hunisi (aralık toplamından). */
+  function funnel(total) {
+    var a = (total && total.actions) || {};
+    var tries = (Number(a.waitlist_try) || 0) + (Number(a.beta_try) || 0);
+    var steps = [
+      { key: "visitors", value: Number(total && total.visitors) || 0 },
+      { key: "engaged", value: Number(total && total.engagedSessions) || 0 },
+      { key: "tries", value: tries },
+      { key: "signups", value: Number(total && total.signups) || 0 },
+    ];
+    var first = steps[0].value;
+    return steps.map(function (s, i) {
+      return { key: s.key, value: s.value, ofFirst: rate(s.value, first), ofPrev: i ? rate(s.value, steps[i - 1].value) : 1 };
+    });
+  }
+
   return {
+    delta: delta,
+    rate: rate,
+    weekdayOf: weekdayOf,
+    weekHourMatrix: weekHourMatrix,
+    countByDay: countByDay,
+    countBy: countBy,
+    sourceTable: sourceTable,
+    funnel: funnel,
     NUMBERS: NUMBERS,
     MAPS: MAPS,
     istanbulDay: istanbulDay,

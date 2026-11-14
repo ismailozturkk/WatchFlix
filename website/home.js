@@ -81,8 +81,15 @@
     renderReel();
   }
 
+  /* Sayaç olayı (site-beacon.js): yalnız eylem ADI gider, e-posta ya da kimlik gitmez. Sayaç yüklenmemişse
+     ya da DNT açıksa kuyrukta kalır, hiçbir yere gönderilmez. Adlar functions/siteStats.js ACTIONS listesinde. */
+  function track(name) {
+    try { (window.__wfq = window.__wfq || []).push(name); } catch (e) { /* sayılamadı */ }
+  }
+
   function setLang(next) {
     if (next === lang) return;
+    track("lang_change");
     lang = next;
     SL.store(lang);
     SL.syncUrl(lang);
@@ -400,6 +407,7 @@
       }
       btn.disabled = true;
       withTimeout(store.addEmail(email), 12000).then(function (res) {
+        track(res.exists ? "waitlist_dup" : "waitlist_ok");
         okState = res;
         saveTicket(res);
         if (!res.exists && countValue != null && res.queueNo > countValue) countValue = res.queueNo;
@@ -407,6 +415,7 @@
         renderCount();
       }).catch(function (err) {
         console.error("Waitlist error:", err);
+        track("waitlist_err");
         msg.textContent = t("errGeneric");
       }).then(function () { btn.disabled = false; });
     });
@@ -417,6 +426,7 @@
      ayrı yazılabilir. Alanlar firestore.rules'taki betaTesters kuralıyla birebir:
      { email, platform, lang, createdAt, source }. Alan eklersen kuralı da güncelle. */
   var BETA_PLATFORMS = { android: "Android", ios: "iOS" };
+  var SITE_LANGS = ["tr", "en", "es", "pt", "de", "it", "fr", "ja", "zh", "hi", "id", "ko"];
   var betaState = null; // { email, platforms: ["android"|"ios"], exists }
 
   /* Bu tarayıcıdan yapılan kayıt (bekleme listesindeki wf_ticket gibi): sayfa
@@ -448,7 +458,7 @@
       var id = btoa(unescape(encodeURIComponent(email))).replace(/[/+=]/g, "_") + "_" + platform;
       var ref = fs.doc(db.app, "betaTesters", id);
       var payload = { email: email, platform: platform, createdAt: fs.serverTimestamp(), source: "landing" };
-      if (["tr", "en", "es", "pt", "de"].indexOf(lang) !== -1) payload.lang = lang;
+      if (SITE_LANGS.indexOf(lang) !== -1) payload.lang = lang; // firestore.rules betaTesters ile aynı liste
       // Okuma yok (kural: get yalnız yönetici); var olan kayıt reddedilir = zaten listede.
       return fs.setDoc(ref, payload)
         .then(function () { return { email: email, platform: platform, exists: false }; }, function (err) {
@@ -527,6 +537,7 @@
       }
       btn.disabled = true;
       withTimeout(addBetaTester(email, platform), 12000).then(function (res) {
+        track(res.exists ? "beta_dup" : res.platform === "ios" ? "beta_ok_ios" : "beta_ok_android");
         var platforms = saveBetaTicket(res);
         // Yeni kayıtta yalnız bu platform anılır; yinelenende kayıtlı olanların tümü.
         betaState = { email: res.email, platforms: res.exists ? platforms : [res.platform], exists: res.exists, queueNo: null };
@@ -544,6 +555,7 @@
         }).then(function () { renderBeta(); });
       }).catch(function (err) {
         console.error("Beta signup error:", err);
+        track("beta_err");
         msg.textContent = t("errGeneric");
       }).then(function () { btn.disabled = false; });
     });

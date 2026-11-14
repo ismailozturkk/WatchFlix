@@ -2205,12 +2205,16 @@ describe("betaTesters (landing test kullanıcısı formu)", () => {
     await assertFails(deleteDoc(ref));
   });
 
+  test("sitenin 12 dilinden biri (ör. ja) site dili olarak yazılabilir", async () => {
+    await assertSucceeds(setDoc(doc(anon(), "betaTesters", "amE_android"), kayit({ lang: "ja" })));
+  });
+
   test("geçersiz platform, e-posta, dil, kaynak, belge kimliği ya da fazladan alan reddedilir", async () => {
     const db = anon();
     const ref = (id = "dGVzdGVy_android") => doc(db, "betaTesters", id);
     await assertFails(setDoc(ref("dGVzdGVy_windows"), kayit({ platform: "windows" })));
     await assertFails(setDoc(ref(), kayit({ email: "olmaz" })));
-    await assertFails(setDoc(ref(), kayit({ lang: "fr" })));
+    await assertFails(setDoc(ref(), kayit({ lang: "zz" })));
     await assertFails(setDoc(ref(), kayit({ source: "app" })));
     await assertFails(setDoc(ref("dGVzdGVy_ios"), kayit()));
     await assertFails(setDoc(ref(), kayit({ name: "Ali" })));

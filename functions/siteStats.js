@@ -13,10 +13,20 @@
 //     pages{index|privacy|terms|delete|other}, hours{"00".."23"},          ← her görüntüleme
 //     refs{direct|google|instagram|…},                                       ← her oturumun girişi
 //     countries{TR|DE|…|XX}, langs{tr|en|…}, devices{mobile|tablet|desktop}, os{ios|android|…}  ← günün tekil ziyaretçisi
+//     browsers{chrome|safari|…}, siteLangs{tr|en|…}, screens{s|m|l}, returnGap{d1|w1|m1|old}       ← günün tekil ziyaretçisi
+//     campaigns{kaynak~kampanya}                                             ← kampanya etiketli oturum girişi
+//     engagedSessions, engagedRefs{kaynak}                                   ← 15 sn görünür kalan oturum (bir kez)
+//     scroll{25|50|75|100}                                                   ← görüntüleme başına bir kez her eşik
+//     actions{waitlist_ok|beta_try|store_google|sec_faq|…}                   ← izinli etkileşim adları (ACTIONS)
+//     signups, convRefs{kaynak}, convCountries{TR|…}, convDevices{…}, convLangs{…}  ← başarılı kayıt (bekleme / beta)
 //   }
+// Kayıt sayıları da yalnız toplamdır: hangi e-postanın hangi kaynaktan geldiği bağlanmaz.
 // Olaylar (istemci website/site-beacon.js):
 //   { t:"v", p, r, tz, l, d, o, s:yeniOturum, n:bugünİlk, f:ilkKez }   görüntüleme
 //   { t:"e", sec }                                                     sayfa gizlenince görünür kalınan saniye
+//   { t:"g", r:girişKaynağı }                                         oturum 15 sn görünür kaldı (bir kez)
+//   { t:"s", d:25|50|75|100 }                                          kaydırma derinliği eşiği
+//   { t:"a", a:eylem, r:girişKaynağı, tz, d, l }                       etkileşim / kayıt
 
 const SHARDS = 4;
 const MAX_BODY = 2048;
@@ -25,6 +35,22 @@ const MAX_ENGAGED_SEC = 1800; // tek olayda en çok 30 dk (açık unutulan sekme
 const PAGES = new Set(["index", "privacy", "terms", "delete", "other"]);
 const DEVICES = new Set(["mobile", "tablet", "desktop"]);
 const OSES = new Set(["ios", "android", "windows", "macos", "linux", "other"]);
+const BROWSERS = new Set(["chrome", "safari", "firefox", "edge", "samsung", "opera", "inapp", "other"]);
+const SCREENS = new Set(["s", "m", "l"]);
+const SITE_LANGS = new Set(["tr", "en", "es", "pt", "de", "it", "fr", "ja", "zh", "hi", "id", "ko"]);
+const SCROLL_DEPTHS = new Set([25, 50, 75, 100]);
+
+/** İzinli etkileşim adları: harita anahtarı istemciden SERBEST gelemez (şişirme / çöp anahtar). */
+const ACTIONS = new Set([
+  "tab_notify", "tab_beta",
+  "waitlist_try", "waitlist_ok", "waitlist_dup", "waitlist_err",
+  "beta_try", "beta_ok_android", "beta_ok_ios", "beta_dup", "beta_err",
+  "store_apple", "store_google",
+  "faq_open", "lang_change", "mock_use", "out_social", "nav_click",
+  "sec_numbers", "sec_screens", "sec_features", "sec_plans", "sec_faq", "sec_footer",
+]);
+/** Başarılı kayıt sayılan eylemler (dönüşüm kırılımları bunlarda yazılır). */
+const SIGNUP_ACTIONS = new Set(["waitlist_ok", "beta_ok_android", "beta_ok_ios"]);
 
 const BOT_RE = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|embedly|curl|wget|python-requests|axios|node-fetch/i;
 
@@ -174,6 +200,23 @@ function normalizeRef(raw) {
   return slug(host) || "direct";
 }
 
+/** "src~camp" kampanya anahtarı; kampanya yoksa null. */
+function normalizeCampaign(src, camp) {
+  const c = slug(camp, 40);
+  if (!c) return null;
+  return `${slug(src, 24) || "direct"}~${c}`;
+}
+
+/** Son ziyaretten bu yana geçen gün → kova. İlk ziyaret ya da bilinmeyen → null. */
+function returnGapBucket(days) {
+  const n = Math.floor(Number(days));
+  if (!Number.isFinite(n) || n < 1) return null;
+  if (n <= 1) return "d1";
+  if (n <= 7) return "w1";
+  if (n <= 30) return "m1";
+  return "old";
+}
+
 function normalizeLang(raw) {
   const m = typeof raw === "string" && /^([a-z]{2,3})(?:[-_]|$)/i.exec(raw.trim());
   return m ? m[1].toLowerCase() : "xx";
@@ -198,6 +241,22 @@ function parseBeacon(body) {
     if (!Number.isFinite(sec) || sec < 1) return null;
     return { type: "engaged", sec: Math.min(sec, MAX_ENGAGED_SEC) };
   }
+  if (data.t === "g") return { type: "engagedSession", ref: normalizeRef(data.r) };
+  if (data.t === "s") {
+    const depth = Number(data.d);
+    return SCROLL_DEPTHS.has(depth) ? { type: "scroll", depth } : null;
+  }
+  if (data.t === "a") {
+    if (typeof data.a !== "string" || !ACTIONS.has(data.a)) return null;
+    return {
+      type: "action",
+      action: data.a,
+      ref: normalizeRef(data.r),
+      country: countryFromTimeZone(data.tz),
+      device: DEVICES.has(data.d) ? data.d : "desktop",
+      lang: SITE_LANGS.has(data.l) ? data.l : "xx",
+    };
+  }
   if (data.t !== "v") return null;
   return {
     type: "view",
@@ -210,6 +269,11 @@ function parseBeacon(body) {
     newSession: data.s === true,
     newToday: data.n === true,
     firstEver: data.f === true,
+    browser: BROWSERS.has(data.b) ? data.b : "other",
+    screen: SCREENS.has(data.w) ? data.w : null,
+    siteLang: SITE_LANGS.has(data.sl) ? data.sl : null,
+    campaign: typeof data.c === "string" ? normalizeCampaign(String(data.r || "").replace(/^utm:/, ""), data.c) : null,
+    returnGap: data.f === true ? null : returnGapBucket(data.g),
   };
 }
 
@@ -238,6 +302,19 @@ function shardDocId(day, shard) {
  */
 function statsPatch(event, { day, hour }, inc) {
   if (event.type === "engaged") return { day, engagedSec: inc(event.sec) };
+  if (event.type === "engagedSession") return { day, engagedSessions: inc(1), engagedRefs: { [event.ref]: inc(1) } };
+  if (event.type === "scroll") return { day, scroll: { [String(event.depth)]: inc(1) } };
+  if (event.type === "action") {
+    const patch = { day, actions: { [event.action]: inc(1) } };
+    if (SIGNUP_ACTIONS.has(event.action)) {
+      patch.signups = inc(1);
+      patch.convRefs = { [event.ref]: inc(1) };
+      patch.convCountries = { [event.country]: inc(1) };
+      patch.convDevices = { [event.device]: inc(1) };
+      patch.convLangs = { [event.lang]: inc(1) };
+    }
+    return patch;
+  }
   const patch = {
     day,
     views: inc(1),
@@ -247,6 +324,7 @@ function statsPatch(event, { day, hour }, inc) {
   if (event.newSession) {
     patch.sessions = inc(1);
     patch.refs = { [event.ref]: inc(1) };
+    if (event.campaign) patch.campaigns = { [event.campaign]: inc(1) };
   }
   if (event.newToday) {
     patch.visitors = inc(1);
@@ -254,6 +332,10 @@ function statsPatch(event, { day, hour }, inc) {
     patch.langs = { [event.lang]: inc(1) };
     patch.devices = { [event.device]: inc(1) };
     patch.os = { [event.os]: inc(1) };
+    patch.browsers = { [event.browser]: inc(1) };
+    if (event.screen) patch.screens = { [event.screen]: inc(1) };
+    if (event.siteLang) patch.siteLangs = { [event.siteLang]: inc(1) };
+    if (event.returnGap) patch.returnGap = { [event.returnGap]: inc(1) };
   }
   if (event.firstEver) patch.newcomers = inc(1);
   return patch;
@@ -264,7 +346,11 @@ module.exports = {
   MAX_BODY,
   MAX_ENGAGED_SEC,
   TZ_COUNTRY,
+  ACTIONS,
+  SIGNUP_ACTIONS,
   countryFromTimeZone,
+  normalizeCampaign,
+  returnGapBucket,
   isBot,
   normalizeRef,
   normalizeLang,

@@ -147,7 +147,7 @@ service cloud.firestore {
                     && request.resource.data.email.size() < 200
                     && request.resource.data.platform in ['android', 'ios']
                     && docId.matches('.+_' + request.resource.data.platform)
-                    && (!('lang' in request.resource.data) || request.resource.data.lang in ['tr', 'en', 'es', 'pt', 'de'])
+                    && (!('lang' in request.resource.data) || request.resource.data.lang in ['tr', 'en', 'es', 'pt', 'de', 'it', 'fr', 'ja', 'zh', 'hi', 'id', 'ko'])
                     && request.resource.data.createdAt == request.time
                     && request.resource.data.source == 'landing';
     }

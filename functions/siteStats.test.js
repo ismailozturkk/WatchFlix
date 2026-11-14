@@ -10,6 +10,8 @@ const {
   parseBeacon,
   shardDocId,
   statsPatch,
+  normalizeCampaign,
+  returnGapBucket,
 } = require("./siteStats");
 
 const inc = (n) => ({ inc: n });
@@ -39,6 +41,7 @@ test("görüntüleme olayı doğrulanır; bilinmeyen değerler güvenli varsayı
   assert.deepEqual(parseBeacon(JSON.stringify(view({ s: true, n: true, f: false }))), {
     type: "view", page: "index", ref: "direct", country: "TR", lang: "tr", device: "mobile", os: "ios",
     newSession: true, newToday: true, firstEver: false,
+    browser: "other", screen: null, siteLang: null, campaign: null, returnGap: null,
   });
   const odd = parseBeacon(view({ p: "../admin", d: "fridge", o: "beos", l: "!!", s: "yes" }));
   assert.equal(odd.page, "other");
@@ -85,4 +88,45 @@ test("artış nesnesi: oturum girişi yönlendireni, günün ilk ziyareti ülke/
   assert.deepEqual([first.sessions, first.visitors, first.newcomers], [{ inc: 1 }, { inc: 1 }, { inc: 1 }]);
 
   assert.deepEqual(statsPatch({ type: "engaged", sec: 30 }, clock, inc), { day: "2026-11-04", engagedSec: { inc: 30 } });
+});
+
+test("yeni görüntüleme alanları: tarayıcı, ekran, site dili, kampanya ve geri dönüş aralığı", () => {
+  const ev = parseBeacon(view({ r: "utm:TikTok", c: "Launch Week", b: "safari", w: "s", sl: "ja", g: 5, s: true, n: true }));
+  assert.equal(ev.browser, "safari");
+  assert.equal(ev.screen, "s");
+  assert.equal(ev.siteLang, "ja");
+  assert.equal(ev.campaign, "tiktok~launch-week");
+  assert.equal(ev.returnGap, "w1");
+  const odd = parseBeacon(view({ b: "netscape", w: "xl", sl: "kl", g: "x", f: true }));
+  assert.deepEqual([odd.browser, odd.screen, odd.siteLang, odd.returnGap], ["other", null, null, null]);
+  assert.equal(normalizeCampaign("x", ""), null);
+  assert.deepEqual([1, 6, 20, 90].map(returnGapBucket), ["d1", "w1", "m1", "old"]);
+
+  const patch = statsPatch(ev, { day: "2026-11-14", hour: "10" }, inc);
+  assert.deepEqual(patch.campaigns, { "tiktok~launch-week": { inc: 1 } });
+  assert.deepEqual(patch.browsers, { safari: { inc: 1 } });
+  assert.deepEqual(patch.siteLangs, { ja: { inc: 1 } });
+  assert.deepEqual(patch.screens, { s: { inc: 1 } });
+  assert.deepEqual(patch.returnGap, { w1: { inc: 1 } });
+});
+
+test("etkileşim olayları: yalnız izinli adlar; kayıt dönüşüm kırılımlarını yazar", () => {
+  const clock = { day: "2026-11-14", hour: "10" };
+  assert.equal(parseBeacon({ t: "a", a: "drop_table" }), null);
+  assert.equal(parseBeacon({ t: "a", a: "__proto__" }), null);
+  assert.deepEqual(statsPatch(parseBeacon({ t: "a", a: "faq_open" }), clock, inc), { day: "2026-11-14", actions: { faq_open: { inc: 1 } } });
+
+  const ok = statsPatch(parseBeacon({ t: "a", a: "beta_ok_ios", r: "utm:instagram", tz: "Europe/Berlin", d: "mobile", l: "de" }), clock, inc);
+  assert.deepEqual(ok.signups, { inc: 1 });
+  assert.deepEqual(ok.convRefs, { instagram: { inc: 1 } });
+  assert.deepEqual(ok.convCountries, { DE: { inc: 1 } });
+  assert.deepEqual(ok.convDevices, { mobile: { inc: 1 } });
+  assert.deepEqual(ok.convLangs, { de: { inc: 1 } });
+});
+
+test("etkileşimli oturum ve kaydırma derinliği", () => {
+  const clock = { day: "2026-11-14", hour: "10" };
+  assert.deepEqual(statsPatch(parseBeacon({ t: "g", r: "t.co" }), clock, inc), { day: "2026-11-14", engagedSessions: { inc: 1 }, engagedRefs: { x: { inc: 1 } } });
+  assert.deepEqual(statsPatch(parseBeacon({ t: "s", d: 75 }), clock, inc), { day: "2026-11-14", scroll: { 75: { inc: 1 } } });
+  assert.equal(parseBeacon({ t: "s", d: 33 }), null);
 });

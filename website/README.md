@@ -16,7 +16,7 @@ Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 | [privacy.html](privacy.html) · [terms.html](terms.html) · [delete-account.html](delete-account.html) | Gizlilik / Şartlar / Hesap silme — mağaza formlarının istediği URL'ler |
 | [legal.css](legal.css) · [legal.js](legal.js) | Üç yasal sayfanın ortak stili ve davranışı |
 | [site-beacon.js](site-beacon.js) | Çerezsiz ziyaret sayacı (dört genel sayfada; `admin.html`'de YOK) → `/api/beacon` |
-| [admin.html](admin.html) · [admin.js](admin.js) · [admin.css](admin.css) · [admin-stats.js](admin-stats.js) | **Yönetim paneli** (`/admin`): ziyaret istatistiği, beta testçileri, bekleme listesi. Arama motorlarına kapalı |
+| [admin.html](admin.html) · [admin.js](admin.js) · [admin.css](admin.css) · [admin-stats.js](admin-stats.js) | **Yönetim paneli** (`/admin`): Genel bakış (önceki döneme kıyaslı KPI, eğilim, huni, otomatik öne çıkanlar), Trafik ve kaynaklar (kaynak başına ilgi/dönüşüm, kampanya), Kitle (ülke, cihaz, tarayıcı, dil, ekran), Davranış (gün×saat ısı haritası, kaydırma, bölüm, etkileşim), Kayıtlar ve dönüşüm (kaynak/ülke/cihaz bazında kayıt, form sonuçları), beta testçileri, bekleme listesi, özellik oyları. Veri yalnız günlük toplam (`functions/siteStats.js`). Arama motorlarına kapalı |
 | `lens-mark.svg` · `favicon.svg` · `favicon.ico` · `apple-touch-icon.png` · `og-image.png` | Lens logosu (5 Kas 2026): üst çubuk/altbilgi işareti, sekme simgesi, paylaşım görseli. Kaynak `marketing/marka/yeni-logo/lens`; altbilgideki büyük logo `index.html` içinde satır içi SVG (göz kırpar, bebek imleci izler: `home.js → setupEyes`). Eski "S" görselleri kaldırıldı |
 
 ## Diller (12)
