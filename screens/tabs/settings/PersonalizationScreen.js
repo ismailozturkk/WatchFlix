@@ -1,6 +1,6 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
-// Ayarlar > Kişiselleştirme. Görsel efekt modu + atmosfer giriş satırı.
+// Ayarlar > Kişiselleştirme. Görsel efekt modu, puanlama sistemi (10/5 yıldız) + atmosfer giriş satırı.
 // Atmosfer, ambiyans arka planı ve ikon arka planı ayarları (9 Kas'tan beri
 // hepsi) AtmosphereScreen'de: tek telefon önizlemesinde katmanlı görünürler.
 // Hub'dan ayrı ekrana taşındı.
@@ -12,6 +12,7 @@ import AppIcon from "@components/AppIcon";
 import { SnowPreview } from "@components/settings/SettingPreviews";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
 import AppIconSection from "@components/settings/AppIconSection";
+import RatingScaleSection from "@components/settings/RatingScaleSection";
 import PremiumPill from "@components/premium/PremiumPill";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -228,6 +229,11 @@ export default function PersonalizationScreen() {
           ) : null}
         </View>
       </View>
+
+      <View style={ps.personalizationGap} />
+
+      {/* Puanlama sistemi: 10 yıldız (yarım puan) | 5 yıldız — yalnız görünüm, puanlar 0-10 kalır. */}
+      <RatingScaleSection colors={C} language={language} />
 
       <View style={ps.personalizationGap} />
 

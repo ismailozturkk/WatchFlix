@@ -36,7 +36,7 @@ import { i18nText } from "@utils/i18nText";
  */
 export function showBadgeCelebration(kutlama, language) {
   if (!kutlama) return false;
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const baslik = baslikOdulu(kutlama.rozetler, lang);
 
   if (baslik) {

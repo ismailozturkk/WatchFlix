@@ -1,4 +1,4 @@
-// İzin sayfası metinleri: beş dil aynı şekilde, satır sayıları ikon tablosuyla uyumlu.
+// İzin sayfası metinleri: sekiz dil aynı şekilde, satır sayıları ikon tablosuyla uyumlu.
 const { PERMISSION_SHEET_COPY, getPermissionSheetCopy } = require("../components/permissions/permissionSheetCopy");
 
 const shape = (value) => {
@@ -13,11 +13,11 @@ const strings = (value) =>
   typeof value === "string" ? [value] : Object.values(value).flatMap(strings);
 
 describe("permissionSheetCopy", () => {
-  test.each(["en", "es", "pt", "de"])("%s, Türkçeyle aynı şekilde", (lang) => {
+  test.each(["en", "es", "pt", "de", "it", "fr", "ja"])("%s, Türkçeyle aynı şekilde", (lang) => {
     expect(shape(PERMISSION_SHEET_COPY[lang])).toEqual(shape(PERMISSION_SHEET_COPY.tr));
   });
 
-  test.each(["tr", "en", "es", "pt", "de"])("%s: boş metin yok, 3 kazanım + 2 kayıp satırı", (lang) => {
+  test.each(["tr", "en", "es", "pt", "de", "it", "fr", "ja"])("%s: boş metin yok, 3 kazanım + 2 kayıp satırı", (lang) => {
     const copy = PERMISSION_SHEET_COPY[lang];
     expect(strings(copy).every((s) => s.trim().length > 0)).toBe(true);
     for (const kind of ["notifications", "mediaLibrary"]) {
@@ -27,6 +27,7 @@ describe("permissionSheetCopy", () => {
   });
 
   test("bilinmeyen dil İngilizceye düşer", () => {
-    expect(getPermissionSheetCopy("ja")).toBe(PERMISSION_SHEET_COPY.en);
+    expect(getPermissionSheetCopy("ko")).toBe(PERMISSION_SHEET_COPY.en);
+    expect(getPermissionSheetCopy("ja")).toBe(PERMISSION_SHEET_COPY.ja);
   });
 });

@@ -4,9 +4,9 @@
 // sunucuda yalnız oy SAYAÇLARI var (firestore.rules DailyPolls), soru metni burada. Kullanıcı üretimi içerik
 // olmadığı için moderasyon gerekmez.
 //
-// Biçim: { id, tr|en|es|pt|de: [soru, A, B] }. `id` KALICIDIR (sayaç gün anahtarına bağlı, id'ye değil; yine de
+// Biçim: { id, tr|en|es|pt|de|it|fr|ja: [soru, A, B] }. `id` KALICIDIR (sayaç gün anahtarına bağlı, id'ye değil; yine de
 // sıralamayı id sabitler): soru metni düzeltilebilir ama id değiştirilmez. Seçenekler kısa tutulur (≤ 24 karakter):
-// kartta yan yana iki düğmeye sığmalı. Test (__tests__/dailyPoll.test.js) beş dilde dolu olmayı, uzunluk sınırını
+// kartta yan yana iki düğmeye sığmalı. Test (__tests__/dailyPoll.test.js) sekiz dilde dolu olmayı, uzunluk sınırını
 // ve kimlik benzersizliğini denetler.
 
 export const DAILY_POLL_QUESTIONS = [
@@ -17,6 +17,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cine o sofá?", "Sala de cine", "Sofá en casa"],
     pt: ["Cinema ou sofá?", "Sala de cinema", "Sofá em casa"],
     de: ["Kino oder Sofa?", "Kinosaal", "Sofa zu Hause"],
+    it: ["Cinema o divano?", "Sala cinematografica", "Divano di casa"],
+    fr: ["Ciné ou canapé ?", "Salle de cinéma", "Canapé à la maison"],
+    ja: ["映画館?それとも家?", "映画館", "家のソファ"],
   },
   {
     id: "subs_or_dub",
@@ -25,6 +28,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Subtítulos o doblaje?", "Subtitulado", "Doblado"],
     pt: ["Legenda ou dublagem?", "Legendado", "Dublado"],
     de: ["Untertitel oder Synchro?", "Untertitel", "Synchronisiert"],
+    it: ["Sottotitoli o doppiaggio?", "Sottotitolato", "Doppiato"],
+    fr: ["VOST ou VF ?", "Sous-titres", "Doublage"],
+    ja: ["字幕?吹き替え?", "字幕", "吹き替え"],
   },
   {
     id: "movie_or_series",
@@ -33,6 +39,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["Esta noche: ¿película o serie?", "Una película", "Una serie"],
     pt: ["Hoje à noite: filme ou série?", "Um filme", "Uma série"],
     de: ["Heute Abend: Film oder Serie?", "Ein Film", "Eine Serie"],
+    it: ["Stasera: film o serie?", "Un film", "Una serie"],
+    fr: ["Ce soir : film ou série ?", "Un film", "Une série"],
+    ja: ["今夜は映画?ドラマ?", "映画", "ドラマ"],
   },
   {
     id: "late_or_early",
@@ -41,6 +50,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cuándo ves cine?", "Tarde por la noche", "Temprano por la tarde"],
     pt: ["Quando você assiste?", "De madrugada", "No início da noite"],
     de: ["Wann schaust du?", "Spät in der Nacht", "Früh am Abend"],
+    it: ["Quando guardi?", "A tarda notte", "In prima serata"],
+    fr: ["Tu regardes quand ?", "Tard le soir", "En début de soirée"],
+    ja: ["いつ観る?", "深夜", "夕方"],
   },
   {
     id: "sequel_or_original",
@@ -49,6 +61,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cuál eliges?", "Secuela de una favorita", "Una historia nueva"],
     pt: ["Qual você escolhe?", "Sequência de um favorito", "Uma história nova"],
     de: ["Was wählst du?", "Fortsetzung eines Lieblings", "Eine ganz neue Story"],
+    it: ["Cosa sceglieresti?", "Il seguito di un preferito", "Una storia nuova"],
+    fr: ["Tu choisirais quoi ?", "La suite d'un favori", "Une histoire inédite"],
+    ja: ["どっちを選ぶ?", "お気に入りの続編", "新しい物語"],
   },
   {
     id: "binge_or_weekly",
@@ -57,6 +72,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cómo ves series?", "Todo de una vez", "Un episodio por semana"],
     pt: ["Como você assiste séries?", "Tudo de uma vez", "Um episódio por semana"],
     de: ["Wie schaust du Serien?", "Alles auf einmal", "Eine Folge pro Woche"],
+    it: ["Come guardi le serie?", "Tutto d'un fiato", "Un episodio a settimana"],
+    fr: ["Les séries, tu les regardes comment ?", "Tout d'un coup", "Un épisode par semaine"],
+    ja: ["ドラマの観方は?", "一気見", "週に1話"],
   },
   {
     id: "spoilers",
@@ -65,6 +83,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Y los spoilers?", "Quiero saberlo", "Nunca me lo cuentes"],
     pt: ["E os spoilers?", "Quero saber antes", "Nunca me conte"],
     de: ["Und Spoiler?", "Ich will es wissen", "Bloß nicht verraten"],
+    it: ["Gli spoiler?", "Voglio sapere", "Mai dirmeli"],
+    fr: ["Les spoilers ?", "Je veux savoir", "Surtout pas"],
+    ja: ["ネタバレは?", "知りたい", "絶対やめて"],
   },
   {
     id: "book_or_film",
@@ -73,6 +94,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["En las adaptaciones de libros", "Primero el libro", "Primero la película"],
     pt: ["Em adaptações de livros?", "Primeiro o livro", "Primeiro o filme"],
     de: ["Bei Buchverfilmungen?", "Erst das Buch lesen", "Erst den Film sehen"],
+    it: ["Per gli adattamenti?", "Prima il libro", "Prima il film"],
+    fr: ["Pour les adaptations ?", "Le livre d'abord", "Le film d'abord"],
+    ja: ["原作ものは?", "先に原作", "先に映画"],
   },
   {
     id: "classic_or_new",
@@ -81,6 +105,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué época?", "Clásicos de siempre", "Estrenos"],
     pt: ["Qual época?", "Clássicos antigos", "Lançamentos"],
     de: ["Welche Zeit?", "Alte Klassiker", "Neuerscheinungen"],
+    it: ["Quale epoca?", "I vecchi classici", "Le nuove uscite"],
+    fr: ["Quelle époque ?", "Les vieux classiques", "Les nouveautés"],
+    ja: ["どの時代?", "昔の名作", "新作"],
   },
   {
     id: "laugh_or_scare",
@@ -89,6 +116,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué te apetece esta noche?", "Algo divertido", "Algo de miedo"],
     pt: ["O que vai ser hoje?", "Algo engraçado", "Algo de arrepiar"],
     de: ["Was darf es heute sein?", "Etwas Lustiges", "Etwas Gruseliges"],
+    it: ["Che umore stasera?", "Qualcosa di divertente", "Qualcosa che fa paura"],
+    fr: ["L'humeur de ce soir ?", "Un truc drôle", "Un truc qui fait peur"],
+    ja: ["今夜の気分は?", "笑える作品", "怖い作品"],
   },
   {
     id: "alone_or_friends",
@@ -97,6 +127,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Con quién ves cine?", "Solo", "Con amigos"],
     pt: ["Com quem você assiste?", "Sozinho", "Com amigos"],
     de: ["Mit wem schaust du?", "Allein", "Mit Freunden"],
+    it: ["Con chi guardi?", "Da solo", "Con gli amici"],
+    fr: ["Tu regardes avec qui ?", "Seul", "Entre amis"],
+    ja: ["誰と観る?", "ひとりで", "友だちと"],
   },
   {
     id: "popcorn",
@@ -105,6 +138,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Palomitas?", "Saladas", "De caramelo"],
     pt: ["Pipoca?", "Salgada", "Caramelizada"],
     de: ["Popcorn?", "Salzig", "Karamell"],
+    it: ["Popcorn?", "Salati", "Al caramello"],
+    fr: ["Pop-corn ?", "Salé", "Caramel"],
+    ja: ["ポップコーンは?", "塩味", "キャラメル味"],
   },
   {
     id: "ending",
@@ -113,6 +149,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué tipo de final?", "Final feliz", "Agridulce o abierto"],
     pt: ["Que tipo de final?", "Final feliz", "Agridoce ou aberto"],
     de: ["Welches Ende?", "Ein Happy End", "Bittersüß oder offen"],
+    it: ["Che tipo di finale?", "Un lieto fine", "Agrodolce o aperto"],
+    fr: ["Quel genre de fin ?", "Une fin heureuse", "Douce-amère ou ouverte"],
+    ja: ["好きな結末は?", "ハッピーエンド", "ほろ苦い・余韻"],
   },
   {
     id: "animation_or_live",
@@ -121,6 +160,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Animación o imagen real?", "Animación", "Imagen real"],
     pt: ["Animação ou live-action?", "Animação", "Atores reais"],
     de: ["Animation oder Realfilm?", "Animation", "Realfilm"],
+    it: ["Animazione o live action?", "Animazione", "Live action"],
+    fr: ["Animation ou prises de vue réelles ?", "Animation", "Prises de vue réelles"],
+    ja: ["アニメ?実写?", "アニメ", "実写"],
   },
   {
     id: "local_or_foreign",
@@ -129,6 +171,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué producciones?", "De mi país", "Del extranjero"],
     pt: ["Quais produções?", "Do meu país", "Do exterior"],
     de: ["Welche Produktionen?", "Aus meinem Land", "Aus dem Ausland"],
+    it: ["Quali produzioni?", "Del mio paese", "Dall'estero"],
+    fr: ["Quelles productions ?", "De mon pays", "De l'étranger"],
+    ja: ["どこの作品?", "自国の作品", "海外の作品"],
   },
   {
     id: "epic_or_short",
@@ -137,6 +182,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Duración ideal?", "Una épica de 3 horas", "90 minutos justos"],
     pt: ["Duração ideal?", "Uma épica de 3 horas", "90 minutos certeiros"],
     de: ["Wie lang darf es sein?", "3-Stunden-Epos", "Knackige 90 Minuten"],
+    it: ["Durata del film?", "Un epico di 3 ore", "90 minuti serrati"],
+    fr: ["Durée du film ?", "Une fresque de 3 h", "90 minutes serrées"],
+    ja: ["映画の長さは?", "3時間の大作", "引き締まった90分"],
   },
   {
     id: "rewatch_or_new",
@@ -145,6 +193,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Volver a ver?", "Repito mis favoritas", "Siempre algo nuevo"],
     pt: ["Rever?", "Reviso meus favoritos", "Sempre algo novo"],
     de: ["Nochmal schauen?", "Lieblinge immer wieder", "Immer was Neues"],
+    it: ["Riguardare?", "Riguardo i preferiti", "Sempre qualcosa di nuovo"],
+    fr: ["Revoir des films ?", "Je revois mes favoris", "Toujours du nouveau"],
+    ja: ["見返す?", "好きな作品を見返す", "いつも新しい作品"],
   },
   {
     id: "trailers",
@@ -153,6 +204,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Tráilers?", "Los veo", "Los evito"],
     pt: ["Trailers?", "Eu assisto", "Eu evito"],
     de: ["Trailer?", "Schaue ich", "Meide ich"],
+    it: ["I trailer?", "Li guardo", "Li evito"],
+    fr: ["Les bandes-annonces ?", "Je les regarde", "Je les évite"],
+    ja: ["予告編は?", "観る", "避ける"],
   },
   {
     id: "blockbuster_or_indie",
@@ -161,6 +215,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cuál va más contigo?", "Grandes superproducciones", "Cine independiente"],
     pt: ["Qual combina mais com você?", "Grandes blockbusters", "Cinema independente"],
     de: ["Was passt mehr zu dir?", "Große Blockbuster", "Independent-Kino"],
+    it: ["Cosa ti somiglia di più?", "Grandi blockbuster", "Cinema indipendente"],
+    fr: ["Qu'est-ce qui te ressemble ?", "Les gros blockbusters", "Le cinéma indé"],
+    ja: ["あなたらしいのは?", "超大作", "インディー映画"],
   },
   {
     id: "character_or_plot",
@@ -169,6 +226,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué te engancha?", "Personajes potentes", "Una trama absorbente"],
     pt: ["O que te prende?", "Personagens fortes", "Uma trama envolvente"],
     de: ["Was zieht dich an?", "Starke Figuren", "Eine fesselnde Story"],
+    it: ["Cosa ti cattura?", "Personaggi forti", "Una trama avvincente"],
+    fr: ["Qu'est-ce qui t'accroche ?", "Des personnages forts", "Une intrigue prenante"],
+    ja: ["惹かれるのは?", "魅力的な人物", "引き込まれる筋書き"],
   },
   {
     id: "score_or_silence",
@@ -177,6 +237,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Ambiente?", "Banda sonora potente", "Silencio y realismo"],
     pt: ["Atmosfera?", "Trilha marcante", "Silêncio e realismo"],
     de: ["Atmosphäre?", "Ein starker Soundtrack", "Leise und realistisch"],
+    it: ["Atmosfera?", "Una colonna sonora epica", "Silenziosa e realistica"],
+    fr: ["L'ambiance ?", "Une grande B.O.", "Calme et réaliste"],
+    ja: ["雰囲気は?", "壮大な音楽", "静かでリアル"],
   },
   {
     id: "awards_or_box_office",
@@ -185,6 +248,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Cuál verías?", "Cine de autor premiado", "Un éxito de taquilla"],
     pt: ["Qual você assistiria?", "Um filme premiado", "Um sucesso de bilheteria"],
     de: ["Was schaust du?", "Preisgekrönter Kunstfilm", "Ein Kassenschlager"],
+    it: ["Cosa guarderesti?", "Un film d'autore premiato", "Un successo al botteghino"],
+    fr: ["Tu regarderais quoi ?", "Un film d'auteur primé", "Un succès au box-office"],
+    ja: ["観るならどっち?", "受賞したアート系", "大ヒット作"],
   },
   {
     id: "cliffhanger",
@@ -193,6 +259,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Finales de episodio?", "Con suspense", "Cerrados"],
     pt: ["Finais de episódio?", "Com suspense", "Fechados"],
     de: ["Folgenenden?", "Cliffhanger", "In sich abgeschlossen"],
+    it: ["Finali di episodio?", "Cliffhanger", "Autoconclusivi"],
+    fr: ["Les fins d'épisode ?", "Cliffhangers", "Bouclées"],
+    ja: ["エピソードの終わり方は?", "続きが気になる", "1話完結"],
   },
   {
     id: "rainy_day",
@@ -201,6 +270,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["Un día de lluvia…", "Un drama emotivo", "Una comedia romántica"],
     pt: ["Num dia de chuva…", "Um drama emocionante", "Uma comédia romântica"],
     de: ["An einem Regentag …", "Ein bewegendes Drama", "Eine Romcom"],
+    it: ["In un giorno di pioggia…", "Un dramma commovente", "Una commedia romantica"],
+    fr: ["Un jour de pluie…", "Un drame émouvant", "Une comédie romantique"],
+    ja: ["雨の日には…", "心にしみるドラマ", "ラブコメ"],
   },
   {
     id: "scifi_or_fantasy",
@@ -209,6 +281,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué universo?", "Ciencia ficción", "Fantasía"],
     pt: ["Qual universo?", "Ficção científica", "Fantasia"],
     de: ["Welches Universum?", "Science-Fiction", "Fantasy"],
+    it: ["Quale universo?", "Fantascienza", "Fantasy"],
+    fr: ["Quel univers ?", "Science-fiction", "Fantasy"],
+    ja: ["どの世界観?", "SF", "ファンタジー"],
   },
   {
     id: "true_or_fiction",
@@ -217,6 +292,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué historia?", "Hechos reales", "Pura ficción"],
     pt: ["Qual história?", "Baseada em fatos reais", "Pura ficção"],
     de: ["Welche Geschichte?", "Nach wahren Begebenheiten", "Reine Fiktion"],
+    it: ["Quale storia?", "Tratta da fatti veri", "Pura finzione"],
+    fr: ["Quelle histoire ?", "Tirée de faits réels", "Pure fiction"],
+    ja: ["どんな物語?", "実話もの", "完全フィクション"],
   },
   {
     id: "screen",
@@ -225,6 +303,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Qué pantalla?", "Móvil o tablet", "La tele"],
     pt: ["Qual tela?", "Celular ou tablet", "A TV"],
     de: ["Welcher Bildschirm?", "Handy oder Tablet", "Der Fernseher"],
+    it: ["Quale schermo?", "Telefono o tablet", "La TV"],
+    fr: ["Quel écran ?", "Téléphone ou tablette", "La télé"],
+    ja: ["どの画面で?", "スマホ・タブレット", "テレビ"],
   },
   {
     id: "snacks",
@@ -233,6 +314,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Mientras ves algo?", "Solo la película", "Película y picoteo"],
     pt: ["Enquanto assiste?", "Só o filme", "Filme e petiscos"],
     de: ["Beim Schauen?", "Nur der Film", "Film und Snacks"],
+    it: ["Mentre guardi?", "Solo il film", "Film e snack"],
+    fr: ["Pendant le film ?", "Juste le film", "Film et grignotage"],
+    ja: ["観ているときは?", "映画だけ", "映画とおやつ"],
   },
   {
     id: "cast_or_director",
@@ -241,6 +325,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Por qué eliges?", "El reparto", "El director"],
     pt: ["Pelo que você escolhe?", "Pelo elenco", "Pelo diretor"],
     de: ["Wonach wählst du?", "Nach der Besetzung", "Nach der Regie"],
+    it: ["Come scegli?", "Dal cast", "Dal regista"],
+    fr: ["Tu choisis selon quoi ?", "Le casting", "Le réalisateur"],
+    ja: ["何で選ぶ?", "キャスト", "監督"],
   },
   {
     id: "ratings",
@@ -249,6 +336,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Las puntuaciones?", "Las miro", "Las ignoro"],
     pt: ["As notas?", "Eu confiro", "Eu ignoro"],
     de: ["Bewertungen?", "Schaue ich nach", "Ignoriere ich"],
+    it: ["I voti?", "Li controllo", "Li ignoro"],
+    fr: ["Les notes ?", "Je les regarde", "Je les ignore"],
+    ja: ["評価は?", "チェックする", "気にしない"],
   },
   {
     id: "after_credits",
@@ -257,6 +347,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Al terminar?", "Lo comento enseguida", "Me quedo pensando"],
     pt: ["Quando o filme acaba?", "Comento na hora", "Fico pensando em silêncio"],
     de: ["Wenn der Film endet?", "Gleich darüber reden", "Still nachdenken"],
+    it: ["Quando il film finisce?", "Ne parlo", "Ci rifletto in silenzio"],
+    fr: ["Quand le film se termine ?", "J'en discute", "Je savoure en silence"],
+    ja: ["観終わったら?", "感想を話す", "静かに余韻に浸る"],
   },
   {
     id: "credits",
@@ -265,6 +358,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Los créditos?", "Los veo hasta el final", "Apago enseguida"],
     pt: ["Os créditos?", "Vejo até o fim", "Desligo logo"],
     de: ["Abspann?", "Bis zum Ende", "Sofort aus"],
+    it: ["Titoli di coda?", "Li guardo fino alla fine", "Spengo subito"],
+    fr: ["Le générique de fin ?", "Je regarde jusqu'au bout", "J'éteins"],
+    ja: ["エンドロールは?", "最後まで観る", "すぐ消す"],
   },
   {
     id: "remake",
@@ -273,6 +369,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Remakes?", "Les doy una oportunidad", "Me basta el original"],
     pt: ["Remakes?", "Dou uma chance", "O original basta"],
     de: ["Remakes?", "Gebe ich eine Chance", "Das Original reicht"],
+    it: ["I remake?", "Gli do una possibilità", "Basta l'originale"],
+    fr: ["Les remakes ?", "Je leur laisse une chance", "L'original suffit"],
+    ja: ["リメイクは?", "観てみる", "オリジナルで十分"],
   },
   {
     id: "long_or_mini",
@@ -281,6 +380,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Formato de serie?", "Temporadas largas", "Miniseries cortas"],
     pt: ["Formato de série?", "Temporadas longas", "Minisséries curtas"],
     de: ["Serienformat?", "Lange Staffeln", "Kurze Miniserien"],
+    it: ["Formato della serie?", "Stagioni lunghe", "Miniserie brevi"],
+    fr: ["Format de série ?", "De longues saisons", "Une mini-série courte"],
+    ja: ["ドラマの形式は?", "長いシーズン", "短いミニシリーズ"],
   },
   {
     id: "childhood_or_now",
@@ -289,6 +391,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Nostalgia o actualidad?", "Películas de mi infancia", "Las de hoy"],
     pt: ["Nostalgia ou hoje?", "Filmes da minha infância", "Os de hoje"],
     de: ["Nostalgie oder heute?", "Filme meiner Kindheit", "Filme von heute"],
+    it: ["Nostalgia o oggi?", "I film della mia infanzia", "I film di oggi"],
+    fr: ["Nostalgie ou présent ?", "Les films de mon enfance", "Les films d'aujourd'hui"],
+    ja: ["懐かしさ?それとも今?", "子どもの頃の映画", "今の映画"],
   },
   {
     id: "bed_or_couch",
@@ -297,6 +402,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Dónde lo ves?", "En la cama", "En el sofá"],
     pt: ["Onde você assiste?", "Na cama", "No sofá"],
     de: ["Wo schaust du?", "Im Bett", "Auf dem Sofa"],
+    it: ["Dove guardi?", "A letto", "Sul divano"],
+    fr: ["Tu regardes où ?", "Au lit", "Sur le canapé"],
+    ja: ["どこで観る?", "ベッドで", "ソファで"],
   },
   {
     id: "marathon_or_single",
@@ -305,6 +413,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Plan de fin de semana?", "Maratón de cine", "Una buena película"],
     pt: ["Plano de fim de semana?", "Maratona de filmes", "Um bom filme"],
     de: ["Wochenendplan?", "Film-Marathon", "Ein richtig guter Film"],
+    it: ["Piano per il weekend?", "Una maratona di film", "Un solo grande film"],
+    fr: ["Programme du week-end ?", "Un marathon de films", "Un seul grand film"],
+    ja: ["週末の予定は?", "映画マラソン", "名作を1本"],
   },
   {
     id: "hero_or_villain",
@@ -313,6 +424,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Con quién vas?", "Con el héroe", "Con el villano"],
     pt: ["Por quem você torce?", "Pelo herói", "Pelo vilão"],
     de: ["Zu wem hältst du?", "Zum Helden", "Zum Bösewicht"],
+    it: ["Per chi tifi?", "L'eroe", "Il cattivo"],
+    fr: ["Tu es pour qui ?", "Le héros", "Le méchant"],
+    ja: ["応援するのは?", "ヒーロー", "悪役"],
   },
   {
     id: "cry_or_smile",
@@ -321,6 +435,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Al final?", "Que me haga llorar", "Que me haga sonreír"],
     pt: ["No final?", "Que me faça chorar", "Que me faça sorrir"],
     de: ["Am Ende?", "Zum Weinen bringen", "Zum Lächeln bringen"],
+    it: ["Alla fine?", "Fammi piangere", "Fammi sorridere"],
+    fr: ["À la fin ?", "Fais-moi pleurer", "Fais-moi sourire"],
+    ja: ["観終わったときは?", "泣かせてほしい", "笑顔にしてほしい"],
   },
   {
     id: "thriller_or_mystery",
@@ -329,6 +446,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿En un thriller?", "Adivinar al culpable", "Que me sorprendan"],
     pt: ["Num thriller?", "Adivinhar o culpado", "Ser surpreendido"],
     de: ["Im Thriller?", "Den Täter erraten", "Überrascht werden"],
+    it: ["In un thriller?", "Indovinare il colpevole", "Farmi sorprendere"],
+    fr: ["Dans un thriller ?", "Deviner le coupable", "Être surpris"],
+    ja: ["スリラーでは?", "犯人を推理する", "驚かされたい"],
   },
   {
     id: "intro_skip",
@@ -337,6 +457,9 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Las intros de series?", "Las veo siempre", "Las salto"],
     pt: ["Aberturas de séries?", "Sempre assisto", "Pulo logo"],
     de: ["Serien-Intros?", "Immer ansehen", "Sofort überspringen"],
+    it: ["Le sigle delle serie?", "Le guardo sempre", "Le salto subito"],
+    fr: ["Les génériques de série ?", "Je les regarde toujours", "Je les passe direct"],
+    ja: ["ドラマのオープニングは?", "毎回観る", "すぐスキップ"],
   },
   {
     id: "comfort_or_challenge",
@@ -345,5 +468,8 @@ export const DAILY_POLL_QUESTIONS = [
     es: ["¿Tu ánimo?", "Algo reconfortante", "Algo que haga pensar"],
     pt: ["Seu humor?", "Algo reconfortante", "Algo que faça pensar"],
     de: ["Deine Stimmung?", "Etwas Gemütliches", "Etwas zum Nachdenken"],
+    it: ["Il tuo umore?", "Un film di conforto", "Qualcosa che fa pensare"],
+    fr: ["Ton humeur ?", "Un film réconfortant", "Un film qui fait réfléchir"],
+    ja: ["今の気分は?", "ほっとする作品", "考えさせられる作品"],
   },
 ];

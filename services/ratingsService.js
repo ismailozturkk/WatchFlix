@@ -4,8 +4,9 @@ import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 // Film / dizi için uygulama-içi yıldız derecelendirme katmanı (Firestore) +
 // TMDB ile HYBRID skor hesabı.
 //
-// Ölçek: HER ŞEY 0-10. Kullanıcı 5 yıldız üzerinden yarım yıldızlarla puanlar
-// (5 × 2 = 10), TMDB vote_average de zaten 0-10. Böylece tek ölçekte birleşir.
+// Ölçek: HER ŞEY 0-10. Kullanıcı 10 yıldız üzerinden yarım puan adımıyla puanlar
+// (0.5 … 8.5 … 10; utils/ratingScale), TMDB vote_average de zaten 0-10. Tek ölçekte birleşir.
+// Eski 5 yıldızlı tam sayı kayıtlar (1..10) aynı ölçekte — göç yok.
 //
 // Hybrid model: OY SAYISINA GÖRE ağırlıklı ortalama (gerçek toplu ortalama).
 //   hybrid = (tmdbAvg * tmdbCount + appSum) / (tmdbCount + appCount)
@@ -36,6 +37,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
+import { normalizeUserRating } from "../utils/ratingScale";
 
 export const mediaKey = (mediaType, mediaId) => `${mediaType}_${mediaId}`;
 
@@ -123,7 +125,9 @@ const withOneRetry = (write) => write().catch(() => write());
 export async function setMyRating({ mediaType, mediaId, uid, rating, title = "", poster = null }) {
   if (!uid) throw new Error("setMyRating: uid yok");
   if (!mediaType || mediaId == null) throw new Error("setMyRating: media eksik");
-  const value = clampRating(rating);
+  // 0.5 adımına oturt (8.4 → 8.5); geçersiz/0 yazılmaz — kaldırma removeMyRating ile.
+  const value = normalizeUserRating(rating);
+  if (value <= 0) throw new Error("setMyRating: geçersiz puan");
   const key = mediaKey(mediaType, mediaId);
   const aggRef = doc(db, "Ratings", key);
   const userRef = doc(db, "Ratings", key, "userRatings", uid);

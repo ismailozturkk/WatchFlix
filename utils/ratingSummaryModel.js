@@ -3,6 +3,7 @@
 // Detaydaki sade puan özeti (components/RatingSummary.js) için SAF biçim yardımcıları — RN/Firebase yok.
 
 import { formatCompactVotes } from "./externalRatings";
+import { formatRatingInScale } from "./ratingScale";
 
 /** 7.84 → "7.8"; puan yoksa (0 / geçersiz) null. */
 export function formatScore(value) {
@@ -10,11 +11,9 @@ export function formatScore(value) {
   return Number.isFinite(n) && n > 0 ? n.toFixed(1) : null;
 }
 
-/** Kullanıcının kendi puanı: tam sayıysa "8", değilse "7.5" (sondaki .0 atılır). */
-export function formatMyRating(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, "");
+/** Kullanıcının kendi puanı 10 üzerinden: ten "8,5" · five (küsuratsız) "9"; tam sayıda ondalık yok. */
+export function formatMyRating(value, language = "en", scale = "ten") {
+  return formatRatingInScale(value, language, scale);
 }
 
 /** TMDB + Seelogd oylarının toplamı, kısa biçimde ("12.3K"); oy yoksa null. */

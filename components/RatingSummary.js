@@ -28,6 +28,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "@utils/i18nText";
 import { isUnreleased } from "@utils/watchState";
 import { formatMyRating, formatScore, summarizeVotes } from "@utils/ratingSummaryModel";
+import useRatingScale from "@hooks/useRatingScale";
 import { getRatingSummaryCopy } from "@utils/ratingSummaryCopy";
 import {
   mediaKey,
@@ -86,7 +87,8 @@ export default function RatingSummary({
   const hybrid = computeHybrid({ tmdbAvg, tmdbCount, count: agg.count, sum: agg.sum });
   const score = formatScore(hybrid);
   const votes = summarizeVotes(tmdbCount, agg.count);
-  const mine = formatMyRating(myRating);
+  const ratingScale = useRatingScale();
+  const mine = formatMyRating(myRating, language, ratingScale);
   const hasMine = mine !== null;
   // İçerik henüz yayınlanmadıysa puanlama kilitli. (Kendi oyu olan kullanıcıyı
   // kilitlemeyiz; tarihler geriye gitmese de mevcut oyunu yönetebilsin.)

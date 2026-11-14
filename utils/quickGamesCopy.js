@@ -225,8 +225,8 @@ export const QUICK_COPY = {
     posterA11y: "Poster sfocato"
   },
   rating: {
-    format: r => `★ ${r.toFixed(1)}`,
-    ratingA11y: (title, r) => `${title}, valutazione TMDB ${r.toFixed(1)}`
+    format: r => `★ ${r.toFixed(1).replace(".", ",")}`,
+    ratingA11y: (title, r) => `${title}, valutazione TMDB ${r.toFixed(1).replace(".", ",")}`
   },
   kind: {
     movie: "Film",
@@ -274,8 +274,8 @@ export const QUICK_COPY = {
       posterA11y: "Affiche floue",
     },
     rating: {
-      format: (r) => `★ ${r.toFixed(1)}`,
-      ratingA11y: (title, r) => `${title}, note TMDB ${r.toFixed(1)}`,
+      format: (r) => `★ ${r.toFixed(1).replace(".", ",")}`,
+      ratingA11y: (title, r) => `${title}, note TMDB ${r.toFixed(1).replace(".", ",")}`,
     },
     kind: { movie: "Film", tv: "Séries" },
     decadeLabel: (d) => `Années ${d}`,

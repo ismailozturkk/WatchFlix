@@ -56,14 +56,23 @@ const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Ago
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 
 const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE };
+const MONTHS_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+const MONTHS_JA = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const MONTH_NAMES = {
+  tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE, it: MONTHS_IT, fr: MONTHS_FR, ja: MONTHS_JA,
+};
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı). YENİ DİL: SCHEDULE/ROUNDS satırlarına `<kod>` alanı + MONTH_NAMES.
 const langKey = (lang) => copyLanguage(lang, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
 
 export const getScheduleEntry = (monthIndex) => SCHEDULE[((monthIndex % 12) + 12) % 12];
 export const themeLabel = (entry, lang) => entry?.[langKey(lang)] || entry?.en || "";
-export const monthLabel = (monthIndex, lang) =>
-  MONTH_NAMES[langKey(lang)][((monthIndex % 12) + 12) % 12];
+// Tablosu eksik dil ya da bozuk ay (ör. sohbet kartında okunamayan periodId) ekranı çökertmez: İngilizce / boş.
+export const monthLabel = (monthIndex, lang) => {
+  const names = MONTH_NAMES[langKey(lang)] || MONTHS_EN;
+  const index = Number(monthIndex);
+  return Number.isFinite(index) ? names[((Math.trunc(index) % 12) + 12) % 12] : "";
+};
 export const mediaLabel = (mediaType, lang) =>
   mediaType === "tv"
     ? { tr: "Dizi", en: "TV", es: "Serie", pt: "Série", de: "TV" , it: "TV", fr: "Séries", ja: "TV"}[langKey(lang)]

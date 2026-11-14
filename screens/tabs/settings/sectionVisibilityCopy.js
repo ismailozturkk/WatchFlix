@@ -105,7 +105,7 @@ const tr = {
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
       stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
       activity: ["Aktivitelerim", "Puanlamaların, yorumların, postların ve taslakların"],
-      ratings: ["Puan dağılımı", "Verdiğin puanların ½ yıldızdan 5 yıldıza grafiği"],
+      ratings: ["Puan dağılımı", "Verdiğin puanların ½ yıldızdan 10 yıldıza grafiği"],
     },
   },
 };
@@ -203,7 +203,7 @@ const en = {
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
       stats: ["Statistics", "How many movies and shows you've watched, and total time"],
       activity: ["My Activity", "Your ratings, comments, posts and drafts"],
-      ratings: ["Rating spread", "A chart of your ratings from ½ to 5 stars"],
+      ratings: ["Rating spread", "A chart of your ratings from ½ to 10 stars"],
     },
   },
 };
@@ -301,7 +301,7 @@ const es = {
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
       stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
       activity: ["Mi actividad", "Tus valoraciones, comentarios, publicaciones y borradores"],
-      ratings: ["Distribución de puntuaciones", "Gráfico de tus puntuaciones de ½ a 5 estrellas"],
+      ratings: ["Distribución de puntuaciones", "Gráfico de tus puntuaciones de ½ a 10 estrellas"],
     },
   },
 };
@@ -399,7 +399,7 @@ const pt = {
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
       stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
       activity: ["Minhas atividades", "Suas notas, comentários, publicações e rascunhos"],
-      ratings: ["Distribuição de notas", "Gráfico das suas notas de ½ a 5 estrelas"],
+      ratings: ["Distribuição de notas", "Gráfico das suas notas de ½ a 10 estrelas"],
     },
   },
 };
@@ -497,7 +497,7 @@ const de = {
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
       stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],
       activity: ["Meine Aktivität", "Deine Bewertungen, Kommentare, Beiträge und Entwürfe"],
-      ratings: ["Bewertungsverteilung", "Diagramm deiner Bewertungen von ½ bis 5 Sternen"],
+      ratings: ["Bewertungsverteilung", "Diagramm deiner Bewertungen von ½ bis 10 Sternen"],
     },
   },
 };
@@ -606,7 +606,7 @@ const it = {
       friends: ["Amici", "Ricerca, amici, messaggi e richieste. Se lo nascondi non potrai raggiungerli da qui"],
       stats: ["Statistiche", "Quanti film e programmi hai guardato e il tempo totale"],
       activity: ["La mia attività", "Le tue valutazioni, commenti, post e bozze"],
-      ratings: ["Distribuzione della valutazione", "Un grafico delle tue valutazioni da ½ a 5 stelle"]
+      ratings: ["Distribuzione della valutazione", "Un grafico delle tue valutazioni da ½ a 10 stelle"]
     }
   }
 };
@@ -703,7 +703,7 @@ const fr = {
       friends: ["Amis", "Recherche, amis, messages et demandes. Si tu la masques, tu ne pourras plus y accéder d'ici"],
       stats: ["Statistiques", "Combien de films et de séries tu as vus, et le temps total"],
       activity: ["Mon activité", "Tes notes, commentaires, publications et brouillons"],
-      ratings: ["Répartition des notes", "Un graphique de tes notes de ½ à 5 étoiles"],
+      ratings: ["Répartition des notes", "Un graphique de tes notes de ½ à 10 étoiles"],
     },
   },
 };
@@ -800,7 +800,7 @@ const ja = {
       friends: ["フレンド", "検索、フレンド、メッセージ、申請。非表示にするとここからアクセスできません"],
       stats: ["統計", "観た映画と番組の数、総時間"],
       activity: ["マイアクティビティ", "評価、コメント、投稿、下書き"],
-      ratings: ["評価の分布", "½〜5つ星の評価のグラフ"],
+      ratings: ["評価の分布", "½〜10の星評価のグラフ"],
     },
   },
 };

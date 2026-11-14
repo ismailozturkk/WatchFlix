@@ -20,7 +20,7 @@ const flatten = (value, prefix = "") =>
       : { ...acc, [path]: item };
   }, {});
 
-const LANGS = ["tr", "en", "es", "pt"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it", "fr", "ja"];
 const placeholders = (text) => (String(text).match(/\{\w+\}/g) || []).sort().join(",");
 
 describe("feedbackCopy", () => {

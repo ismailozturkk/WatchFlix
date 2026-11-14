@@ -141,10 +141,10 @@ describe("RatingSummary", () => {
     expect(button().props.accessibilityLabel).toBe(`${RATING_SUMMARY_COPY.tr.score("7.8", "12K")}. ${RATING_SUMMARY_COPY.tr.rated("8")}`);
   });
 
-  it("ondalıklı kendi puanı korunur", () => {
+  it("ondalıklı kendi puanı korunur (Türkçede virgül)", () => {
     mockMine = 7.5;
     mount();
-    expect(texts()).toContain("7.5");
+    expect(texts()).toContain("7,5");
   });
 
   it("düğme puanlama sayfasını açar", () => {

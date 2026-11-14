@@ -1,6 +1,6 @@
 // components/permissions/permissionSheetCopy.js
 //
-// İzin sayfasının (PermissionActionSheet) metinleri, beş dil. Takvimin kendi sayfası
+// İzin sayfasının (PermissionActionSheet) metinleri, sekiz dil. Takvimin kendi sayfası
 // var (CalendarPermissionSheet); bildirim izninin ilk açıklaması NotificationPrimingSheet.
 // "Geri çek" her dilde sistem ayarlarına götürür: işletim sistemi uygulamanın kendi
 // iznini kapatmasına izin vermez, metin bunu gizlemez.
@@ -242,7 +242,148 @@ const de = {
   },
 };
 
-export const PERMISSION_SHEET_COPY = { tr, en, es, pt, de };
+const it = {
+  shared: {
+    notNow: "Non ora",
+    cancel: "Annulla",
+    openSettings: "Apri le impostazioni di sistema",
+    revokeAction: "Disattiva nelle impostazioni di sistema",
+    settingsFootnote: "I permessi si possono cambiare solo nelle impostazioni di sistema; questo pulsante ti porta lì.",
+    requestFootnote: "Puoi cambiare idea quando vuoi in Impostazioni › Permessi.",
+  },
+  notifications: {
+    requestTitle: "Consenti le notifiche",
+    requestBody: "Promemoria e messaggi hanno bisogno del permesso di notifica per arrivare sul tuo telefono.",
+    allow: "Attiva le notifiche",
+    blockedTitle: "Notifiche disattivate",
+    blockedBody: "Questo permesso è stato negato in precedenza: ora si può attivare solo dalle impostazioni di sistema.",
+    revokeTitle: "Revoca il permesso di notifica",
+    revokeBody: "Se lo disattivi, Seelogd non potrà inviare notifiche al tuo telefono.",
+    gain: [
+      { t: "Promemoria di uscita", d: "Ti avvisiamo quando escono i film e gli episodi che segui" },
+      { t: "Amici e messaggi", d: "Richieste di amicizia e messaggi arrivano subito" },
+      { t: "Mi piace e commenti", d: "Non perdi le reazioni ai tuoi post" },
+    ],
+    lose: [
+      { t: "I promemoria si fermano", d: "I promemoria di film ed episodi non arrivano sul telefono" },
+      { t: "I messaggi restano muti", d: "Vedrai i nuovi messaggi quando apri l'app" },
+    ],
+  },
+  mediaLibrary: {
+    requestTitle: "Permesso di salvare nella galleria",
+    requestBody: "Serve per salvare locandine e schede di condivisione sul telefono.",
+    allow: "Consenti il salvataggio",
+    blockedTitle: "Permesso galleria disattivato",
+    blockedBody: "Questo permesso è stato negato in precedenza: ora si può attivare solo dalle impostazioni di sistema.",
+    revokeTitle: "Revoca il permesso della galleria",
+    revokeBody: "Se lo disattivi, Seelogd non potrà salvare immagini sul tuo telefono.",
+    gain: [
+      { t: "Solo salvataggio", d: "Seelogd aggiunge soltanto nuove immagini alla galleria" },
+      { t: "La galleria non viene letta", d: "Le tue foto non vengono viste né inviate da nessuna parte" },
+      { t: "Solo quando lo chiedi", d: "Un'immagine viene aggiunta solo quando tocchi salva" },
+    ],
+    lose: [
+      { t: "Niente salvataggi", d: "Non potrai scaricare locandine e schede di condivisione" },
+      { t: "Le immagini salvate restano", d: "Ciò che hai salvato resta nella galleria" },
+    ],
+  },
+};
+
+const fr = {
+  shared: {
+    notNow: "Pas maintenant",
+    cancel: "Annuler",
+    openSettings: "Ouvrir les réglages du système",
+    revokeAction: "Désactiver dans les réglages du système",
+    settingsFootnote: "Les autorisations ne se modifient que dans les réglages du système ; ce bouton t'y emmène.",
+    requestFootnote: "Tu peux changer d'avis à tout moment dans Réglages › Autorisations.",
+  },
+  notifications: {
+    requestTitle: "Autoriser les notifications",
+    requestBody: "Tes rappels et messages ont besoin de l'autorisation de notification pour arriver sur ton téléphone.",
+    allow: "Activer les notifications",
+    blockedTitle: "Notifications désactivées",
+    blockedBody: "Cette autorisation a déjà été refusée : elle ne peut plus être activée que dans les réglages du système.",
+    revokeTitle: "Retirer l'autorisation de notification",
+    revokeBody: "Si tu la désactives, Seelogd ne pourra plus envoyer de notifications sur ton téléphone.",
+    gain: [
+      { t: "Rappels de sortie", d: "Sois prévenu quand les films et épisodes que tu suis sortent" },
+      { t: "Amis et messages", d: "Les demandes d'amis et les messages arrivent tout de suite" },
+      { t: "J'aime et commentaires", d: "Ne rate aucune réaction à tes publications" },
+    ],
+    lose: [
+      { t: "Les rappels s'arrêtent", d: "Les rappels de films et d'épisodes n'arrivent plus" },
+      { t: "Les messages restent muets", d: "Tu verras les nouveaux messages en ouvrant l'app" },
+    ],
+  },
+  mediaLibrary: {
+    requestTitle: "Autoriser l'enregistrement dans la galerie",
+    requestBody: "Nécessaire pour enregistrer les affiches et les cartes de partage sur ton téléphone.",
+    allow: "Autoriser l'enregistrement",
+    blockedTitle: "Accès à la galerie désactivé",
+    blockedBody: "Cette autorisation a déjà été refusée : elle ne peut plus être activée que dans les réglages du système.",
+    revokeTitle: "Retirer l'accès à la galerie",
+    revokeBody: "Si tu le désactives, Seelogd ne pourra plus enregistrer d'images sur ton téléphone.",
+    gain: [
+      { t: "Enregistrement seulement", d: "Seelogd ajoute uniquement de nouvelles images à ta galerie" },
+      { t: "Ta galerie n'est pas lue", d: "Tes photos ne sont ni vues ni envoyées nulle part" },
+      { t: "Seulement quand tu le demandes", d: "Une image n'est ajoutée que si tu touches Enregistrer" },
+    ],
+    lose: [
+      { t: "Plus d'enregistrement", d: "Tu ne pourras plus télécharger d'affiches ni de cartes de partage" },
+      { t: "Les images enregistrées restent", d: "Ce que tu as enregistré reste dans ta galerie" },
+    ],
+  },
+};
+
+const ja = {
+  shared: {
+    notNow: "今はしない",
+    cancel: "キャンセル",
+    openSettings: "システム設定を開く",
+    revokeAction: "システム設定でオフにする",
+    settingsFootnote: "権限はシステム設定でのみ変更できます。このボタンから設定を開けます。",
+    requestFootnote: "設定 › 権限 からいつでも変更できます。",
+  },
+  notifications: {
+    requestTitle: "通知を許可",
+    requestBody: "リマインダーやメッセージをスマートフォンに届けるには通知の許可が必要です。",
+    allow: "通知をオンにする",
+    blockedTitle: "通知はオフです",
+    blockedBody: "この権限は以前に拒否されたため、システム設定からのみオンにできます。",
+    revokeTitle: "通知の許可を取り消す",
+    revokeBody: "オフにすると、Seelogdはスマートフォンに通知を送れなくなります。",
+    gain: [
+      { t: "公開リマインダー", d: "フォロー中の映画やエピソードが公開されたらお知らせします" },
+      { t: "フレンドとメッセージ", d: "フレンド申請やメッセージがすぐに届きます" },
+      { t: "いいねとコメント", d: "投稿へのリアクションを見逃しません" },
+    ],
+    lose: [
+      { t: "リマインダーが止まります", d: "映画やエピソードのリマインダーが届かなくなります" },
+      { t: "メッセージが通知されません", d: "新しいメッセージはアプリを開いたときに確認できます" },
+    ],
+  },
+  mediaLibrary: {
+    requestTitle: "ギャラリーへの保存を許可",
+    requestBody: "ポスターや共有カードをスマートフォンに保存するために必要です。",
+    allow: "保存を許可",
+    blockedTitle: "ギャラリーの権限はオフです",
+    blockedBody: "この権限は以前に拒否されたため、システム設定からのみオンにできます。",
+    revokeTitle: "ギャラリーの権限を取り消す",
+    revokeBody: "オフにすると、Seelogdはスマートフォンに画像を保存できなくなります。",
+    gain: [
+      { t: "保存のみ", d: "Seelogdはギャラリーに新しい画像を追加するだけです" },
+      { t: "ギャラリーは読み取りません", d: "既存の写真を見たり、どこかへ送ったりしません" },
+      { t: "求めたときだけ", d: "保存をタップしたときにだけ画像が追加されます" },
+    ],
+    lose: [
+      { t: "画像を保存できません", d: "ポスターや共有カードをダウンロードできなくなります" },
+      { t: "保存済みの画像は残ります", d: "これまでに保存した画像はギャラリーに残ります" },
+    ],
+  },
+};
+
+export const PERMISSION_SHEET_COPY = { tr, en, es, pt, de, it, fr, ja };
 
 export const getPermissionSheetCopy = (language) =>
   PERMISSION_SHEET_COPY[copyLanguage(language, Object.keys(PERMISSION_SHEET_COPY))];

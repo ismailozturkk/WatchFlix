@@ -1,7 +1,7 @@
 // components/profile/RatingDistributionCard.js
 //
-// Profil "Puan dağılımı" kartı: kullanıcının verdiği puanların 10 kademelik
-// (½★ … ★★★★★) histogramı. Sütun boyu o kademedeki oy sayısıyla orantılı.
+// Profil "Puan dağılımı" kartı: kullanıcının verdiği puanların 20 kademelik
+// (½ … 10, yarım puan adımlı; 10 yıldız ölçeği) histogramı. Sütun boyu o kademedeki oy sayısıyla orantılı.
 //
 // Veri: Lists/{uid}.activityIndex.ratings haritası (0-10) — EK OKUMA YOK.
 //   Kendi profil  → ListStatusContext.activityIndex.ratings
@@ -39,33 +39,35 @@ import * as Haptics from "../../services/hapticsService";
 import { intlLocaleOf } from "../../utils/appLanguages";
 import {
   RATING_STEPS,
+  ratingStepsOf,
   buildRatingDistribution,
   formatStarAverage,
-  stepToStars,
+  formatStep,
 } from "../../utils/ratingDistribution";
 import { getRatingDistributionCopy } from "../../utils/ratingDistributionCopy";
+import useRatingScale from "../../hooks/useRatingScale";
 
-// Kompakt düzen (9 Kas kullanıcı kararı): grafik ½★ ile ★★★★★ arasında tek satır,
+// Kompakt düzen (9 Kas kullanıcı kararı): grafik ½ ile 10★ arasında tek satır,
 // başlık tek blok; kart Aktivitelerim kartının altında onunla aynı ölçekte durur.
 const CHART_HEIGHT = 40;
 // Seçili sütunun üstündeki sayı etiketine yer.
 const CHART_TOP_ROOM = 12;
-const BAR_GAP = 3;
+// 20 kademe (14 Kas, yarım puan): sütun arası daraldı.
+const BAR_GAP = 2;
 // Dolu kademede sütun en az bu kadar görünsün (tek oy da fark edilsin).
 const MIN_BAR = 3;
 const SELECTION_HOLD_MS = 2200;
-const STEPS = Array.from({ length: RATING_STEPS }, (_, i) => i + 1);
+// En geniş ölçek (10 yıldız = 20 kademe); 5 yıldızda ilk 10 kullanılır.
+const ALL_STEPS = Array.from({ length: RATING_STEPS }, (_, i) => i + 1);
 
-// Kademe → yıldız dizisi (yalnız dolu + yarım; boş yıldız çizilmez).
-const StarRun = memo(function StarRun({ step, size, color, gap = 1 }) {
-  const full = Math.floor(step / 2);
-  const half = step % 2 === 1;
+// Kademe etiketi: "8,5★" — 10 yıldızlı ölçekte yıldız dizisi sığmaz, sayı + tek yıldız.
+const StepLabel = memo(function StepLabel({ step, size, color, language, scale }) {
   return (
-    <View style={[styles.starRun, { gap }]}>
-      {Array.from({ length: full }).map((_, i) => (
-        <Ionicons key={i} name="star" size={size} color={color} />
-      ))}
-      {half ? <Ionicons name="star-half" size={size} color={color} /> : null}
+    <View style={styles.starRun}>
+      <Text allowFontScaling={false} style={[styles.stepText, { color, fontSize: size + 1.5 }]}>
+        {formatStep(step, language, scale)}
+      </Text>
+      <Ionicons name="star" size={size} color={color} />
     </View>
   );
 });
@@ -83,7 +85,14 @@ function RatingDistributionCard({
   const starColor = theme.colors?.orange ?? "#F97316";
   const muted = theme.text?.muted ?? "#888";
 
-  const dist = useMemo(() => buildRatingDistribution(ratings), [ratings]);
+  // Ayarlar > Kişiselleştirme: 10 yıldız → 20 yarım puan kademesi, 5 yıldız → 10 tam puan kademesi
+  // (iki modda da etiketler ve ortalama 10 üzerinden).
+  const ratingScale = useRatingScale();
+  const stepCount = ratingStepsOf(ratingScale);
+  const STEPS = useMemo(() => ALL_STEPS.slice(0, stepCount), [stepCount]);
+  const stepCountRef = useRef(stepCount);
+  stepCountRef.current = stepCount;
+  const dist = useMemo(() => buildRatingDistribution(ratings, ratingScale), [ratings, ratingScale]);
   const { counts, total, max, average, modeStep } = dist;
   const empty = total === 0;
 
@@ -98,8 +107,8 @@ function RatingDistributionCard({
     const width = widthRef.current;
     if (!width) return;
     const index = Math.min(
-      RATING_STEPS - 1,
-      Math.max(0, Math.floor((x / width) * RATING_STEPS)),
+      stepCountRef.current - 1,
+      Math.max(0, Math.floor((x / width) * stepCountRef.current)),
     );
     const step = index + 1;
     if (selectedRef.current !== step) {
@@ -144,13 +153,13 @@ function RatingDistributionCard({
   );
 
   // ── Büyüme animasyonu: veri ilk geldiğinde sütunlar sırayla yükselir ───────
-  const grow = useRef(STEPS.map(() => new Animated.Value(0))).current;
+  const grow = useRef(ALL_STEPS.map(() => new Animated.Value(0))).current;
   const grown = useRef(false);
   useEffect(() => {
     if (empty || grown.current) return;
     grown.current = true;
     Animated.stagger(
-      38,
+      22,
       grow.map((value) =>
         Animated.spring(value, {
           toValue: 1,
@@ -181,7 +190,7 @@ function RatingDistributionCard({
     </Text>
   ) : selected ? (
     <View style={styles.subtitleRow}>
-      <StarRun step={selected} size={10} color={starColor} />
+      <StepLabel step={selected} size={10} color={starColor} language={language} scale={ratingScale} />
       <Text
         allowFontScaling={false}
         numberOfLines={1}
@@ -203,7 +212,7 @@ function RatingDistributionCard({
         {modeStep ? `  ·  ${copy.mostCommon} ` : ""}
       </Text>
       {modeStep ? (
-        <StarRun step={modeStep} size={9} color={withAlpha(starColor, 0.85)} />
+        <StepLabel step={modeStep} size={9} color={withAlpha(starColor, 0.85)} language={language} scale={ratingScale} />
       ) : null}
     </View>
   );
@@ -257,7 +266,7 @@ function RatingDistributionCard({
         copy.a11y(fmt(total), averageText),
         ...STEPS.filter((s) => counts[s - 1] > 0).map((s) =>
           copy.a11yStep(
-            String(stepToStars(s)).replace(".", language === "en" ? "." : ","),
+            formatStep(s, language, ratingScale),
             fmt(counts[s - 1]),
           ),
         ),
@@ -292,7 +301,7 @@ function RatingDistributionCard({
         header
       )}
 
-      {/* ── Histogram: ½★ [sütunlar] ★★★★★ ────────────────────────────────── */}
+      {/* ── Histogram: ½★ [20 sütun] 10★ ──────────────────────────────────── */}
       <View style={styles.chartRow}>
         <Ionicons
           name="star-half"
@@ -317,7 +326,7 @@ function RatingDistributionCard({
               const ratio = max > 0 ? count / max : 0;
               // Boşken arkada soluk bir çan eğrisi: kartın neye dönüşeceğini sezdirir.
               const ghost = empty
-                ? 0.18 + 0.62 * Math.exp(-((step - 7) ** 2) / 8)
+                ? 0.18 + 0.62 * Math.exp(-((step / stepCount - 0.7) ** 2) / 0.08)
                 : 0;
               const height = empty
                 ? Math.round(ghost * CHART_HEIGHT)
@@ -391,11 +400,12 @@ function RatingDistributionCard({
           </View>
         </View>
         <View style={styles.axisEnd}>
-          <StarRun
-            step={10}
+          <StepLabel
+            step={stepCount}
             size={8}
             color={withAlpha(starColor, empty ? 0.4 : 0.9)}
-            gap={0.5}
+            language={language}
+            scale={ratingScale}
           />
         </View>
       </View>
@@ -505,7 +515,8 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     fontWeight: "900",
   },
-  starRun: { flexDirection: "row", alignItems: "center" },
+  starRun: { flexDirection: "row", alignItems: "center", gap: 1 },
+  stepText: { fontWeight: "900", includeFontPadding: false },
 });
 
 export default memo(RatingDistributionCard);

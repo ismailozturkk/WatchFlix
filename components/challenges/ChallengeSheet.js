@@ -323,7 +323,7 @@ function Counted({ challenge, progress, copy, theme, color, posterWidth, titles,
               {kind === "countries" || kind === "country"
                 ? `${flagOf(film.label)} ${film.name}`
                 : kind === "ratingRange"
-                  ? `★ ${String(film.rating / 2)}${film.name ? ` · ${film.name}` : ""}`
+                  ? `★ ${film.rating}${film.name ? ` · ${film.name}` : ""}`
                   : film.name}
             </Text>
           </GlassTouchable>

@@ -24,6 +24,7 @@ import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
 import { POSTER_CORNER_SCALES } from "../../utils/posterCorners";
 import { POSTER_SIZES } from "../../utils/posterSizes";
 import { IMAGE_QUALITY_LEVELS } from "../../utils/imageQuality";
+import { RATING_SCALES, DEFAULT_RATING_SCALE } from "../../utils/ratingScale";
 import { WEATHER_CHOICES } from "../../utils/weatherParticles";
 import {
   DEFAULT_HAPTIC_INTENSITY,
@@ -225,6 +226,14 @@ const settingsKeys = {
     ],
   },
   haptics: { key: "hapticsEnabled", type: TYPES.boolean, default: false },
+  // Puan görünüm ölçeği (utils/ratingScale): "ten" = 10 yıldız yarım puan, "five" = 5 yıldız.
+  // Yalnız cihaz tercihi; saklanan puanlar hep 0-10.
+  ratingScale: {
+    key: "ratingScale",
+    type: TYPES.string,
+    default: DEFAULT_RATING_SCALE,
+    validate: oneOf(...RATING_SCALES),
+  },
   // Titreşim ince ayarları (bkz. utils/hapticPatterns.js). Ana anahtar `haptics`.
   hapticsLevel: {
     key: "hapticsLevel",

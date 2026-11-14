@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DatePickerModal, { normalizeDate } from "../modals/DatePickerModal";
 import BottomSheetModal from "../common/BottomSheetModal";
 import RatingInput from "../RatingInput";
+import { formatRatingInScale, ratingScaleSpec } from "../../utils/ratingScale";
+import useRatingScale from "../../hooks/useRatingScale";
 import { useTheme } from "../../context/ThemeContext";
 import GlassCloseButton from "../common/GlassCloseButton";
 import { useLanguage } from "../../context/LanguageContext";
@@ -66,6 +68,7 @@ export default function WatchedDateSheet({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const ratingScale = useRatingScale();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const posterUri = usePosterUri();
@@ -489,10 +492,10 @@ export default function WatchedDateSheet({
                 },
               ]}
             >
-              <RatingInput value={ratingDraft} onChange={setRatingDraft} size={27} color={theme.colors.orange} />
+              <RatingInput value={ratingDraft} onChange={setRatingDraft} size={ratingScale === "five" ? 30 : 26} color={theme.colors.orange} scale={ratingScale} />
               <Text allowFontScaling={false} style={[styles.ratingValue, { color: ratingDraft > 0 ? theme.colors.orange : theme.text.muted }]}>
                 {ratingDraft > 0
-                  ? `${ratingDraft.toFixed(1)} / 10`
+                  ? `${formatRatingInScale(ratingDraft, language, ratingScale)} / ${ratingScaleSpec(ratingScale).max}`
                   : i18nText(
                       "autoI18n.yildizlara_dokun_veya_kaydir",
                       "Dokun veya kaydır",
@@ -725,7 +728,8 @@ const styles = StyleSheet.create({
   ratingResetText: { fontSize: 10.5, fontWeight: "700" },
   lockedBox: { minHeight: 44, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
   lockedText: { flex: 1, fontSize: 11.5, lineHeight: 15, fontWeight: "600" },
-  ratingCard: { minHeight: 52, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  // 10 yıldız tam satırı kaplar; değer altında ortalanır (eskiden 5 yıldız + yanında değer).
+  ratingCard: { minHeight: 52, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center", gap: 4 },
   ratingValue: { fontSize: 11.5, fontWeight: "700" },
   commentField: { position: "relative", minHeight: 42, borderRadius: 14, borderWidth: 1.5, overflow: "hidden" },
   commentInput: { width: "100%", minHeight: 42, maxHeight: 104, paddingTop: 9, paddingHorizontal: 11, paddingRight: 42, paddingBottom: 9, fontSize: 13, lineHeight: 18 },

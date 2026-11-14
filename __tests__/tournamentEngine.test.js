@@ -237,3 +237,26 @@ describe("getChampionStats + computeThirdPlace", () => {
     expect(stats.pct).toBe(0);
   });
 });
+
+describe("ay / tür / medya adları her uygulama dilinde", () => {
+  const { APP_LANGUAGES } = require("../utils/appLanguages");
+  const engine = require("../services/tournamentEngine");
+
+  it.each(APP_LANGUAGES.map((l) => l.code))("%s: monthLabel 12 ayın hepsini verir, çökmez", (code) => {
+    for (let m = 0; m < 12; m += 1) {
+      const label = engine.monthLabel(m, code);
+      expect(typeof label).toBe("string");
+      expect(label.length).toBeGreaterThan(0);
+    }
+    expect(engine.mediaLabel("tv", code)).toBeTruthy();
+    expect(engine.mediaLabel("movie", code)).toBeTruthy();
+    expect(engine.themeLabel(engine.getScheduleEntry(0), code)).toBeTruthy();
+  });
+
+  it("bilinmeyen dil ve bozuk ay çökmez", () => {
+    expect(engine.monthLabel(0, "xx")).toBe("January");
+    expect(engine.monthLabel(undefined, "tr")).toBe("");
+    expect(engine.monthLabel(NaN, "fr")).toBe("");
+    expect(engine.monthLabel(-1, "fr")).toBe("Décembre");
+  });
+});

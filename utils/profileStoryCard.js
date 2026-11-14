@@ -221,11 +221,11 @@ export function formatStoryNumber(value, language = "tr", { compact = false } = 
   const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
   const short = (divisor, unit) => {
     const text = (n / divisor).toFixed(1).replace(/\.0$/, "");
-    // Ondalık virgül: Türkçe ve İspanyolca; ayraç İngilizcede nokta.
-    return `${lang === "en" ? text : text.replace(".", ",")}${unit}`;
+    // Ondalık ayraç: İngilizce ve Japoncada nokta, diğer dillerde virgül.
+    return `${lang === "en" || lang === "ja" ? text : text.replace(".", ",")}${unit}`;
   };
   if (compact && n >= 1_000_000) return short(1_000_000, "M");
-  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : lang === "pt" ? " mil" : lang === "de" ? "K" : lang === "it" ? " mila" : lang === "fr" ? "B" : lang === "ja" ? "B" : "B");
+  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : lang === "pt" ? " mil" : lang === "de" ? "K" : lang === "it" ? " mila" : lang === "fr" ? " k" : lang === "ja" ? "K" : "B"); // "B" = Türkçe "bin"
   try {
     return n.toLocaleString(intlLocaleOf(language));
   } catch {

@@ -424,7 +424,7 @@ export function challengeProgress(challenge, joinedAt, { movies = [], episodes =
         return { key, type, id: Number(id), name: title.name || "", imagePath: title.imagePath || null, day: null, rating: Number(ratings[key]) };
       });
     if (rule.kind === "ratingRange") {
-      // Her farklı kademenin (0-10 ölçeği, yarım yıldız = 1) ilk yapımı (anahtar sırasıyla, belirlenimli).
+      // Her farklı yıldız kademesinin (10 yıldız ölçeği; 8.5 → 9'a yuvarlanır) ilk yapımı (anahtar sırasıyla, belirlenimli).
       const byStep = new Map();
       for (const item of fresh) {
         const step = Math.min(10, Math.max(1, Math.round(item.rating)));

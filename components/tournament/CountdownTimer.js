@@ -115,6 +115,9 @@ export default function CountdownTimer({
     es: ["DÍAS", "H", "MIN", "S"],
     pt: ["DIAS", "H", "MIN", "S"],
     de: ["TAG", "STD", "MIN", "SEK"],
+    it: ["GG", "ORE", "MIN", "SEC"],
+    fr: ["J", "H", "MIN", "S"],
+    ja: ["日", "時間", "分", "秒"],
   });
   const values = [d, h, m, s];
 

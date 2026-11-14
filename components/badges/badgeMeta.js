@@ -50,7 +50,7 @@ export function odulAdi(id, lang = "tr") {
 
   const prestij = prestijCoz(id);
   if (prestij) {
-    const ad = AILE_ADI[prestij.family] || { tr: prestij.family, en: prestij.family, es: prestij.family, pt: prestij.family, de: prestij.family };
+    const ad = AILE_ADI[prestij.family] || { tr: prestij.family, en: prestij.family, es: prestij.family, pt: prestij.family, de: prestij.family, it: prestij.family, fr: prestij.family, ja: prestij.family };
     const aile = ad[code] || ad.en;
     return pickByLanguage(code, {
       tr: `${aile} · ${prestij.n}. prestij`,

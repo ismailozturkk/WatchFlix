@@ -71,14 +71,20 @@ const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep"
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 const MONTHS_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-const SHORT_MONTHS = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE };
+const MONTHS_IT = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+const MONTHS_FR = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const MONTHS_JA = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+const SHORT_MONTHS = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE, it: MONTHS_IT, fr: MONTHS_FR, ja: MONTHS_JA };
 
 function formatReleaseDate(dateStr, variant, language) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return String(dateStr).slice(0, 4);
   if (variant === "year") return String(d.getFullYear());
-  const mon = SHORT_MONTHS[copyLanguage(language, Object.keys(SHORT_MONTHS))][d.getMonth()];
+  const lang = copyLanguage(language, Object.keys(SHORT_MONTHS));
+  const mon = SHORT_MONTHS[lang][d.getMonth()];
+  // Japonca: ay adı zaten "3月"; gün sonra gelir ("3月5日", tam: "2026年3月5日").
+  if (lang === "ja") return variant === "full" ? `${d.getFullYear()}年${mon}${d.getDate()}日` : `${mon}${d.getDate()}日`;
   if (variant === "full") return `${d.getDate()} ${mon} ${d.getFullYear()}`;
   return `${d.getDate()} ${mon}`;
 }

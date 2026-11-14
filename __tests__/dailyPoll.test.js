@@ -73,7 +73,7 @@ const { POLL_COPY } = require("../utils/dailyPollCopy");
 const DailyPollWidget = require("../components/hub/DailyPollWidget").default;
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
-const LANGS = ["tr", "en", "es", "pt", "de"];
+const LANGS = ["tr", "en", "es", "pt", "de", "it", "fr", "ja"];
 const TODAY = "2026-10-21"; // TR günü (12:00 +03)
 
 describe("soru bankası", () => {
@@ -84,7 +84,7 @@ describe("soru bankası", () => {
     ids.forEach((id) => expect(id).toMatch(/^[a-z][a-z0-9_]*$/));
   });
 
-  test("her soru beş dilde [soru, A, B] dolu; seçenekler birbirinden farklı ve kısa", () => {
+  test("her soru sekiz dilde [soru, A, B] dolu; seçenekler birbirinden farklı ve kısa", () => {
     for (const q of DAILY_POLL_QUESTIONS) {
       for (const lang of LANGS) {
         const entry = q[lang];
@@ -104,7 +104,7 @@ describe("soru bankası", () => {
     }
   });
 
-  test("beş dilde tekrar eden soru metni yok (kopyala-yapıştır hatasını yakalar)", () => {
+  test("sekiz dilde tekrar eden soru metni yok (kopyala-yapıştır hatasını yakalar)", () => {
     for (const lang of LANGS) {
       const prompts = DAILY_POLL_QUESTIONS.map((q) => q[lang][0]);
       expect(new Set(prompts).size).toBe(prompts.length);

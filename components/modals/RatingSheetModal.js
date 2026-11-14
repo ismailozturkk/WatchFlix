@@ -4,7 +4,7 @@
 //   - Kompakt düzen (9 Kas kullanıcı kararı): sayfa yüksekliği İÇERİĞE göre (eskiden
 //     ekranın %70'i sabit). HYBRID skor (TMDB + uygulama oyları), TMDB puanı ve
 //     kullanıcı ortalaması başlıkta afişin yanında tek blokta.
-//   - Kullanıcı kendi oyunu RatingInput ile 0-10 (yarım yıldız) verir
+//   - Kullanıcı kendi oyunu RatingInput ile 10 yıldız, yarım puan adımlı (0,5-10) verir
 //   - Kaydet / Oyumu kaldır (yalnız çöp simgesi)
 //
 // Kullanım (CommentSheetModal gibi, parent <Modal> ile sarmalanır):
@@ -47,6 +47,9 @@ import { isUnreleased } from "@utils/watchState";
 import { alpha } from "../../theme/colors";
 import RatingStars from "@components/RatingStars";
 import RatingInput from "@components/RatingInput";
+import { useLanguage } from "@context/LanguageContext";
+import { formatRatingInScale, ratingScaleSpec } from "@utils/ratingScale";
+import useRatingScale from "@hooks/useRatingScale";
 import {
   mediaKey,
   subscribeToAggregate,
@@ -88,6 +91,9 @@ export default function RatingSheetModal({
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { language } = useLanguage();
+  // Ayarlar > Kişiselleştirme: 10 yıldız (yarım puan) ya da 5 yıldız. Saklama hep 0-10.
+  const ratingScale = useRatingScale();
   const posterUri = usePosterUri();
   const insets = useSafeAreaInsets();
 
@@ -361,10 +367,10 @@ export default function RatingSheetModal({
                   allowFontScaling={false}
                   style={[styles.draftValue, { color: draft > 0 ? theme.colors.orange : theme.text.muted }]}
                 >
-                  {draft > 0 ? `${draft.toFixed(1)} / 10` : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
+                  {draft > 0 ? `${formatRatingInScale(draft, language, ratingScale)} / ${ratingScaleSpec(ratingScale).max}` : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
                 </Text>
               </View>
-              <RatingInput value={draft} onChange={setDraft} size={34} color={theme.colors.orange} />
+              <RatingInput value={draft} onChange={setDraft} size={ratingScale === "five" ? 36 : 32} color={theme.colors.orange} scale={ratingScale} />
             </View>
           )}
 

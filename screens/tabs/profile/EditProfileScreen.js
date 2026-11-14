@@ -166,7 +166,8 @@ export default function EditProfileScreen({ navigation }) {
       Toast.show({ type: "success", text1: i18nText("autoI18n.profil_guncellendi", "Profil güncellendi") });
       navigation.goBack();
     } catch (e) {
-      Toast.show({ type: "error", text1: e?.message || i18nText("autoI18n.guncellenemedi", "Güncellenemedi") });
+      // Ham hata metni (Türkçe servis mesajı ya da Firebase İngilizcesi) kullanıcı diline uymaz: yerel metin.
+      Toast.show({ type: "error", text1: i18nText("autoI18n.guncellenemedi", "Güncellenemedi") });
     } finally {
       setSaving(false);
     }
@@ -240,7 +241,7 @@ export default function EditProfileScreen({ navigation }) {
   // kendisi kapattıysa (iptal) hata değildir: toast gösterilmez.
   const handleDangerFailure = (e) => {
     const code = e?.code || "";
-    let msg = e?.message || (isReset ? resetCopy.incomplete : i18nText("autoI18n.hesap_silinemedi", "Hesap silinemedi"));
+    let msg = isReset ? resetCopy.incomplete : i18nText("autoI18n.hesap_silinemedi", "Hesap silinemedi");
     let silent = false;
     if (
       usesPassword &&

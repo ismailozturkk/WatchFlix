@@ -126,15 +126,21 @@ function offerDuration(offer, lang) {
   const count = (offer.cycles || 1) * (offer.unitCount || 1);
   const one = count === 1;
   const units = {
-    day: pickByLanguage(lang, { tr: "gün", en: one ? "day" : "days", es: one ? "día" : "días", pt: one ? "dia" : "dias", de: one ? "Tag" : "Tage" }),
-    week: pickByLanguage(lang, { tr: "hafta", en: one ? "week" : "weeks", es: one ? "semana" : "semanas", pt: one ? "semana" : "semanas", de: one ? "Woche" : "Wochen" }),
-    month: pickByLanguage(lang, { tr: "ay", en: one ? "month" : "months", es: one ? "mes" : "meses", pt: one ? "mês" : "meses", de: one ? "Monat" : "Monate" }),
-    year: pickByLanguage(lang, { tr: "yıl", en: one ? "year" : "years", es: one ? "año" : "años", pt: one ? "ano" : "anos", de: one ? "Jahr" : "Jahre" }),
+    day: pickByLanguage(lang, { tr: "gün", en: one ? "day" : "days", es: one ? "día" : "días", pt: one ? "dia" : "dias", de: one ? "Tag" : "Tage", it: one ? "giorno" : "giorni", fr: one ? "jour" : "jours", ja: "日" }),
+    week: pickByLanguage(lang, { tr: "hafta", en: one ? "week" : "weeks", es: one ? "semana" : "semanas", pt: one ? "semana" : "semanas", de: one ? "Woche" : "Wochen", it: one ? "settimana" : "settimane", fr: one ? "semaine" : "semaines", ja: "週間" }),
+    month: pickByLanguage(lang, { tr: "ay", en: one ? "month" : "months", es: one ? "mes" : "meses", pt: one ? "mês" : "meses", de: one ? "Monat" : "Monate", it: one ? "mese" : "mesi", fr: "mois", ja: "か月" }),
+    year: pickByLanguage(lang, { tr: "yıl", en: one ? "year" : "years", es: one ? "año" : "años", pt: one ? "ano" : "anos", de: one ? "Jahr" : "Jahre", it: one ? "anno" : "anni", fr: one ? "an" : "ans", ja: "年" }),
   };
+  const feminine = offer.unit === "week"; // it/fr/de/pt: hafta dişil (settimana, semaine, Woche, semana)
   const unit = units[offer.unit];
   if (!unit) return pickByLanguage(lang, { tr: "İlk dönem", en: "Intro", es: "Inicial", pt: "Inicial", de: "Einführung" , it: "Intro", fr: "Découverte", ja: "お試し"});
   if (lang === "es") return one ? `${unit} inicial` : `${count} ${unit} iniciales`;
   if (lang === "tr") return one ? `İlk ${unit}` : `İlk ${count} ${unit}`;
+  if (lang === "pt") return one ? `${feminine ? "Primeira" : "Primeiro"} ${unit}` : `${feminine ? "Primeiras" : "Primeiros"} ${count} ${unit}`;
+  if (lang === "de") return one ? `${feminine ? "Erste" : "Erster"} ${unit}` : `Erste ${count} ${unit}`;
+  if (lang === "it") return one ? `${feminine ? "Prima" : "Primo"} ${unit}` : `${feminine ? "Prime" : "Primi"} ${count} ${unit}`;
+  if (lang === "fr") return one ? `${feminine ? "Première" : "Premier"} ${unit}` : `${count} ${feminine ? "premières" : "premiers"} ${unit}`;
+  if (lang === "ja") return `最初の${count}${unit}`;
   return one ? `First ${unit}` : `First ${count} ${unit}`;
 }
 

@@ -199,8 +199,9 @@ function ColorSlider({ value, max, onChange, gradient, thumbColor, theme }) {
  */
 export default function ColorPickerSheet({ visible, initialValue, title, language = "tr", sources = [], originalHex, contrastAgainst, onClose, onConfirm }) {
   const { theme } = useTheme();
-  // Üç dilli seçici: es verilmezse İngilizce (utils/appLanguages kuralı).
-  const t = (trText, enText, esText, ptText, deText) => pickByLanguage(language, { tr: trText, en: enText, es: esText ?? enText, pt: ptText ?? enText, de: deText ?? enText });
+  // Sekiz dilli seçici: verilmeyen dil İngilizce (utils/appLanguages kuralı).
+  const t = (trText, enText, esText, ptText, deText, itText, frText, jaText) =>
+    pickByLanguage(language, { tr: trText, en: enText, es: esText ?? enText, pt: ptText ?? enText, de: deText ?? enText, it: itText ?? enText, fr: frText ?? enText, ja: jaText ?? enText });
 
   const [mode, setMode] = useState("absolute");
   const [hsl, setHsl] = useState({ h: 0, s: 0, l: 0 });
@@ -282,13 +283,13 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
             {normalizeHex(originalHex) ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${t("Önceki renk", "Previous color", "Color anterior", "Cor anterior", "Vorherige Farbe")} ${normalizeHex(originalHex)}`}
+                accessibilityLabel={`${t("Önceki renk", "Previous color", "Color anterior", "Cor anterior", "Vorherige Farbe", "Colore precedente", "Couleur précédente", "以前の色")} ${normalizeHex(originalHex)}`}
                 onPress={restoreOriginal}
                 style={[styles.preview, styles.previewPrev, { backgroundColor: normalizeHex(originalHex), borderColor: theme.border }]}
               >
                 <AppIcon family="Ionicons" name="arrow-undo" size={15} color={readableTextOn(normalizeHex(originalHex))} />
                 <Text style={[styles.previewPrevText, { color: readableTextOn(normalizeHex(originalHex)) }]} numberOfLines={1}>
-                  {t("Önceki", "Previous", "Anterior", "Anterior", "Vorherige")}
+                  {t("Önceki", "Previous", "Anterior", "Anterior", "Vorherige", "Precedente", "Précédente", "以前")}
                 </Text>
               </Pressable>
             ) : null}
@@ -310,8 +311,8 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
           {/* Mod seçimi */}
           {sources.length > 0 ? (
             <View style={[styles.segment, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <SegBtn active={mode === "absolute"} icon="color-palette-outline" label={t("Renk", "Color", "Color", "Cor", "Farbe")} onPress={() => setMode("absolute")} theme={theme} />
-              <SegBtn active={mode === "relative"} icon="git-network-outline" label={t("Bağlı", "Linked", "Vinculado", "Vinculado", "Verknüpft")} onPress={() => setMode("relative")} theme={theme} />
+              <SegBtn active={mode === "absolute"} icon="color-palette-outline" label={t("Renk", "Color", "Color", "Cor", "Farbe", "Colore", "Couleur", "色")} onPress={() => setMode("absolute")} theme={theme} />
+              <SegBtn active={mode === "relative"} icon="git-network-outline" label={t("Bağlı", "Linked", "Vinculado", "Vinculado", "Verknüpft", "Collegato", "Lié", "連動")} onPress={() => setMode("relative")} theme={theme} />
             </View>
           ) : null}
 
@@ -333,13 +334,13 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                 />
               </GlassBox>
 
-              <Channel label={t("Ton", "Hue", "Tono", "Matiz", "Farbton")} theme={theme}>
+              <Channel label={t("Ton", "Hue", "Tono", "Matiz", "Farbton", "Tonalità", "Teinte", "色相")} theme={theme}>
                 <ColorSlider value={hsl.h} max={360} onChange={(v) => setChannel("h", v)} gradient={HUE_GRADIENT} thumbColor={hslToHex(hsl.h, 100, 50)} theme={theme} />
               </Channel>
-              <Channel label={t("Doygunluk", "Saturation", "Saturación", "Saturação", "Sättigung")} theme={theme}>
+              <Channel label={t("Doygunluk", "Saturation", "Saturación", "Saturação", "Sättigung", "Saturazione", "Saturation", "彩度")} theme={theme}>
                 <ColorSlider value={hsl.s} max={100} onChange={(v) => setChannel("s", v)} gradient={satGradient} thumbColor={absHex} theme={theme} />
               </Channel>
-              <Channel label={t("Parlaklık", "Lightness", "Luminosidad", "Luminosidade", "Helligkeit")} theme={theme}>
+              <Channel label={t("Parlaklık", "Lightness", "Luminosidad", "Luminosidade", "Helligkeit", "Luminosità", "Luminosité", "明度")} theme={theme}>
                 <ColorSlider value={hsl.l} max={100} onChange={(v) => setChannel("l", v)} gradient={lightGradient} thumbColor={absHex} theme={theme} />
               </Channel>
 
@@ -358,7 +359,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
           ) : (
             <>
               {/* Kaynak token seçimi */}
-              <Text style={[styles.channelLabel, { color: theme.text.muted, marginTop: 13 }]}>{t("Kaynak renk", "Source color", "Color de origen", "Cor de origem", "Quellfarbe")}</Text>
+              <Text style={[styles.channelLabel, { color: theme.text.muted, marginTop: 13 }]}>{t("Kaynak renk", "Source color", "Color de origen", "Cor de origem", "Quellfarbe", "Colore di origine", "Couleur source", "元の色")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sourceRow} style={styles.sourceWrap}>
                 {sources.map((src) => {
                   const active = rel.from === src.key;
@@ -377,10 +378,10 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                 })}
               </ScrollView>
 
-              <Channel label={`${t("Açıklık", "Lightness", "Luminosidad", "Luminosidade", "Helligkeit")}  ${offsetLabel(rel.l)}`} theme={theme}>
+              <Channel label={`${t("Açıklık", "Lightness", "Luminosidad", "Luminosidade", "Helligkeit", "Luminosità", "Luminosité", "明度")}  ${offsetLabel(rel.l)}`} theme={theme}>
                 <ColorSlider value={rel.l + 100} max={200} onChange={(v) => setRel((p) => ({ ...p, l: Math.round(v) - 100 }))} gradient={OFFSET_GRADIENT} thumbColor={relHex} theme={theme} />
               </Channel>
-              <Channel label={`${t("Doygunluk", "Saturation", "Saturación", "Saturação", "Sättigung")}  ${offsetLabel(rel.s)}`} theme={theme}>
+              <Channel label={`${t("Doygunluk", "Saturation", "Saturación", "Saturação", "Sättigung", "Saturazione", "Saturation", "彩度")}  ${offsetLabel(rel.s)}`} theme={theme}>
                 <ColorSlider value={rel.s + 100} max={200} onChange={(v) => setRel((p) => ({ ...p, s: Math.round(v) - 100 }))} gradient={["#808080", sourceColor]} thumbColor={relHex} theme={theme} />
               </Channel>
 
@@ -388,8 +389,8 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                 <AppIcon family="Ionicons" name="link-outline" size={14} color={theme.accent} />
                 <Text style={[styles.relHintText, { color: theme.text.secondary }]} numberOfLines={2}>
                   {sourceLabel}{" · "}{rel.l === 0 && rel.s === 0
-                    ? t("aynı renk", "same color", "mismo color", "mesma cor", "dieselbe Farbe")
-                    : `${rel.l !== 0 ? `${t("açıklık", "lightness", "luminosidad", "luminosidade", "Helligkeit")} ${offsetLabel(rel.l)}` : ""}${rel.l !== 0 && rel.s !== 0 ? " · " : ""}${rel.s !== 0 ? `${t("doygunluk", "saturation", "saturación", "saturação", "Sättigung")} ${offsetLabel(rel.s)}` : ""}`}
+                    ? t("aynı renk", "same color", "mismo color", "mesma cor", "dieselbe Farbe", "stesso colore", "même couleur", "同じ色")
+                    : `${rel.l !== 0 ? `${t("açıklık", "lightness", "luminosidad", "luminosidade", "Helligkeit", "luminosità", "luminosité", "明度")} ${offsetLabel(rel.l)}` : ""}${rel.l !== 0 && rel.s !== 0 ? " · " : ""}${rel.s !== 0 ? `${t("doygunluk", "saturation", "saturación", "saturação", "Sättigung", "saturazione", "saturation", "彩度")} ${offsetLabel(rel.s)}` : ""}`}
                 </Text>
               </View>
             </>
@@ -398,11 +399,11 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
 
           <View style={styles.actions}>
             <GlassPressable onPress={onClose} style={[styles.cancelBtn, { borderColor: theme.border }]}>
-              <Text style={[styles.cancelText, { color: theme.text.secondary }]}>{t("Vazgeç", "Cancel", "Cancelar", "Cancelar", "Abbrechen")}</Text>
+              <Text style={[styles.cancelText, { color: theme.text.secondary }]}>{t("Vazgeç", "Cancel", "Cancelar", "Cancelar", "Abbrechen", "Annulla", "Annuler", "キャンセル")}</Text>
             </GlassPressable>
             <GlassPressable onPress={confirm} style={[styles.confirmBtn, { backgroundColor: theme.accent }]}>
               <AppIcon family="Ionicons" name="checkmark" size={19} color="#fff" />
-              <Text style={styles.confirmText}>{t("Seç", "Apply", "Aplicar", "Aplicar", "Anwenden")}</Text>
+              <Text style={styles.confirmText}>{t("Seç", "Apply", "Aplicar", "Aplicar", "Anwenden", "Applica", "Appliquer", "適用")}</Text>
             </GlassPressable>
           </View>
       </SafeAreaView>

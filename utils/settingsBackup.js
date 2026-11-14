@@ -28,6 +28,7 @@ import {
 } from "../theme/colors";
 import { TONES, TONE_PATTERN } from "../theme/toneModel";
 import { normalizeHex } from "./colorUtils";
+import { isRatingScale } from "./ratingScale";
 import { normalizeDecorScopes } from "./decorScopes";
 import { normalizeSectionVisibility } from "./sectionVisibility";
 import { normalizePresets } from "./discoverFilters";
@@ -115,6 +116,7 @@ export const BACKUP_GROUPS = Object.freeze([
       "streamingProviderIds",
       "onboardingGenreKeys",
       "imageQualityLevel",
+      "ratingScale",
     ],
   },
   {
@@ -203,6 +205,7 @@ const RULES = {
   theme: { check: isThemeId },
   effectMode: { check: (v) => EFFECT_MODES.includes(v) },
   imageQualityLevel: { check: (v) => IMAGE_QUALITY_LEVELS.includes(v) },
+  ratingScale: { check: isRatingScale },
   streamingProviderIds: { check: isPositiveIntList },
   fontRoles: { check: isPlain, normalize: normalizeFontRoles },
   decorScopes: { check: isPlain, normalize: normalizeDecorScopes },

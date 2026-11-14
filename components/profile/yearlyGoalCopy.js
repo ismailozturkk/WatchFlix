@@ -632,11 +632,12 @@ export const getYearlyGoalCopy = (language) =>
 export const fillCopy = (text, values = {}) =>
   String(text).replace(/\{(\w+)\}/g, (_, key) => (key in values ? String(values[key]) : `{${key}}`));
 
-/** Ondalık gösterim: 1.0 → "1", 2.5 → "2.5" (tr/es virgül). */
+/** Ondalık gösterim: 1.0 → "1", 2.5 → "2.5" (en/ja nokta; diğer diller virgül). */
 export function formatGoalNumber(value, language) {
   const rounded = Math.round(Number(value) * 10) / 10;
   const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  return copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]) === "en" ? text : text.replace(".", ",");
+  const code = copyLanguage(language, ["tr", "en", "es", "pt", "de", "it", "fr", "ja"]);
+  return code === "en" || code === "ja" ? text : text.replace(".", ",");
 }
 
 /** Yüzde gösterimi: tr "%62", diğer diller "62%". */

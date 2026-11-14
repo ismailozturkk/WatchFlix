@@ -1,10 +1,10 @@
 // screens/tabs/settings/hapticsCopy.js
 //
-// Ayarlar > Titreşim ekranının metinleri: yerel tr/en/es/pt/de. Anahtar eşitliği,
+// Ayarlar > Titreşim ekranının metinleri: yerel tr/en/es/pt/de/it/fr/ja. Anahtar eşitliği,
 // boş değer ve "katalogdaki her kategori/düzey/güç/örnek desenin her dilde adı var"
 // kuralı __tests__/hapticsSettings.test.js'te bekçilenir.
 //
-// YENİ DESEN örnek listesine (HAPTIC_SAMPLES) girerse buraya beş dilde ad yaz.
+// YENİ DESEN örnek listesine (HAPTIC_SAMPLES) girerse buraya sekiz dilde ad yaz.
 
 import { copyLanguage } from "../../../utils/appLanguages";
 
@@ -346,7 +346,212 @@ const de = {
   offHint: "Schalte die Vibration ein, um diese Einstellungen zu ändern.",
 };
 
-export const HAPTICS_COPY = Object.freeze({ tr, en, es, pt, de });
+const it = {
+  title: "Vibrazione",
+  rowOff: "Disattivata",
+  rowOn: "{level} · {intensity}",
+  masterTitle: "Vibrazione",
+  masterSub: "Feedback tattile per tocchi, risultati e festeggiamenti",
+  intro:
+    "Scegli quando e con quale intensità vibra il telefono. Tocca un'opzione per sentirla subito.",
+  levelLabel: "QUANDO VIBRARE",
+  levels: {
+    minimal: ["Minima", "Solo i momenti chiave: pressione lunga, salvato, errori, badge e festeggiamenti"],
+    balanced: ["Bilanciata", "Consigliata. Anche schede, chip, interruttori e trascinamento si sentono appena"],
+    rich: ["Ricca", "Un tocco leggero a ogni interazione, inclusi pannelli e pulsanti leggeri"],
+  },
+  intensityLabel: "INTENSITÀ",
+  intensities: { soft: "Leggera", normal: "Normale", strong: "Forte" },
+  intensityHint: {
+    soft: "Vibrazioni più morbide e silenziose",
+    normal: "Gli effetti tattili del tuo telefono",
+    strong: "Vibrazioni più marcate e lunghe",
+  },
+  categoryLabel: "DOVE VIBRARE",
+  categoryHint: "Tocca una riga per sentire la vibrazione di quell'area.",
+  categories: {
+    navigation: ["Navigazione e selezione", "Schede, chip, interruttori, cursori"],
+    gestures: ["Gesti", "Pressione lunga, trascina e rilascia, schede da scorrere, aggiorna"],
+    feedback: ["Esito delle azioni", "Salvato, aggiunto alla lista, eliminato, avvisi ed errori"],
+    games: ["Giochi", "Risposte giuste/sbagliate, conti alla rovescia, vittorie"],
+    social: ["Chat e social", "Invio e ricezione di messaggi, mi piace, reazioni, amici"],
+    celebrations: ["Festeggiamenti", "Badge, serie, obiettivi e match di CineSwipe"],
+  },
+  libraryLabel: "LIBRERIA DI SCHEMI",
+  libraryHint: "Tocca uno schema per sentirlo. Qui suonano anche quelli delle aree disattivate.",
+  patterns: {
+    select: "Selezione",
+    tabSwitch: "Scheda",
+    toggleOn: "Interruttore",
+    sliderTick: "Cursore",
+    longPress: "Pressione lunga",
+    dragStart: "Trascina",
+    drop: "Rilascia",
+    swipeThreshold: "Scorri",
+    success: "Riuscito",
+    added: "Aggiunto",
+    delete: "Eliminato",
+    warning: "Avviso",
+    error: "Errore",
+    correct: "Giusto",
+    wrong: "Sbagliato",
+    countdown: "Conto alla rovescia",
+    win: "Hai vinto",
+    send: "Invia",
+    receive: "Nuovo messaggio",
+    like: "Mi piace",
+    reaction: "Reazione",
+    badge: "Badge",
+    streak: "Serie",
+    goal: "Obiettivo",
+    match: "Match",
+  },
+  noteIos:
+    "Se su iPhone Impostazioni › Suoni e feedback aptico › Feedback aptico di sistema è disattivato, non sentirai le vibrazioni.",
+  noteAndroid:
+    "Se nelle Impostazioni del telefono › Suoni e vibrazione › Feedback al tocco è disattivato, le intensità Leggera e Normale non si sentono. Forte usa direttamente il motore di vibrazione.",
+  reset: "Ripristina predefiniti",
+  resetSub: "Bilanciata · Normale · tutte le aree attive",
+  offHint: "Attiva la vibrazione per cambiare queste impostazioni.",
+};
+
+const fr = {
+  title: "Vibrations",
+  rowOff: "Désactivées",
+  rowOn: "{level} · {intensity}",
+  masterTitle: "Vibrations",
+  masterSub: "Retour tactile pour les touches, les résultats et les célébrations",
+  intro:
+    "Choisis quand et avec quelle force ton téléphone vibre. Touche une option pour la ressentir tout de suite.",
+  levelLabel: "QUAND VIBRER",
+  levels: {
+    minimal: ["Minimal", "Seulement les moments clés : appui long, enregistré, erreurs, badges et célébrations"],
+    balanced: ["Équilibré", "Recommandé. Onglets, puces, interrupteurs et glisser se ressentent aussi légèrement"],
+    rich: ["Riche", "Un léger tic à chaque toucher, y compris les panneaux et boutons légers"],
+  },
+  intensityLabel: "FORCE",
+  intensities: { soft: "Douce", normal: "Normale", strong: "Forte" },
+  intensityHint: {
+    soft: "Vibrations plus douces et discrètes",
+    normal: "Les effets tactiles de ton téléphone",
+    strong: "Vibrations plus marquées et plus longues",
+  },
+  categoryLabel: "OÙ VIBRER",
+  categoryHint: "Touche une ligne pour ressentir les vibrations de cette zone.",
+  categories: {
+    navigation: ["Navigation et sélection", "Onglets, puces, interrupteurs, curseurs"],
+    gestures: ["Gestes", "Appui long, glisser-déposer, cartes à balayer, actualisation"],
+    feedback: ["Résultats d'action", "Enregistré, ajouté à la liste, supprimé, alertes et erreurs"],
+    games: ["Jeux", "Bonnes/mauvaises réponses, comptes à rebours, victoires"],
+    social: ["Discussion et social", "Envoi et réception de messages, j'aime, réactions, amis"],
+    celebrations: ["Célébrations", "Badges, séries, objectifs et matchs CineSwipe"],
+  },
+  libraryLabel: "BIBLIOTHÈQUE DE MOTIFS",
+  libraryHint: "Touche un motif pour le ressentir. Ceux des zones désactivées jouent aussi ici.",
+  patterns: {
+    select: "Sélection",
+    tabSwitch: "Onglet",
+    toggleOn: "Interrupteur",
+    sliderTick: "Curseur",
+    longPress: "Appui long",
+    dragStart: "Glisser",
+    drop: "Déposer",
+    swipeThreshold: "Balayer",
+    success: "Réussi",
+    added: "Ajouté",
+    delete: "Supprimé",
+    warning: "Alerte",
+    error: "Erreur",
+    correct: "Juste",
+    wrong: "Faux",
+    countdown: "Compte à rebours",
+    win: "Gagné",
+    send: "Envoyer",
+    receive: "Nouveau message",
+    like: "J'aime",
+    reaction: "Réaction",
+    badge: "Badge",
+    streak: "Série",
+    goal: "Objectif",
+    match: "Match",
+  },
+  noteIos:
+    "Si Réglages › Sons et vibrations › Retour haptique du système est désactivé sur ton iPhone, tu ne sentiras pas les vibrations.",
+  noteAndroid:
+    "Si Paramètres › Sons et vibrations › Retour tactile est désactivé sur ton téléphone, les forces Douce et Normale ne se ressentent pas. Forte pilote directement le moteur de vibration.",
+  reset: "Rétablir les valeurs par défaut",
+  resetSub: "Équilibré · Normale · toutes les zones actives",
+  offHint: "Active les vibrations pour modifier ces réglages.",
+};
+
+const ja = {
+  title: "振動",
+  rowOff: "オフ",
+  rowOn: "{level} · {intensity}",
+  masterTitle: "振動",
+  masterSub: "タップ、結果、お祝いの触覚フィードバック",
+  intro: "いつ、どのくらいの強さで振動するかを選べます。選択肢をタップするとすぐに試せます。",
+  levelLabel: "振動するタイミング",
+  levels: {
+    minimal: ["少なめ", "大事な場面だけ:長押し、保存、エラー、バッジ、お祝い"],
+    balanced: ["バランス", "おすすめ。タブ、チップ、スイッチ、ドラッグも軽く感じられます"],
+    rich: ["多め", "すべてのタッチで軽いクリック。シートや軽いボタンも含みます"],
+  },
+  intensityLabel: "強さ",
+  intensities: { soft: "弱", normal: "標準", strong: "強" },
+  intensityHint: {
+    soft: "やわらかく静かな振動",
+    normal: "スマートフォン本来の触覚効果",
+    strong: "よりはっきりした長めの振動",
+  },
+  categoryLabel: "振動する場所",
+  categoryHint: "行をタップすると、その場所の振動を試せます。",
+  categories: {
+    navigation: ["移動と選択", "タブ、チップ、スイッチ、スライダー"],
+    gestures: ["ジェスチャー", "長押し、ドラッグ&ドロップ、スワイプカード、更新"],
+    feedback: ["操作の結果", "保存、リストに追加、削除、警告とエラー"],
+    games: ["ゲーム", "正解/不正解、カウントダウン、勝利"],
+    social: ["チャットとソーシャル", "メッセージの送受信、いいね、リアクション、フレンド"],
+    celebrations: ["お祝い", "バッジ、連続記録、目標、CineSwipeのマッチ"],
+  },
+  libraryLabel: "パターンライブラリ",
+  libraryHint: "パターンをタップすると振動を試せます。オフにした場所のパターンもここで再生されます。",
+  patterns: {
+    select: "選択",
+    tabSwitch: "タブ",
+    toggleOn: "スイッチ",
+    sliderTick: "スライダー",
+    longPress: "長押し",
+    dragStart: "ドラッグ",
+    drop: "ドロップ",
+    swipeThreshold: "スワイプ",
+    success: "成功",
+    added: "追加",
+    delete: "削除",
+    warning: "警告",
+    error: "エラー",
+    correct: "正解",
+    wrong: "不正解",
+    countdown: "カウントダウン",
+    win: "勝利",
+    send: "送信",
+    receive: "新着メッセージ",
+    like: "いいね",
+    reaction: "リアクション",
+    badge: "バッジ",
+    streak: "連続記録",
+    goal: "目標",
+    match: "マッチ",
+  },
+  noteIos: "iPhoneの 設定 › サウンドと触覚 › システムの触覚 がオフの場合、振動は感じられません。",
+  noteAndroid:
+    "スマートフォンの 設定 › 音とバイブレーション › タッチ操作時のバイブ がオフの場合、弱と標準の振動は感じられません。強は振動モーターを直接使います。",
+  reset: "初期設定に戻す",
+  resetSub: "バランス · 標準 · すべての場所オン",
+  offHint: "設定を変更するには振動をオンにしてください。",
+};
+
+export const HAPTICS_COPY = Object.freeze({ tr, en, es, pt, de, it, fr, ja });
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getHapticsCopy = (language) =>
