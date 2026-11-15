@@ -37,10 +37,10 @@ MUTED = (150, 162, 180)
 
 # Panorama (01 + 02)
 HERO = {
-    "tr-TR": (["FİLM VE DİZİ", "HAYATIN"], "TEK YERDE", ["8 DİL", "160+ ROZET", "10'LUK PUAN"],
-              "10 üzerinden, yarım puanla"),
-    "en-US": (["YOUR MOVIE", "& TV LIFE"], "IN ONE PLACE", ["8 LANGUAGES", "160+ BADGES", "RATE OUT OF 10"],
-              "Rate out of 10, halves too"),
+    "tr-TR": (["FİLM VE DİZİ", "HAYATIN"], "TEK YERDE",
+              ["İzleme geçmişi", "İnceleme ve puan", "Yorumlar", "Listeler", "Rozetler", "Arkadaşlarla paylaş"]),
+    "en-US": (["YOUR MOVIE", "& TV LIFE"], "IN ONE PLACE",
+              ["Watch history", "Reviews & ratings", "Comments", "Lists", "Badges", "Share with friends"]),
 }
 
 # Tekil görseller: (dosya, {dil: (beyaz satır, renkli satır)}, çıkıntı kartı kaynağı (x0,y0,x1,y1) ya da None,
@@ -59,7 +59,6 @@ SINGLES = [
     ("08-rozetler", {"tr-TR": ("ROZETLERİ", "TOPLA"), "en-US": ("COLLECT", "BADGES")},
      (40, 1010, 1166, 1425), 0.62, 0),
 ]
-HERO_CALLOUT = (330, 880, 1060, 1130)   # 02: 8.5/10 puan satırı
 
 
 # ─── Yardımcılar ───────────────────────────────────────────────────────────────
@@ -263,44 +262,32 @@ def hero(platform, W, H, style, lang):
     c = background(PW, PH, k, [
         (0.12, 0.18, 520, (20, 200, 232), 60), (0.45, 0.70, 560, (255, 59, 92), 45),
         (0.80, 0.30, 600, (139, 124, 246), 50), (0.98, 0.95, 420, (19, 141, 240), 40)])
-    whites, accent, chips, note = HERO[lang]
+    whites, accent, chips = HERO[lang]
     m = round(70 * k)
     y = round((150 if not tall else 230) * k)
     y = headline(c, whites, accent, m, y, W - 2 * m, 118 * k, k, align="left")
-    # Rozet çipleri (yarı saydam: ayrı katmanda çizilip harmanlanır)
-    fy = y + round(44 * k)
-    f = font(F_SEMI, 30 * k)
+    # Özellik çipleri (yarı saydam: ayrı katmanda çizilip harmanlanır)
+    fy = y + round(48 * k)
+    f = font(F_SEMI, 32 * k)
+    h = round(72 * k)
+    gap = round((20 if not tall else 30) * k)
     layer = Image.new("RGBA", c.size, (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    for chip in chips:
+    for i, chip in enumerate(chips):
         tw = d.textlength(chip, font=f)
-        h = round(66 * k)
-        d.rounded_rectangle((m, fy, m + tw + 74 * k, fy + h), radius=h // 2,
-                            fill=(255, 255, 255, 22), outline=(255, 255, 255, 70), width=max(2, round(2 * k)))
-        d.ellipse((m + 24 * k, fy + h / 2 - 8 * k, m + 40 * k, fy + h / 2 + 8 * k), fill=ACCENT[0] + (255,))
-        d.text((m + 54 * k, fy + h / 2), chip, font=f, fill=WHITE + (255,), anchor="lm")
-        fy += h + round(18 * k)
+        col = ACCENT[i % len(ACCENT)]
+        d.rounded_rectangle((m, fy, m + tw + 82 * k, fy + h), radius=h // 2,
+                            fill=(255, 255, 255, 20), outline=col + (150,), width=max(2, round(2 * k)))
+        d.ellipse((m + 26 * k, fy + h / 2 - 9 * k, m + 44 * k, fy + h / 2 + 9 * k), fill=col + (255,))
+        d.text((m + 60 * k, fy + h / 2), chip, font=f, fill=WHITE + (255,), anchor="lm")
+        fy += h + gap
     c = Image.alpha_composite(c, layer)
-    # Arka telefon (02) — 2. görselin sağında, sağa eğik
-    p2, s2, off2, src2 = make_phone("02-film-detay", round(640 * k), style)
-    c = place(c, p2, (1.62 * W, H * (0.58 if not tall else 0.56)), -7, k)
-    # Ön telefon (01) — sınırın üstünde, sola eğik
-    p1, s1, off1, src1 = make_phone("01-kesif", round(700 * k), style)
-    c = place(c, p1, (1.02 * W, H * (0.78 if not tall else 0.70)), 9, k)
-    # Çıkıntı kartı: 02'deki puan satırı + üstünde etiket
-    card = callout(src2, HERO_CALLOUT, round(760 * k), k)
-    cy = H * (0.86 if not tall else 0.82)
-    c = place(c, card, (1.55 * W, cy), 0, k)
-    fn = font(F_SEMI, 32 * k)
-    layer = Image.new("RGBA", c.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    tw = d.textlength(note, font=fn)
-    ph_ = round(64 * k)
-    lx, ly = 1.55 * W - (tw + 60 * k) / 2, cy - card.height / 2 - ph_ - 16 * k
-    d.rounded_rectangle((lx, ly, lx + tw + 60 * k, ly + ph_), radius=ph_ // 2, fill=(10, 12, 18, 235),
-                        outline=ACCENT[1] + (255,), width=max(2, round(2 * k)))
-    d.text((1.55 * W, ly + ph_ / 2), note, font=fn, fill=WHITE + (255,), anchor="mm")
-    c = Image.alpha_composite(c, layer)
+    # Arka telefon (02) — 2. görselde, hafif sağa eğik
+    p2, _, _, _ = make_phone("02-film-detay", round(740 * k), style)
+    c = place(c, p2, (1.60 * W, H * (0.60 if not tall else 0.57)), -6, k)
+    # Ön telefon (01) — iki görselin sınırında, sola eğik
+    p1, _, _, _ = make_phone("01-kesif", round(720 * k), style)
+    c = place(c, p1, (1.0 * W, H * (0.80 if not tall else 0.72)), 9, k)
     return c.crop((0, 0, W, H)), c.crop((W, 0, 2 * W, H))
 
 
