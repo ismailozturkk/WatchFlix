@@ -1,7 +1,7 @@
 # Mağaza (Play Store) varlıkları
 
-> **DURUM (15 Kas 2026):** Metinler, ikon ve feature graphic güncel (Lens markası).
-> **Ekran görüntüleri ESKİ** (29 Tem, eski arayüz + eski "S" logo) — yeniden çekilecek.
+> **DURUM (15 Kas 2026):** Metinler, ikon, feature graphic ve 8 ekran görüntüsü (TR + EN) güncel.
+> Ekranlar iPhone'dan, İngilizce arayüzle çekildi; TR sette yalnız başlıklar Türkçe.
 
 ## Dizin yapısı
 
@@ -13,8 +13,10 @@ store/
   assets/
     play-icon-512.png              ← assets/icon_default/icon.png'den (Lens)
     feature-graphic-tr.png / -en   ← python store/uret-feature-graphic.py
-    screenshots/tr-TR/             ← ESKİ, yenilenecek
+    screenshots/{tr-TR,en-US}/     ← python store/uret-ekran-goruntuleri.py
+  raw-screenshots/ios-en/          ← kaynak iPhone ekranları (1206×2622)
   uret-feature-graphic.py
+  uret-ekran-goruntuleri.py        ← başlıklar ve kırpma bu dosyada
 ```
 
 Kurallar: ad metin içinde küçük harfle **seelogd** (marketing/marka/MARKA_REHBERI.md).
@@ -33,7 +35,8 @@ Plan, limit veya dil değişirse metni koddan doğrula: `utils/premiumFeatures.j
 
 - **Mağaza ikonu**: 512×512 PNG ✅
 - **Feature graphic**: 1024×500 ✅ (TR + EN)
-- **Telefon ekran görüntüleri**: en az 2, önerilen 4–8, 9:16 (1080×1920). TR ve EN ayrı set.
+- **Telefon ekran görüntüleri**: 8 adet, 1080×1920 ✅ (TR + EN). iPhone oranı Play'in 2:1 sınırını
+  aştığı için ekranlar marka zemini üzerine küçültülerek yerleştirildi, durum çubuğu kırpıldı.
 
 ## Console tarafında metinlerle birlikte girilecekler
 
