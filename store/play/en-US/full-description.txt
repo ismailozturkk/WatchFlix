@@ -1,47 +1,53 @@
-Every movie and show you watch, in one place — seelogd is your watch diary, social network, and movie game in a single app.
+Every movie and show you watch, in one place. seelogd is your watch diary, your stats, your friends and your movie games in a single app.
 
 🎬 TRACK
-• Log the movies you watch and track TV shows episode by episode
-• Rate, review, and take personal notes
-• Automatic stats from your watch history: genres, hours, habits
-• Discover your year with a personal "Wrapped" recap every December
+• Log movies, follow TV shows episode by episode and never lose your place
+• Rate out of 10 with half points (like 8.5), write reviews and private notes
+• Weekly streak: watch on two days a week and your flame turns a new color every week
+• Reminders for new episodes and release dates, with one-tap add to your phone calendar
+• Home screen widgets keep your lists and stats one glance away
+
+📊 STATS
+• Total watch time, genre breakdown, rating distribution and daily history
+• Episode rating graphs for TV shows
+• 160+ badges and a personal Wrapped recap at the end of the year
 
 📋 ORGANIZE
-• Build a watchlist, favorites, and custom lists
-• Create shared lists with friends and fill them together
-• Get reminders for new episodes and release dates
-• Home screen widgets put your lists and stats one glance away
+• Watchlist, favorites, your four favorites and custom lists
+• Shared lists you build together with friends
+• Import from Letterboxd and IMDb; export your library as JSON or CSV
+
+🔎 DISCOVER
+• Trending, top rated, upcoming, World Tour, Oscar and Emmy winners
+• "What should I watch?" filters and CineMatch AI picks based on your history
+• Where to watch: see which platform carries a title and get notified when it arrives
 
 👥 SHARE
-• Add friends, browse their profiles and stats
-• Share posts, comment, and like
-• Plan movie nights in one-to-one and group chats
+• Add friends, browse their profiles and lists, see your taste match
+• Share posts, comment, and plan movie nights in one-to-one and group chats
 • Film Club: pick, watch and discuss a film together with your group
 
 🎮 PLAY
-• Test your movie knowledge: Scene Guess, Poster Puzzle, Blurred Poster and "Which came first?"
-• Frame of the Day: name the film from a single frame — hints cost you points
-• Film Chain: connect two actors through the films they share
-• Question of the Day, daily duels, Cinema Bingo and Watch Challenges
-• Vote in the Seelogd Top 100 and follow the monthly genre tournament
-• Earn XP in the Weekly League, climb the leaderboards, collect badges
+• Scene Guess, Poster Puzzle, Blurred Poster, "Which came first?" and "Which is rated higher?"
+• Frame of the Day, Film Chain, Cinema Bingo and Watch Challenges
+• Question of the Day, the Weekly League, a monthly genre tournament and the seelogd Top 100
 
-🤖 DISCOVER
-• AI-powered recommendations tailored to your watch history
-• "Where to watch?" — find which streaming platform carries what you're looking for
+🎨 MAKE IT YOURS
+• Light and dark themes, build your own theme, dozens of fonts
+• Atmosphere: living backgrounds inspired by the seasons and the stories you love
+• App icon picker
 
 ⭐ PREMIUM
-The core features are free. Paid plans add:
-• CineMatch AI: Free 3 per day / 30 per month, Premium 20 / 300, Premium Max 50 / 900 messages
-• A plan-specific profile identity badge your friends can see
-• Higher limits: custom lists (Free 1 · Premium 25 · Max unlimited), friends (2 · 150 · unlimited), group chats (1 · 10 · unlimited), notes and to-do lists (5 · 50 · unlimited), note length (500 · 2,000 · 20,000 characters), movie and show notes (20 · 200 · unlimited), movie and show reminders (10 and 20 · 50 and 100 · unlimited)
-• Day-and-time reminders for your notes and to-do lists
-• Games (Scene Guess, Poster Puzzle and the quick games), Film Chain, Frame of the Day, Film Club, CineSwipe and voting in the monthly tournament — Free can watch the tournament, while Question of the Day and the Weekly League are open to everyone
-• Your own themes, all 56 fonts, app icon picker, snowfall, ambient background and icon background
-• Wrapped archive (Free this year only · Premium last 5 years · Max every year) and streaming alerts for up to 100 titles (Free: 10)
-• In-app bug reports (Premium and Max) and feature requests (Max only)
+Tracking, lists, stats, discovery and chat are free. Paid plans (Premium and Premium Max) add:
+• More CineMatch AI messages (Free 3 a day, Premium 20, Max 50)
+• Games, Film Chain, Frame of the Day, Film Club, CineSwipe and voting in the tournament
+• Higher limits for lists, friends, groups, notes and reminders
+• Theme studio, every font, the icon picker and ambient backgrounds
+• Wrapped archive for past years and a plan badge on your profile
 
-Available in English, Turkish, Spanish, Portuguese and German. Dark theme included. Free to use.
+Available in English, Turkish, Spanish, Portuguese, German, Italian, French and Japanese.
+
+seelogd does not host or stream any movies or shows.
 
 —
 This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data provided by JustWatch.
