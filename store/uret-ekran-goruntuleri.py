@@ -95,12 +95,17 @@ def frame(shot, crop):
     scale = sh / im.height
     sw = round(im.width * scale)
     im = im.resize((sw, sh), Image.LANCZOS).convert("RGBA")
-    # Ön kamera deliği (durum çubuğu alanının ortasında)
+    # Dinamik Ada: iPhone oranlarıyla (402 pt genişlikte 126x37 pt, üstten 11 pt)
     d = ImageDraw.Draw(im)
-    cx, cy, r = sw // 2, round(status_h * scale * 0.5), 13
-    d.ellipse((cx - r - 3, cy - r - 3, cx + r + 3, cy + r + 3), fill=(28, 30, 36, 255))
-    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(4, 5, 8, 255))
-    d.ellipse((cx - 5, cy - 6, cx + 1, cy), fill=(40, 52, 80, 255))
+    pt = sw / 402
+    iw, ih = round(126 * pt), round(37 * pt)
+    ix, iy = (sw - iw) // 2, round(11 * pt)
+    d.rounded_rectangle((ix, iy, ix + iw, iy + ih), radius=ih // 2, fill=(0, 0, 0, 255))
+    # Sağ uçta kamera merceği izi
+    lr = round(ih * 0.2)
+    lx, ly = ix + iw - ih // 2, iy + ih // 2
+    d.ellipse((lx - lr, ly - lr, lx + lr, ly + lr), fill=(14, 16, 24, 255))
+    d.ellipse((lx - lr // 2, ly - lr // 2, lx, ly), fill=(34, 44, 70, 255))
     mask = Image.new("L", (sw, sh), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, sw - 1, sh - 1), radius=SCREEN_R, fill=255)
     pw, ph = sw + 2 * BEZEL, PHONE_H
