@@ -13,7 +13,9 @@ store/
   assets/
     play-icon-512.png              ← assets/icon_default/icon.png'den (Lens)
     feature-graphic-tr.png / -en   ← python store/uret-feature-graphic.py
-    screenshots/{tr-TR,en-US}/     ← python store/uret-ekran-goruntuleri.py
+    screenshots/android/{tr-TR,en-US}/  ← Play, 1080×1920, kamera deliği
+    screenshots/ios/{tr-TR,en-US}/      ← App Store 6,9", 1290×2796, Dinamik Ada
+                                        (ikisi de: python store/uret-ekran-goruntuleri.py)
   raw-screenshots/ios-en/          ← kaynak iPhone ekranları (1206×2622)
   uret-feature-graphic.py
   uret-ekran-goruntuleri.py        ← başlıklar ve kırpma bu dosyada
@@ -35,7 +37,7 @@ Plan, limit veya dil değişirse metni koddan doğrula: `utils/premiumFeatures.j
 
 - **Mağaza ikonu**: 512×512 PNG ✅
 - **Feature graphic**: 1024×500 ✅ (TR + EN)
-- **Telefon ekran görüntüleri**: 8 adet, 1080×1920 ✅ (TR + EN). iPhone oranı Play'in 2:1 sınırını
+- **Telefon ekran görüntüleri**: 8 adet × TR + EN × 2 platform ✅ — Android 1080×1920, iOS 1290×2796 (App Store 6,9"). iPhone oranı Play'in 2:1 sınırını
   aştığı için ekranlar telefon çerçevesi içinde marka zemini üzerine yerleştirildi; saat/pil gizlendi.
 
 ## Console tarafında metinlerle birlikte girilecekler
