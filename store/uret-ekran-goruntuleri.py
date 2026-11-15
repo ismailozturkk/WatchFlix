@@ -3,7 +3,7 @@
 # Kaynak: store/raw-screenshots/ios-en/*.jpg (iPhone, 1206x2622). Çalıştır:
 #   python store/uret-ekran-goruntuleri.py
 # iPhone oranı (~1:2,17) Play'in 2:1 sınırını aşar; bu yüzden ekran küçültülüp
-# marka zemini üzerine yerleştirilir, üstteki durum çubuğu kırpılır.
+# telefon çerçevesi içinde marka zemini üzerine yerleştirilir; durum çubuğu bulanıklaştırılır.
 import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -13,7 +13,7 @@ OUT = os.path.join(ROOT, "store", "assets", "screenshots")
 FONT = os.path.join(ROOT, "marketing", "marka", "yeni-logo", "kaynak", "font", "sora-600.ttf")
 W, H = 1080, 1920
 
-# (dosya, kırpma: üst px ya da (üst, alt) px, {dil: (başlık, alt satır)})
+# (dosya, durum çubuğu yüksekliği px ya da (durum çubuğu, içerik sonu) px, {dil: (başlık, alt satır)})
 SHOTS = [
     ("01-kesif", 150, {
         "en-US": ("Find what to watch next", "Trends, top rated and picks for you"),
@@ -62,40 +62,94 @@ def fit(draw, text, size, maxw):
         size -= 2
     return ImageFont.truetype(FONT, size)
 
-def frame(shot, crop):
+BEZEL = 20          # çerçeve kalınlığı
+SCREEN_R = 78       # ekran köşe yarıçapı
+PHONE_TOP = 286
+PHONE_H = H - PHONE_TOP - 44
+
+def screen_image(shot, crop):
+    """Telefon ekranı: tam iPhone oranı. Üstteki durum çubuğu (saat, pil) bulanıklaştırılır,
+    (üst, alt) verilmişse alttan kesilen kısım ekranın son satır rengiyle doldurulur."""
     im = Image.open(shot).convert("RGB")
-    top_px, bottom_px = crop if isinstance(crop, tuple) else (crop, im.height)
-    im = im.crop((0, top_px, im.width, bottom_px))
-    box_top, box_w, box_h = 330, 900, H - 330 - 70
-    scale = min(box_w / im.width, box_h / im.height)
-    sw, sh = round(im.width * scale), round(im.height * scale)
+    status_h, bottom_px = crop if isinstance(crop, tuple) else (crop, im.height)
+    full_w, full_h = im.width, im.height
+    if bottom_px < full_h:
+        filler = im.crop((0, bottom_px - 4, full_w, bottom_px - 2)).resize((1, 1)).getpixel((0, 0))
+        base = Image.new("RGB", (full_w, full_h), filler)
+        base.paste(im.crop((0, 0, full_w, bottom_px)), (0, 0))
+        im = base
+    # Saat/pil yazısını silmek için şerit, hemen altındaki satırların uzatılmış
+    # kopyasıyla doldurulur; sınır 40 px'lik yumuşak geçişle içeriğe karışır.
+    fade = 40
+    row = im.crop((0, status_h, full_w, status_h + 4)).resize((full_w, status_h + fade))
+    row = row.filter(ImageFilter.GaussianBlur(4))
+    alpha = Image.new("L", (1, status_h + fade))
+    for yy in range(status_h + fade):
+        alpha.putpixel((0, yy), 255 if yy < status_h else round(255 * (1 - (yy - status_h) / fade)))
+    im.paste(row, (0, 0), alpha.resize((full_w, status_h + fade)))
+    return im, status_h
+
+def frame(shot, crop):
+    im, status_h = screen_image(shot, crop)
+    sh = PHONE_H - 2 * BEZEL
+    scale = sh / im.height
+    sw = round(im.width * scale)
     im = im.resize((sw, sh), Image.LANCZOS).convert("RGBA")
+    # Ön kamera deliği (durum çubuğu alanının ortasında)
+    d = ImageDraw.Draw(im)
+    cx, cy, r = sw // 2, round(status_h * scale * 0.5), 13
+    d.ellipse((cx - r - 3, cy - r - 3, cx + r + 3, cy + r + 3), fill=(28, 30, 36, 255))
+    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(4, 5, 8, 255))
+    d.ellipse((cx - 5, cy - 6, cx + 1, cy), fill=(40, 52, 80, 255))
     mask = Image.new("L", (sw, sh), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, sw - 1, sh - 1), radius=52, fill=255)
-    return im, mask, (W - sw) // 2, box_top + (box_h - sh) // 2
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, sw - 1, sh - 1), radius=SCREEN_R, fill=255)
+    pw, ph = sw + 2 * BEZEL, PHONE_H
+    return im, mask, (W - pw) // 2, PHONE_TOP, pw, ph
+
+def draw_phone(canvas, x, y, pw, ph):
+    outer_r = SCREEN_R + BEZEL
+    shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle((x - 4, y + 16, x + pw + 4, y + ph + 30), radius=outer_r, fill=(0, 0, 0, 190))
+    canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(30)))
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    # Yan tuşlar (gövdenin arkasında, kenardan taşan)
+    d.rounded_rectangle((x + pw - 2, y + 300, x + pw + 7, y + 430), radius=4, fill=(52, 56, 66, 255))
+    d.rounded_rectangle((x - 7, y + 250, x + 2, y + 340), radius=4, fill=(52, 56, 66, 255))
+    d.rounded_rectangle((x - 7, y + 360, x + 2, y + 450), radius=4, fill=(52, 56, 66, 255))
+    # Gövde: metalik kenar + koyu çerçeve
+    d.rounded_rectangle((x, y, x + pw - 1, y + ph - 1), radius=outer_r, fill=(58, 62, 72, 255))
+    d.rounded_rectangle((x + 3, y + 3, x + pw - 4, y + ph - 4), radius=outer_r - 3, fill=(12, 13, 17, 255))
+    d.rounded_rectangle((x + 4, y + 4, x + pw - 5, y + ph - 5), radius=outer_r - 4, outline=(255, 255, 255, 22), width=2)
+    return Image.alpha_composite(canvas, layer)
+
+def save(img, path):
+    """Windows'ta dosya önizlemede/izleyicide açıkken yazım ara sıra reddedilir: geçici dosya + yeniden dene."""
+    import time
+    tmp = path + ".tmp.png"
+    img.save(tmp)
+    for _ in range(20):
+        try:
+            os.replace(tmp, path)
+            return
+        except OSError:
+            time.sleep(0.5)
+    raise OSError("yazılamadı: " + path)
 
 def main():
-    for name, crop_top, texts in SHOTS:
-        shot, mask, x, y = frame(os.path.join(RAW, name + ".jpg"), crop_top)
+    for name, crop, texts in SHOTS:
+        shot, mask, x, y, pw, ph = frame(os.path.join(RAW, name + ".jpg"), crop)
         for lang, (head, sub) in texts.items():
-            canvas = background()
-            shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            ImageDraw.Draw(shadow).rounded_rectangle(
-                (x - 6, y + 10, x + shot.width + 6, y + shot.height + 22), radius=58, fill=(0, 0, 0, 170))
-            canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(26)))
-            canvas.paste(shot, (x, y), mask)
-            border = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            ImageDraw.Draw(border).rounded_rectangle(
-                (x, y, x + shot.width - 1, y + shot.height - 1), radius=52, outline=(255, 255, 255, 34), width=3)
-            canvas = Image.alpha_composite(canvas, border)
+            canvas = draw_phone(background(), x, y, pw, ph)
+            canvas.paste(shot, (x + BEZEL, y + BEZEL), mask)
             d = ImageDraw.Draw(canvas)
             f1 = fit(d, head, 72, W - 120)
             f2 = fit(d, sub, 38, W - 140)
-            for text, font, ty, fill in ((head, f1, 112, (238, 244, 251)), (sub, f2, 214, (150, 162, 180))):
+            for text, font, ty, fill in ((head, f1, 92, (238, 244, 251)), (sub, f2, 192, (150, 162, 180))):
                 tw = d.textlength(text, font=font)
                 d.text(((W - tw) / 2, ty), text, font=font, fill=fill)
             os.makedirs(os.path.join(OUT, lang), exist_ok=True)
-            canvas.convert("RGB").save(os.path.join(OUT, lang, name + ".png"))
+            save(canvas.convert("RGB"), os.path.join(OUT, lang, name + ".png"))
     print("ok")
 
 if __name__ == "__main__":

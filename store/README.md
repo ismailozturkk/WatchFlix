@@ -36,7 +36,7 @@ Plan, limit veya dil değişirse metni koddan doğrula: `utils/premiumFeatures.j
 - **Mağaza ikonu**: 512×512 PNG ✅
 - **Feature graphic**: 1024×500 ✅ (TR + EN)
 - **Telefon ekran görüntüleri**: 8 adet, 1080×1920 ✅ (TR + EN). iPhone oranı Play'in 2:1 sınırını
-  aştığı için ekranlar marka zemini üzerine küçültülerek yerleştirildi, durum çubuğu kırpıldı.
+  aştığı için ekranlar telefon çerçevesi içinde marka zemini üzerine yerleştirildi; saat/pil gizlendi.
 
 ## Console tarafında metinlerle birlikte girilecekler
 
