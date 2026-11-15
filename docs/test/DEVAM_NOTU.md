@@ -37,7 +37,7 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 
 ## Açık işler (T3 dışı)
 
-- Gizlilik göçü: eski hesaplarda kökte email/birthDate duruyor → `migrateAccountPrivate.js` kuru çalışma, `--apply`, sonra Aşama 3 + rules deploy (servis hesabı gerekli). `website/privacy.html:272` ile çelişiyor (Yüksek).
+- ~~Gizlilik göçü~~ **BİTTİ (15 Kas, 64518a26):** 8 hesabın kökü temizlendi, Aşama 3 kuralı (`legacyRootAccountWrites` = false) yayında. Servis hesabı anahtarı silindi ve konsoldan iptal edildi.
 - Sahte arkadaş denetimi: `functions/scripts/auditFriendships.js` hazır, çalıştırılmadı (sa.json gerekli).
 - İstemci düzeltmeleri (T1: 2.1, 3.1, 3.2, 5.1, Debug kapısı) cihazlara yeni build/OTA ile gidecek; Play kapalı testi için production AAB gerekli (T6 öncesi).
 - `expirePromoGrants` deploy sonrası ilk çalışma günlüğü kontrol edilmedi.

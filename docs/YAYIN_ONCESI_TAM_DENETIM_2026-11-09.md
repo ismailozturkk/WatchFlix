@@ -317,12 +317,12 @@ zorlaşması. **Öneri:** yayından önce dokunma (yeniden yazım = yeni hata). 
 - [x] **G-2 (deploy)** Hosting 10 Kas yayında (seelogd.com/privacy.html sürüm 1.7 doğrulandı)
 - [ ] **G-2 (cihaz)** anahtarı cihazda dene
 - [ ] **G-2 (karar)** AB için varsayılan kapalı + ilk açılışta sor?
-- [ ] **S-2** `npm audit fix` (kök + `functions/`), testler, `expo export`
+- [x] **S-2** `npm audit fix` (kök + `functions/`), testler, `expo export` — 15 Kas: axios 1.21.1, xmldom, follow-redirects, decode-uri-component, fast-xml-parser vb. kapandı; npm 10 + 11 `ci --dry-run` temiz, jest 9700/9700, functions 0 hata, Android export tamam. Kalan bilinçli kabul: `@grpc/grpc-js` (yalnız sunucu tarafı açıklar; RN Firestore gRPC kullanmaz, düzeltmesi Firebase SDK major'ı ister), `linkify-it` (düzeltme yok; yalnız AI yanıtı markdown'ı), `glob`/`minimatch` (geliştirme araçları). functions kilidi güncel; bir sonraki functions deploy'unda canlıya gider.
 - [ ] **R-2** `fetchVotesOnce` yedek yoluna `limit` ya da kaldır
 
 ### Yayından önce (ölçüm / panel)
 - [ ] **P-4** EAS preview APK ile bellek ölçümü (10× detay aç/kapa)
-- [ ] **G-3** e-posta/doğum tarihi göçü (kuru çalıştırma → uygula → kural son aşama → site metni)
+- [x] **G-3** e-posta/doğum tarihi göçü — 15 Kas: kuru çalışma → `--apply` (8/18 hesap) → Aşama 3 kuralı deploy edildi (64518a26); site metni zaten doğru
 - [ ] Play: 12 testçi / 14 gün sayacı, Data Safety formu (G-2'den sonra "kullanıcı kapatabilir" cevabı değişir)
 - [ ] App Store Connect: abonelik ürünleri "Gönderilmeye hazır", Paid Apps anlaşması, RevenueCat teklifi
 - [ ] TMDB ticari lisans e-postası (Premium satıldığı için)
