@@ -37,7 +37,8 @@ Plan, limit veya dil değişirse metni koddan doğrula: `utils/premiumFeatures.j
 
 - **Mağaza ikonu**: 512×512 PNG ✅
 - **Feature graphic**: 1024×500 ✅ (TR + EN)
-- **Telefon ekran görüntüleri**: 8 adet × TR + EN × 2 platform ✅ — Android 1080×1920, iOS 1290×2796 (App Store 6,9"). iPhone oranı Play'in 2:1 sınırını
+- **Telefon ekran görüntüleri**: 8 adet × TR + EN × 2 platform ✅ (01 + 02 bağlı panorama; başlık fontu
+  `store/fonts/` Unbounded, OFL) — Android 1080×1920, iOS 1290×2796 (App Store 6,9"). iPhone oranı Play'in 2:1 sınırını
   aştığı için ekranlar telefon çerçevesi içinde marka zemini üzerine yerleştirildi; saat/pil gizlendi.
 
 ## Console tarafında metinlerle birlikte girilecekler
