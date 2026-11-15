@@ -218,14 +218,15 @@
           <select id="betaPeriod" aria-label="Beta kayıt tarihi"><option value="all">Tüm tarihler</option><option value="1">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
           <select id="betaSort" aria-label="Beta sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="email">E-posta A–Z</option></select>
           <div class="actions">
-            <button class="btn sm" type="button" id="betaCopy">E-postaları kopyala</button>
+            <button class="btn sm" type="button" id="betaCopyAndroid" title="Play Console → Kapalı test → Test kullanıcıları">Android e-postalarını kopyala</button>
+            <button class="btn sm" type="button" id="betaCopyIos" title="App Store Connect → TestFlight → Harici test kullanıcıları">iOS e-postalarını kopyala</button>
             <button class="btn ghost sm" type="button" id="betaCsv">CSV indir</button>
           </div>
         </div>
         <p class="result-count" id="betaCount" role="status"></p>
         <div class="table-wrap"><table class="table" id="betaTable"><thead><tr><th>E-posta</th><th>Platform</th><th>Dil</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
         <div class="pager"><button class="btn ghost sm" type="button" id="betaPrev">← Önceki</button><span id="betaPage"></span><button class="btn ghost sm" type="button" id="betaNext">Sonraki →</button></div>
-        <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console → Kapalı test → Test kullanıcıları listesine, iOS e-postalarını App Store Connect → TestFlight → Harici test kullanıcılarına ekle. "Kopyala" görünen (süzülmüş) listenin tamamını virgülle ayırır; CSV de aynı süzgeci kullanır. Davetler bu panelden gönderilmez.</p></details>
+        <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console → Kapalı test → Test kullanıcıları listesine, iOS e-postalarını App Store Connect → TestFlight → Harici test kullanıcılarına ekle. "Android/iOS e-postalarını kopyala" yalnız o platformun kayıtlarını alır (arama ve tarih süzgecine uyan tümü, virgülle ayrılmış); CSV de aynı süzgeci kullanır. Davetler bu panelden gönderilmez.</p></details>
       </section>
 
       <!-- BEKLEME -->

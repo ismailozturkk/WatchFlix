@@ -850,8 +850,12 @@ function renderBetaVotes() {
 }
 
 /* ── Beta testçileri ─────────────────────────────────────────────── */
-function betaRows() {
-  return S.selectRows(state.beta, { search: $("#betaSearch").value, platform: state.betaPlatform, period: $("#betaPeriod").value, sort: $("#betaSort").value });
+function betaRows(platform = state.betaPlatform) {
+  return S.selectRows(state.beta, { search: $("#betaSearch").value, platform, period: $("#betaPeriod").value, sort: $("#betaSort").value });
+}
+/** Kopyalama platforma göre ayrı: Android → Play Console, iOS → TestFlight. Arama/tarih süzgeci geçerli. */
+function betaPlatformEmails(platform) {
+  return [...new Set(betaRows(platform).map((r) => r.email))];
 }
 
 function renderBeta() {
@@ -871,7 +875,11 @@ function renderBeta() {
   ].join("");
   const rows = betaRows();
   const page = paginate("beta", rows);
-  $("#betaCopy").disabled = !rows.length;
+  const nA = betaPlatformEmails("android").length, nI = betaPlatformEmails("ios").length;
+  $("#betaCopyAndroid").disabled = !nA;
+  $("#betaCopyAndroid").textContent = `Android e-postalarını kopyala (${nf.format(nA)})`;
+  $("#betaCopyIos").disabled = !nI;
+  $("#betaCopyIos").textContent = `iOS e-postalarını kopyala (${nf.format(nI)})`;
   $("#betaCsv").disabled = !rows.length;
   $("#betaCount").textContent = `${nf.format(rows.length)} sonuç · ${nf.format(state.beta.length)} toplam kayıt`;
   $("#betaTable tbody").innerHTML = page.length
@@ -888,10 +896,12 @@ $("#betaFilter").addEventListener("click", (ev) => {
   renderBeta();
 });
 for (const id of ["betaSearch", "betaPeriod", "betaSort"]) $("#" + id).addEventListener(id === "betaSearch" ? "input" : "change", () => { state.page.beta = 1; renderBeta(); });
-$("#betaCopy").addEventListener("click", () => {
-  const list = [...new Set(betaRows().map((r) => r.email))];
-  copy(list.join(", "), `${nf.format(list.length)} e-posta kopyalandı`);
-});
+for (const [id, platform, label] of [["betaCopyAndroid", "android", "Android"], ["betaCopyIos", "ios", "iOS"]]) {
+  $("#" + id).addEventListener("click", () => {
+    const list = betaPlatformEmails(platform);
+    copy(list.join(", "), `${nf.format(list.length)} ${label} e-postası kopyalandı`);
+  });
+}
 $("#betaCsv").addEventListener("click", () => download(
   `seelogd-beta-${S.istanbulDay(new Date())}.csv`,
   S.toCsv([["email", "platform", "lang", "createdAt"], ...betaRows().map((r) => [r.email, r.platform, r.lang, r.at ? r.at.toISOString() : ""])]),

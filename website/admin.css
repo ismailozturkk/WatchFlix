@@ -298,7 +298,7 @@ select { padding-right: 30px; }
 /* Liste araç çubuğu */
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .toolbar .search { flex: 1 1 220px; min-width: 0; }
-.toolbar .actions { display: flex; gap: 8px; margin-left: auto; }
+.toolbar .actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .result-count { color: var(--ink-3); font-size: 12.5px; }
 .pager { display: flex; justify-content: center; align-items: center; gap: 12px; color: var(--ink-2); font-size: 13px; }
 
