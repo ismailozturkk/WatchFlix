@@ -1,8 +1,9 @@
 # Kullanıcı özel alanlarının gizli belgeye göçü
 
-> Durum (16 Eki 2026): kod, kural ve testler hazır; **commit edilmedi.**
-> Adım 1 (kurallar) 16 Eki'de deploy EDİLDİ (`legacyRootAccountWrites()` = `true`,
-> proje `movieandtv-2832a`). İstemci/OTA, toplu göç, Aşama 3 ve web hâlâ bekliyor.
+> **Durum (15 Kas 2026): GÖÇ TAMAMLANDI.** Toplu betik `--apply` ile çalıştı (18 hesap tarandı,
+> 8'inin kökünden e-posta/doğum tarihi/jeton taşındı, çakışma 0; ikinci kuru çalışma 0).
+> Aşama 3 yayında: `legacyRootAccountWrites()` = `false`, kurallar deploy edildi ve canlıda doğrulandı.
+> Kök belgeye bu alanlar artık yazılamaz; `website/privacy.html` iddiası doğru.
 > Yayın sırası ve kararlar en altta.
 
 ## 1. Sorun

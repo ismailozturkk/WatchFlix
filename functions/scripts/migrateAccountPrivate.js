@@ -24,16 +24,17 @@
 //      node scripts/migrateAccountPrivate.js --apply    # gerçek yazım
 //   5) Bittiğinde sa.json'u SİL (gizli anahtar). .gitignore'da olduğundan emin ol.
 
-const admin = require("firebase-admin");
+// firebase-admin 14: namespace API (admin.firestore()) kalktı → modüler girişler.
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue, FieldPath } = require("firebase-admin/firestore");
 const { planUserMigration, ALL_ROOT_FIELDS } = require("./accountMigrationPlan");
 
 const APPLY = process.argv.includes("--apply");
 const PAGE = 300;
 const BATCH_LIMIT = 450; // 500 sınırının altında; bir kullanıcı en fazla 3 işlem
 
-admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS env'inden okur
-const db = admin.firestore();
-const { FieldValue, FieldPath } = admin.firestore;
+initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS env'inden okur
+const db = getFirestore();
 
 async function main() {
   console.log(APPLY ? "MOD: --apply (YAZILACAK)" : "MOD: kuru çalışma (hiçbir şey yazılmaz)");

@@ -845,9 +845,9 @@ describe("birthDate kilidi", () => {
     ...extra,
   });
 
-  test("alani olmayan hesap bir kez yazabilir", async () => {
+  test("ASAMA 3: alani olmayan hesap kokte tarih YAZAMAZ (gizli belgeye gider)", async () => {
     await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(alice, "Users", ALICE), { birthDate: "1998-03-05" }),
     );
   });
@@ -1009,9 +1009,9 @@ describe("Users/{uid}/private/account", () => {
     );
   });
 
-  test("GOC SONRASI: kokte tarih yeniden yazilirsa gizli kopyayla ayni olmali", async () => {
-    // Eski istemci tarihi kökte "boş" görüp seçici açabilir; farklı bir tarihi
-    // yazamamalı (18 altı kullanıcı kapıyı açmasın).
+  test("GOC SONRASI (Asama 3): kokte tarih hic yeniden yazilamaz", async () => {
+    // Eski istemci tarihi kökte "boş" görüp seçici açabilir; ne farklı ne aynı
+    // tarihi köke geri yazabilmeli (alan yalnız private/account'ta yaşar).
     await seed(async (db) => {
       await setDoc(doc(db, "Users", ALICE), profil());
       await setDoc(account(db), { birthDate: "2010-01-01" });
@@ -1019,7 +1019,7 @@ describe("Users/{uid}/private/account", () => {
     await assertFails(
       updateDoc(doc(alice, "Users", ALICE), { birthDate: "1990-01-01" }),
     );
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(alice, "Users", ALICE), { birthDate: "2010-01-01" }),
     );
   });
@@ -1029,9 +1029,9 @@ describe("Users/{uid}/private/account", () => {
     await assertSucceeds(deleteDoc(account(alice)));
   });
 
-  test("ESKI ISTEMCI uyumu: kayit ekrani e-posta + tarihi hala kok belgeye yazabilir", async () => {
-    // Aşama 3 anahtarı açıkken (şimdiki durum) bozulmamalı.
-    await assertSucceeds(
+  test("ASAMA 3: eski kayit ekrani e-posta + tarihi kok belgeye YAZAMAZ", async () => {
+    // 15 Kas 2026: toplu göç çalıştı, anahtar kapandı (legacyRootAccountWrites = false).
+    await assertFails(
       setDoc(doc(alice, "Users", ALICE), profil({
         email: "a@b.co",
         birthDate: "1998-03-05",
@@ -1064,12 +1064,10 @@ describe("Asama 3 anahtari kapali (kokte ozel alan yazimi yasak)", () => {
       path.join(__dirname, "..", "..", "firestore.rules"),
       "utf8",
     );
-    const strict = source.replace(
-      /(function legacyRootAccountWrites\(\) \{ return )true;/,
-      "$1false;",
-    );
-    // Çeviri sessizce tutmazsa bu blok hiçbir şeyi kanıtlamaz.
-    expect(strict).not.toBe(source);
+    // 15 Kas 2026'dan beri anahtar dosyada zaten `false` (Aşama 3 yayında);
+    // biri yanlışlıkla geri açarsa bu blok kırmızı yansın.
+    expect(source).toMatch(/function legacyRootAccountWrites\(\) \{ return false; \}/);
+    const strict = source;
     strictEnv = await initializeTestEnvironment({
       projectId: "seelogd-rules-test-strict",
       firestore: { rules: strict, host: "127.0.0.1", port: 8085 },

@@ -355,7 +355,7 @@ service cloud.firestore {
     // migrateAccountPrivate.js) çalıştıktan sonra false yap + rules deploy:
     // kök belgeye bu alanlar EKLENEMEZ/DEĞİŞTİRİLEMEZ (silmek hep serbest).
     // Testler anahtarın iki konumunu da dener (firestore.rules.test.js).
-    function legacyRootAccountWrites() { return true; }
+    function legacyRootAccountWrites() { return false; }
     // ARAMA ANAHTARI (2026-10-31 denetimi H-1). true: sahadaki eski istemciler arkadaş aramasını Users
     // koleksiyonunda doğrudan ön-ek sorgusuyla yapar (limit 20) — liste yalnız bu tek sayfalık sorguya açık.
     // Tüm istemciler `searchUsers` callable'ına geçince false yap + rules deploy: Users hiç listelenemez.
