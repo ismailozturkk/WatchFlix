@@ -3,7 +3,8 @@
 // E-POSTA DOĞRULAMA KAPISININ SUNUCU ARKASI (16 Kas 2026). Doğrulanmamış e-posta+şifre
 // hesabı kayıt sırasında profil + kullanıcı adı yazabiliyor (kayıt işlemi bunu ister,
 // bkz. firestore.rules isAuthedOwner). Bu modül o hesapların yan etkilerini kapatır:
-//   1) beta Premium Max verilmez (grantBetaOnUserCreated + applyBetaAccess),
+//   1) (KALDIRILDI 16 Kas) beta Max artık doğrulamayı BEKLEMEZ: kayıt anında verilmeyince yeni
+//      testçi abonelik ekranı gördü; Max doğrulanmamış hesaba kurallar yüzünden hiçbir şey açmıyor,
 //   2) arkadaş aramasında çıkmaz (searchUsers),
 //   3) STALE_UNVERIFIED_DAYS gün doğrulanmazsa silinir → kullanıcı adı ve e-posta serbest
 //      kalır (cleanupUnverifiedAccounts),

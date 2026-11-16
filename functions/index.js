@@ -845,10 +845,10 @@ exports.grantBetaOnUserCreated = onDocumentCreated(
   async (event) => {
     if (!betaAccess.isBetaActive()) return;
     try {
-      // Doğrulanmamış e-posta+şifre hesabı (kayıt anı) Max ALMAZ: rastgele e-postayla açılan
-      // toplu hesaplar abonelik kaydı üretmesin. Doğrulanınca saatlik süpürme verir.
-      const record = await getAuth().getUser(event.params.uid).catch(() => null);
-      if (!unverifiedAccounts.isAccountVerified(record)) return;
+      // DOĞRULAMA BEKLENMEZ (16 Kas düzeltmesi): e-posta+şifre hesabı kayıt anında hep doğrulanmamıştır;
+      // Max'i saatlik süpürmeye bırakmak yeni testçiye ilk dakikalarda abonelik ekranı gösterdi (ve
+      // satın almaya yol açtı). Doğrulanmamış hesap Max ile de hiçbir şey yapamaz: kurallar
+      // (isSignedIn) ve callable'lar (requireVerified) doğrulama ister.
       await grantBetaAccess(event.params.uid, event.data?.get("entitlements"));
     } catch (error) {
       console.warn(`[grantBetaOnUserCreated] uid=${event.params.uid}:`, error?.message);
@@ -876,19 +876,12 @@ exports.applyBetaAccess = onSchedule(
         if (last) query = query.startAfter(last);
         const page = await query.get();
         if (page.empty) break;
-        // Yalnız hakkı eksik olanlar için Auth'a sorulur (100'lük toplu okuma); doğrulanmamış
-        // hesaplar atlanır (bkz. unverifiedAccounts.js).
+        // Doğrulama durumuna bakılmaz (bkz. grantBetaOnUserCreated): Max, doğrulanmamış hesaba
+        // kurallar ve callable'lar yüzünden hiçbir şey açmaz.
         const needing = page.docs.filter((doc) =>
           betaAccess.needsBetaGrant(doc.get("entitlements"), betaAccess.BETA_ACCESS, nowMs));
-        let verified = new Set();
-        try {
-          verified = await unverifiedAccounts.verifiedUidSet(getAuth(), needing.map((doc) => doc.id));
-        } catch (error) {
-          console.warn("[applyBetaAccess] Auth okunamadı:", error?.message);
-        }
         scanned += page.docs.length;
         for (const doc of needing) {
-          if (!verified.has(doc.id)) continue;
           try {
             if (await grantBetaAccess(doc.id, doc.get("entitlements"))) granted += 1;
           } catch (error) {
