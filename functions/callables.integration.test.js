@@ -69,6 +69,8 @@ test.before(async () => {
     }
     throw new Error(`beklenmeyen fetch: ${u}`);
   };
+  // Emülatör hesapları "şimdi" açılır; yayın tarihi kesimi (unverifiedAccounts.js) onları eski sayardı.
+  process.env.SEELOGD_TEST_GATE_SINCE_MS = "0";
   fns = require("./index");
   db = require("firebase-admin/firestore").getFirestore();
 });

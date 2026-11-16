@@ -31,7 +31,7 @@ window.SITE_CONFIG = {
     apple: "",
     google: "",
   },
-  launchDate: null,
+  launchDate: "2027-01-01T00:00:00+03:00",
   showPlans: false, // beta süresince planlar gizli
   baseCount: 1071, // gösterilen sayı = baseCount + Firestore kayıt sayısı
   firebaseConfig: {

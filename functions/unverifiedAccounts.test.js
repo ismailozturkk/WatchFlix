@@ -8,7 +8,7 @@ const {
   verifiedUidSet,
 } = require("./unverifiedAccounts");
 
-const NOW = Date.UTC(2026, 10, 30);
+const NOW = Date.UTC(2027, 0, 20); // yayından (1 Oca 2027) sonra
 const DAY = 24 * 60 * 60 * 1000;
 const rec = (over = {}) => ({
   uid: "u1",
@@ -74,5 +74,10 @@ test("kapıdan ÖNCE açılmış eski hesaplar silinmez/değiştirilmez (verisi 
   const legacy = rec({ metadata: { creationTime: new Date(Date.UTC(2026, 9, 1)).toUTCString() } });
   assert.equal(isReplaceableUnverified(legacy), false);
   assert.equal(isStaleUnverified(legacy, NOW), false);
+  // yayından bir gün önce açılan hesap da eski sayılır; yayın gecesi açılan sayılmaz
+  const eve = rec({ metadata: { creationTime: new Date(Date.UTC(2026, 11, 31)).toUTCString() } });
+  assert.equal(isStaleUnverified(eve, NOW), false);
+  const launch = rec({ metadata: { creationTime: new Date(Date.UTC(2027, 0, 1)).toUTCString() } });
+  assert.equal(isStaleUnverified(launch, NOW), true);
   assert.equal(isReplaceableUnverified(rec({ metadata: {} })), false);
 });

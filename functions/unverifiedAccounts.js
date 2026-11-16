@@ -15,10 +15,16 @@
 
 const FEDERATED = new Set(["google.com", "apple.com"]);
 const STALE_UNVERIFIED_DAYS = 3;
-// Kapı bu tarihte devreye girdi. ÖNCESİNDE açılmış doğrulanmamış hesaplar o zamana kadar
-// uygulamayı serbestçe kullanabiliyordu — listeleri, puanları, sohbetleri olabilir. Onlar
-// SİLİNMEZ ve Google/Apple girişiyle DEĞİŞTİRİLMEZ; kapıda e-postalarını doğrulayabilirler.
-const GATE_SINCE_MS = Date.UTC(2026, 10, 16);
+// Yayın tarihi (1 Ocak 2027, UTC). ÖNCESİNDE açılmış doğrulanmamış hesaplar kapısız eski
+// sürümlerle uygulamayı serbestçe kullanabiliyordu — listeleri, puanları, sohbetleri olabilir.
+// Onlar SİLİNMEZ ve Google/Apple girişiyle DEĞİŞTİRİLMEZ; kapıda e-postalarını doğrulayabilirler.
+// Emülatör testleri hesapları "şimdi" açtığından kesimi SEELOGD_TEST_GATE_SINCE_MS ile ezebilir;
+// canlı ortamda bu değişken YOKTUR.
+const TEST_GATE_SINCE = process.env.SEELOGD_TEST_GATE_SINCE_MS;
+const GATE_SINCE_MS =
+  TEST_GATE_SINCE && Number.isFinite(Number(TEST_GATE_SINCE))
+    ? Number(TEST_GATE_SINCE)
+    : Date.UTC(2027, 0, 1);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const providerIds = (record) =>
