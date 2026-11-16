@@ -61,6 +61,8 @@ crash.txt
 
 # FCM / service account (gizli — asla commit etme)
 *-firebase-adminsdk-*.json
+# Google Play yükleme hizmet hesabı anahtarı (EAS Submit; anahtar EAS sunucusunda saklanır)
+play-service-account*.json
 
 # Firebase hosting deploy onbellegi
 .firebase/

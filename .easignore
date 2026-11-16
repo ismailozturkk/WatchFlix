@@ -89,6 +89,7 @@ nul
 *.pem
 *.mobileprovision
 *-firebase-adminsdk-*.json
+play-service-account*.json
 
 # Rebrand öncesi ölü ikon yedekleri ve kullanılmayan Lottie animasyonları
 assets/oldicon/
