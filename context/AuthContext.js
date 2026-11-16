@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
@@ -24,6 +25,7 @@ import { db } from "../firebase";
 import {
   isGoogleProfileComplete,
 } from "../services/googleAuthService";
+import { requiresEmailVerification } from "../utils/emailVerificationGate";
 
 const AuthContext = createContext();
 
@@ -97,30 +99,85 @@ export const AuthProvider = ({ children }) => {
     set(Keys.cachedInitialRoute, "TabScreen");
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Kullanıcı kapsamlı anahtarların (taslaklar, AI sohbetleri, avatar)
-        // hangi kovaya yazılacağını bu belirler — resolveInitialRoute'tan da
-        // ÖNCE kurulmalı, o yol depolamayı okuyor.
-        setActiveUser(user.uid);
-        const cachedRoute = get(Keys.cachedInitialRoute) || "TabScreen";
-        setInitialRoute(cachedRoute);
-        setNeedsProfileCompletion(cachedRoute === "GoogleProfileCompletionScreen");
-        setUser(user);
-        setLoading(false);
-        set(Keys.cachedUserId, user.uid);
+  // E-POSTA DOĞRULAMA KAPISI (bkz. utils/emailVerificationGate.js). Doğrulanmamış
+  // e-posta+şifre hesabı `user` olarak YAYINLANMAZ: ~100 tüketici (dinleyiciler, liste
+  // kökü, profil yazımları) hiç başlamaz; App.js gezgin yerine doğrulama ekranını çizer.
+  const [pendingVerificationUser, setPendingVerificationUser] = useState(null);
+  // Kayıt ekranı hesabı açıp profili yazarken (birkaç saniye) kapı inmesin: RegisterScreen
+  // gezginle birlikte sökülür ve yarım kalan profil işlemi sahipsiz kalırdı.
+  const gateHold = useRef(false);
+  const enterSignedInRef = useRef(null);
 
-        try {
-          const freshRoute = await resolveInitialRoute(user);
-          if (freshRoute !== cachedRoute) {
-            setInitialRoute(freshRoute);
-            setNeedsProfileCompletion(freshRoute === "GoogleProfileCompletionScreen");
-          }
-          set(Keys.cachedInitialRoute, freshRoute);
-        } catch {
-          set(Keys.cachedInitialRoute, "TabScreen");
+  const showVerificationGate = useCallback((user) => {
+    setUser(null);
+    setNeedsProfileCompletion(false);
+    setPendingVerificationUser(user);
+    // Soğuk açılış tohumu: doğrulanmamış hesap bir sonraki açılışta bir kare bile
+    // TabScreen'e düşmesin.
+    remove(Keys.cachedUserId);
+    setLoading(false);
+  }, []);
+
+  const holdVerificationGate = useCallback(() => {
+    gateHold.current = true;
+  }, []);
+
+  /** Kayıt bitti: oturum hâlâ açıksa (doğrulanmamış) kapıyı göster. */
+  const releaseVerificationGate = useCallback(() => {
+    gateHold.current = false;
+    const current = auth.currentUser;
+    if (!current) return;
+    if (requiresEmailVerification(current)) showVerificationGate(current);
+    else enterSignedInRef.current?.(current);
+  }, [showVerificationGate]);
+
+  /** Doğrulama ekranı: kullanıcı tazelendi ve doğrulandı → uygulamaya al. */
+  const markEmailVerified = useCallback(() => {
+    const current = auth.currentUser;
+    if (!current || requiresEmailVerification(current)) return false;
+    setPendingVerificationUser(null);
+    enterSignedInRef.current?.(current);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const enterSignedIn = async (user) => {
+      // Kullanıcı kapsamlı anahtarların (taslaklar, AI sohbetleri, avatar)
+      // hangi kovaya yazılacağını bu belirler — resolveInitialRoute'tan da
+      // ÖNCE kurulmalı, o yol depolamayı okuyor.
+      setActiveUser(user.uid);
+      const cachedRoute = get(Keys.cachedInitialRoute) || "TabScreen";
+      setInitialRoute(cachedRoute);
+      setNeedsProfileCompletion(cachedRoute === "GoogleProfileCompletionScreen");
+      setUser(user);
+      setLoading(false);
+      set(Keys.cachedUserId, user.uid);
+
+      try {
+        const freshRoute = await resolveInitialRoute(user);
+        if (freshRoute !== cachedRoute) {
+          setInitialRoute(freshRoute);
+          setNeedsProfileCompletion(freshRoute === "GoogleProfileCompletionScreen");
         }
+        set(Keys.cachedInitialRoute, freshRoute);
+      } catch {
+        set(Keys.cachedInitialRoute, "TabScreen");
+      }
+    };
+    enterSignedInRef.current = enterSignedIn;
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user && requiresEmailVerification(user)) {
+        if (gateHold.current) {
+          setLoading(false);
+          return;
+        }
+        showVerificationGate(user);
+        return;
+      }
+      if (user) {
+        setPendingVerificationUser(null);
+        await enterSignedIn(user);
       } else {
         // İlk açılışta (onboarding görülmediyse) tanıtım akışına, sonrasında
         // doğrudan giriş ekranına yönlendir.
@@ -128,6 +185,7 @@ export const AuthProvider = ({ children }) => {
         const unauthRoute = seenOnboarding ? "LoginScreen" : "OnboardingScreen";
         setInitialRoute(unauthRoute);
         setUser(null);
+        setPendingVerificationUser(null);
         setNeedsProfileCompletion(false);
         setLoading(false);
 
@@ -156,13 +214,33 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [showVerificationGate]);
 
   // Memo: ~100 tüketici var; değer her render'da yeni nesne olursa sağlayıcının
   // her yeniden çizimi hepsini yeniden çizdirir.
   const value = useMemo(
-    () => ({ user, loading, initialRoute, needsProfileCompletion, markProfileCompleted }),
-    [user, loading, initialRoute, needsProfileCompletion, markProfileCompleted],
+    () => ({
+      user,
+      loading,
+      initialRoute,
+      needsProfileCompletion,
+      markProfileCompleted,
+      pendingVerificationUser,
+      markEmailVerified,
+      holdVerificationGate,
+      releaseVerificationGate,
+    }),
+    [
+      user,
+      loading,
+      initialRoute,
+      needsProfileCompletion,
+      markProfileCompleted,
+      pendingVerificationUser,
+      markEmailVerified,
+      holdVerificationGate,
+      releaseVerificationGate,
+    ],
   );
 
   return (

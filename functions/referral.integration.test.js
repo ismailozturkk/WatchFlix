@@ -85,7 +85,7 @@ async function mkUser(uid, extra = {}) {
   await db.doc(`Users/${uid}`).set({ displayName: `Kisi ${uid}`, username: uid, avatarIndex: 1, ...extra });
 }
 
-const call = (fn, uid, data = {}) => fn.run({ auth: { uid }, data });
+const call = (fn, uid, data = {}) => fn.run({ auth: { uid, token: { email_verified: true } }, data });
 
 async function reasonOf(promise) {
   try {

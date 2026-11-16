@@ -3,8 +3,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─── Helpers ────────────────────────────────────────────────────────
-    function isSignedIn() { return request.auth != null; }
+    // E-POSTA DOĞRULAMA KAPISI (16 Kas 2026). Rastgele e-postayla açılan hesaplar liste
+    // ekleme / oy / mesaj gibi spam işlemleri yapabiliyordu. isSignedIn() artık "oturum
+    // açık VE e-posta doğrulanmış" demek; neredeyse her kural ondan geçtiği için okuma ve
+    // yazmaların tamamı kapanır. Google/Apple oturumları sağlayıcıda doğrulanmış sayılır.
+    // Token'daki email_verified, istemci getIdToken(true) yapana kadar eski kalır
+    // (utils/emailVerificationGate.js → refreshVerification).
+    // Doğrulanmamış hesaba BIRAKILANLAR yalnız kayıt işleminin kendisi: kendi kök profil
+    // belgesi (oku + oluştur), private/account oluşturma ve kullanıcı adı rezervasyonu.
+    function isAuthed() { return request.auth != null; }
+    function emailVerified() {
+      return request.auth.token.get('email_verified', false) == true
+          || request.auth.token.get('firebase', {}).get('sign_in_provider', '') in ['google.com', 'apple.com'];
+    }
+    function isSignedIn() { return isAuthed() && emailVerified(); }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    // Doğrulama ŞARTI OLMADAN sahiplik — yalnız yukarıdaki kayıt istisnalarında kullan.
+    function isAuthedOwner(uid) { return isAuthed() && request.auth.uid == uid; }
     function onlyUpdating(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
@@ -86,12 +101,13 @@ service cloud.firestore {
     // Yönetici = siteAdmins/{uid} belgesi VAR. Belgeyi yalnız Firebase Console'dan
     // (ya da Admin SDK ile) elle açarsın; istemci yazamaz. Kişi yalnız KENDİ belgesinin
     // varlığını okuyabilir (panel "yetkin yok" ekranını buna göre gösterir).
+    // Yönetim paneli e-posta kapısının dışında: yetki zaten siteAdmins belgesiyle sınırlı.
     function isSiteAdmin() {
-      return isSignedIn()
+      return isAuthed()
         && exists(/databases/$(database)/documents/siteAdmins/$(request.auth.uid));
     }
     match /siteAdmins/{uid} {
-      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow get: if isAuthedOwner(uid);
       allow list, write: if false;
     }
     // Site ziyaret istatistiği: günlük toplamlar, yalnız siteBeacon (Admin SDK) yazar.
@@ -548,7 +564,8 @@ service cloud.firestore {
       // herkesin kullanıcı tabanını sayfalayıp kazımasına açıktı; arama artık `searchUsers` callable'ı
       // (functions/userSearch.js: hız sınırlı, yalnız 5 alan). Eski istemciler için tek sayfa (≤ 20) sorgu,
       // legacyUserSearchList() açıkken kalır; sınırsız ya da büyük sayfalı sorgu her durumda reddedilir.
-      allow get: if isSignedIn();
+      // Kendi belgesi doğrulamasız da okunur: kayıt işlemi (createUserProfile) okur.
+      allow get: if isSignedIn() || isAuthedOwner(uid);
       allow list: if isSignedIn() && legacyUserSearchList() && request.query.limit <= 20;
       // Sunucuya ait alanlar — istemci ne kendi belgesinde ne başkasınınkinde
       // yazabilir:
@@ -557,7 +574,8 @@ service cloud.firestore {
       //   • badges: kimlik rozetleri (kurucu rozeti geri alınamaz bir kamu
       //     vaadi; bkz. components/badges/badgeCatalog.js). Kural olmadan
       //     herkes kendine "Kurucu" yazabiliyordu.
-      allow create: if isOwner(uid)
+      // Kayıt anında e-posta henüz doğrulanmamıştır → isAuthedOwner (bkz. emailVerified()).
+      allow create: if isAuthedOwner(uid)
                     && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
                     && rootCreateWithoutPrivateFields()
                     && fourFavoritesOk()
@@ -718,7 +736,9 @@ service cloud.firestore {
     // göç planı: docs/mimari/KULLANICI_OZEL_ALAN_GOCU.md.
     match /Users/{uid}/private/{docId} {
       allow read, delete: if isOwner(uid);
-      allow create: if isOwner(uid) && docId != 'entitlements'
+      // private/account kayıt işleminde (doğrulamadan önce) yazılır; diğerleri doğrulama ister.
+      allow create: if (isOwner(uid) || (docId == 'account' && isAuthedOwner(uid)))
+                    && docId != 'entitlements'
                     && (docId != 'account' || accountCreateOk(uid))
                     && (docId != 'streak' || streakDocOk())
                     && (docId != 'universes' || universesDocOk())
@@ -1243,8 +1263,9 @@ service cloud.firestore {
       // sorgusu hesap silme purge'unda, Admin SDK ile (functions/accountPurge.js).
       allow get: if true;
       allow list: if false;
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      // Kayıt işleminde (doğrulamadan önce) rezerve edilir → isAuthed.
+      allow create: if isAuthed() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuthed() && resource.data.uid == request.auth.uid;
       // Update yok — username değişimi delete+create transaction'ı.
     }
 

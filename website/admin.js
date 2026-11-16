@@ -15,9 +15,20 @@ import {
 import {
   getFirestore, collection, doc, getDoc, getDocs, query, where,
 } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js";
+import {
+  initializeAppCheck, ReCaptchaEnterpriseProvider,
+} from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app-check.js";
 
 const S = window.AdminStats;
 const app = initializeApp(window.SITE_CONFIG.firebaseConfig);
+// App Check: site-config.js appCheckSiteKey doluysa (Firestore/Auth zorunluluğu öncesi şart).
+// Auth/Firestore'dan ÖNCE kurulmalı ki ilk istekler de jeton taşısın.
+if (window.SITE_CONFIG.appCheckSiteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(window.SITE_CONFIG.appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 const auth = getAuth(app);
 const db = getFirestore(app);
 

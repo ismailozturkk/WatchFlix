@@ -15,4 +15,6 @@ module.exports = {
   // Emülatöre yazan testler saf mantık testlerinden yavaş; varsayılan 5 sn
   // ilk bağlantıda (JVM ısınması) yetmiyor.
   testTimeout: 30000,
+  // E-posta doğrulama kapısı: test kullanıcıları varsayılan olarak doğrulanmış.
+  setupFiles: ["<rootDir>/__tests__/rulesSetup/verifiedTokenDefault.js"],
 };

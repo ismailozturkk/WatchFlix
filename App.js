@@ -45,6 +45,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 // kalıyor çünkü olası İLK rotalar (auth kapısı initialRoute'u bunlardan seçer).
 import LoginScreen from "./screens/auth/LoginScreen";
 import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
+import EmailVerificationScreen from "./screens/auth/EmailVerificationScreen";
 import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import WeatherLayer from "./components/decor/WeatherLayer";
 import { useTheme } from "./context/ThemeContext";
@@ -287,7 +288,7 @@ function AppContent() {
   }, [theme]);
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [swipeViewReady, setSwipeViewReady] = useState(false);
-  const { user, initialRoute, loading, needsProfileCompletion } = useAuth();
+  const { user, initialRoute, loading, needsProfileCompletion, pendingVerificationUser } = useAuth();
 
   useEffect(() => {
     // Profil tamamlanmadan Lists/{uid} YAZMA. Google kullanıcısı tamamlama
@@ -381,6 +382,11 @@ function AppContent() {
         // render tetikliyordu.
       }}
     >
+      {/* E-POSTA DOĞRULAMA KAPISI: doğrulanmamış e-posta+şifre hesabı gezgine hiç
+          girmez (utils/emailVerificationGate.js). Toast/uyarı host'ları aşağıda kalır. */}
+      {pendingVerificationUser ? (
+        <EmailVerificationScreen />
+      ) : (
       <Stack.Navigator
         initialRouteName={initialRoute}
         // Free kullanıcıda her ekranın üstünde "Premium'a geç" şeridi; kurallar
@@ -1007,6 +1013,7 @@ function AppContent() {
           />
         ) : null}
       </Stack.Navigator>
+      )}
 
       {showChatModal && swipeViewReady && <SwipeViewHost />}
       {/* Yanıt bekleyen davetler + turnuva anları: önce üstte toast gibi kart, sonra kenarda

@@ -82,7 +82,7 @@ async function reset() {
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 const call = (fn, uid, data = {}, token = {}) =>
-  fn.run({ auth: uid ? { uid, token: { auth_time: nowSec(), ...token } } : undefined, data });
+  fn.run({ auth: uid ? { uid, token: { auth_time: nowSec(), email_verified: true, ...token } } : undefined, data });
 
 async function codeOf(promise) {
   try {
@@ -110,6 +110,18 @@ test("oturumsuz çağrılar reddedilir", { skip }, async () => {
     assert.equal(await codeOf(call(fns[name], null, {})), "unauthenticated", name);
   }
   assert.equal(calls.gemini + calls.omdb + calls.revenuecat, 0);
+});
+
+test("e-postası doğrulanmamış hesap callable kullanamaz; hesap silme açık kalır", { skip }, async () => {
+  await reset();
+  const unverified = { email_verified: false, firebase: { sign_in_provider: "password" } };
+  await mkUser("spam");
+  for (const name of ["callGemini", "redeemCode", "getReferralOverview", "getExternalRatings", "searchUsers", "voteBetaFeature"]) {
+    assert.equal(await codeOf(call(fns[name], "spam", {}, unverified)), "permission-denied", name);
+  }
+  // Kapıdan geçer (permission-denied DEĞİL); bilinmeyen aşama gerçek silmeye girmeden durdurur.
+  assert.equal(await codeOf(call(fns.deleteAccountData, "spam", { phase: "everything" }, unverified)), "invalid-argument");
+  assert.equal(calls.gemini + calls.omdb, 0);
 });
 
 test("deleteAccountData: eski oturum belirteciyle ve bilinmeyen aşamayla çalışmaz", { skip }, async () => {
@@ -255,4 +267,66 @@ test("syncPremiumStatus: profil şartı, RevenueCat hatası, başarı ve kısma"
   const again = await call(fns.syncPremiumStatus, "sub");
   assert.equal(again.throttled, true);
   assert.equal(calls.revenuecat, 2, "kısılan çağrı RevenueCat'e gitmemeli");
+});
+
+// ─── E-posta doğrulama kapısının sunucu arkası (unverifiedAccounts.js) — Auth emülatörü ister ───
+const authSkip = skip || (process.env.FIREBASE_AUTH_EMULATOR_HOST ? false : "FIREBASE_AUTH_EMULATOR_HOST yok");
+
+async function mkAuth(uid, email, emailVerified) {
+  const auth = require("firebase-admin/auth").getAuth();
+  await auth.deleteUser(uid).catch(() => {});
+  await auth.createUser({ uid, email, emailVerified, password: "parola-123456" });
+}
+
+test("searchUsers: e-postası doğrulanmamış hesap aramada çıkmaz", { skip: authSkip }, async () => {
+  await reset();
+  await mkAuth("arayan", "arayan@example.com", true);
+  await mkAuth("gercek", "gercek@example.com", true);
+  await mkAuth("spamci", "spamci@example.com", false);
+  await mkUser("gercek", { usernameLower: "kanka_gercek", username: "kanka_gercek" });
+  await mkUser("spamci", { usernameLower: "kanka_spam", username: "kanka_spam" });
+  const res = await call(fns.searchUsers, "arayan", { term: "kanka" });
+  const ids = res.users.map((u) => u.uid);
+  assert.ok(ids.includes("gercek"), JSON.stringify(res.users));
+  assert.ok(!ids.includes("spamci"), "doğrulanmamış hesap sonuçta olmamalı");
+});
+
+test("checkGoogleSignInEligibility: aynı adresteki doğrulanmamış şifre hesabı silinir, Google girişine izin verilir", { skip: authSkip }, async () => {
+  await reset();
+  const auth = require("firebase-admin/auth").getAuth();
+  await mkAuth("isgal", "kurban@example.com", false);
+  await mkUser("isgal", { usernameLower: "kurban", username: "kurban" });
+  await db.doc("Usernames/kurban").set({ uid: "isgal" });
+  fake.tokeninfo = {
+    aud: "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
+    sub: "g-1",
+    email: "kurban@example.com",
+    email_verified: "true",
+  };
+  const res = await call(fns.checkGoogleSignInEligibility, null, { idToken: "x".repeat(200) });
+  assert.deepEqual(res, { allowed: true });
+  assert.equal(await codeOf(auth.getUser("isgal")), "auth/user-not-found");
+  assert.equal((await db.doc("Users/isgal").get()).exists, false);
+  assert.equal((await db.doc("Usernames/kurban").get()).exists, false, "kullanıcı adı serbest kalmalı");
+});
+
+test("checkGoogleSignInEligibility: DOĞRULANMIŞ şifre hesabı silinmez, bağlama istenir", { skip: authSkip }, async () => {
+  await reset();
+  const auth = require("firebase-admin/auth").getAuth();
+  await mkAuth("sahip", "sahip@example.com", true);
+  fake.tokeninfo = {
+    aud: "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com",
+    sub: "g-2",
+    email: "sahip@example.com",
+    email_verified: "true",
+  };
+  assert.equal(await codeOf(call(fns.checkGoogleSignInEligibility, null, { idToken: "x".repeat(200) })), "already-exists");
+  assert.equal((await auth.getUser("sahip")).uid, "sahip");
+});
+
+// Hesap temizliği (purgeAccountData) RTDB bağlantısı açar; kapatılmazsa süreç bitmez.
+test.after(async () => {
+  if (skip) return;
+  const { getApps, deleteApp } = require("firebase-admin/app");
+  await Promise.all(getApps().map((app) => deleteApp(app)));
 });

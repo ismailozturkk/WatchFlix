@@ -31,6 +31,7 @@ jest.mock("../services/authEmail", () => {
   const actual = jest.requireActual("../utils/authEmailCopy");
   return {
     sendVerificationEmail: (...args) => mockSendVerification(...args),
+    verificationCooldownLeft: () => 0,
     authEmailErrorMessage: (error, language) => `ERR:${error.code}:${language}`,
     fillAuthEmailText: actual.fillAuthEmailText,
   };

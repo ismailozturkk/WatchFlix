@@ -20,6 +20,16 @@ const tr = {
   nowVerified: "E-postan doğrulandı",
   sendWait: "Gönder ({n})",
   spamHint: "Gelmezse spam/gereksiz klasörünü de kontrol et.",
+  gateTitle: "E-postanı doğrula",
+  gateBody: "{email} adresine bir doğrulama bağlantısı gönderdik. Bağlantıya tıkladıktan sonra aşağıdaki düğmeye bas.",
+  gateWhy: "Sahte hesapları önlemek için e-postası doğrulanmamış hesaplar uygulamayı kullanamaz. 3 gün içinde doğrulanmayan hesaplar silinir.",
+  gateCheck: "Doğruladım, devam et",
+  gateNotYet: "E-postan henüz doğrulanmamış görünüyor. Bağlantıya tıkladığından emin ol.",
+  gateSignOut: "Çıkış yap / başka hesap kullan",
+  loginNeedsVerify: "Devam etmek için e-postanı doğrula",
+  gateNoEmailTitle: "E-posta gelmedi mi?",
+  gateNoEmailHint: "Spam/gereksiz klasörüne de bak. E-posta hiç gelmediyse ya da bağlantının süresi dolduysa aşağıdan yenisini gönder.",
+  gateWrongEmail: "Adres yanlışsa çıkış yapıp doğru adresle yeniden kayıt olabilirsin.",
 };
 
 const en = {
@@ -34,6 +44,16 @@ const en = {
   nowVerified: "Your email is verified",
   sendWait: "Send ({n})",
   spamHint: "If it does not arrive, check your spam folder too.",
+  gateTitle: "Verify your email",
+  gateBody: "We sent a verification link to {email}. After you tap the link, press the button below.",
+  gateWhy: "To prevent fake accounts, accounts with an unverified email cannot use the app. Accounts not verified within 3 days are deleted.",
+  gateCheck: "I've verified, continue",
+  gateNotYet: "Your email doesn't look verified yet. Make sure you tapped the link.",
+  gateSignOut: "Sign out / use another account",
+  loginNeedsVerify: "Verify your email to continue",
+  gateNoEmailTitle: "Didn't get the email?",
+  gateNoEmailHint: "Check your spam folder too. If it never arrived or the link has expired, send a new one below.",
+  gateWrongEmail: "If the address is wrong, sign out and register again with the right one.",
 };
 
 const es = {
@@ -48,6 +68,16 @@ const es = {
   nowVerified: "Tu correo está verificado",
   sendWait: "Enviar ({n})",
   spamHint: "Si no llega, revisa también la carpeta de spam.",
+  gateTitle: "Verifica tu correo",
+  gateBody: "Enviamos un enlace de verificación a {email}. Después de abrir el enlace, pulsa el botón de abajo.",
+  gateWhy: "Para evitar cuentas falsas, las cuentas con correo sin verificar no pueden usar la app. Las cuentas no verificadas en 3 días se eliminan.",
+  gateCheck: "Ya lo verifiqué, continuar",
+  gateNotYet: "Tu correo aún no parece verificado. Asegúrate de haber abierto el enlace.",
+  gateSignOut: "Cerrar sesión / usar otra cuenta",
+  loginNeedsVerify: "Verifica tu correo para continuar",
+  gateNoEmailTitle: "¿No te llegó el correo?",
+  gateNoEmailHint: "Revisa también la carpeta de spam. Si nunca llegó o el enlace caducó, envía uno nuevo abajo.",
+  gateWrongEmail: "Si la dirección es incorrecta, cierra sesión y regístrate de nuevo con la correcta.",
 };
 
 const pt = {
@@ -62,6 +92,16 @@ const pt = {
   nowVerified: "Seu e-mail foi verificado",
   sendWait: "Enviar ({n})",
   spamHint: "Se não chegar, verifique também a pasta de spam.",
+  gateTitle: "Verifique seu e-mail",
+  gateBody: "Enviamos um link de verificação para {email}. Depois de abrir o link, toque no botão abaixo.",
+  gateWhy: "Para evitar contas falsas, contas com e-mail não verificado não podem usar o app. Contas não verificadas em 3 dias são excluídas.",
+  gateCheck: "Já verifiquei, continuar",
+  gateNotYet: "Seu e-mail ainda não parece verificado. Confira se você abriu o link.",
+  gateSignOut: "Sair / usar outra conta",
+  loginNeedsVerify: "Verifique seu e-mail para continuar",
+  gateNoEmailTitle: "Não recebeu o e-mail?",
+  gateNoEmailHint: "Verifique também a pasta de spam. Se ele não chegou ou o link expirou, envie um novo abaixo.",
+  gateWrongEmail: "Se o endereço estiver errado, saia e cadastre-se de novo com o correto.",
 };
 
 const de = {
@@ -76,6 +116,16 @@ const de = {
   nowVerified: "Deine E-Mail ist bestätigt",
   sendWait: "Senden ({n})",
   spamHint: "Kommt sie nicht an, prüfe auch den Spam-Ordner.",
+  gateTitle: "Bestätige deine E-Mail",
+  gateBody: "Wir haben einen Bestätigungslink an {email} gesendet. Tippe auf den Link und drücke dann unten auf die Schaltfläche.",
+  gateWhy: "Um Fake-Konten zu verhindern, können Konten mit unbestätigter E-Mail die App nicht nutzen. Nicht innerhalb von 3 Tagen bestätigte Konten werden gelöscht.",
+  gateCheck: "Bestätigt, weiter",
+  gateNotYet: "Deine E-Mail scheint noch nicht bestätigt zu sein. Hast du auf den Link getippt?",
+  gateSignOut: "Abmelden / anderes Konto verwenden",
+  loginNeedsVerify: "Bestätige deine E-Mail, um fortzufahren",
+  gateNoEmailTitle: "Keine E-Mail erhalten?",
+  gateNoEmailHint: "Sieh auch im Spam-Ordner nach. Ist sie nie angekommen oder der Link abgelaufen, sende unten eine neue.",
+  gateWrongEmail: "Ist die Adresse falsch, melde dich ab und registriere dich mit der richtigen neu.",
 };
 const it = {
   invalidEmail: "Inserisci un indirizzo email valido.",
@@ -88,7 +138,17 @@ const it = {
   verificationSent: "Email di verifica inviata a {email}",
   nowVerified: "La tua email è verificata",
   sendWait: "Invia ({n})",
-  spamHint: "Se non arriva, controlla anche la cartella spam."
+  spamHint: "Se non arriva, controlla anche la cartella spam.",
+  gateTitle: "Verifica la tua email",
+  gateBody: "Abbiamo inviato un link di verifica a {email}. Dopo aver aperto il link, premi il pulsante qui sotto.",
+  gateWhy: "Per evitare account falsi, gli account con email non verificata non possono usare l'app. Gli account non verificati entro 3 giorni vengono eliminati.",
+  gateCheck: "Ho verificato, continua",
+  gateNotYet: "La tua email non risulta ancora verificata. Assicurati di aver aperto il link.",
+  gateSignOut: "Esci / usa un altro account",
+  loginNeedsVerify: "Verifica la tua email per continuare",
+  gateNoEmailTitle: "Non hai ricevuto l'email?",
+  gateNoEmailHint: "Controlla anche la cartella spam. Se non è mai arrivata o il link è scaduto, inviane una nuova qui sotto.",
+  gateWrongEmail: "Se l'indirizzo è sbagliato, esci e registrati di nuovo con quello corretto.",
 };
 const fr = {
   invalidEmail: "Saisis une adresse e-mail valide.",
@@ -102,6 +162,16 @@ const fr = {
   nowVerified: "Ton e-mail est vérifié",
   sendWait: "Envoyer ({n})",
   spamHint: "S'il n'arrive pas, vérifie aussi tes spams.",
+  gateTitle: "Vérifie ton e-mail",
+  gateBody: "Nous avons envoyé un lien de vérification à {email}. Après avoir ouvert le lien, appuie sur le bouton ci-dessous.",
+  gateWhy: "Pour éviter les faux comptes, les comptes dont l'e-mail n'est pas vérifié ne peuvent pas utiliser l'app. Les comptes non vérifiés sous 3 jours sont supprimés.",
+  gateCheck: "C'est fait, continuer",
+  gateNotYet: "Ton e-mail ne semble pas encore vérifié. Vérifie que tu as bien ouvert le lien.",
+  gateSignOut: "Se déconnecter / utiliser un autre compte",
+  loginNeedsVerify: "Vérifie ton e-mail pour continuer",
+  gateNoEmailTitle: "Tu n'as pas reçu l'e-mail ?",
+  gateNoEmailHint: "Vérifie aussi tes spams. S'il n'est jamais arrivé ou si le lien a expiré, envoies-en un nouveau ci-dessous.",
+  gateWrongEmail: "Si l'adresse est fausse, déconnecte-toi et inscris-toi à nouveau avec la bonne.",
 };
 const ja = {
   invalidEmail: "有効なメールアドレスを入力してください。",
@@ -115,6 +185,16 @@ const ja = {
   nowVerified: "メールアドレスは確認済みです",
   sendWait: "送信({n})",
   spamHint: "届かない場合は迷惑メールフォルダも確認してください。",
+  gateTitle: "メールアドレスを確認してください",
+  gateBody: "{email}に確認リンクを送信しました。リンクを開いたら、下のボタンを押してください。",
+  gateWhy: "なりすましアカウントを防ぐため、メールアドレスが未確認のアカウントはアプリを利用できません。 3日以内に確認されないアカウントは削除されます。",
+  gateCheck: "確認しました、続ける",
+  gateNotYet: "メールアドレスはまだ確認されていないようです。リンクを開いたか確認してください。",
+  gateSignOut: "サインアウト / 別のアカウントを使う",
+  loginNeedsVerify: "続けるにはメールアドレスを確認してください",
+  gateNoEmailTitle: "メールが届きませんか?",
+  gateNoEmailHint: "迷惑メールフォルダも確認してください。届かない場合やリンクの有効期限が切れた場合は、下から再送信してください。",
+  gateWrongEmail: "メールアドレスが間違っている場合は、サインアウトして正しいアドレスで登録し直してください。",
 };
 
 export const AUTH_EMAIL_COPY = Object.freeze({ tr, en, es, pt, de ,

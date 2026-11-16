@@ -299,12 +299,23 @@
   function initDb() {
     if (dbReady) return dbReady;
     if (!CFG.firebaseConfig) { dbReady = Promise.resolve(); return dbReady; }
+    var appCheckKey = CFG.appCheckSiteKey;
     dbReady = Promise.all([
       import("https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js"),
       import("https://www.gstatic.com/firebasejs/11.7.3/firebase-firestore.js"),
+      // App Check yalnız anahtar varsa yüklenir; reCAPTCHA betiği de ancak form gönderilirken
+      // (Firestore gerektiğinde) iner — sayfayı açan herkese yüklenmez.
+      appCheckKey ? import("https://www.gstatic.com/firebasejs/11.7.3/firebase-app-check.js") : null,
     ]).then(function (mods) {
       var fs = mods[1];
-      db = { fs: fs, app: fs.getFirestore(mods[0].initializeApp(CFG.firebaseConfig)) };
+      var app = mods[0].initializeApp(CFG.firebaseConfig);
+      if (mods[2]) {
+        mods[2].initializeAppCheck(app, {
+          provider: new mods[2].ReCaptchaEnterpriseProvider(appCheckKey),
+          isTokenAutoRefreshEnabled: false,
+        });
+      }
+      db = { fs: fs, app: fs.getFirestore(app) };
     }).catch(function (err) {
       dbReady = null; // sonraki denemede yeniden dene
       throw err;

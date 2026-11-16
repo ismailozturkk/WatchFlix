@@ -26,6 +26,8 @@ import {
 } from "firebase/auth";
 import Toast from "@components/AppToast";
 import { cleanEmail, sendVerificationEmail } from "../../services/authEmail";
+import { useAuth } from "../../context/AuthContext";
+import { getAuthEmailCopy } from "../../utils/authEmailCopy";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
@@ -97,6 +99,7 @@ const strengthOf = (length) => {
 
 export default function RegisterScreen({ navigation }) {
   const { theme } = useTheme();
+  const { holdVerificationGate, releaseVerificationGate } = useAuth();
   const insets = useSafeAreaInsets();
   const accent = theme.accent;
   const isLightTheme = isLightSurface(theme.primary);
@@ -270,6 +273,10 @@ export default function RegisterScreen({ navigation }) {
     setIsloading(true);
     let createdUser = null;
     let profileCreated = false;
+    // Hesap açılır açılmaz AuthContext doğrulama kapısını indirip bu ekranı sökmesin:
+    // profil işlemi bitene kadar beklet (bkz. utils/emailVerificationGate.js).
+    holdVerificationGate();
+    let gateShown = false;
     try {
       const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(
@@ -298,10 +305,9 @@ export default function RegisterScreen({ navigation }) {
         method: "email",
       });
       profileCreated = true;
-      // NOT: yaş kısıtı burada UYGULANMAZ. Bu akış birkaç satır aşağıda
-      // signOut'a gidiyor, o da oturum deposunu (dolayısıyla kısıt bayrağını)
-      // temizliyor. Kısıt, kullanıcı gerçekten giriş yaptığında profilden
-      // türetiliyor — bkz. context/UserProfileContext.js.
+      // NOT: yaş kısıtı burada UYGULANMAZ. Kullanıcı önce doğrulama kapısında
+      // bekler; kısıt, uygulamaya gerçekten girdiğinde profilden türetiliyor —
+      // bkz. context/UserProfileContext.js.
 
       // Profil olusmadan once verification gondermiyoruz. Profil transaction'i
       // duserse Auth kullanicisini silebilir ve e-postayi kilitlemeyiz.
@@ -313,11 +319,6 @@ export default function RegisterScreen({ navigation }) {
         verificationSent = false;
       }
 
-      // Kayit ekrani Firebase'de otomatik oturum acar. Kullanici emailini
-      // dogrulamadan uygulamaya sizmasin; basarili kayittan sonra giris ekranina
-      // temiz bir oturumla don.
-      await signOut(auth);
-
       Toast.show({
         type: verificationSent ? "success" : "info",
         text1: verificationSent
@@ -325,9 +326,12 @@ export default function RegisterScreen({ navigation }) {
               username,
               email: emailClean,
             })
-          : language === "tr" ? "Hesabın oluşturuldu. Giriş yaptıktan sonra Profil ekranından doğrulama e-postasını yeniden gönderebilirsin." : language === "es" ? "Tu cuenta se ha creado. Tras iniciar sesión puedes reenviar la verificación desde tu perfil." : language === "pt" ? "Sua conta foi criada. Depois de entrar, você pode reenviar a verificação pelo seu perfil." : language === "de" ? "Dein Konto wurde erstellt. Nach der Anmeldung kannst du die Bestätigung in deinem Profil erneut senden." : language === "it" ? "Il tuo account è stato creato. Dopo aver effettuato l'accesso puoi inviare nuovamente l'e-mail di verifica dal tuo profilo." : language === "fr" ? "Ton compte a été créé. Une fois connecté, tu pourras renvoyer l'e-mail de vérification depuis ton profil." : language === "ja" ? "アカウントを作成しました。サインイン後、プロフィールから確認メールを再送信できます。" : "Your account was created. After signing in you can resend the verification email from your profile.",
+          : getAuthEmailCopy(language).generic,
       });
-      navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
+      // Oturum AÇIK kalır ama uygulamaya değil doğrulama kapısına girer
+      // (EmailVerificationScreen): bağlantıya tıklayınca oradan içeri alınır.
+      gateShown = true;
+      releaseVerificationGate();
     } catch (error) {
       // Auth olustu ama profil transaction'i tamamlanmadiysa yetim hesabi sil.
       // Aksi halde ayni e-posta sonraki denemelerde kalici olarak "kullanimda"
@@ -335,6 +339,7 @@ export default function RegisterScreen({ navigation }) {
       if (createdUser && !profileCreated) {
         await deleteUser(createdUser).catch(() => signOut(getAuth()).catch(() => {}));
       }
+      if (!gateShown) releaseVerificationGate();
       const message =
         error?.code === "auth/email-already-in-use"
           ? language === "tr" ? "Bu e-posta ile zaten bir hesap var. Mevcut giriş yöntemini kullan; Google hesabıysan Google ile giriş yap." : language === "es" ? "Ya existe una cuenta con este correo. Usa su método de inicio de sesión actual; si es una cuenta de Google, inicia sesión con Google." : language === "pt" ? "Já existe uma conta com este e-mail. Use o método de login atual dela; se for uma conta do Google, entre com o Google." : language === "de" ? "Ein Konto verwendet diese E-Mail-Adresse bereits. Nutze die bisherige Anmeldemethode; bei einem Google-Konto melde dich mit Google an." : language === "it" ? "Un account utilizza già questa email. Utilizzare il metodo di accesso esistente; se si tratta di un account Google, accedi con Google." : language === "fr" ? "Un compte utilise déjà cet e-mail. Utilise sa méthode de connexion existante ; s'il s'agit d'un compte Google, connecte-toi avec Google." : language === "ja" ? "このメールアドレスはすでに別のアカウントで使われています。そのアカウントのサインイン方法を使ってください。Googleアカウントの場合はGoogleでサインインしてください。" : "An account already uses this email. Use its existing sign-in method; if it is a Google account, sign in with Google."

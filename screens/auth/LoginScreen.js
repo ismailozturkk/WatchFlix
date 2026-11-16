@@ -66,6 +66,8 @@ import {
   signInWithApple,
 } from "../../services/appleAuthService";
 import useAppLogo from "@hooks/useAppLogo";
+import { requiresEmailVerification } from "../../utils/emailVerificationGate";
+import { getAuthEmailCopy } from "../../utils/authEmailCopy";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
@@ -200,6 +202,13 @@ export default function LoginScreen({ navigation }) {
       } else if (recentUsers.some((u) => u.email === userEmail)) {
         // Zaten kayıtlı bir hesapla girildi: en son giriş listenin başına geçsin
         await storeUser(userEmail);
+      }
+
+      // E-postası doğrulanmamış hesap: AuthContext gezgin yerine doğrulama ekranını
+      // çizer (utils/emailVerificationGate.js). TabScreen'e gitmeye çalışma.
+      if (requiresEmailVerification(userCredentials.user)) {
+        Toast.show({ type: "info", text1: getAuthEmailCopy(language).loginNeedsVerify });
+        return;
       }
 
       let userName = userCredentials.user.displayName || userEmail;

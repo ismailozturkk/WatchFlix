@@ -18,6 +18,7 @@ import {
   authEmailErrorMessage,
   fillAuthEmailText,
   sendVerificationEmail,
+  verificationCooldownLeft,
 } from "../services/authEmail";
 import { getAuthEmailCopy } from "../utils/authEmailCopy";
 import useCooldown from "./useCooldown";
@@ -30,6 +31,12 @@ export default function useEmailVerification(user, language) {
   const { remaining, start: startCooldown, active: cooling } = useCooldown();
   const copy = getAuthEmailCopy(language);
   const wasVerified = useRef(Boolean(user?.emailVerified));
+
+  // Başka ekranda (kayıt / doğrulama kapısı) az önce gönderildiyse bekleme sürsün.
+  useEffect(() => {
+    const left = verificationCooldownLeft(user?.uid, VERIFICATION_RESEND_COOLDOWN_S);
+    if (left > 0) startCooldown(left);
+  }, [user?.uid, startCooldown]);
 
   const refresh = useCallback(async () => {
     if (!user || user.emailVerified) return;

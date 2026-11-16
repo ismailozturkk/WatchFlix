@@ -21,7 +21,13 @@ const {
   onDocumentUpdated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
-const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { onCall: onCallBase, onRequest, HttpsError } = require("firebase-functions/v2/https");
+// Her callable App Check politikasını TEK yerden alır (functions/appCheckPolicy.js).
+const { APP_CHECK_ENFORCED } = require("./appCheckPolicy");
+const onCall = (options, handler) =>
+  typeof options === "function"
+    ? onCallBase({ enforceAppCheck: APP_CHECK_ENFORCED }, options)
+    : onCallBase({ ...options, enforceAppCheck: APP_CHECK_ENFORCED }, handler);
 const {
   resolveAiPlan,
   getAiPlanLimits,
@@ -29,6 +35,9 @@ const {
   buildAiQuota,
 } = require("./aiQuota");
 const aiProxy = require("./aiProxy");
+// E-posta doğrulama kapısı: doğrulanmamış e-posta+şifre hesabı callable kullanamaz.
+const { requireVerified } = require("./emailVerifiedGate");
+const unverifiedAccounts = require("./unverifiedAccounts");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -381,9 +390,7 @@ const PREMIUM_SYNC_MIN_INTERVAL_MS = 15 * 1000;
 exports.syncPremiumStatus = onCall(
   { ...CAPACITY.upstream, secrets: [REVENUECAT_SECRET_API_KEY] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Sign-in required");
-    }
+    requireVerified(request);
     const uid = request.auth.uid;
     const userRef = db.doc(`Users/${uid}`);
     const privateRef = db.doc(`Users/${uid}/private/entitlements`);
@@ -497,7 +504,7 @@ function profileSummary(snap) {
  * kazandığım ücretsiz aylar ve BEN davetle geldiysem ilk ay indirimim.
  */
 exports.getReferralOverview = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const uid = request.auth.uid;
   const userSnap = await db.doc(`Users/${uid}`).get();
   if (!userSnap.exists) throw new HttpsError("failed-precondition", "Profile required");
@@ -583,7 +590,7 @@ exports.getReferralOverview = onCall(CAPACITY.light, async (request) => {
  * Hepsi tek transaction'da: sayaç, kullanım kaydı ve plan birlikte yazılır.
  */
 exports.redeemCode = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const uid = request.auth.uid;
   const code = referral.normalizeCode(request.data?.code);
   if (!code) throw referralFailure(referral.REASONS.NOT_FOUND);
@@ -719,7 +726,7 @@ exports.redeemCode = onCall(CAPACITY.light, async (request) => {
 
 /** Birikmiş davet ödülünü (1 ay) başlatır. Mağaza aboneliği sürerken başlatılamaz. */
 exports.claimReferralReward = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const uid = request.auth.uid;
   const userRef = db.doc(`Users/${uid}`);
   const accountRef = db.doc(`ReferralAccounts/${uid}`);
@@ -838,6 +845,10 @@ exports.grantBetaOnUserCreated = onDocumentCreated(
   async (event) => {
     if (!betaAccess.isBetaActive()) return;
     try {
+      // Doğrulanmamış e-posta+şifre hesabı (kayıt anı) Max ALMAZ: rastgele e-postayla açılan
+      // toplu hesaplar abonelik kaydı üretmesin. Doğrulanınca saatlik süpürme verir.
+      const record = await getAuth().getUser(event.params.uid).catch(() => null);
+      if (!unverifiedAccounts.isAccountVerified(record)) return;
       await grantBetaAccess(event.params.uid, event.data?.get("entitlements"));
     } catch (error) {
       console.warn(`[grantBetaOnUserCreated] uid=${event.params.uid}:`, error?.message);
@@ -865,8 +876,19 @@ exports.applyBetaAccess = onSchedule(
         if (last) query = query.startAfter(last);
         const page = await query.get();
         if (page.empty) break;
-        for (const doc of page.docs) {
-          scanned += 1;
+        // Yalnız hakkı eksik olanlar için Auth'a sorulur (100'lük toplu okuma); doğrulanmamış
+        // hesaplar atlanır (bkz. unverifiedAccounts.js).
+        const needing = page.docs.filter((doc) =>
+          betaAccess.needsBetaGrant(doc.get("entitlements"), betaAccess.BETA_ACCESS, nowMs));
+        let verified = new Set();
+        try {
+          verified = await unverifiedAccounts.verifiedUidSet(getAuth(), needing.map((doc) => doc.id));
+        } catch (error) {
+          console.warn("[applyBetaAccess] Auth okunamadı:", error?.message);
+        }
+        scanned += page.docs.length;
+        for (const doc of needing) {
+          if (!verified.has(doc.id)) continue;
           try {
             if (await grantBetaAccess(doc.id, doc.get("entitlements"))) granted += 1;
           } catch (error) {
@@ -1012,6 +1034,68 @@ exports.purgeOnAuthUserDeleted = functionsV1
  * verir; boylece email hesabi once normal giris yapip Ayarlar'dan Google'i acikca
  * baglamadan Google credential Firebase'e hic gonderilmez.
  */
+/**
+ * Doğrulanmamış e-posta+şifre hesabını siler: önce Auth kaydı (e-posta hemen serbest kalır),
+ * sonra verisi (profil, kullanıcı adı…). purgeOnAuthUserDeleted da aynı temizliği yapar;
+ * işlem idempotent.
+ */
+async function releaseUnverifiedAccount(uid, reason) {
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      console.error(`[releaseUnverifiedAccount] uid=${uid} silinemedi:`, error?.code);
+      throw new HttpsError("unavailable", "Account check is temporarily unavailable");
+    }
+  }
+  try {
+    await purgeAccountData({ db, rtdb }, uid);
+  } catch (error) {
+    console.warn(`[releaseUnverifiedAccount] uid=${uid} veri temizliği (tetikleyici tekrar dener):`, error?.message);
+  }
+  console.log(`[releaseUnverifiedAccount] uid=${uid} neden=${reason}`);
+}
+
+/**
+ * Günde bir: STALE_UNVERIFIED_DAYS (3) günden eski, e-postası hiç doğrulanmamış
+ * e-posta+şifre hesaplarını siler. Kullanıcı adları ve e-posta adresleri serbest kalır; rastgele
+ * adreslerle toplu açılan hesaplar birikmez. Yönetici hesaplarına (siteAdmins) dokunulmaz.
+ * Tur başına en çok 300 silme (Auth silme kotası); kalanlar ertesi güne kalır.
+ */
+exports.cleanupUnverifiedAccounts = onSchedule(
+  {
+    ...CAPACITY.singleton,
+    schedule: "every day 04:30",
+    timeZone: "Etc/UTC",
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const nowMs = Date.now();
+    const MAX_DELETES = 300;
+    let pageToken;
+    let scanned = 0;
+    let deleted = 0;
+    do {
+      const page = await getAuth().listUsers(1000, pageToken);
+      pageToken = page.pageToken;
+      for (const record of page.users) {
+        scanned += 1;
+        if (deleted >= MAX_DELETES) break;
+        if (!unverifiedAccounts.isStaleUnverified(record, nowMs)) continue;
+        const admin = await db.doc(`siteAdmins/${record.uid}`).get();
+        if (admin.exists) continue;
+        try {
+          await releaseUnverifiedAccount(record.uid, "stale");
+          deleted += 1;
+        } catch (error) {
+          console.warn(`[cleanupUnverifiedAccounts] uid=${record.uid}:`, error?.message);
+        }
+      }
+    } while (pageToken && deleted < MAX_DELETES);
+    console.log(`[cleanupUnverifiedAccounts] ${deleted} silindi / ${scanned} hesap tarandı`);
+  },
+);
+
 exports.checkGoogleSignInEligibility = onCall(CAPACITY.light, async (request) => {
   const idToken = request.data?.idToken;
   if (typeof idToken !== "string" || idToken.length < 100 || idToken.length > 5000) {
@@ -1048,6 +1132,14 @@ exports.checkGoogleSignInEligibility = onCall(CAPACITY.light, async (request) =>
       console.error("Google eligibility Auth lookup failed", error?.code);
       throw new HttpsError("unavailable", "Account check is temporarily unavailable");
     }
+  }
+
+  // Aynı adreste doğrulanmamış e-posta+şifre hesabı: Google adresin sahipliğini kanıtladı.
+  // O hesap (başkasının açtığı "işgal" hesabı ya da sahibinin yarım bıraktığı kayıt) silinir,
+  // Google ile yeni hesap açılır. Aksi hâlde adresin gerçek sahibi kendi e-postasıyla giremezdi.
+  if (existingUser && unverifiedAccounts.isReplaceableUnverified(existingUser)) {
+    await releaseUnverifiedAccount(existingUser.uid, "Google");
+    existingUser = null;
   }
 
   if (
@@ -1091,6 +1183,14 @@ exports.checkAppleSignInEligibility = onCall(CAPACITY.light, async (request) => 
       console.error("Apple eligibility Auth lookup failed", error?.code);
       throw new HttpsError("unavailable", "Account check is temporarily unavailable");
     }
+  }
+
+  // Aynı adreste doğrulanmamış e-posta+şifre hesabı: Apple adresin sahipliğini kanıtladı.
+  // O hesap (başkasının açtığı "işgal" hesabı ya da sahibinin yarım bıraktığı kayıt) silinir,
+  // Apple ile yeni hesap açılır. Aksi hâlde adresin gerçek sahibi kendi e-postasıyla giremezdi.
+  if (existingUser && unverifiedAccounts.isReplaceableUnverified(existingUser)) {
+    await releaseUnverifiedAccount(existingUser.uid, "Apple");
+    existingUser = null;
   }
 
   if (
@@ -1147,7 +1247,7 @@ exports.revokeAppleAuthorization = onCall(
 const userSearchAllow = externalRatings.createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
 
 exports.searchUsers = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const term = userSearch.normalizeSearchTerm(request.data?.term);
   if (!term) return { users: [] };
   if (!userSearchAllow(request.auth.uid)) {
@@ -1160,7 +1260,17 @@ exports.searchUsers = onCall(CAPACITY.light, async (request) => {
     .where("usernameLower", "<=", `${term}${userSearch.PREFIX_END}`)
     .limit(userSearch.SEARCH_LIMIT + 1)
     .get();
-  return { users: userSearch.pickResults(snap.docs, request.auth.uid) };
+  // E-postası doğrulanmamış hesaplar aramada çıkmaz: kayıt anında yazdıkları profil
+  // (görünen ad, kullanıcı adı) spam vitrini olmasın. Auth okunamazsa güvenli tarafta kal.
+  let verified;
+  try {
+    verified = await unverifiedAccounts.verifiedUidSet(getAuth(), snap.docs.map((doc) => doc.id));
+  } catch (error) {
+    console.warn("[searchUsers] Auth okunamadı:", error?.message);
+    throw new HttpsError("unavailable", "Search is temporarily unavailable");
+  }
+  const docs = snap.docs.filter((doc) => verified.has(doc.id));
+  return { users: userSearch.pickResults(docs, request.auth.uid) };
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1224,7 +1334,7 @@ exports.siteBeacon = onRequest(CAPACITY.light, async (req, res) => {
 // yeniden kurma tek sorguya indirgenir.
 const boardRebuilds = new Map(); // boardId → Promise
 exports.getBoardSnapshot = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const boardId = request.data?.boardId;
   const source = publicBoards.boardSource(boardId);
   if (!source) throw new HttpsError("invalid-argument", "Unknown board");
@@ -1269,8 +1379,7 @@ exports.getBoardSnapshot = onCall(CAPACITY.light, async (request) => {
 // Hak YALNIZ kullanıcıya bir cevap ya da kendi içeriğinden doğan güvenlik
 // engeli döndüğünde harcanır; üst akış hatası ve boş model yanıtı iade edilir.
 //
-// App Check: Faz 0 Hafta 2'de Play Integrity kurulunca aşağıdaki
-// enforceAppCheck true yapılmalı (şimdilik false — istemcide App Check yok).
+// App Check: tek anahtar functions/appCheckPolicy.js (onCall sarmalayıcısı uygular).
 // ───────────────────────────────────────────────────────────────────────────
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
@@ -1374,13 +1483,9 @@ exports.callGemini = onCall(
     ...CAPACITY.upstream,
     secrets: [GEMINI_API_KEY],
     timeoutSeconds: 70,
-    // TODO(Faz 0 Hafta 2): App Check (Play Integrity) istemcide kurulunca aç.
-    enforceAppCheck: false,
   },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Sign-in required");
-    }
+    requireVerified(request);
     const uid = request.auth.uid;
 
     // ── Girdi doğrulama (geçersizse Gemini'ye ve kotaya hiç dokunmadan) ──
@@ -1481,9 +1586,9 @@ const omdbSeasonCache = externalRatings.createTtlCache({ ttlMs: 24 * 60 * 60 * 1
 const omdbAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 60 * 1000 });
 
 exports.getExternalRatings = onCall(
-  { ...CAPACITY.upstream, secrets: [OMDB_API_KEY], timeoutSeconds: 20, enforceAppCheck: false },
+  { ...CAPACITY.upstream, secrets: [OMDB_API_KEY], timeoutSeconds: 20 },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+    requireVerified(request);
     const req = externalRatings.validateRatingsRequest(request.data);
     if (!req.ok) throw new HttpsError("invalid-argument", req.reason);
     if (!omdbAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
@@ -2962,7 +3067,7 @@ const { normalizeIdentity } = require("./profileIdentity");
 const { SOURCE_IDS: LEAGUE_SOURCES, prevWeekId: leaguePrevWeek, weekIdOf: leagueWeekOf } = require("./leagueRules");
 
 exports.voteBetaFeature = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const { featureId, choice } = request.data || {};
   if (!betaFeatureVotes.isValidFeature(featureId) || !betaFeatureVotes.isValidChoice(choice)) {
     throw new HttpsError("invalid-argument", "Invalid beta vote");
@@ -2971,7 +3076,7 @@ exports.voteBetaFeature = onCall(CAPACITY.light, async (request) => {
 });
 
 exports.awardLeagueXp = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   const uid = request.auth.uid;
   const source = request.data?.source;
   const ref = request.data?.ref;
@@ -3040,7 +3145,7 @@ exports.matchNightly = onSchedule(
 // ek olarak örnek içi patlama freni.
 const matchHelloAllow = externalRatings.createRateLimiter({ limit: 20, windowMs: 60 * 1000 });
 exports.matchHello = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   if (!matchHelloAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
   return matchServer.sendHello(db, request.auth.uid, { cid: request.data?.cid }).catch(matchError);
 });
@@ -3050,7 +3155,7 @@ const pairScoreAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 
 // Kartın menüsü: gizle / engelle / şikâyet (opak kimlikle; adayın uid'si istemciye hiç gelmez).
 const matchActionAllow = externalRatings.createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
 exports.matchAction = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   if (!matchActionAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
   const { cid, action, reason } = request.data || {};
   return matchServer.matchAction(db, request.auth.uid, { cid, action, reason }).catch(matchError);
@@ -3059,14 +3164,14 @@ exports.matchAction = onCall(CAPACITY.light, async (request) => {
 // Çembere katıl: yeterli üye katılınca mevcut grup sohbeti kurulur, sonra katılan gruba eklenir.
 const matchCircleAllow = externalRatings.createRateLimiter({ limit: 10, windowMs: 60 * 1000 });
 exports.matchCircleJoin = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   if (!matchCircleAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
   const { lane, name } = request.data || {};
   return matchServer.joinCircle(db, request.auth.uid, { lane, name }).catch(matchError);
 });
 
 exports.getMatchPairScore = onCall(CAPACITY.light, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  requireVerified(request);
   if (!pairScoreAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
   return matchServer.pairScore(db, request.auth.uid, request.data?.friendUid).catch(matchError);
 });

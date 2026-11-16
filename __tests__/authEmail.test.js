@@ -146,3 +146,43 @@ describe("hata metinleri", () => {
     expect(texts).toEqual([copy.invalidEmail, copy.offline, copy.tooMany, copy.noSession, copy.generic]);
   });
 });
+
+describe("doğrulama e-postası — 16 Kas düzeltmeleri", () => {
+  const { markVerificationSent, verificationCooldownLeft } = require("../services/authEmail");
+
+  it("İtalyanca şablon İtalyanca gider (eskiden İngilizce'ye düşüyordu)", () => {
+    expect(authLanguageCode("it")).toBe("it");
+  });
+
+  it("oturumu geçersiz kılan hatalar NO_SESSION, kota dolumu TOO_MANY sayılır", () => {
+    for (const code of ["auth/user-token-expired", "auth/user-not-found", "auth/user-disabled", "auth/invalid-user-token"]) {
+      expect(classifyAuthEmailError(firebaseError(code))).toBe(AuthEmailCode.NO_SESSION);
+    }
+    expect(classifyAuthEmailError(firebaseError("auth/quota-exceeded"))).toBe(AuthEmailCode.TOO_MANY);
+  });
+
+  it("başarılı gönderim bekleme süresini ekranlar arası paylaşır", async () => {
+    const user = fakeUser({ uid: "cool-1" });
+    expect(verificationCooldownLeft("cool-1", 60)).toBe(0);
+    await sendVerificationEmail(user, { language: "tr", authInstance: mockAuth });
+    const left = verificationCooldownLeft("cool-1", 60);
+    expect(left).toBeGreaterThan(55);
+    expect(left).toBeLessThanOrEqual(60);
+  });
+
+  it("sınır hatası da beklemeyi başlatır; diğer hatalar başlatmaz", async () => {
+    mockSendVerify.mockRejectedValueOnce(firebaseError("auth/too-many-requests"));
+    await expect(sendVerificationEmail(fakeUser({ uid: "cool-2" }), { authInstance: mockAuth })).rejects.toMatchObject({ code: AuthEmailCode.TOO_MANY });
+    expect(verificationCooldownLeft("cool-2", 60)).toBeGreaterThan(0);
+
+    mockSendVerify.mockRejectedValueOnce(firebaseError("auth/network-request-failed"));
+    await expect(sendVerificationEmail(fakeUser({ uid: "cool-3" }), { authInstance: mockAuth })).rejects.toMatchObject({ code: AuthEmailCode.OFFLINE });
+    expect(verificationCooldownLeft("cool-3", 60)).toBe(0);
+  });
+
+  it("bekleme süresi zamanla biter", () => {
+    markVerificationSent("cool-4", 1_000_000);
+    expect(verificationCooldownLeft("cool-4", 60, 1_000_000 + 30_000)).toBe(30);
+    expect(verificationCooldownLeft("cool-4", 60, 1_000_000 + 61_000)).toBe(0);
+  });
+});

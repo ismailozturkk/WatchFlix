@@ -21,7 +21,7 @@ import { normalizeAppLanguage } from "../utils/appLanguages";
 import { fillAuthEmailText, getAuthEmailCopy } from "../utils/authEmailCopy";
 
 /** Uygulama dili → Firebase şablon dili. Brezilya Portekizcesi `pt-BR`. */
-const FIREBASE_LANGUAGE = Object.freeze({ tr: "tr", en: "en", es: "es", pt: "pt-BR", de: "de" , it: "en", fr: "fr", ja: "ja"});
+const FIREBASE_LANGUAGE = Object.freeze({ tr: "tr", en: "en", es: "es", pt: "pt-BR", de: "de", it: "it", fr: "fr", ja: "ja" });
 
 export const authLanguageCode = (language) => FIREBASE_LANGUAGE[normalizeAppLanguage(language)] || "en";
 
@@ -57,7 +57,16 @@ export function classifyAuthEmailError(error) {
     case "auth/network-request-failed":
       return AuthEmailCode.OFFLINE;
     case "auth/too-many-requests":
+    case "auth/quota-exceeded":
       return AuthEmailCode.TOO_MANY;
+    // Hesap silinmiş / devre dışı / oturum geçersiz: tekrar denemek işe yaramaz,
+    // yeniden giriş gerekir (doğrulama kapısı bu durumda oturumu kapatır).
+    case "auth/user-token-expired":
+    case "auth/invalid-user-token":
+    case "auth/user-not-found":
+    case "auth/user-disabled":
+    case "auth/no-current-user":
+      return AuthEmailCode.NO_SESSION;
     default:
       return AuthEmailCode.UNKNOWN;
   }
@@ -99,6 +108,23 @@ export async function sendResetEmail(email, { language = i18n.language, authInst
   return address;
 }
 
+// Son doğrulama e-postası (uid → ms). Kayıt ekranı gönderir, hemen ardından doğrulama
+// kapısı açılır: bekleme süresi ekranlar arasında paylaşılmazsa kullanıcı "tekrar gönder"e
+// basıp Firebase'in too-many-requests kilidine düşüyordu. Süreç içi yeterli.
+const lastVerificationSentAt = new Map();
+
+/** Bu uid için son gönderimden bu yana kalan bekleme (sn; 0 = gönderilebilir). */
+export function verificationCooldownLeft(uid, cooldownS, now = Date.now()) {
+  const at = uid ? lastVerificationSentAt.get(uid) : undefined;
+  if (!at) return 0;
+  return Math.max(0, Math.ceil((at + cooldownS * 1000 - now) / 1000));
+}
+
+/** Gönderim (ya da sınır hatası) anını kaydeder. */
+export function markVerificationSent(uid, now = Date.now()) {
+  if (uid) lastVerificationSentAt.set(uid, now);
+}
+
 /**
  * Doğrulama e-postası gönderir. Önce kullanıcıyı tazeler: bağlantıya başka cihazda
  * tıklanmışsa `emailVerified` bayattır ve gereksiz e-posta gitmesin.
@@ -113,8 +139,12 @@ export async function sendVerificationEmail(user = auth.currentUser, { language 
     authInstance.languageCode = authLanguageCode(language);
     await sendEmailVerification(user);
   } catch (error) {
-    throw wrap(error);
+    const wrapped = wrap(error);
+    // Sınır aşıldıysa da bekleme başlasın: düğme hemen tekrar basılmasın.
+    if (wrapped.code === AuthEmailCode.TOO_MANY) markVerificationSent(user.uid);
+    throw wrapped;
   }
+  markVerificationSent(user.uid);
   return { sent: true, alreadyVerified: false };
 }
 

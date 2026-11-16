@@ -43,4 +43,10 @@ window.SITE_CONFIG = {
     appId: "1:427087836931:web:dbfa3ca10b4d725fe91b36",
     // measurementId kaldırıldı (6 Kas): sitede Analytics yok, kullanılmıyordu.
   },
+  // App Check (reCAPTCHA Enterprise) site anahtarı. BOŞ = App Check kapalı (bugünkü davranış).
+  // Firestore/Auth'ta App Check ZORUNLU yapılmadan ÖNCE doldurulmalı; yoksa bekleme listesi
+  // formu ve /admin paneli reddedilir. Anahtar: Google Cloud → reCAPTCHA → "Web sitesi" anahtarı
+  // (alan adları: seelogd.com, movieandtv-2832a.web.app, movieandtv-2832a.firebaseapp.com),
+  // sonra Firebase Console → App Check → Seelogd (web) → reCAPTCHA Enterprise'a aynı anahtar.
+  appCheckSiteKey: "",
 };
