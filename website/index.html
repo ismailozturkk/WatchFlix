@@ -63,6 +63,22 @@
            "Beta" → betaTesters + aynı e-posta waitlist'e de yazılır (yayın günü haber alır).
            Uzun bilgilendirme metinleri "Ayrıntılar" altında açılır. home.js → setupJoin / setupForm / setupBeta.
            #beta çapası eski bağlantılar (Instagram bio: seelogd.com/#beta) için: beta sekmesini açar. -->
+      <!-- Tahmini çıkış geri sayımı: site-config.js launchDate (home.js → renderCountdown). Tarih yoksa,
+           geçtiyse ya da mağaza bağlantısı varsa gizli kalır; "tahmini" notu bilinçli (tarih kayabilir). -->
+      <div class="countdown" id="countdown" hidden>
+        <div class="cd-head">
+          <span class="cd-label"><span class="dot" aria-hidden="true"></span><span data-i18n="cdLabel">Estimated launch</span></span>
+          <span class="cd-date" id="cdDate"></span>
+        </div>
+        <div class="cd-grid" role="timer" aria-live="off" data-i18n-aria="cdAria" aria-label="Time left until the estimated launch">
+          <div class="cd-cell"><b id="cdD">0</b><small data-i18n="cdDays">days</small></div>
+          <div class="cd-cell"><b id="cdH">00</b><small data-i18n="cdHours">hours</small></div>
+          <div class="cd-cell"><b id="cdM">00</b><small data-i18n="cdMins">min</small></div>
+          <div class="cd-cell"><b id="cdS">00</b><small data-i18n="cdSecs">sec</small></div>
+        </div>
+        <p class="cd-note" data-i18n="cdNote">Estimated date: it could land a little earlier or a little later.</p>
+      </div>
+
       <span id="beta" class="anchor" aria-hidden="true"></span>
       <div class="notify join" id="notify" data-mode="notify">
         <div class="join-head">

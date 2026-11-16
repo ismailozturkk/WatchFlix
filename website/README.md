@@ -58,9 +58,10 @@ stores: {
 - **Resmî rozetler:** şu an düğmeler özel çizimdir (Apple/Google logoları + metin). Apple ve Google marka
   kuralları yayın günü resmî "Download on the App Store" / "Get it on Google Play" rozetlerini ister;
   `index.html`'deki iki `.store` bloğunun (hero + son çağrı) yerine resmî görselleri koy.
-- `launchDate` (isteğe bağlı): ISO biçiminde (`2026-11-20T10:00:00+03:00`) yazılırsa hap "… tarihinde
-  yayında" der; `null` ise "Yakında". **Geri sayım sayacı kaldırıldı:** geçmiş tarihte sıfırlanmış sayaç
-  ve "YAYINDA!" yazısı yanıltıcıydı (uygulama mağazada değilken).
+- `launchDate` (isteğe bağlı, şu an `2027-01-01T00:00:00+03:00`): ISO biçiminde yazılırsa hero'da
+  **"Tahmini çıkış" geri sayımı** çıkar (gün/saat/dk/sn + "biraz önce ya da sonra olabilir" notu; tarih
+  İstanbul saatiyle yazılır). Tarih geçince, mağaza bağlantısı girilince ya da `null` iken sayaç gizlenir —
+  geçmiş tarihte "YAYINDA!" diyen eski sayacın hatası tekrarlanmaz. Metinler home-i18n.js `cd*`.
 
 ## Görsel bölümler (6 Kas 2026)
 

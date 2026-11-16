@@ -147,20 +147,52 @@
     return isNaN(d.getTime()) ? null : d;
   }
 
+  /* Tahmini çıkış geri sayımı (launchDate). Tarih kesin DEĞİL — kart bunu açıkça söyler. Gösterilmez:
+     tarih yoksa, geçtiyse (eski sayaç geçmiş tarihte "YAYINDA" diyordu) ya da mağaza bağlantısı varsa.
+     Tarih İstanbul saatiyle yazılır: 1 Ocak 00:00 (+03) başka saat diliminde "31 Aralık"a kaymasın. */
+  var cdTimer = null;
+  var pad2 = function (n) { return n < 10 ? "0" + n : String(n); };
+
+  function tickCountdown() {
+    var target = launchTarget();
+    var left = target ? target.getTime() - Date.now() : 0;
+    if (left <= 0) { renderCountdown(storeInfo()); return; }
+    var s = Math.floor(left / 1000);
+    var set = function (id, value) { var el = $(id); if (el && el.textContent !== value) el.textContent = value; };
+    set("#cdD", new Intl.NumberFormat(LOCALES[lang]).format(Math.floor(s / 86400)));
+    set("#cdH", pad2(Math.floor(s / 3600) % 24));
+    set("#cdM", pad2(Math.floor(s / 60) % 60));
+    set("#cdS", pad2(s % 60));
+  }
+
+  function renderCountdown(info) {
+    var box = $("#countdown");
+    if (!box) return;
+    var target = launchTarget();
+    var show = !!target && !info.any && target.getTime() > Date.now();
+    box.hidden = !show;
+    if (!show) {
+      if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+      return;
+    }
+    var dateEl = $("#cdDate");
+    if (dateEl) {
+      dateEl.textContent = new Intl.DateTimeFormat(LOCALES[lang], {
+        day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Istanbul",
+      }).format(target);
+    }
+    tickCountdown();
+    if (!cdTimer) cdTimer = setInterval(tickCountdown, 1000);
+  }
+
   /* Hero hapı, üst çubuk düğmesi ve son çağrı metni duruma göre çizilir. */
   function applyState() {
     var info = storeInfo();
     document.body.classList.toggle("is-live", info.all);
 
     var pill = $("#pillText");
-    var target = launchTarget();
-    if (pill) {
-      if (info.any) pill.textContent = t("pillLive");
-      else if (target && target.getTime() > Date.now()) {
-        var date = new Intl.DateTimeFormat(LOCALES[lang], { day: "numeric", month: "long", year: "numeric" }).format(target);
-        pill.textContent = fmt(t("pillDate"), { date: date });
-      } else pill.textContent = t("pillSoon");
-    }
+    if (pill) pill.textContent = info.any ? t("pillLive") : t("pillSoon");
+    renderCountdown(info);
 
     var cta = $("#navCta");
     if (cta) {
