@@ -46,6 +46,8 @@ import { ThemeProvider } from "./context/ThemeContext";
 import LoginScreen from "./screens/auth/LoginScreen";
 import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
 import EmailVerificationScreen from "./screens/auth/EmailVerificationScreen";
+import ForceUpdateScreen from "./screens/ForceUpdateScreen";
+import useForceUpdate from "./hooks/useForceUpdate";
 import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import WeatherLayer from "./components/decor/WeatherLayer";
 import { useTheme } from "./context/ThemeContext";
@@ -289,6 +291,9 @@ function AppContent() {
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
   const [swipeViewReady, setSwipeViewReady] = useState(false);
   const { user, initialRoute, loading, needsProfileCompletion, pendingVerificationUser } = useAuth();
+  // Zorunlu güncelleme: yüklü sürüm AppConfig/minVersion'dan eskiyse her şeyin yerine
+  // ForceUpdateScreen (utils/forceUpdate.js). Okunamazsa engel yok.
+  const forceUpdate = useForceUpdate();
 
   useEffect(() => {
     // Profil tamamlanmadan Lists/{uid} YAZMA. Google kullanıcısı tamamlama
@@ -384,7 +389,13 @@ function AppContent() {
     >
       {/* E-POSTA DOĞRULAMA KAPISI: doğrulanmamış e-posta+şifre hesabı gezgine hiç
           girmez (utils/emailVerificationGate.js). Toast/uyarı host'ları aşağıda kalır. */}
-      {pendingVerificationUser ? (
+      {forceUpdate.required ? (
+        <ForceUpdateScreen
+          current={forceUpdate.current}
+          minimum={forceUpdate.minimum}
+          links={forceUpdate.links}
+        />
+      ) : pendingVerificationUser ? (
         <EmailVerificationScreen />
       ) : (
       <Stack.Navigator
