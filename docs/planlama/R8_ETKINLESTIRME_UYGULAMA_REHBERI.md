@@ -154,6 +154,12 @@ paketlerdeki `r8.json` dosyasından okur. RN 8.12.**0**'ı sabitliyor (en son ya
 yüzdeleri yine "-" gösterebilir. Bu, Aşama 7'de ölçülerek netleşecek; çözümü bu rehberin kapsamı dışında
 (Expo SDK yükseltmesi) ve kullanıcıya raporlanır.
 
+**17 Kas ölçüm + çözüm:** 1.5.3 (9, AGP 8.12.0) Play'de karartma %81 (mapping.txt tahmini), optimizasyon ve
+küçültme "-" çıktı → belirsizlik doğrulandı. `plugins/withAndroidR8.js` artık kök `build.gradle`'da AGP'yi
+**8.12.3**'e (8.12'nin en son yaması) sabitliyor; Gradle `8.12.0 -> 8.12.3` çözüyor, R8 8.12.14 → 8.12.22. Yerel
+`bundleRelease` başarılı; AAB'de `app-metadata.properties` `androidGradlePluginVersion=8.12.3`, `r8.json`
+istatistikleri ≈%62/%62/%62. Play sonucu bir sonraki yüklemede görülecek. RN yükseltmesinde `AGP_VERSION` güncellenmeli.
+
 ### 2.4 Kütüphane taraması (R8 neyi silebilir?)
 
 Tüketici kuralı (consumer ProGuard) **olan**: react-native çekirdeği, expo-modules-core, expo-notifications,

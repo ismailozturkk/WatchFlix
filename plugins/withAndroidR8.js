@@ -11,13 +11,24 @@
 //   3. app/proguard-rules.pro: native/android-r8/keep-rules.pro içeriğini işaretli
 //      blok olarak ekler,
 //   4. res/raw/seelogd_keep.xml: adıyla okunan kaynakları (Play Billing kayıt
-//      dosyaları) kaynak küçültmeye karşı korur.
+//      dosyaları) kaynak küçültmeye karşı korur,
+//   5. kök build.gradle: AGP'yi küçük sürümün EN SON yamasına sabitler. Play,
+//      optimizasyon/küçültme yüzdelerini r8.json'dan yalnız "AGP 8.10+ en son yama"
+//      ile derlenen paketlerde okur; RN 0.86.3 8.12.0 getiriyor → 1.5.3'te bu iki
+//      alan "-" çıktı (karartma mapping.txt tahminiyle %81). Gradle en yüksek
+//      sürümü seçtiği için açık sürüm RN eklentisinin 8.12.0'ını geçersiz kılar.
 //
-// Seçenekler (kademeli açmak için): { optimize = true, optimizedResourceShrinking = true }.
+// Seçenekler (kademeli açmak için): { optimize = true, optimizedResourceShrinking = true,
+// agpVersion = AGP_VERSION } — agpVersion: null bu adımı atlar.
 // Not: bir seçenek kapatılınca önceki prebuild'den kalan gradle.properties satırı
 // silinmez (prebuild --clean kullanılmıyor); EAS her derlemede android/'i sıfırdan üretir.
 
-const { withAppBuildGradle, withGradleProperties, withDangerousMod } = require("expo/config-plugins");
+const {
+  withAppBuildGradle,
+  withProjectBuildGradle,
+  withGradleProperties,
+  withDangerousMod,
+} = require("expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
 
@@ -31,6 +42,20 @@ const NEW_DEFAULT = 'getDefaultProguardFile("proguard-android-optimize.txt")';
 // Aynı yığında (Expo 57 / RN 0.86 / AGP 8.12) ilk R8 çalıştırması şablonun
 // 2 GB / 512 MB değerleriyle Metaspace OOM verdiği raporlandı.
 const JVM_ARGS = "-Xmx4g -XX:MaxMetaspaceSize=1g";
+// AGP 8.12 serisinin en son yaması (dl.google.com maven-metadata, 17 Kas 2026).
+// RN yükseltmesiyle AGP küçük sürümü değişirse bunu da güncelle ya da kaldır.
+const AGP_VERSION = "8.12.3";
+const AGP_CLASSPATH = /classpath\(\s*['"]com\.android\.tools\.build:gradle(?::[^'"]*)?['"]\s*\)/;
+
+// Kök build.gradle: sürümsüz AGP classpath'ine açık sürüm yazar (idempotent).
+function pinAgpVersion(contents, version) {
+  if (!AGP_CLASSPATH.test(contents)) {
+    throw new Error(
+      "withAndroidR8: kök build.gradle içinde com.android.tools.build:gradle classpath'i bulunamadı — Expo şablonu değişmiş, plugin güncellenmeli.",
+    );
+  }
+  return contents.replace(AGP_CLASSPATH, `classpath('com.android.tools.build:gradle:${version}')`);
+}
 
 // gradle.properties: varsa değeri değiştirir, yoksa ekler (idempotent).
 function setGradleProperty(props, key, value) {
@@ -62,7 +87,16 @@ function mergeKeepRules(contents, rules) {
   return `${contents.trimEnd()}\n\n${block}\n`;
 }
 
-function withAndroidR8(config, { optimize = true, optimizedResourceShrinking = true } = {}) {
+function withAndroidR8(
+  config,
+  { optimize = true, optimizedResourceShrinking = true, agpVersion = AGP_VERSION } = {},
+) {
+  if (agpVersion) {
+    config = withProjectBuildGradle(config, (c) => {
+      c.modResults.contents = pinAgpVersion(c.modResults.contents, agpVersion);
+      return c;
+    });
+  }
   config = withGradleProperties(config, (c) => {
     setGradleProperty(c.modResults, "org.gradle.jvmargs", JVM_ARGS);
     if (optimizedResourceShrinking) {
@@ -94,6 +128,8 @@ module.exports = withAndroidR8;
 module.exports.setGradleProperty = setGradleProperty;
 module.exports.swapDefaultProguardFile = swapDefaultProguardFile;
 module.exports.mergeKeepRules = mergeKeepRules;
+module.exports.pinAgpVersion = pinAgpVersion;
+module.exports.AGP_VERSION = AGP_VERSION;
 module.exports.RULES_SRC = RULES_SRC;
 module.exports.KEEP_RES_SRC = KEEP_RES_SRC;
 module.exports.BEGIN = BEGIN;

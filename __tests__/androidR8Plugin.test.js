@@ -12,6 +12,8 @@ const {
   setGradleProperty,
   swapDefaultProguardFile,
   mergeKeepRules,
+  pinAgpVersion,
+  AGP_VERSION,
   RULES_SRC,
   KEEP_RES_SRC,
   BEGIN,
@@ -41,6 +43,34 @@ describe("swapDefaultProguardFile", () => {
 
   test("çapa yoksa sessiz geçmez, hata fırlatır", () => {
     expect(() => swapDefaultProguardFile("release { }")).toThrow(/withAndroidR8/);
+  });
+});
+
+describe("pinAgpVersion", () => {
+  const root = [
+    "dependencies {",
+    "    classpath('com.android.tools.build:gradle')",
+    "    classpath('com.facebook.react:react-native-gradle-plugin')",
+    "}",
+  ].join("\n");
+
+  test("sürümsüz AGP classpath'ine en son yamayı yazar, diğerlerine dokunmaz", () => {
+    const out = pinAgpVersion(root, AGP_VERSION);
+    expect(out).toContain(`classpath('com.android.tools.build:gradle:${AGP_VERSION}')`);
+    expect(out).toContain("classpath('com.facebook.react:react-native-gradle-plugin')");
+  });
+
+  test("ikinci kez uygulanınca değişmez", () => {
+    const once = pinAgpVersion(root, AGP_VERSION);
+    expect(pinAgpVersion(once, AGP_VERSION)).toBe(once);
+  });
+
+  test("Play r8.json'u yalnız yamalı sürümde okur: .0 yaması olamaz", () => {
+    expect(AGP_VERSION).toMatch(/^8\.\d+\.[1-9]\d*$/);
+  });
+
+  test("çapa yoksa sessiz geçmez, hata fırlatır", () => {
+    expect(() => pinAgpVersion("dependencies { }", AGP_VERSION)).toThrow(/withAndroidR8/);
   });
 });
 
