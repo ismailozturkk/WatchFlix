@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kaynak küçültmenin silmemesi gereken, koddan değil ADIYLA okunan kaynaklar.
+  plugins/withAndroidR8.js bu dosyayı android/app/src/main/res/raw/ altına kopyalar.
+
+  Play Billing 8.x (RevenueCat üzerinden) "Phenotype" kayıt dosyaları: Kademe A'da
+  korunuyordu, AGP 8.12 optimize kaynak küçültmesi (android.r8.optimizedResourceShrinking)
+  bunları siliyor. Google Play Hizmetleri bu tür dosyaları başka süreçten kaynak adıyla
+  okuyabildiği için küçültücü kullanımı göremez; satın alma gelir açısından kritik ve
+  emülatörde doğrulanamıyor → bilinçli olarak korunuyor (maliyeti birkaç KB).
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/com_android_billingclient_heterodyne_info,@raw/com_android_billingclient_registration_info" />

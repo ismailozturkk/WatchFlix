@@ -118,7 +118,10 @@
         {
           "url": "https://de.sentry.io/",
           "project": "react-native",
-          "organization": "seelogd"
+          "organization": "seelogd",
+          "experimental_android": {
+            "enableAndroidGradlePlugin": true
+          }
         }
       ],
       "./plugins/withAndroidWidgets.js",
@@ -196,7 +199,17 @@
           },
           "androidIntentFilters": ["text/*"]
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/withAndroidR8.js"
     ],
     "owner": "smlztrk",
     "updates": {
